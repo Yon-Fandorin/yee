@@ -18,6 +18,7 @@ PATCH_FILES=(
   "$SCRIPT_DIR/patches/0011-align-floating-tab-sidebar-hit-region.patch"
   "$SCRIPT_DIR/patches/0012-sync-floating-tab-sidebar-foreground-opacity.patch"
   "$SCRIPT_DIR/patches/0013-match-pilot-tabs-and-location-bar.patch"
+  "$SCRIPT_DIR/patches/0014-fix-windows-protoc-python-aliases.patch"
 )
 
 if [[ -z "$CHROMIUM_SRC" ]]; then

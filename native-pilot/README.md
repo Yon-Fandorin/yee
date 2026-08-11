@@ -10,9 +10,20 @@ fast checkpoint independent of the source build. It does not use Electron, CEF,
 
 ## Run
 
+macOS:
+
 ```sh
 ./native-pilot/launch.sh
 ```
+
+Windows PowerShell:
+
+```powershell
+.\native-pilot\launch.ps1
+```
+
+The Windows launcher uses `%ProgramFiles%\Google\Chrome\Application\chrome.exe`
+by default. Set `YEE_CHROME_BINARY` when Chrome is installed elsewhere.
 
 The launcher creates an isolated browser profile in
 `native-pilot/runtime/profile`, enables Chromium's native vertical-tabs feature,
@@ -36,6 +47,8 @@ immediately visible. To open a different set of initial pages:
 - The visual shell can start from the Arc/Aside-influenced mint direction
   without committing the product to Electron.
 
-The custom Tenant/Workspace launcher shelf is not injected into Chrome by this
-harness. That requires an in-tree Chromium Views/WebUI change and is the next
-source-integration layer.
+The installed-Chrome harness still does not inject the custom shell controls.
+The source-built Yee overlay carries the first native Views scaffold: leading
+Tenant/Workspace identity, real omnibox, real vertical tabs, rounded content
+surface, and a trailing Agent findings status. Use `chromium-dev/run.ps1` to
+inspect it after building Chromium.

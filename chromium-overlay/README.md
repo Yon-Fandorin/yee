@@ -7,8 +7,16 @@ observes `TabStripModel` and renders real `WebContents` tabs.
 
 ## Apply to a Chromium checkout
 
+macOS:
+
 ```sh
 ./chromium-overlay/apply.sh /absolute/path/to/chromium/src
+```
+
+Windows PowerShell:
+
+```powershell
+.\chromium-overlay\apply.ps1 -ChromiumSrc F:\chromium\src
 ```
 
 The script checks each patch before applying it, skips patches that are already
@@ -23,12 +31,13 @@ present, and refuses mismatched target files. The overlay currently changes:
 - 실제 `ToolbarView`를 재배치한 sidebar toggle, navigation, Omnibox, extension dock
 - 버튼으로 고정/해제되고 왼쪽 끝에서 flyout되는 native Tab sidebar
 - 파일럿 토큰을 1차 이식한 42px 2줄 탭과 36px 글라스 주소창
+- Windows proto wrappers so Store app aliases cannot shadow depot_tools Python
 
-The brand asset installer crops the presentation whitespace from
-`assets/brand/yee-logo-v8c-dino-nubs.png`, generates the macOS iconset/ICNS, and
-updates Chromium's bundled product-logo sizes. It uses the macOS-native `sips`
-tool and Chromium's own lightweight ICNS packer, so the output is reproducible
-without committing generated Chromium binaries.
+The brand asset installers crop the presentation whitespace from
+`assets/brand/yee-logo-v8c-dino-nubs.png`. macOS generates an ICNS with `sips`
+and Chromium's lightweight ICNS packer. Windows uses `System.Drawing` to
+generate the multi-resolution `chromium.ico` and bundled product-logo PNGs.
+Generated Chromium assets stay in the local checkout rather than this repo.
 
 The scaffold is intentionally structural: 64px titlebar, 232px sidebar, and an
 8px gutter. The first product slot shows a two-line tenant/workspace Context
@@ -95,9 +104,20 @@ Normal launches stay pinned to `Ready`;
 `--yee-agent-status-demo` explicitly cycles the states for visual review, and
 `--yee-agent-status=<ready|working|needs-input>` pins one state.
 
+Use a non-mutating compatibility check before updating Chromium:
+
+```powershell
+.\chromium-overlay\apply.ps1 -ChromiumSrc F:\chromium\src -CheckOnly
+```
+
+The identity and Agent Status elements are UI contracts, not fake integrations.
+The Omnibox remains Chromium's real location bar and the tab list remains backed
+by `TabStripModel`/`WebContents`. Dynamic tenant switching and a live agent
+runtime still need product-service integration.
+
 ## Build configuration
 
-After applying the patch from the Chromium `src` directory:
+After applying the patch from the Chromium `src` directory on macOS:
 
 ```sh
 gn gen out/YeePilot --args="$(tr '\n' ' ' < /path/to/yee/chromium-overlay/args.gn)"
@@ -111,3 +131,8 @@ The generated checkout and build are placed in Git-ignored `.local-build/`, not
 in repository history. [`../chromium-dev/`](../chromium-dev/) wraps Chromium's
 official `depot_tools`, shallow fetch, GN, and Ninja flow with disk guards and a
 headless renderer smoke test.
+
+On Windows, Chromium intentionally keeps the development executable filename
+`chrome.exe`; its embedded product metadata, icon, and installer display name
+are branded as Yee. Build and run it through the PowerShell commands documented
+in [`../chromium-dev/README.md`](../chromium-dev/README.md).

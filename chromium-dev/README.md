@@ -4,7 +4,124 @@ This directory manages a real local Chromium checkout without committing its
 source or build artifacts to `yee`. Generated data lives under
 `yee/.local-build/`, which is Git-ignored.
 
-## One-time setup
+Both macOS (`.sh`) and Windows (`.ps1`) entry points use the same overlay and
+compact `out/YeePilot` configuration. Do not share one `depot_tools` directory
+between Windows and WSL/Linux because depot_tools keeps platform-specific state.
+
+## Windows prerequisites
+
+The current Chromium checkout requires:
+
+- 64-bit Windows 10 or newer on an NTFS volume
+- Visual Studio 2026 with **Desktop development with C++** and MFC/ATL
+- Windows 11 SDK 10.0.28000.2270 or newer (including Debugging Tools)
+- Git for Windows
+
+`doctor.ps1` validates these without changing the machine. SDK and Visual Studio
+may live on `C:` while source, depot_tools, and build output live on a roomier
+drive such as `F:`.
+
+## Windows one-time setup
+
+From the repository root in PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\chromium-dev\doctor.ps1
+.\chromium-dev\checkout.ps1
+.\chromium-dev\configure.ps1
+.\chromium-dev\build.ps1
+.\chromium-dev\smoke-test.ps1
+```
+
+Generated data defaults to `.local-build`. To reuse or place it elsewhere,
+define `YEE_LOCAL_BUILD_ROOT` before running any command:
+
+```powershell
+$env:YEE_LOCAL_BUILD_ROOT = 'F:\yee'
+.\chromium-dev\doctor.ps1
+```
+
+That layout resolves to `F:\yee\depot_tools`, `F:\yee\chromium\src`, and
+`F:\yee\chromium\src\out\YeePilot`. Advanced users can override only
+`YEE_DEPOT_TOOLS_DIR` or `YEE_CHROMIUM_ROOT` instead.
+
+If a compatible output tree already exists, reuse it instead of retaining a
+second Chromium build:
+
+```powershell
+$env:YEE_LOCAL_BUILD_ROOT = 'F:\yee'
+$env:YEE_OUT_NAME = 'Default'
+.\chromium-dev\configure.ps1
+.\chromium-dev\build.ps1
+```
+
+## Windows daily use
+
+```powershell
+.\chromium-dev\sync.ps1
+.\chromium-dev\configure.ps1
+.\chromium-dev\build.ps1
+.\chromium-dev\smoke-test.ps1
+.\chromium-dev\run.ps1
+.\chromium-dev\usage.ps1
+```
+
+`sync.ps1` runs `gclient sync` for the commit currently checked out in
+Chromium; it does not advance `src` to a newer `origin/main`. Updating Chromium
+source while the Yee overlay is present needs an explicit clean/rebase/reapply
+workflow so local patched files are never discarded implicitly. Keep source
+updates separate, then rerun `configure.ps1` to check and apply the overlay.
+
+`usage.ps1` recursively scans the large checkout and can take over a minute. It
+is intentionally separate from `build.ps1` so a successful build reports
+completion immediately.
+
+Set the number of local build jobs for the current shell when needed:
+
+```powershell
+$env:YEE_BUILD_JOBS = '4'
+.\chromium-dev\build.ps1
+```
+
+`doctor.ps1` recommends a machine-local job count capped at the number of
+physical CPU cores and one job per 8 GiB of installed RAM. This conservative
+limit was selected after six jobs left less than 2 GiB available on the pilot's
+32 GiB Windows workstation; four jobs kept useful headroom. Record RAM, output
+drive space, Siso working set, and completed work every 30 seconds while a build
+is active with:
+
+```powershell
+.\chromium-dev\record-build-memory.ps1
+```
+
+Records are stored under the Git-ignored `.local-exclude/build-memory/` directory in
+this repository. `machine.json` keeps the stable machine recommendation and
+`build-memory.jsonl` keeps append-only session samples. Override the log path
+with `YEE_BUILD_MEMORY_LOG` when needed.
+
+The pilot does not yet have a distinct Windows install identity. Its installer
+would share Chromium's install paths, AppID, and ProgID, so it can conflict with
+an existing Chromium installation. For isolated installer development only,
+acknowledge that limitation explicitly:
+
+```powershell
+.\chromium-dev\build.ps1 -Target mini_installer -AllowSharedChromiumInstallIdentity
+```
+
+The development browser remains `out\YeePilot\chrome.exe`, as expected by
+Chromium's runtime layout. Its embedded product name and icon are Yee. The
+installer target remains `mini_installer.exe` but installs the Yee display name.
+Do not distribute it until the install-mode identity is separated.
+
+`run.ps1` also supports a previously built unbranded Chromium binary as a fast
+native checkpoint. It seeds an isolated profile with the pilot's 232px vertical
+tabs preference and enables Chromium's native vertical-tabs features at
+runtime. This reuses the real browser and tab model immediately, but it does not
+retrofit Yee's embedded product name or executable icon; those still require a
+successful source build.
+
+## macOS one-time setup
 
 ```sh
 ./chromium-dev/doctor.sh
@@ -35,7 +152,7 @@ Xcode.
 requires 45 GiB and `build.sh` requires 35 GiB. These guards leave room for
 macOS and prevent a nearly-full volume from failing late in the workflow.
 
-## Daily use
+## macOS daily use
 
 ```sh
 ./chromium-dev/sync.sh

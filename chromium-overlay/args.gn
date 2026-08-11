@@ -3,5 +3,7 @@ is_debug = false
 # binaries than a component build. Keep one compact output tree for the pilot.
 is_component_build = false
 symbol_level = 0
+# Keep the two largest language runtimes from retaining separate debug symbols.
+blink_symbol_level = 0
+v8_symbol_level = 0
 is_official_build = false
-use_lld = false

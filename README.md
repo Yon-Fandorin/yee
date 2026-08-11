@@ -39,6 +39,22 @@ Chromium 소스, `depot_tools`, 빌드 산출물은 모두 Git에서 제외된
 ./chromium-dev/smoke-test.sh
 ```
 
+Windows uses equivalent PowerShell entry points:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\chromium-dev\doctor.ps1
+.\chromium-dev\checkout.ps1
+.\chromium-dev\configure.ps1
+.\chromium-dev\build.ps1
+.\chromium-dev\smoke-test.ps1
+```
+
+SDK and Visual Studio can remain on `C:` while checkout/build data is redirected
+to another drive with `YEE_LOCAL_BUILD_ROOT`. See
+[`chromium-dev/README.md`](chromium-dev/README.md) for the supported Windows
+layout and installer target.
+
 전체 Git 이력과 별도 Git cache를 받지 않으며, 디버그 심볼을 만들지 않고
 `out/YeePilot` 하나만 유지한다. 상세한 용량 정책과 일상 명령은
 [`chromium-dev/README.md`](chromium-dev/README.md)에 있다.
