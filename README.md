@@ -1,0 +1,91 @@
+# yee
+
+Chromium을 기반으로 사용자와 에이전트가 함께 사용하는 브라우저를 탐색하는
+pilot 프로젝트다. 현재 목표는 실제 Chromium 탭 모델을 유지하면서, 사용자에게는
+Arc/Aside 계열의 조용한 sidebar-first 셸을 제공하고 에이전트에는 브라우저 내부
+상태로 이어지는 명확한 통합 경계를 만드는 것이다.
+
+## Native Chromium checkpoint
+
+[`native-pilot/`](native-pilot/)은 설치된 현재 Chrome의 Chromium 런타임과 native
+vertical tabs를 격리 프로필로 실행하는 가장 작은 실제 브라우저 체크포인트다.
+Electron, CEF, `<webview>`를 사용하지 않으며 탭과 페이지는 실제
+`TabStripModel`/`WebContents` 상태다.
+
+```sh
+./native-pilot/launch.sh
+```
+
+설치된 바이너리를 사용하는 이 체크포인트와 별도로,
+[`chromium-dev/`](chromium-dev/)가 얕은 Chromium 체크아웃과 단일 compact Release
+빌드 환경을 관리한다. 커스텀 Tenant/Workspace Launcher는 Chromium Views/WebUI
+소스 통합에서 추가한다.
+
+[`chromium-overlay/`](chromium-overlay/)에는 동일한 native vertical-tab 기본값을
+upstream Chromium checkout에 적용하는 최소 source patch와 GN 설정을 둔다.
+
+## Local Chromium build
+
+Chromium 소스, `depot_tools`, 빌드 산출물은 모두 Git에서 제외된
+`.local-build/`에 생성한다.
+
+```sh
+./chromium-dev/doctor.sh
+./chromium-dev/checkout.sh
+./chromium-dev/configure.sh
+./chromium-dev/build.sh
+./chromium-dev/smoke-test.sh
+```
+
+전체 Git 이력과 별도 Git cache를 받지 않으며, 디버그 심볼을 만들지 않고
+`out/YeePilot` 하나만 유지한다. 상세한 용량 정책과 일상 명령은
+[`chromium-dev/README.md`](chromium-dev/README.md)에 있다.
+
+현재 첫 산출물은 Chromium 소스와 분리된 브라우저 셸 프로토타입이다. 가장 작은
+단위인 Title bar와 Tab sidebar부터 검증한 뒤 Chromium Views/WebUI 경계를
+결정한다. 프로토타입의 웹페이지는 레이아웃 검증을 위한 샘플이며, 실제
+`WebContents` 연결은 아직 포함하지 않는다.
+
+## Browser shell prototype
+
+별도 빌드 없이 저장소 루트에서 임시 서버를 실행해
+[`prototype/index.html`](prototype/index.html)을 확인할 수 있다.
+
+```sh
+python3 -m http.server 4173 --bind 127.0.0.1
+```
+
+기본 확인 주소는
+`http://127.0.0.1:4173/prototype/?titlebar=regular&tenant=offset&sidebar=open`이다.
+
+화면 변형은 쿼리로 비교한다.
+
+- `titlebar=regular|thin`: 64px 기본형과 44px 압축형
+- `tenant=squircle|offset|inset`: Tenant 이미지 실루엣 비교
+- `sidebar=open|closed`: 고정 사이드바와 닫힌 사이드바
+
+두 Title bar 밀도 모두 Tenant 이미지와 Tenant/Workspace 두 줄 맥락을 유지한다.
+현재 기본 실루엣은 한쪽 곡률을 강조한 `offset`이다.
+
+현재 방향은 Arc와 Aside의 sidebar-first 탐색을 참고한 정적 WebUI형 셸이다.
+
+- Title bar의 Leading Area는 Tenant/Workspace 전환 맥락을 소유한다.
+- Command Runway는 탐색, 주소/검색/명령, 확장 프로그램을 하나의 표면에 묶는다.
+- Trailing Area의 Agent Status는 탭 구성과 분리된 실행 상태를 보여준다.
+- Tab sidebar의 Group은 사용자가 탭을 정리하는 UI 도구일 뿐 Agent Task를
+  소유하지 않는다.
+- 사이드바를 닫으면 웹 표면이 전체 폭을 사용한다. 왼쪽 끝에 가리키면 글라스
+  패널로 미리 보이고, 클릭하거나 단축키를 사용하면 고정되어 웹 표면을 민다.
+
+프로토타입의 동작 코드는 화면 개념별 ES module로 분리한다.
+
+- `js/launcher.js`: Title bar의 전역 Launcher
+- `js/workspace.js`: Tab/Group과 Sidebar의 추가, 선택, 닫기, 고정 상태
+- `js/dom.js`: DOM contract helper
+
+`+` 버튼이나 `⌘T`로 새 Tab을 추가하고, `⌘K` 또는 `⌘L`로 Launcher를 연다.
+`⌘W`는 현재 Tab을 닫고 `⌘B`는 Sidebar 고정 상태를 전환한다. Launcher에서는
+`↑`/`↓`로 열린 Tab을 이동하고 `Enter`로 선택한다.
+
+동작 코드는 시각 클래스 대신 `data-action`, `data-field`, `data-region`을 계약으로
+사용한다.

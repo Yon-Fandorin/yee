@@ -1,0 +1,19 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+if [[ -n "${1:-}" && "$1" == metal* && -n "${YEE_METAL_BIN:-}" ]]; then
+  METAL_TOOL="$1"
+  METAL_TOOL_BIN="${YEE_METAL_BIN:h}/$METAL_TOOL"
+  if [[ -x "$METAL_TOOL_BIN" ]]; then
+    shift
+    if [[ "$METAL_TOOL" == "metal" && -n "${CLANG_MODULE_CACHE_PATH:-}" ]]; then
+      exec "$METAL_TOOL_BIN" \
+        -fmodules-cache-path="$CLANG_MODULE_CACHE_PATH" \
+        "${@}"
+    fi
+    exec "$METAL_TOOL_BIN" "${@}"
+  fi
+fi
+
+exec /usr/bin/xcrun "${@}"

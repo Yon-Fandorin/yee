@@ -1,0 +1,28 @@
+{
+  "browser": {
+    "check_default_browser": false,
+    "has_seen_welcome_page": true
+  },
+  "distribution": {
+    "import_bookmarks": false,
+    "import_history": false,
+    "import_home_page": false,
+    "import_search_engine": false,
+    "make_chrome_default": false,
+    "skip_first_run_ui": true
+  },
+  "profile": {
+    "exit_type": "Normal",
+    "exited_cleanly": true,
+    "name": "yee pilot"
+  },
+  "session": {
+    "restore_on_startup": 5
+  },
+  "vertical_tabs": {
+    "collapsed_state": false,
+    "enabled": true,
+    "enabled_first_time": true,
+    "uncollapsed_width": 232
+  }
+}
