@@ -1,0 +1,495 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index afb85cbf68..ee19ccd8d6 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -12,6 +12,7 @@
+ #include <set>
+ #include <utility>
+ 
++#include "cc/paint/paint_flags.h"
+ #include "base/auto_reset.h"
+ #include "base/byte_size.h"
+ #include "base/check.h"
+@@ -36,7 +37,8 @@
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/stringprintf.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/task/single_thread_task_runner.h"
++#include "base/timer/timer.h"
+ #include "base/trace_event/trace_event.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -330,7 +332,8 @@
+ #include "ui/events/event_utils.h"
+ #include "ui/gfx/animation/animation_runner.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/color_utils.h"
++#include "ui/gfx/font_list.h"
+ #include "ui/gfx/geometry/outsets.h"
+ #include "ui/gfx/geometry/point.h"
+ #include "ui/gfx/geometry/rect.h"
+@@ -414,6 +417,383 @@ using web_modal::WebContentsModalDialogHost;
+ 
+ namespace {
+ 
++constexpr char kYeeShellScaffoldSwitch[] = "yee-shell-scaffold";
++constexpr char kYeeAgentStatusDemoSwitch[] = "yee-agent-status-demo";
++constexpr char kYeeAgentStatusSwitch[] = "yee-agent-status";
++constexpr int kYeeShellScaffoldViewId = 0x594545;
++constexpr int kYeeAgentStatusViewId = 0x594546;
++constexpr int kYeeCommandRunwayViewId = 0x594547;
++constexpr int kYeeTitlebarHeight = 64;
++constexpr int kYeeSidebarWidth = 232;
++constexpr int kYeeShellGutter = 8;
++constexpr int kYeeTrailingWidth = 184;
++constexpr float kYeeContentCornerRadius = 13.0f;
++
++// The status surface owns its own small compositor layer. Status changes must
++// never invalidate the full-window shell or the WebContents layer.
++class YeeAgentStatusView : public views::View {
++ public:
++  enum class Status {
++    kReady,
++    kWorking,
++    kNeedsInput,
++  };
++
++  YeeAgentStatusView() {
++    SetCanProcessEventsWithinSubtree(false);
++    SetPaintToLayer();
++    layer()->SetFillsBoundsOpaquely(false);
++    layer()->SetName("YeeAgentStatusView");
++
++    const base::CommandLine* const command_line =
++        base::CommandLine::ForCurrentProcess();
++    const std::string requested_status =
++        command_line->GetSwitchValueASCII(kYeeAgentStatusSwitch);
++    if (requested_status == "working") {
++      status_ = Status::kWorking;
++    } else if (requested_status == "needs-input") {
++      status_ = Status::kNeedsInput;
++    }
++
++    if (requested_status.empty() &&
++        command_line->HasSwitch(kYeeAgentStatusDemoSwitch)) {
++      demo_timer_.Start(FROM_HERE, base::Seconds(2.5), this,
++                        &YeeAgentStatusView::AdvanceDemo);
++    }
++  }
++
++  YeeAgentStatusView(const YeeAgentStatusView&) = delete;
++  YeeAgentStatusView& operator=(const YeeAgentStatusView&) = delete;
++  ~YeeAgentStatusView() override = default;
++
++  void OnPaint(gfx::Canvas* canvas) override {
++    const gfx::Rect bounds = GetLocalBounds();
++    if (bounds.IsEmpty()) {
++      return;
++    }
++
++    std::u16string_view title;
++    std::u16string_view detail;
++    SkColor status_color;
++    switch (status_) {
++      case Status::kReady:
++        title = u"Ready";
++        detail = u"No active task";
++        status_color = SkColorSetRGB(91, 139, 127);
++        break;
++      case Status::kWorking:
++        title = u"Working";
++        detail = u"Reading this tab";
++        status_color = SkColorSetRGB(65, 156, 132);
++        break;
++      case Status::kNeedsInput:
++        title = u"Needs input";
++        detail = u"Waiting for you";
++        status_color = SkColorSetRGB(190, 132, 78);
++        break;
++    }
++
++    cc::PaintFlags halo_flags;
++    halo_flags.setAntiAlias(true);
++    halo_flags.setColor(SkColorSetA(status_color, 34));
++    halo_flags.setStyle(cc::PaintFlags::kFill_Style);
++    const gfx::PointF indicator_center(17.0f, 17.0f);
++    canvas->DrawCircle(indicator_center, 7.0f, halo_flags);
++
++    cc::PaintFlags indicator_flags;
++    indicator_flags.setAntiAlias(true);
++    indicator_flags.setColor(status_color);
++    indicator_flags.setStyle(cc::PaintFlags::kFill_Style);
++    canvas->DrawCircle(indicator_center, 3.5f, indicator_flags);
++
++    const gfx::FontList title_font = gfx::FontList().Derive(
++        -1, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM);
++    const gfx::FontList detail_font = gfx::FontList().Derive(
++        -3, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL);
++    canvas->DrawStringRect(
++        title, title_font, SkColorSetRGB(45, 61, 57),
++        gfx::Rect(30, 6, std::max(0, bounds.width() - 40), 20));
++    canvas->DrawStringRect(
++        detail, detail_font, SkColorSetRGB(101, 116, 111),
++        gfx::Rect(14, 27, std::max(0, bounds.width() - 24), 14));
++  }
++
++ private:
++  void AdvanceDemo() {
++    switch (status_) {
++      case Status::kReady:
++        status_ = Status::kWorking;
++        break;
++      case Status::kWorking:
++        status_ = Status::kNeedsInput;
++        break;
++      case Status::kNeedsInput:
++        status_ = Status::kReady;
++        break;
++    }
++    SchedulePaint();
++  }
++
++  Status status_ = Status::kReady;
++  base::RepeatingTimer demo_timer_;
++};
++
++// A UI-only command runway. Its bounds stay entirely inside the titlebar and
++// never overlap or participate in the WebContents layout.
++class YeeCommandRunwayView : public views::View {
++ public:
++  YeeCommandRunwayView() {
++    SetCanProcessEventsWithinSubtree(false);
++    SetPaintToLayer();
++    layer()->SetFillsBoundsOpaquely(false);
++    layer()->SetName("YeeCommandRunwayView");
++  }
++
++  YeeCommandRunwayView(const YeeCommandRunwayView&) = delete;
++  YeeCommandRunwayView& operator=(const YeeCommandRunwayView&) = delete;
++  ~YeeCommandRunwayView() override = default;
++
++  void OnPaint(gfx::Canvas* canvas) override {
++    constexpr int kControlSize = 28;
++    constexpr int kControlGap = 2;
++    constexpr int kRunwayPadding = 8;
++    constexpr int kAddressHeight = 32;
++    constexpr int kExtensionAreaWidth = 86;
++
++    const gfx::Rect bounds = GetLocalBounds();
++    if (bounds.width() < 300 || bounds.height() < kAddressHeight) {
++      return;
++    }
++
++    const SkColor icon_color = SkColorSetRGB(65, 84, 78);
++    const SkColor muted_icon_color = SkColorSetARGB(112, 65, 84, 78);
++
++    cc::PaintFlags icon_flags;
++    icon_flags.setAntiAlias(true);
++    icon_flags.setColor(icon_color);
++    icon_flags.setStrokeWidth(1.45f);
++    icon_flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
++    icon_flags.setStyle(cc::PaintFlags::kStroke_Style);
++
++    cc::PaintFlags muted_icon_flags = icon_flags;
++    muted_icon_flags.setColor(muted_icon_color);
++
++    cc::PaintFlags active_button_flags;
++    active_button_flags.setAntiAlias(true);
++    active_button_flags.setColor(SkColorSetARGB(30, 76, 143, 126));
++    active_button_flags.setStyle(cc::PaintFlags::kFill_Style);
++
++    const int control_y = (bounds.height() - kControlSize) / 2;
++    int control_x = kRunwayPadding;
++    auto control_center = [&](int x) {
++      return gfx::PointF(x + kControlSize / 2.0f,
++                         control_y + kControlSize / 2.0f);
++    };
++
++    // Tab sidebar toggle: the only softly tinted control, giving the runway a
++    // recognizable leading anchor without turning every icon into a button.
++    canvas->DrawRoundRect(
++        gfx::RectF(control_x, control_y, kControlSize, kControlSize), 9.0f,
++        active_button_flags);
++    gfx::RectF tab_icon(control_x + 7.5f, control_y + 7.0f, 13.0f, 14.0f);
++    canvas->DrawRoundRect(tab_icon, 3.5f, icon_flags);
++    canvas->DrawLine(gfx::PointF(tab_icon.x() + 4.5f, tab_icon.y() + 1.0f),
++                     gfx::PointF(tab_icon.x() + 4.5f,
++                                 tab_icon.bottom() - 1.0f),
++                     icon_flags);
++    control_x += kControlSize + 5;
++
++    auto draw_chevron = [&](int x, bool points_left,
++                            const cc::PaintFlags& flags) {
++      const gfx::PointF center = control_center(x);
++      const float direction = points_left ? -1.0f : 1.0f;
++      canvas->DrawLine(
++          gfx::PointF(center.x() + 3.0f * direction, center.y() - 5.0f),
++          gfx::PointF(center.x() - 2.0f * direction, center.y()), flags);
++      canvas->DrawLine(
++          gfx::PointF(center.x() - 2.0f * direction, center.y()),
++          gfx::PointF(center.x() + 3.0f * direction, center.y() + 5.0f),
++          flags);
++    };
++    draw_chevron(control_x, true, muted_icon_flags);
++    control_x += kControlSize + kControlGap;
++    draw_chevron(control_x, false, muted_icon_flags);
++    control_x += kControlSize + kControlGap;
++
++    const gfx::PointF reload_center = control_center(control_x);
++    canvas->DrawCircle(reload_center, 5.5f, icon_flags);
++    canvas->DrawLine(
++        gfx::PointF(reload_center.x() + 4.0f, reload_center.y() - 5.2f),
++        gfx::PointF(reload_center.x() + 7.0f, reload_center.y() - 5.0f),
++        icon_flags);
++    canvas->DrawLine(
++        gfx::PointF(reload_center.x() + 7.0f, reload_center.y() - 5.0f),
++        gfx::PointF(reload_center.x() + 6.2f, reload_center.y() - 2.0f),
++        icon_flags);
++    control_x += kControlSize + 8;
++
++    cc::PaintFlags divider_flags;
++    divider_flags.setColor(SkColorSetARGB(42, 65, 84, 78));
++    divider_flags.setStrokeWidth(1.0f);
++    divider_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    canvas->DrawLine(gfx::PointF(control_x, 15.0f),
++                     gfx::PointF(control_x, bounds.height() - 15.0f),
++                     divider_flags);
++
++    const int address_x = control_x + 10;
++    const int extension_x = std::max(address_x + 140,
++                                     bounds.width() - kExtensionAreaWidth);
++    const int address_width = std::max(0, extension_x - address_x - 8);
++    const int address_y = (bounds.height() - kAddressHeight) / 2;
++
++    cc::PaintFlags address_fill_flags;
++    address_fill_flags.setAntiAlias(true);
++    address_fill_flags.setColor(SkColorSetARGB(70, 255, 255, 255));
++    address_fill_flags.setStyle(cc::PaintFlags::kFill_Style);
++    cc::PaintFlags address_outline_flags;
++    address_outline_flags.setAntiAlias(true);
++    address_outline_flags.setColor(SkColorSetARGB(56, 255, 255, 255));
++    address_outline_flags.setStrokeWidth(1.0f);
++    address_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    gfx::RectF address_rect(address_x, address_y, address_width,
++                            kAddressHeight);
++    address_rect.Inset(0.5f);
++    canvas->DrawRoundRect(address_rect, 11.0f, address_fill_flags);
++    canvas->DrawRoundRect(address_rect, 11.0f, address_outline_flags);
++
++    cc::PaintFlags site_halo_flags;
++    site_halo_flags.setAntiAlias(true);
++    site_halo_flags.setColor(SkColorSetARGB(30, 67, 146, 125));
++    site_halo_flags.setStyle(cc::PaintFlags::kFill_Style);
++    cc::PaintFlags site_dot_flags = site_halo_flags;
++    site_dot_flags.setColor(SkColorSetRGB(72, 137, 120));
++    const gfx::PointF site_center(address_x + 15.0f,
++                                  bounds.height() / 2.0f);
++    canvas->DrawCircle(site_center, 6.0f, site_halo_flags);
++    canvas->DrawCircle(site_center, 2.5f, site_dot_flags);
++
++    const gfx::FontList address_font = gfx::FontList().Derive(
++        -2, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM);
++    canvas->DrawStringRect(
++        u"example.com", address_font, SkColorSetRGB(66, 82, 77),
++        gfx::Rect(address_x + 27, address_y + 7,
++                  std::max(0, address_width - 38), 18));
++
++    // Two quiet pinned-extension marks plus one overflow control reserve the
++    // shape of the final extension area without committing runtime behavior.
++    cc::PaintFlags extension_one_flags;
++    extension_one_flags.setAntiAlias(true);
++    extension_one_flags.setColor(SkColorSetRGB(104, 159, 143));
++    extension_one_flags.setStyle(cc::PaintFlags::kFill_Style);
++    cc::PaintFlags extension_two_flags = extension_one_flags;
++    extension_two_flags.setColor(SkColorSetRGB(128, 137, 151));
++    const float extension_center_y = bounds.height() / 2.0f;
++    canvas->DrawCircle(gfx::PointF(extension_x + 13.0f, extension_center_y),
++                       5.0f, extension_one_flags);
++    canvas->DrawCircle(gfx::PointF(extension_x + 35.0f, extension_center_y),
++                       5.0f, extension_two_flags);
++    for (int dot = 0; dot < 3; ++dot) {
++      canvas->DrawCircle(
++          gfx::PointF(extension_x + 57.0f + dot * 4.0f,
++                      extension_center_y),
++          1.15f, site_dot_flags);
++    }
++  }
++};
++
++// A deliberately content-free shell used while Yee's top-level regions are
++// being designed. The existing Chromium views stay alive beneath this overlay
++// so the experiment remains reversible and does not fork browser behavior.
++class YeeShellScaffoldView : public views::View {
++ public:
++  YeeShellScaffoldView() {
++    SetCanProcessEventsWithinSubtree(false);
++    SetPaintToLayer();
++    layer()->SetFillsBoundsOpaquely(false);
++    layer()->SetName("YeeShellScaffoldView");
++  }
++
++  YeeShellScaffoldView(const YeeShellScaffoldView&) = delete;
++  YeeShellScaffoldView& operator=(const YeeShellScaffoldView&) = delete;
++  ~YeeShellScaffoldView() override = default;
++
++  void OnPaint(gfx::Canvas* canvas) override {
++    constexpr int kWindowControlsWidth = 88;
++
++    const gfx::Rect bounds = GetLocalBounds();
++    if (bounds.IsEmpty()) {
++      return;
++    }
++
++    // These low-alpha surfaces allow the native GlassFrame material to remain
++    // visible without imposing a decorative gradient on the shell.
++    canvas->FillRect(gfx::Rect(0, 0, bounds.width(), kYeeTitlebarHeight),
++                     SkColorSetARGB(38, 225, 235, 232));
++    canvas->FillRect(
++        gfx::Rect(0, kYeeTitlebarHeight, kYeeSidebarWidth,
++                  std::max(0, bounds.height() - kYeeTitlebarHeight)),
++        SkColorSetARGB(31, 225, 235, 232));
++
++    cc::PaintFlags surface_flags;
++    surface_flags.setAntiAlias(true);
++    surface_flags.setColor(SkColorSetARGB(31, 255, 255, 255));
++    surface_flags.setStyle(cc::PaintFlags::kFill_Style);
++
++    cc::PaintFlags outline_flags;
++    outline_flags.setAntiAlias(true);
++    outline_flags.setColor(SkColorSetARGB(82, 255, 255, 255));
++    outline_flags.setStrokeWidth(1.0f);
++    outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++
++    auto draw_section = [&](const gfx::Rect& rect) {
++      if (rect.IsEmpty()) {
++        return;
++      }
++      gfx::RectF section(rect);
++      section.Inset(0.5f);
++      canvas->DrawRoundRect(section, kYeeContentCornerRadius, surface_flags);
++      canvas->DrawRoundRect(section, kYeeContentCornerRadius, outline_flags);
++    };
++
++    const int top_height = kYeeTitlebarHeight - 2 * kYeeShellGutter;
++    const int sidebar_inner_right = kYeeSidebarWidth - kYeeShellGutter;
++    const int runway_x = kYeeSidebarWidth + kYeeShellGutter;
++    const int trailing_x =
++        std::max(runway_x, bounds.width() - kYeeTrailingWidth);
++    draw_section(gfx::Rect(kWindowControlsWidth, kYeeShellGutter,
++                           sidebar_inner_right - kWindowControlsWidth,
++                           top_height));
++    draw_section(gfx::Rect(runway_x, kYeeShellGutter,
++                           std::max(0, trailing_x - runway_x - kYeeShellGutter),
++                           top_height));
++    draw_section(gfx::Rect(trailing_x, kYeeShellGutter,
++                           std::max(0, bounds.width() - trailing_x -
++                                           kYeeShellGutter),
++                           top_height));
++    draw_section(gfx::Rect(
++        kYeeShellGutter, kYeeTitlebarHeight + kYeeShellGutter,
++        kYeeSidebarWidth - 2 * kYeeShellGutter,
++        std::max(0, bounds.height() - kYeeTitlebarHeight -
++                        2 * kYeeShellGutter)));
++
++    cc::PaintFlags content_outline_flags;
++    content_outline_flags.setAntiAlias(true);
++    content_outline_flags.setColor(SkColorSetARGB(52, 74, 110, 101));
++    content_outline_flags.setStrokeWidth(1.0f);
++    content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    gfx::RectF content_rect(
++        gfx::Rect(kYeeSidebarWidth + kYeeShellGutter,
++                  kYeeTitlebarHeight + kYeeShellGutter,
++                  std::max(0, bounds.width() - kYeeSidebarWidth -
++                                  2 * kYeeShellGutter),
++                  std::max(0, bounds.height() - kYeeTitlebarHeight -
++                                  2 * kYeeShellGutter)));
++    content_rect.Inset(0.5f);
++    canvas->DrawRoundRect(content_rect, kYeeContentCornerRadius,
++                          content_outline_flags);
++  }
++};
++
+ // The visible height of the shadow above the tabs. Clicks in this area are
+ // treated as clicks to the frame, rather than clicks to the tab.
+ const int kTabShadowSize = 2;
+@@ -1013,6 +1393,36 @@ BrowserView::BrowserView(Browser* browser)
+                                 base::Unretained(this)));
+   }
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          kYeeShellScaffoldSwitch) &&
++      vertical_tab_strip_region_view_) {
++    top_container_->SetPaintToLayer();
++    top_container_->layer()->SetFillsBoundsOpaquely(false);
++    top_container_->layer()->SetOpacity(0.0f);
++
++    vertical_tab_strip_region_view_->SetPaintToLayer();
++    vertical_tab_strip_region_view_->layer()->SetFillsBoundsOpaquely(false);
++    vertical_tab_strip_region_view_->layer()->SetOpacity(0.0f);
++
++    auto yee_shell_scaffold = std::make_unique<YeeShellScaffoldView>();
++    auto* const yee_shell_scaffold_view = yee_shell_scaffold.get();
++    AddChildView(std::unique_ptr<views::View>(std::move(yee_shell_scaffold)));
++    yee_shell_scaffold_view->SetID(kYeeShellScaffoldViewId);
++    yee_shell_scaffold_view->SetProperty(views::kViewIgnoredByLayoutKey, true);
++
++    auto yee_command_runway = std::make_unique<YeeCommandRunwayView>();
++    auto* const yee_command_runway_view = yee_command_runway.get();
++    AddChildView(std::unique_ptr<views::View>(std::move(yee_command_runway)));
++    yee_command_runway_view->SetID(kYeeCommandRunwayViewId);
++    yee_command_runway_view->SetProperty(views::kViewIgnoredByLayoutKey, true);
++
++    auto yee_agent_status = std::make_unique<YeeAgentStatusView>();
++    auto* const yee_agent_status_view = yee_agent_status.get();
++    AddChildView(std::unique_ptr<views::View>(std::move(yee_agent_status)));
++    yee_agent_status_view->SetID(kYeeAgentStatusViewId);
++    yee_agent_status_view->SetProperty(views::kViewIgnoredByLayoutKey, true);
++  }
++
+   // Create do-nothing view for the sake of controlling the z-order of the find
+   // bar widget.
+   find_bar_host_view_ = AddChildView(std::make_unique<View>());
+@@ -4802,6 +5212,27 @@ void BrowserView::Layout(PassKey) {
+ 
+   LayoutSuperclass<views::View>(this);
+ 
++  if (views::View* const yee_shell_scaffold_view =
++          GetViewByID(kYeeShellScaffoldViewId)) {
++    yee_shell_scaffold_view->SetBoundsRect(GetLocalBounds());
++    const int runway_x = kYeeSidebarWidth + kYeeShellGutter;
++    const int trailing_x = std::max(runway_x, width() - kYeeTrailingWidth);
++    if (views::View* const yee_command_runway_view =
++            GetViewByID(kYeeCommandRunwayViewId)) {
++      yee_command_runway_view->SetBoundsRect(gfx::Rect(
++          runway_x, kYeeShellGutter,
++          std::max(0, trailing_x - runway_x - kYeeShellGutter),
++          kYeeTitlebarHeight - 2 * kYeeShellGutter));
++    }
++    if (views::View* const yee_agent_status_view =
++            GetViewByID(kYeeAgentStatusViewId)) {
++      yee_agent_status_view->SetBoundsRect(gfx::Rect(
++          trailing_x, kYeeShellGutter,
++          std::max(0, width() - trailing_x - kYeeShellGutter),
++          kYeeTitlebarHeight - 2 * kYeeShellGutter));
++    }
++  }
++
+   // TODO(jamescook): Why was this in the middle of layout code?
+   toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
+   GetFrameView()->UpdateMinimumSize();
+@@ -5024,6 +5455,15 @@ void BrowserView::AddedToWidget() {
+   layout_views.multi_contents_view = multi_contents_view_;
+   layout_views.side_panel = side_panel_;
+   layout_views.top_container_separator = top_container_separator_;
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          kYeeShellScaffoldSwitch)) {
++    layout_views.content_layout_config = BrowserContentLayoutConfig{
++        gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeShellGutter,
++                          kYeeSidebarWidth + kYeeShellGutter, kYeeShellGutter,
++                          kYeeShellGutter),
++        gfx::RoundedCornersF(kYeeContentCornerRadius),
++        /*show_top_separator=*/false};
++  }
+   // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)
+ 
+   SetLayoutManager(BrowserViewLayout::CreateLayout(

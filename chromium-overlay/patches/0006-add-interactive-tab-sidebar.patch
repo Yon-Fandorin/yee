@@ -1,0 +1,384 @@
+diff --git a/chrome/browser/ui/tabs/features.cc b/chrome/browser/ui/tabs/features.cc
+--- a/chrome/browser/ui/tabs/features.cc
++++ b/chrome/browser/ui/tabs/features.cc
+@@ -39,7 +39,7 @@
+ 
+ BASE_FEATURE(kVerticalTabsNewBadge, base::FEATURE_ENABLED_BY_DEFAULT);
+ 
+-BASE_FEATURE(kVerticalTabsExpandOnHover, base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kVerticalTabsExpandOnHover, base::FEATURE_ENABLED_BY_DEFAULT);
+ BASE_FEATURE_PARAM(bool,
+                    kVerticalTabsExpandOnHoverDefaultEnabled,
+                    &kVerticalTabsExpandOnHover,
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -628,6 +628,14 @@
+   YeeShellScaffoldView(const YeeShellScaffoldView&) = delete;
+   YeeShellScaffoldView& operator=(const YeeShellScaffoldView&) = delete;
+   ~YeeShellScaffoldView() override = default;
++
++  void SetSidebarReserved(bool reserved) {
++    if (sidebar_reserved_ == reserved) {
++      return;
++    }
++    sidebar_reserved_ = reserved;
++    SchedulePaint();
++  }
+ 
+   void OnPaint(gfx::Canvas* canvas) override {
+     const gfx::Rect bounds = GetLocalBounds();
+@@ -639,10 +647,12 @@
+     // visible without imposing a decorative gradient on the shell.
+     canvas->FillRect(gfx::Rect(0, 0, bounds.width(), kYeeTitlebarHeight),
+                      SkColorSetARGB(38, 225, 235, 232));
+-    canvas->FillRect(
+-        gfx::Rect(0, kYeeTitlebarHeight, kYeeSidebarWidth,
+-                  std::max(0, bounds.height() - kYeeTitlebarHeight)),
+-        SkColorSetARGB(31, 225, 235, 232));
++    if (sidebar_reserved_) {
++      canvas->FillRect(
++          gfx::Rect(0, kYeeTitlebarHeight, kYeeSidebarWidth,
++                    std::max(0, bounds.height() - kYeeTitlebarHeight)),
++          SkColorSetARGB(31, 225, 235, 232));
++    }
+ 
+     cc::PaintFlags surface_flags;
+     surface_flags.setAntiAlias(true);
+@@ -673,27 +683,26 @@
+         gfx::Rect(trailing_x, kYeeShellGutter,
+                   std::max(0, bounds.width() - trailing_x - kYeeShellGutter),
+                   top_height));
+-    draw_section(gfx::Rect(kYeeShellGutter,
+-                           kYeeTitlebarHeight + kYeeShellGutter,
+-                           kYeeSidebarWidth - 2 * kYeeShellGutter,
+-                           std::max(0, bounds.height() - kYeeTitlebarHeight -
+-                                           2 * kYeeShellGutter)));
+-
+     cc::PaintFlags content_outline_flags;
+     content_outline_flags.setAntiAlias(true);
+     content_outline_flags.setColor(SkColorSetARGB(52, 74, 110, 101));
+     content_outline_flags.setStrokeWidth(1.0f);
+     content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    const int content_left = sidebar_reserved_
++                                 ? kYeeSidebarWidth + kYeeShellGutter
++                                 : kYeeShellGutter;
+     gfx::RectF content_rect(gfx::Rect(
+-        kYeeSidebarWidth + kYeeShellGutter,
+-        kYeeTitlebarHeight + kYeeShellGutter,
+-        std::max(0, bounds.width() - kYeeSidebarWidth - 2 * kYeeShellGutter),
++        content_left, kYeeTitlebarHeight + kYeeShellGutter,
++        std::max(0, bounds.width() - content_left - kYeeShellGutter),
+         std::max(0,
+                  bounds.height() - kYeeTitlebarHeight - 2 * kYeeShellGutter)));
+     content_rect.Inset(0.5f);
+     canvas->DrawRoundRect(content_rect, kYeeContentCornerRadius,
+                           content_outline_flags);
+   }
++
++ private:
++  bool sidebar_reserved_ = true;
+ };
+ 
+ // The visible height of the shadow above the tabs. Clicks in this area are
+@@ -1296,12 +1305,8 @@
+   }
+ 
+   if (IsYeeShellScaffoldEnabled() && vertical_tab_strip_region_view_) {
+-    vertical_tab_strip_region_view_->SetPaintToLayer();
+-    vertical_tab_strip_region_view_->layer()->SetFillsBoundsOpaquely(false);
+-    vertical_tab_strip_region_view_->layer()->SetOpacity(0.0f);
+-    vertical_tab_strip_region_view_->SetCanProcessEventsWithinSubtree(false);
+-    vertical_tab_strip_region_view_->GetViewAccessibility().SetIsInvisible(
+-        true);
++    vertical_tab_strip_region_view_->SetHideCollapsedRail(true);
++    vertical_tab_strip_state_controller->SetExpandOnHoverEnabled(true);
+ 
+     auto yee_shell_scaffold = std::make_unique<YeeShellScaffoldView>();
+     auto* const yee_shell_scaffold_view = yee_shell_scaffold.get();
+@@ -5113,6 +5118,13 @@
+ 
+   if (views::View* const yee_shell_scaffold_view =
+           GetViewByID(kYeeShellScaffoldViewId)) {
++    auto* const vertical_tabs_controller =
++        tabs::VerticalTabStripStateController::From(browser_.get());
++    static_cast<YeeShellScaffoldView*>(yee_shell_scaffold_view)
++        ->SetSidebarReserved(
++            vertical_tabs_controller &&
++            vertical_tabs_controller->GetCollapseState() !=
++                tabs::VerticalTabStripCollapseState::kCollapsed);
+     yee_shell_scaffold_view->SetBoundsRect(GetLocalBounds());
+     const int runway_x = kYeeSidebarWidth + kYeeShellGutter;
+     const int trailing_x = std::max(runway_x, width() - kYeeTrailingWidth);
+@@ -5373,7 +5385,14 @@
+                           kYeeSidebarWidth + kYeeShellGutter, kYeeShellGutter,
+                           kYeeShellGutter),
+         gfx::RoundedCornersF(kYeeContentCornerRadius),
+-        /*show_top_separator=*/false};
++        /*show_top_separator=*/false,
++        /*collapsed_vertical_tab_strip_leading_inset=*/kYeeShellGutter,
++        /*vertical_tab_strip_spacing=*/kYeeShellGutter};
++    layout_views.vertical_tab_strip_layout_config =
++        BrowserVerticalTabStripLayoutConfig{
++            gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeShellGutter, 0,
++                              kYeeShellGutter, 0),
++            /*collapsed_width=*/kYeeShellGutter};
+   }
+   // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)
+ 
+diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
+--- a/chrome/browser/ui/views/frame/contents_container_view.cc
++++ b/chrome/browser/ui/views/frame/contents_container_view.cc
+@@ -478,7 +478,11 @@
+     return layouts;
+   }
+ 
+-  gfx::Rect full_contents_bounds = GetContentsBounds();
++  // Proposed layouts can be calculated before this view receives its new
++  // bounds from the parent. Derive the content rect from `size_bounds` so the
++  // WebContents viewport is updated in the same layout pass as its container.
++  gfx::Rect full_contents_bounds(gfx::Size(width, height));
++  full_contents_bounds.Inset(GetInsets());
+   gfx::Rect devtools_bounds;
+   // The area contents excluding devtools is drawn (ie |contents_view_|,
+   // |new_tab_footer_view_|, etc).
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_layout.h b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+--- a/chrome/browser/ui/views/frame/layout/browser_view_layout.h
++++ b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+@@ -47,8 +47,18 @@
+   gfx::Insets insets;
+   gfx::RoundedCornersF corner_radii;
+   bool show_top_separator = true;
++  std::optional<int> collapsed_vertical_tab_strip_leading_inset;
++  int vertical_tab_strip_spacing = 0;
+ };
+ 
++// Optional placement for a vertical tab strip living inside a shell-defined
++// surface. A smaller collapsed width creates an edge target while the native
++// expand-on-hover animation grows the strip over the content.
++struct BrowserVerticalTabStripLayoutConfig {
++  gfx::Insets insets;
++  int collapsed_width = 0;
++};
++
+ // Optional placement for a toolbar that lives inside a shell-defined titlebar.
+ // The layout engine consumes geometry only and remains unaware of the product
+ // that supplied it.
+@@ -102,6 +112,8 @@
+ 
+   std::optional<BrowserContentLayoutConfig> content_layout_config;
+   std::optional<BrowserToolbarLayoutConfig> toolbar_layout_config;
++  std::optional<BrowserVerticalTabStripLayoutConfig>
++      vertical_tab_strip_layout_config;
+ 
+   // The contents separator used for when the top container is overlaid.
+   // Note: when `SideBySide` feature is disabled, this separator is also
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -737,6 +737,19 @@
+       int vertical_tab_strip_width =
+           horizontal_layout.vertical_tab_strip_width +
+           vertical_tab_strip_hover_width;
++
++      if (views().vertical_tab_strip_layout_config) {
++        const BrowserVerticalTabStripLayoutConfig& config =
++            *views().vertical_tab_strip_layout_config;
++        const int expanded_width =
++            views().vertical_tab_strip_region_view->uncollapsed_width();
++        const double reveal_amount =
++            std::max(vertical_tab_strip_animation.tab_strip_width,
++                     vertical_tab_strip_animation.expand_on_hover_width);
++        vertical_tab_strip_width =
++            base::ClampRound(gfx::Tween::DoubleValueBetween(
++                reveal_amount, config.collapsed_width, expanded_width));
++      }
+ 
+       // The overall width during an expand must change monotonically.
+       if (vertical_tab_strip_animation.current_motion ==
+@@ -756,13 +769,25 @@
+         last_vertical_tab_strip_width_ = vertical_tab_strip_width;
+       }
+ 
+-      vertical_tab_strip_bounds =
+-          gfx::Rect(params.visual_client_area.x(),
+-                    params.visual_client_area.y() +
+-                        vertical_tab_strip_animation.top_offset,
+-                    vertical_tab_strip_width,
+-                    params.visual_client_area.height() -
+-                        vertical_tab_strip_animation.top_offset);
++      if (views().vertical_tab_strip_layout_config) {
++        const BrowserVerticalTabStripLayoutConfig& config =
++            *views().vertical_tab_strip_layout_config;
++        gfx::Rect available_bounds = browser_params.visual_client_area;
++        available_bounds.Inset(config.insets);
++        vertical_tab_strip_bounds = gfx::Rect(
++            available_bounds.origin(),
++            gfx::Size(
++                std::min(vertical_tab_strip_width, available_bounds.width()),
++                available_bounds.height()));
++      } else {
++        vertical_tab_strip_bounds =
++            gfx::Rect(params.visual_client_area.x(),
++                      params.visual_client_area.y() +
++                          vertical_tab_strip_animation.top_offset,
++                      vertical_tab_strip_width,
++                      params.visual_client_area.height() -
++                          vertical_tab_strip_animation.top_offset);
++      }
+ 
+       if (layout_data_->window_state == WindowState::kFullscreenWithToolbar &&
+           layout_data_->separator_info.adjust_for_missing_separator) {
+@@ -779,10 +804,11 @@
+       // Let the vertical tab strip animate out over the content.
+       if (vertical_tab_strip_animation.current_motion) {
+         clip_content_for_animation =
+-            vertical_tab_strip_animation.current_motion ==
+-                TabStripAnimations::kExpand ||
+-            vertical_tab_strip_animation.current_motion ==
+-                TabStripAnimations::kCollapse;
++            !views().content_layout_config &&
++            (vertical_tab_strip_animation.current_motion ==
++                 TabStripAnimations::kExpand ||
++             vertical_tab_strip_animation.current_motion ==
++                 TabStripAnimations::kCollapse);
+         unclipped_contents_region.Inset(gfx::Insets::TLBR(
+             0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
+       } else {
+@@ -1109,7 +1135,8 @@
+   // bounds. This is to make optimizations during animations e.g. avoid
+   // repositioning status bubble.
+   views().multi_contents_view->SetIsAnimatingContent(
+-      side_panel_is_animating || vertical_tab_strip_animation.current_motion);
++      side_panel_is_animating ||
++      (!content_config && vertical_tab_strip_animation.current_motion));
+ 
+   // Lay out contents container. The contents container contains the multi-
+   // contents view when multi-contents are enabled. The checks here are to
+@@ -1136,8 +1163,22 @@
+                             content_right - content_left,
+                             params.visual_client_area.height());
+   if (content_config) {
++    gfx::Insets content_insets = content_config->insets;
++    const bool vertical_tab_strip_collapsed =
++        horizontal_layout.vertical_tab_strip_collapsed_state ==
++        VerticalTabStripCollapsedState::kCollapsed;
++    if (vertical_tab_strip_collapsed &&
++        content_config->collapsed_vertical_tab_strip_leading_inset) {
++      content_insets.set_left(
++          *content_config->collapsed_vertical_tab_strip_leading_inset);
++    } else if (views().vertical_tab_strip_region_view &&
++               content_config->vertical_tab_strip_spacing > 0) {
++      content_insets.set_left(
++          views().vertical_tab_strip_region_view->uncollapsed_width() +
++          content_config->vertical_tab_strip_spacing);
++    }
+     contents_bounds = browser_params.visual_client_area;
+-    contents_bounds.Inset(content_config->insets);
++    contents_bounds.Inset(content_insets);
+   }
+   auto& contents_layout =
+       layout.AddChild(views().multi_contents_view, contents_bounds);
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -240,6 +240,7 @@
+         update_state_controller_collapsed_callback_.Run(true);
+       }
+       InvalidateLayout();
++      UpdateCollapsedRailVisibility();
+       break;
+     }
+     case BrowserAnimationUpdate::kCanceled:
+@@ -260,6 +261,7 @@
+       if (!target_collapse_state_.collapsed) {
+         update_state_controller_collapsed_callback_.Run(true);
+       }
++      UpdateCollapsedRailVisibility();
+       break;
+   }
+ }
+@@ -337,6 +339,11 @@
+   }
+ }
+ 
++void VerticalTabStripRegionView::SetHideCollapsedRail(bool hide) {
++  hide_collapsed_rail_ = hide;
++  UpdateCollapsedRailVisibility();
++}
++
+ bool VerticalTabStripRegionView::WillWrapDueToOverflow(
+     int available_width) const {
+   return top_button_container_->WillWrapDueToOverflow(available_width);
+@@ -684,8 +691,6 @@
+       ->Start(TabStripAnimations::kVerticalTabStrip, motion);
+ }
+ 
+-
+-
+ VerticalTabStripRegionView::RegionViewFocusListener::RegionViewFocusListener(
+     VerticalTabStripRegionView* region_view)
+     : region_view_(region_view) {}
+@@ -800,6 +805,7 @@
+       state == tabs::VerticalTabStripCollapseState::kCollapsed) {
+     UpdateExpandOnHoverState();
+   }
++  UpdateCollapsedRailVisibility();
+ }
+ 
+ void VerticalTabStripRegionView::UpdateColors() {
+@@ -1018,6 +1024,10 @@
+ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
+   is_expanded_on_hover_ = expand;
+   ResetExpandOnHoverTimers();
++
++  if (expand) {
++    UpdateCollapsedRailVisibility();
++  }
+ 
+   if (expand) {
+     expand_on_hover_start_time_ = base::TimeTicks::Now();
+@@ -1040,6 +1050,14 @@
+                      : TabStripAnimations::kCollapseOnHover);
+ }
+ 
++void VerticalTabStripRegionView::UpdateCollapsedRailVisibility() {
++  const bool visible = !hide_collapsed_rail_ || is_expanded_on_hover_ ||
++                       state_controller_->GetCollapseState() !=
++                           tabs::VerticalTabStripCollapseState::kCollapsed;
++  layer()->SetOpacity(visible ? 1.0f : 0.0f);
++  GetViewAccessibility().SetIsInvisible(!visible);
++}
++
+ void VerticalTabStripRegionView::RegisterExpandOnHoverLock(
+     VerticalTabStripExpandOnHoverLock* lock) {
+   hover_locks_.insert(lock);
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+@@ -98,6 +98,9 @@
+   void SetCaptionButtonWidthForLayout(int caption_button_width);
+   void SetIsExitingExpandOnHoverForLayout(bool is_exiting_expand_on_hover);
+   void SetTransitionButtonOpacity(float opacity);
++  // Keeps the collapsed strip as an invisible edge hit target. The rail is
++  // painted again while expanding, expanded, or expanded-on-hover.
++  void SetHideCollapsedRail(bool hide);
+   bool WillWrapDueToOverflow(int available_width) const;
+ 
+   // views::View:
+@@ -222,6 +225,7 @@
+   void CalculateMouseVelocityForExpandOnHover();
+   void ResetExpandOnHoverTimers();
+   void AnimateExpandOnHover(bool expand);
++  void UpdateCollapsedRailVisibility();
+ 
+   void RegisterExpandOnHoverLock(VerticalTabStripExpandOnHoverLock* lock);
+   void UnregisterExpandOnHoverLock(VerticalTabStripExpandOnHoverLock* lock);
+@@ -271,6 +275,7 @@
+ 
+   base::OneShotTimer expand_on_hover_timer_;
+   bool is_expanded_on_hover_ = false;
++  bool hide_collapsed_rail_ = false;
+   std::optional<base::TimeTicks> expand_on_hover_start_time_;
+   base::RetainingOneShotTimer expand_on_hover_heuristic_timer_;
+   std::optional<gfx::Point> point_at_expand_on_hover_timer_start_;

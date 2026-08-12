@@ -1,0 +1,96 @@
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_layout.h b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+index 263ca8ae6d..12b1c5f6c1 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_layout.h
++++ b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+@@ -6,11 +6,14 @@
+ #define CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_LAYOUT_H_
+ 
+ #include <memory>
++#include <optional>
+ 
+ #include "base/memory/raw_ptr.h"
+ #include "chrome/browser/ui/views/frame/custom_floating_corner.h"
+ #include "ui/base/interaction/element_identifier.h"
++#include "ui/gfx/geometry/insets.h"
+ #include "ui/gfx/geometry/rect.h"
++#include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/native_ui_types.h"
+ #include "ui/views/layout/layout_manager.h"
+@@ -37,6 +40,15 @@ namespace web_modal {
+ class WebContentsModalDialogHost;
+ }
+ 
++// Optional structural treatment for the browser content surface. The layout
++// engine consumes these values without knowing which product or shell supplied
++// them.
++struct BrowserContentLayoutConfig {
++  gfx::Insets insets;
++  gfx::RoundedCornersF corner_radii;
++  bool show_top_separator = true;
++};
++
+ // Views associated with a browser view.
+ struct BrowserViewLayoutViews {
+   BrowserViewLayoutViews();
+@@ -78,6 +90,8 @@ struct BrowserViewLayoutViews {
+   raw_ptr<SidePanel> side_panel = nullptr;
+   raw_ptr<views::View> side_panel_animation_content = nullptr;
+ 
++  std::optional<BrowserContentLayoutConfig> content_layout_config;
++
+   // The contents separator used for when the top container is overlaid.
+   // Note: when `SideBySide` feature is disabled, this separator is also
+   // used when not overlaid. Once the feature is fully rolled out, we can
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index 8a35c869b1..cf33b96bb4 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1068,8 +1068,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   // especially obvious in split view, where turning the separator off provides
+   // the required top padding.
+   const auto& separator_info = layout_data_->separator_info;
++  const auto& content_config = views().content_layout_config;
+   views().multi_contents_view->SetShouldShowTopSeparator(
+-      separator_info.multi_contents_separator);
++      separator_info.multi_contents_separator &&
++      (!content_config || content_config->show_top_separator));
+ 
+   // Updating the top, left and right insets for contents container view when
+   // in split view. This is dependent on a number of other browser states.
+@@ -1122,11 +1124,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     content_right =
+         std::min(content_right, browser_params.visual_client_area.right());
+   }
++  gfx::Rect contents_bounds(content_left, params.visual_client_area.y(),
++                            content_right - content_left,
++                            params.visual_client_area.height());
++  if (content_config) {
++    contents_bounds = browser_params.visual_client_area;
++    contents_bounds.Inset(content_config->insets);
++  }
+   auto& contents_layout =
+-      layout.AddChild(views().multi_contents_view,
+-                      gfx::Rect(content_left, params.visual_client_area.y(),
+-                                content_right - content_left,
+-                                params.visual_client_area.height()));
++      layout.AddChild(views().multi_contents_view, contents_bounds);
+ 
+   // Maybe expand and clip the web contents to avoid issues during animation.
+   if (features::UseSidePanelFlyoverAnimation()) {
+@@ -1169,8 +1175,13 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     }
+   }
+ 
+-  // If the window goes out of glass mode, these changes won't hurt anything.
+-  if (in_glass_mode()) {
++  if (content_config) {
++    // Use MultiContentsView's native propagation path so WebContents,
++    // DevTools, footers, overlays, and split views share the same clip.
++    views().multi_contents_view->SetBackgroundRadii(
++        content_config->corner_radii);
++  } else if (in_glass_mode()) {
++    // If the window goes out of glass mode, these changes won't hurt anything.
+     gfx::RoundedCornersF content_corners;
+     if (layout_data_->tab_strip_type == TabStripType::kVertical &&
+         !is_fullscreen(layout_data_->window_state) &&

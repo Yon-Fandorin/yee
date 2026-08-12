@@ -1,0 +1,46 @@
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -69,7 +69,8 @@
+ //
+ // This is a percentage, with 0.0 meaning no change to the outline, and 1.0
+ // meaning the outline disappears completely.
+ constexpr double kVerticalTabStripOutlineFadeOnHover = 0.5;
++constexpr int kFloatingVerticalTabStripCornerRadius = 18;
+ 
+ // Increases the leading or trailing exclusion padding to `minimum`.
+ void IncreasePaddingToMinimum(BrowserLayoutParams& params, int minimum) {
+@@ -1597,9 +1598,9 @@
+ 
+     if (tab_strip_config && tab_strip_config->collapsed_width > 0 &&
+         animation.expand_on_hover_width > 0.0) {
+-      const int radius =
+-          base::ClampRound((tab_strip_config->collapsed_width + 5) *
+-                           animation.expand_on_hover_width);
++      const int radius =
++          base::ClampRound(kFloatingVerticalTabStripCornerRadius *
++                           animation.expand_on_hover_width);
+       for (const CornerOrientation corner :
+            {CornerOrientation::kTopLeading, CornerOrientation::kTopTrailing,
+             CornerOrientation::kBottomTrailing,
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -83,12 +83,12 @@
+ 
+ // Shadow is used in expand-on-hover mode. Shadow radius and opacity are dynamic
+ // and set by the layout.
+-constexpr int kExpandOnHoverShadowElevation = 4;
++constexpr int kExpandOnHoverShadowElevation = 8;
+ constexpr ShadowFrameView::ShadowAlpha kExpandOnHoverShadowAlpha(
+-    {.light_key = 0.3,
+-     .light_ambient = 0.0,
+-     .dark_key = 0.6,
+-     .dark_ambient = 0.0});
++    {.light_key = 0.16,
++     .light_ambient = 0.04,
++     .dark_key = 0.36,
++     .dark_ambient = 0.08});
+ }  // namespace
+ 
+ DEFINE_CLASS_CUSTOM_ELEMENT_EVENT_TYPE(VerticalTabStripRegionView,

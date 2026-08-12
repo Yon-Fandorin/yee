@@ -16,8 +16,10 @@ fast checkpoint independent of the source build. It does not use Electron, CEF,
 
 The launcher creates an isolated browser profile in
 `native-pilot/runtime/profile`, enables Chromium's native vertical-tabs feature,
-and asks Chromium's `ThemeService` to generate the shell palette from the mint
-porcelain seed. It does not read or mutate the user's normal Chrome profile.
+enables the macOS 26 native `GlassFrame`, and asks Chromium's `ThemeService` to
+generate the shell palette from the mint seed. The glass remains browser chrome;
+web content stays opaque. It does not read or mutate the user's normal Chrome
+profile.
 
 The default window starts with three live pages so the vertical tab list is
 immediately visible. To open a different set of initial pages:

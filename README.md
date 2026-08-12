@@ -23,6 +23,8 @@ Electron, CEF, `<webview>`를 사용하지 않으며 탭과 페이지는 실제
 
 [`chromium-overlay/`](chromium-overlay/)에는 동일한 native vertical-tab 기본값을
 upstream Chromium checkout에 적용하는 최소 source patch와 GN 설정을 둔다.
+macOS 26에서는 Chromium의 native `GlassFrame` 합성을 실행 시 활성화해 웹
+콘텐츠를 제외한 프레임, 툴바, Tab sidebar가 뒤 배경을 비추도록 한다.
 
 ## Local Chromium build
 
@@ -41,10 +43,10 @@ Chromium 소스, `depot_tools`, 빌드 산출물은 모두 Git에서 제외된
 `out/YeePilot` 하나만 유지한다. 상세한 용량 정책과 일상 명령은
 [`chromium-dev/README.md`](chromium-dev/README.md)에 있다.
 
-현재 첫 산출물은 Chromium 소스와 분리된 브라우저 셸 프로토타입이다. 가장 작은
-단위인 Title bar와 Tab sidebar부터 검증한 뒤 Chromium Views/WebUI 경계를
-결정한다. 프로토타입의 웹페이지는 레이아웃 검증을 위한 샘플이며, 실제
-`WebContents` 연결은 아직 포함하지 않는다.
+정적 셸 프로토타입과 함께 실제 Chromium `WebContents`를 사용하는 Yee 빌드를
+검증하고 있다. 현재 구현 범위는 Title bar, native Toolbar, Tab sidebar와
+Browser Content 경계다. 탭 버튼으로 sidebar를 고정하거나 닫을 수 있고, 닫힌
+상태에서는 왼쪽 끝 hover로 콘텐츠 위에 flyout된다.
 
 ## Browser shell prototype
 
