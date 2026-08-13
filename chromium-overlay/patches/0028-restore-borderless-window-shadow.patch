@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+index 646691b..e562b81 100644
+--- a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
++++ b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+@@ -442,9 +442,19 @@ bool BrowserDesktopWindowTreeHostWin::GetDwmFrameInsetsInPixels(
+     return false;
+   }
+ 
+-  // Don't extend the glass in at all if it won't be visible.
+-  if (!ShouldUseNativeFrame() || GetWidget()->IsFullscreen() ||
+-      ShouldBrowserCustomDrawTitlebar(browser_view_)) {
++  const bool use_yee_restored_shadow =
++      IsYeeShellScaffoldEnabled() && browser_view_->GetIsNormalType() &&
++      !GetWidget()->IsMaximized() && !GetWidget()->IsFullscreen() &&
++      !IsSystemHighContrastEnabled();
++
++  // A one-pixel transparent DWM extension keeps the compositor-owned rounded
++  // window shadow alive after Yee removes the visible non-client frame. The
++  // client still paints every visible edge, and DWMWA_COLOR_NONE continues to
++  // suppress the activation outline.
++  if (use_yee_restored_shadow) {
++    *insets = gfx::Insets::TLBR(1, 0, 0, 0);
++  } else if (!ShouldUseNativeFrame() || GetWidget()->IsFullscreen() ||
++             ShouldBrowserCustomDrawTitlebar(browser_view_)) {
+     *insets = gfx::Insets();
+   } else {
+     // The glass should extend to the bottom of the tabstrip.

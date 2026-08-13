@@ -1,0 +1,52 @@
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
+index 5883589..af9f46c 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
++++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
+@@ -885,16 +885,27 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+           ? 0
+           : caption_button_metrics_->GetCaptionButtonWidth();
+ 
+-  const int height =
++  const auto frame_elements = GetClientFrameElementInfo();
++  int caption_y = WindowTopY();
++  int height =
+       !GetBrowserView()->GetWebAppFrameToolbarPreferredSize().IsEmpty()
+           ? (TitlebarHeight(false) - WindowTopY())
+           : GetFrameHeight();
++  if (frame_elements.tabstrip_preferred_height == 0 &&
++      frame_elements.toolbar_minimum_height > 0) {
++    // A vertical-tab browser puts the toolbar inside the visual titlebar.
++    // Fill that visual row so hover/focus paint reaches the top edge. The
++    // frame's non-client hit test still returns HTTOP before caption-button
++    // handling in restored windows, preserving the resize affordance.
++    caption_y = 0;
++    height = TitlebarMaximizedVisualHeight();
++  }
+ 
+   caption_button_container_->SetBounds(
+       CaptionButtonsOnLeadingEdge()
+           ? system_caption_buttons_width
+           : width() - system_caption_buttons_width - preferred_size.width(),
+-      WindowTopY(), preferred_size.width(), height);
++      caption_y, preferred_size.width(), height);
+ }
+ 
+ void BrowserFrameViewWin::LayoutClientView() {
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 19ffb23..927ea0f 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1444,6 +1444,13 @@ ClientFrameElementInfo BrowserView::GetFrameElementInfo() const {
+           : 0;
+   if (toolbar_ && ShouldDrawVerticalTabStrip()) {
+     info.toolbar_minimum_height = toolbar_->GetMinimumSize().height();
++    if (IsYeeShellScaffoldEnabled()) {
++      // BrowserFrameViewWin adds two DIPs of breathing room around toolbar
++      // content. Supplying 46 here makes the resulting visual titlebar match
++      // Yee's 48 DIP shell row in restored and maximized windows.
++      info.toolbar_minimum_height =
++          std::max(info.toolbar_minimum_height, kYeeTitlebarHeight - 2);
++    }
+   } else if (web_app_frame_toolbar_ && ShouldDrawWebAppFrameToolbar()) {
+     info.toolbar_minimum_height =
+         web_app_frame_toolbar_->GetMinimumSize().height();

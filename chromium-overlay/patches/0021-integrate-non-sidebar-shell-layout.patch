@@ -1,0 +1,576 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 5876123..af2e432 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -350,6 +350,7 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/accessibility/view_accessibility_utils.h"
+ #include "ui/views/animation/compositor_animation_runner.h"
++#include "ui/views/background.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/controls/button/menu_button.h"
+ #include "ui/views/controls/textfield/textfield.h"
+@@ -427,23 +428,24 @@ namespace {
+ constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
+ constexpr char kYeeAgentStatusDemoSwitch[] = "yee-agent-status-demo";
+ constexpr char kYeeAgentStatusSwitch[] = "yee-agent-status";
+-constexpr int kYeeShellScaffoldViewId = 0x594545;
+ constexpr int kYeeAgentStatusViewId = 0x594546;
+-constexpr int kYeeContextSwitcherViewId = 0x594547;
+-constexpr int kYeeTitlebarHeight = 64;
++constexpr int kYeeTitlebarHeight = 48;
+ constexpr int kYeeSidebarWidth = 232;
+-constexpr int kYeeShellGutter = 8;
+-constexpr int kYeeWindowControlsWidth = 88;
+-constexpr int kYeeTrailingWidth = 184;
+-constexpr float kYeeContentCornerRadius = 13.0f;
++constexpr int kYeeContentGutter = 6;
++constexpr int kYeeCollapsedSidebarWidth = 8;
++constexpr int kYeeToolbarLeadingInset = 10;
++constexpr int kYeeTitlebarControlGap = 8;
++constexpr int kYeeAgentWidth = 168;
++constexpr int kYeeAgentHeight = 34;
++constexpr float kYeeContentCornerRadius = 8.0f;
+ 
+ bool IsYeeShellScaffoldEnabled() {
+   return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+       kDisableYeeShellScaffoldSwitch);
+ }
+ 
+-// The status surface owns its own small compositor layer. Status changes must
+-// never invalidate the full-window shell or the WebContents layer.
++// A compact status view laid out as a first-class titlebar accessory. Its
++// compositor layer keeps status updates local to this surface.
+ class YeeAgentStatusView : public views::View {
+  public:
+   enum class Status {
+@@ -454,6 +456,7 @@ class YeeAgentStatusView : public views::View {
+ 
+   YeeAgentStatusView() {
+     SetCanProcessEventsWithinSubtree(false);
++    SetPreferredSize(gfx::Size(kYeeAgentWidth, kYeeAgentHeight));
+     SetPaintToLayer();
+     layer()->SetFillsBoundsOpaquely(false);
+     layer()->SetName("YeeAgentStatusView");
+@@ -485,6 +488,21 @@ class YeeAgentStatusView : public views::View {
+       return;
+     }
+ 
++    gfx::RectF surface(bounds);
++    surface.Inset(0.5f);
++    cc::PaintFlags surface_flags;
++    surface_flags.setAntiAlias(true);
++    surface_flags.setColor(SkColorSetRGB(249, 249, 249));
++    surface_flags.setStyle(cc::PaintFlags::kFill_Style);
++    canvas->DrawRoundRect(surface, 6.0f, surface_flags);
++
++    cc::PaintFlags outline_flags;
++    outline_flags.setAntiAlias(true);
++    outline_flags.setColor(SkColorSetRGB(223, 223, 223));
++    outline_flags.setStrokeWidth(1.0f);
++    outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    canvas->DrawRoundRect(surface, 6.0f, outline_flags);
++
+     std::u16string_view title;
+     std::u16string_view detail;
+     SkColor status_color;
+@@ -525,10 +543,10 @@ class YeeAgentStatusView : public views::View {
+         -3, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL);
+     canvas->DrawStringRect(
+         title, title_font, SkColorSetRGB(45, 61, 57),
+-        gfx::Rect(30, 6, std::max(0, bounds.width() - 40), 20));
++        gfx::Rect(30, 5, std::max(0, bounds.width() - 40), 13));
+     canvas->DrawStringRect(
+         detail, detail_font, SkColorSetRGB(101, 116, 111),
+-        gfx::Rect(14, 27, std::max(0, bounds.width() - 24), 14));
++        gfx::Rect(30, 18, std::max(0, bounds.width() - 40), 11));
+   }
+ 
+  private:
+@@ -551,192 +569,49 @@ class YeeAgentStatusView : public views::View {
+   base::RepeatingTimer demo_timer_;
+ };
+ 
+-// UI contract for the first product slot in the titlebar. Tenant/workspace
+-// resolution is deliberately deferred, but the slot should never read as an
+-// unexplained empty glass panel.
+-class YeeContextSwitcherView : public views::View {
++// Paint Yee's Windows shell through BrowserView's existing background path.
++// Reading the laid-out content view here keeps the substrate aligned with the
++// real MultiContentsView without a second, manually positioned child view.
++class YeeShellBackground : public views::Background {
+  public:
+-  YeeContextSwitcherView() {
+-    SetCanProcessEventsWithinSubtree(false);
+-    SetPaintToLayer();
+-    layer()->SetFillsBoundsOpaquely(false);
+-    layer()->SetName("YeeContextSwitcherView");
+-  }
+-
+-  YeeContextSwitcherView(const YeeContextSwitcherView&) = delete;
+-  YeeContextSwitcherView& operator=(const YeeContextSwitcherView&) = delete;
+-  ~YeeContextSwitcherView() override = default;
+-
+-  void OnPaint(gfx::Canvas* canvas) override {
+-    const gfx::Rect bounds = GetLocalBounds();
++  explicit YeeShellBackground(views::View* content_view)
++      : content_view_(content_view) {}
++  YeeShellBackground(const YeeShellBackground&) = delete;
++  YeeShellBackground& operator=(const YeeShellBackground&) = delete;
++  ~YeeShellBackground() override = default;
++
++  void Paint(gfx::Canvas* canvas, views::View* view) const override {
++    const gfx::Rect bounds = view->GetLocalBounds();
+     if (bounds.IsEmpty()) {
+       return;
+     }
+ 
+-    constexpr float kTenantSize = 28.0f;
+-    const gfx::RectF tenant_rect(4.0f, 10.0f, kTenantSize, kTenantSize);
+-    const SkVector tenant_radii[4] = {
+-        {11.5f, 11.5f}, {8.0f, 8.0f}, {11.5f, 11.5f}, {8.0f, 8.0f}};
+-
+-    cc::PaintFlags tenant_flags;
+-    tenant_flags.setAntiAlias(true);
+-    tenant_flags.setColor(SkColorSetRGB(91, 139, 127));
+-    tenant_flags.setStyle(cc::PaintFlags::kFill_Style);
+-    canvas->DrawPath(SkPath::RRect(SkRRect::MakeRectRadii(
+-                         gfx::RectFToSkRect(tenant_rect), tenant_radii)),
+-                     tenant_flags);
+-
+-    const gfx::FontList monogram_font =
+-        gfx::FontList().Derive(-3, gfx::Font::NORMAL, gfx::Font::Weight::BOLD);
+-    canvas->DrawStringRectWithFlags(u"N", monogram_font, SK_ColorWHITE,
+-                                    gfx::ToRoundedRect(tenant_rect),
+-                                    gfx::Canvas::TEXT_ALIGN_CENTER);
+-
+-    const gfx::FontList tenant_font = gfx::FontList().Derive(
+-        -5, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM);
+-    const gfx::FontList workspace_font = gfx::FontList().Derive(
+-        -3, gfx::Font::NORMAL, gfx::Font::Weight::SEMIBOLD);
+-    canvas->DrawStringRect(
+-        u"Northstar Labs", tenant_font, SkColorSetRGB(101, 116, 111),
+-        gfx::Rect(40, 9, std::max(0, bounds.width() - 56), 15));
+-    canvas->DrawStringRect(
+-        u"Product", workspace_font, SkColorSetRGB(45, 61, 57),
+-        gfx::Rect(40, 24, std::max(0, bounds.width() - 56), 16));
+-
+-    cc::PaintFlags chevron_flags;
+-    chevron_flags.setAntiAlias(true);
+-    chevron_flags.setColor(SkColorSetRGB(119, 132, 128));
+-    chevron_flags.setStrokeWidth(1.35f);
+-    chevron_flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
+-    chevron_flags.setStyle(cc::PaintFlags::kStroke_Style);
+-    const float chevron_x = std::max(48.0f, bounds.width() - 10.0f);
+-    canvas->DrawLine(gfx::PointF(chevron_x - 3.0f, 21.0f),
+-                     gfx::PointF(chevron_x, 24.0f), chevron_flags);
+-    canvas->DrawLine(gfx::PointF(chevron_x, 24.0f),
+-                     gfx::PointF(chevron_x + 3.0f, 21.0f), chevron_flags);
+-  }
+-};
+-
+-// A deliberately content-free shell used while Yee's top-level regions are
+-// being designed. Existing Chromium views paint above this material layer, so
+-// the experiment remains reversible and does not fork browser behavior.
+-class YeeShellScaffoldView : public views::View {
+- public:
+-  YeeShellScaffoldView() {
+-    SetCanProcessEventsWithinSubtree(false);
+-    SetPaintToLayer();
+-    layer()->SetFillsBoundsOpaquely(false);
+-    layer()->SetName("YeeShellScaffoldView");
+-  }
+-
+-  YeeShellScaffoldView(const YeeShellScaffoldView&) = delete;
+-  YeeShellScaffoldView& operator=(const YeeShellScaffoldView&) = delete;
+-  ~YeeShellScaffoldView() override = default;
+-
+-  void SetTrailingCaptionInset(int inset) {
+-    inset = std::max(0, inset);
+-    if (trailing_caption_inset_ == inset) {
+-      return;
+-    }
+-    trailing_caption_inset_ = inset;
+-    SchedulePaint();
+-  }
+-
+-  void SetContentBounds(const gfx::Rect& bounds) {
+-    if (content_bounds_ == bounds) {
+-      return;
+-    }
+-    content_bounds_ = bounds;
+-    SchedulePaint();
+-  }
+-
+-  void SetTitlebarLeadingWidth(int width) {
+-    width = std::max(0, width);
+-    if (titlebar_leading_width_ == width) {
+-      return;
+-    }
+-    titlebar_leading_width_ = width;
+-    SchedulePaint();
+-  }
++    // Match the latest pilot's Windows 11 surface rather than approximating
++    // the macOS glass material on this platform.
++    canvas->FillRect(bounds, SkColorSetRGB(243, 243, 243));
++    canvas->FillRect(gfx::Rect(0, kYeeTitlebarHeight - 1, bounds.width(), 1),
++                     SkColorSetRGB(227, 227, 227));
+ 
+-  void OnPaint(gfx::Canvas* canvas) override {
+-    const gfx::Rect bounds = GetLocalBounds();
+-    if (bounds.IsEmpty()) {
++    gfx::RectF content_rect(content_view_->bounds());
++    if (content_rect.IsEmpty()) {
+       return;
+     }
+-
+-    // Windows does not expose Chromium's macOS-only GlassFrame material. Paint
+-    // the pilot's porcelain base below the native controls so translucent
+-    // surfaces never reveal the active frame's saturated accent color.
+-    canvas->FillRect(bounds, SkColorSetRGB(238, 241, 239));
+-
+-    // Match the pilot's frosted titlebar tint. The shell view is installed
+-    // below the interactive Chromium views, so this fill provides material
+-    // without washing out toolbar content.
+-    canvas->FillRect(gfx::Rect(0, 0, bounds.width(), kYeeTitlebarHeight),
+-                     SkColorSetARGB(224, 246, 249, 247));
+-    // The pinned tab sidebar is transparent in the pilot. Keeping the shell
+-    // base uninterrupted here lets the sidebar, content gutter, and the space
+-    // exposed by rounded WebContents corners read as one continuous material.
+-
+-    cc::PaintFlags surface_flags;
+-    surface_flags.setAntiAlias(true);
+-    surface_flags.setColor(SkColorSetARGB(117, 255, 255, 255));
+-    surface_flags.setStyle(cc::PaintFlags::kFill_Style);
+-
+-    cc::PaintFlags outline_flags;
+-    outline_flags.setAntiAlias(true);
+-    outline_flags.setColor(SkColorSetARGB(148, 255, 255, 255));
+-    outline_flags.setStrokeWidth(1.0f);
+-    outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
+-
+-    auto draw_section = [&](const gfx::Rect& rect) {
+-      if (rect.IsEmpty()) {
+-        return;
+-      }
+-      gfx::RectF section(rect);
+-      section.Inset(0.5f);
+-      canvas->DrawRoundRect(section, kYeeContentCornerRadius, surface_flags);
+-      canvas->DrawRoundRect(section, kYeeContentCornerRadius, outline_flags);
+-    };
+-
+-    const int top_height = kYeeTitlebarHeight - 2 * kYeeShellGutter;
+-    const int runway_x = titlebar_leading_width_ + kYeeShellGutter;
+-    const int trailing_right = std::max(
+-        runway_x,
+-        bounds.width() - kYeeShellGutter - trailing_caption_inset_);
+-    const int trailing_x = std::max(
+-        runway_x,
+-        trailing_right - (kYeeTrailingWidth - kYeeShellGutter));
+-    draw_section(
+-        gfx::Rect(trailing_x, kYeeShellGutter,
+-                  std::max(0, trailing_right - trailing_x),
+-                  top_height));
+-    // Use the laid-out MultiContentsView bounds rather than recomputing them
+-    // from the nominal sidebar width. The tab strip may restore a persisted
+-    // width, and even a small mismatch leaves a second-colored strip visible
+-    // around the rounded WebContents clip.
+-    gfx::RectF content_rect(content_bounds_);
+     content_rect.Inset(0.5f);
+ 
+-    // Match the pilot's paper surface and quiet elevation. The opaque backing
+-    // also gives antialiased WebContents corners one consistent substrate.
+     cc::PaintFlags content_surface_flags;
+     content_surface_flags.setAntiAlias(true);
+     content_surface_flags.setColor(SK_ColorWHITE);
+     content_surface_flags.setStyle(cc::PaintFlags::kFill_Style);
+     content_surface_flags.setLooper(gfx::CreateShadowDrawLooper({
+-        gfx::ShadowValue(gfx::Vector2d(0, 2), 8.0,
+-                         SkColorSetARGB(10, 38, 60, 54)),
+         gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0,
+-                         SkColorSetARGB(7, 38, 60, 54)),
++                         SkColorSetARGB(13, 0, 0, 0)),
+     }));
+     canvas->DrawRoundRect(content_rect, kYeeContentCornerRadius,
+                           content_surface_flags);
+ 
+     cc::PaintFlags content_outline_flags;
+     content_outline_flags.setAntiAlias(true);
+-    content_outline_flags.setColor(SkColorSetARGB(20, 54, 93, 85));
++    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
+     content_outline_flags.setStrokeWidth(1.0f);
+     content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
+     canvas->DrawRoundRect(content_rect, kYeeContentCornerRadius,
+@@ -744,9 +619,7 @@ class YeeShellScaffoldView : public views::View {
+   }
+ 
+  private:
+-  int trailing_caption_inset_ = 0;
+-  gfx::Rect content_bounds_;
+-  int titlebar_leading_width_ = kYeeSidebarWidth;
++  const raw_ptr<views::View> content_view_;
+ };
+ 
+ // The visible height of the shadow above the tabs. Clicks in this area are
+@@ -1352,28 +1225,12 @@ BrowserView::BrowserView(Browser* browser)
+     vertical_tab_strip_region_view_->SetHideCollapsedRail(true);
+     vertical_tab_strip_state_controller->SetExpandOnHoverEnabled(true);
+ 
+-    auto yee_shell_scaffold = std::make_unique<YeeShellScaffoldView>();
+-    auto* const yee_shell_scaffold_view = yee_shell_scaffold.get();
+-    // Keep the material underneath WebContents, toolbar, and tabs. Painting it
+-    // as the first BrowserView child lets it replace the raw frame color while
+-    // preserving native interaction and text contrast above it.
+-    AddChildViewAt(
+-        std::unique_ptr<views::View>(std::move(yee_shell_scaffold)), 0);
+-    yee_shell_scaffold_view->SetID(kYeeShellScaffoldViewId);
+-    yee_shell_scaffold_view->SetProperty(views::kViewIgnoredByLayoutKey, true);
+-
+-    auto yee_context_switcher = std::make_unique<YeeContextSwitcherView>();
+-    auto* const yee_context_switcher_view = yee_context_switcher.get();
+-    AddChildView(std::unique_ptr<views::View>(std::move(yee_context_switcher)));
+-    yee_context_switcher_view->SetID(kYeeContextSwitcherViewId);
+-    yee_context_switcher_view->SetProperty(views::kViewIgnoredByLayoutKey,
+-                                           true);
++    SetBackground(std::make_unique<YeeShellBackground>(multi_contents_view_));
+ 
+     auto yee_agent_status = std::make_unique<YeeAgentStatusView>();
+     auto* const yee_agent_status_view = yee_agent_status.get();
+     AddChildView(std::unique_ptr<views::View>(std::move(yee_agent_status)));
+     yee_agent_status_view->SetID(kYeeAgentStatusViewId);
+-    yee_agent_status_view->SetProperty(views::kViewIgnoredByLayoutKey, true);
+   }
+ 
+   // Create do-nothing view for the sake of controlling the z-order of the find
+@@ -5166,43 +5023,6 @@ void BrowserView::Layout(PassKey) {
+ 
+   LayoutSuperclass<views::View>(this);
+ 
+-  if (views::View* const yee_shell_scaffold_view =
+-          GetViewByID(kYeeShellScaffoldViewId)) {
+-    const BrowserLayoutParams frame_layout_params =
+-        GetFrameView()->GetBrowserLayoutParams();
+-    const int trailing_caption_inset = base::ClampCeil(
+-        frame_layout_params.trailing_exclusion.ContentWithPadding().width());
+-    auto* const yee_shell =
+-        static_cast<YeeShellScaffoldView*>(yee_shell_scaffold_view);
+-    yee_shell->SetTrailingCaptionInset(trailing_caption_inset);
+-    yee_shell->SetContentBounds(multi_contents_view_->bounds());
+-    const int titlebar_leading_width =
+-        vertical_tab_strip_region_view_->uncollapsed_width();
+-    yee_shell->SetTitlebarLeadingWidth(titlebar_leading_width);
+-    yee_shell_scaffold_view->SetBoundsRect(GetLocalBounds());
+-    const int runway_x = titlebar_leading_width + kYeeShellGutter;
+-    const int trailing_right = std::max(
+-        runway_x, width() - kYeeShellGutter - trailing_caption_inset);
+-    const int trailing_x = std::max(
+-        runway_x,
+-        trailing_right - (kYeeTrailingWidth - kYeeShellGutter));
+-    if (views::View* const yee_context_switcher_view =
+-            GetViewByID(kYeeContextSwitcherViewId)) {
+-      yee_context_switcher_view->SetBoundsRect(
+-          gfx::Rect(kYeeWindowControlsWidth, kYeeShellGutter,
+-                    std::max(0, titlebar_leading_width -
+-                                    kYeeWindowControlsWidth),
+-                    kYeeTitlebarHeight - 2 * kYeeShellGutter));
+-    }
+-    if (views::View* const yee_agent_status_view =
+-            GetViewByID(kYeeAgentStatusViewId)) {
+-      yee_agent_status_view->SetBoundsRect(
+-          gfx::Rect(trailing_x, kYeeShellGutter,
+-                    std::max(0, trailing_right - trailing_x),
+-                    kYeeTitlebarHeight - 2 * kYeeShellGutter));
+-    }
+-  }
+-
+   // TODO(jamescook): Why was this in the middle of layout code?
+   toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
+   GetFrameView()->UpdateMinimumSize();
+@@ -5347,10 +5167,6 @@ void BrowserView::AddedToWidget() {
+ 
+   if (IsYeeShellScaffoldEnabled()) {
+     toolbar_->ConfigureForCompactShell();
+-    // The shell scaffold and WebContents are layer-backed and are created after
+-    // the top container. Put the live toolbar at the front only after the full
+-    // BrowserView hierarchy exists so those later layers cannot cover it.
+-    ReorderChildView(top_container_.get(), children().size() - 1);
+   }
+ 
+   if (omnibox::IsWebUIOmniboxInBrowserViewEnabled()) {
+@@ -5436,30 +5252,32 @@ void BrowserView::AddedToWidget() {
+   layout_views.vertical_tab_strip_top_corner = vertical_tab_strip_top_corner_;
+   layout_views.organizer_panel_container = organizer_panel_container_;
+   layout_views.toolbar = toolbar_;
++  layout_views.titlebar_end = GetViewByID(kYeeAgentStatusViewId);
+   layout_views.infobar_container = infobar_container_;
+   layout_views.multi_contents_view = multi_contents_view_;
+   layout_views.side_panel = side_panel_;
+   layout_views.top_container_separator = top_container_separator_;
+   if (IsYeeShellScaffoldEnabled()) {
+     layout_views.toolbar_layout_config = BrowserToolbarLayoutConfig{
+-        gfx::Insets::TLBR(kYeeShellGutter, kYeeSidebarWidth, 0,
+-                          kYeeTrailingWidth + kYeeShellGutter),
+-        kYeeTitlebarHeight - 2 * kYeeShellGutter, kYeeTitlebarHeight,
++        gfx::Insets::TLBR((kYeeTitlebarHeight - 40) / 2,
++                          kYeeToolbarLeadingInset, 0,
++                          kYeeTitlebarControlGap),
++        /*height=*/40, kYeeTitlebarHeight,
+         /*show_container_background=*/false,
+-        /*leading_vertical_tab_strip_spacing=*/0};
++        /*trailing_accessory_spacing=*/kYeeTitlebarControlGap};
+     layout_views.content_layout_config = BrowserContentLayoutConfig{
+-        gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeShellGutter,
+-                          kYeeSidebarWidth + kYeeShellGutter, kYeeShellGutter,
+-                          kYeeShellGutter),
++        gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeContentGutter,
++                          kYeeSidebarWidth + kYeeContentGutter,
++                          kYeeContentGutter, kYeeContentGutter),
+         gfx::RoundedCornersF(kYeeContentCornerRadius),
+         /*show_top_separator=*/false,
+-        /*collapsed_vertical_tab_strip_leading_inset=*/kYeeShellGutter,
+-        /*vertical_tab_strip_spacing=*/kYeeShellGutter};
++        /*collapsed_vertical_tab_strip_leading_inset=*/kYeeContentGutter,
++        /*vertical_tab_strip_spacing=*/kYeeContentGutter};
+     layout_views.vertical_tab_strip_layout_config =
+         BrowserVerticalTabStripLayoutConfig{
+-            gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeShellGutter, 0,
+-                              kYeeShellGutter, 0),
+-            /*collapsed_width=*/kYeeShellGutter};
++            gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeContentGutter, 0,
++                              kYeeContentGutter, 0),
++            /*collapsed_width=*/kYeeCollapsedSidebarWidth};
+   }
+   // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)
+ 
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_layout.h b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+index a268d68..3a0599b 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_layout.h
++++ b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
+@@ -67,10 +67,7 @@ struct BrowserToolbarLayoutConfig {
+   int height = 0;
+   int reserved_height = 0;
+   bool show_container_background = true;
+-  // When present, derive the leading inset from the vertical tab strip's
+-  // restored uncollapsed width plus this spacing. This keeps shell-defined
+-  // titlebars aligned when Chromium restores a user-resized tab strip.
+-  std::optional<int> leading_vertical_tab_strip_spacing;
++  int trailing_accessory_spacing = 0;
+ };
+ 
+ // Views associated with a browser view.
+@@ -109,6 +106,7 @@ struct BrowserViewLayoutViews {
+   raw_ptr<CustomFloatingCorner> vertical_tab_strip_top_corner = nullptr;
+   raw_ptr<OrganizerPanelView> organizer_panel_container = nullptr;
+   raw_ptr<views::View> toolbar = nullptr;
++  raw_ptr<views::View> titlebar_end = nullptr;
+   raw_ptr<InfoBarContainerView> infobar_container = nullptr;
+   raw_ptr<MultiContentsView> multi_contents_view = nullptr;
+   raw_ptr<SidePanel> side_panel = nullptr;
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index a3f7479..88465de 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -696,6 +696,31 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   const bool adjust_for_cracking = AvoidCrackingForFractionalDisplay();
+   const HorizontalLayout& horizontal_layout = layout_data_->horizontal_layout;
+ 
++  // Shell-defined titlebar accessories participate in the same proposed
++  // layout as the toolbar and native caption exclusion. This keeps them out of
++  // BrowserView's imperative Layout() path and prevents control overlap.
++  if (IsParentedTo(views().titlebar_end, views().browser_view)) {
++    gfx::Rect titlebar_end_bounds;
++    const bool titlebar_end_visible =
++        delegate().IsToolbarVisible() && views().toolbar_layout_config;
++    if (titlebar_end_visible) {
++      const BrowserToolbarLayoutConfig& config =
++          *views().toolbar_layout_config;
++      const gfx::Size preferred_size =
++          views().titlebar_end->GetPreferredSize();
++      const int trailing_exclusion = base::ClampCeil(
++          browser_params.trailing_exclusion.ContentWithPadding().width());
++      titlebar_end_bounds = gfx::Rect(
++          browser_params.visual_client_area.right() - trailing_exclusion -
++              config.insets.right() - preferred_size.width(),
++          browser_params.visual_client_area.y() + config.insets.top() +
++              std::max(0, (config.height - preferred_size.height()) / 2),
++          preferred_size.width(), preferred_size.height());
++    }
++    layout.AddChild(views().titlebar_end, titlebar_end_bounds,
++                    titlebar_end_visible);
++  }
++
+   // Lay out horizontal tab strip region if present.
+   if (IsParentedTo(views().horizontal_tab_strip_region_view,
+                    views().browser_view)) {
+@@ -1363,19 +1388,19 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
+             *views().toolbar_layout_config;
+         const int trailing_exclusion = base::ClampCeil(
+             params.trailing_exclusion.ContentWithPadding().width());
+-        int leading_inset = config.insets.left();
+-        if (config.leading_vertical_tab_strip_spacing &&
+-            views().vertical_tab_strip_region_view) {
+-          leading_inset =
+-              views().vertical_tab_strip_region_view->uncollapsed_width() +
+-              *config.leading_vertical_tab_strip_spacing;
+-        }
++        const int trailing_accessory_width =
++            views().titlebar_end && delegate().IsToolbarVisible()
++                ? views().titlebar_end->GetPreferredSize().width() +
++                      config.trailing_accessory_spacing
++                : 0;
+         toolbar_bounds =
+-            gfx::Rect(params.visual_client_area.x() + leading_inset,
++            gfx::Rect(params.visual_client_area.x() + config.insets.left(),
+                       params.visual_client_area.y() + config.insets.top(),
+                       std::max(0, params.visual_client_area.width() -
+-                                      leading_inset - config.insets.right() -
+-                                      trailing_exclusion),
++                                      config.insets.left() -
++                                      config.insets.right() -
++                                      trailing_exclusion -
++                                      trailing_accessory_width),
+                       config.height);
+         params.SetTop(original_top + config.reserved_height);
+       } else {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index 9ab749f..79de749 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -174,8 +174,8 @@
+ 
+ namespace {
+ 
+-constexpr int kCompactShellLocationBarHeight = 36;
+-constexpr int kCompactShellLocationBarRadius = 10;
++constexpr int kCompactShellLocationBarHeight = 32;
++constexpr int kCompactShellLocationBarRadius = 7;
+ 
+ int IncrementalMinimumWidth(const views::View* view) {
+   return (view && view->GetVisible()) ? view->GetMinimumSize().width() : 0;
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 1c1dc2f..d30568d 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -382,6 +382,22 @@ void ToolbarView::ConfigureForCompactShell() {
+ 
+   location_bar_view_->ConfigureForCompactShell();
+ 
++  const gfx::Size kCompactControlSize(30, 30);
++  compact_shell_sidebar_button_->SetPreferredSize(kCompactControlSize);
++  if (back_) {
++    back_->SetPreferredSize(kCompactControlSize);
++  }
++  if (forward_) {
++    forward_->SetPreferredSize(kCompactControlSize);
++  }
++  if (reload_) {
++    reload_->SetPreferredSize(kCompactControlSize);
++  }
++  if (extensions_container_) {
++    extensions_container_->GetExtensionsButton()->SetPreferredSize(
++        kCompactControlSize);
++  }
++
+   constexpr int kControlMargin = 1;
+   compact_shell_sidebar_button_->SetProperty(
+       views::kMarginsKey, gfx::Insets::VH(0, kControlMargin));

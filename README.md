@@ -5,6 +5,10 @@ pilot 프로젝트다. 현재 목표는 실제 Chromium 탭 모델을 유지하�
 Arc/Aside 계열의 조용한 sidebar-first 셸을 제공하고 에이전트에는 브라우저 내부
 상태로 이어지는 명확한 통합 경계를 만드는 것이다.
 
+실제 Chromium 구현에서 지켜야 할 레이아웃 치수, OS별 경계, Sidebar 정보 구조와
+회귀 체크리스트는 [`docs/browser-shell-spec.md`](docs/browser-shell-spec.md)를
+기준으로 한다.
+
 ## Native Chromium checkpoint
 
 [`native-pilot/`](native-pilot/)은 설치된 현재 Chrome의 Chromium 런타임과 native
@@ -78,18 +82,20 @@ python3 -m http.server 4173 --bind 127.0.0.1
 
 화면 변형은 쿼리로 비교한다.
 
-- `titlebar=regular|thin`: 64px 기본형과 44px 압축형
+- `titlebar=regular|thin`: OS별 기본 Title bar와 압축형
 - `tenant=squircle|offset|inset`: Tenant 이미지 실루엣 비교
 - `sidebar=open|closed`: 고정 사이드바와 닫힌 사이드바
+- `os=windows|mac|linux`: 플랫폼 frame과 caption controls 비교
 
-두 Title bar 밀도 모두 Tenant 이미지와 Tenant/Workspace 두 줄 맥락을 유지한다.
-현재 기본 실루엣은 한쪽 곡률을 강조한 `offset`이다.
+Tenant/Workspace 맥락은 Title bar가 아니라 Sidebar footer에 유지한다. 현재 기본
+실루엣은 한쪽 곡률을 강조한 `offset`이다.
 
 현재 방향은 Arc와 Aside의 sidebar-first 탐색을 참고한 정적 WebUI형 셸이다.
 
-- Title bar의 Leading Area는 Tenant/Workspace 전환 맥락을 소유한다.
-- Command Runway는 탐색, 주소/검색/명령, 확장 프로그램을 하나의 표면에 묶는다.
-- Trailing Area의 Agent Status는 탭 구성과 분리된 실행 상태를 보여준다.
+- Title bar의 Leading rail은 Sidebar, New item, Agent activity와 탐색 action을
+  소유한다. Omnibox 시작점은 Browser Content 시작점과 맞춘다.
+- Command Runway는 주소/검색/명령과 확장 프로그램을 하나의 표면에 묶는다.
+- 상세 Agent Status는 Sidebar에 두고 Toolbar에는 compact status만 둔다.
 - Tab sidebar의 Group은 사용자가 탭을 정리하는 UI 도구일 뿐 Agent Task를
   소유하지 않는다.
 - 사이드바를 닫으면 웹 표면이 전체 폭을 사용한다. 왼쪽 끝에 가리키면 글라스

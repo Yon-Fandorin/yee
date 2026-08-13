@@ -1,0 +1,220 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index b3e266b..29e2ade 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -431,6 +431,7 @@ constexpr int kYeeContentGutter = 6;
+ constexpr int kYeeCollapsedSidebarWidth = 8;
+ constexpr int kYeeToolbarLeadingInset = 10;
+ constexpr int kYeeTitlebarControlGap = 8;
++constexpr int kYeeContentOutlineViewId = 92003;
+ constexpr float kYeeContentCornerRadius = 8.0f;
+ 
+ bool IsYeeShellScaffoldEnabled() {
+@@ -458,9 +459,6 @@ class YeeShellBackground : public views::Background {
+     // Match the latest pilot's Windows 11 surface rather than approximating
+     // the macOS glass material on this platform.
+     canvas->FillRect(bounds, SkColorSetRGB(243, 243, 243));
+-    canvas->FillRect(gfx::Rect(0, kYeeTitlebarHeight - 1, bounds.width(), 1),
+-                     SkColorSetRGB(227, 227, 227));
+-
+     gfx::RectF content_rect(content_view_->bounds());
+     if (content_rect.IsEmpty()) {
+       return;
+@@ -491,6 +489,44 @@ class YeeShellBackground : public views::Background {
+   const raw_ptr<views::View> content_view_;
+ };
+ 
++// A composited foreground stroke for the real WebContents surface. Keeping
++// this as a sibling layer avoids two failure modes: painting the line below an
++// opaque renderer hides it, while appending paint operations after recursive
++// child painting is unsafe for BrowserView's delegated-compositing path.
++class YeeContentOutlineView : public views::View {
++  METADATA_HEADER(YeeContentOutlineView, views::View)
++
++ public:
++  YeeContentOutlineView() {
++    SetID(kYeeContentOutlineViewId);
++    SetPaintToLayer();
++    layer()->SetFillsBoundsOpaquely(false);
++    SetCanProcessEventsWithinSubtree(false);
++  }
++  YeeContentOutlineView(const YeeContentOutlineView&) = delete;
++  YeeContentOutlineView& operator=(const YeeContentOutlineView&) = delete;
++  ~YeeContentOutlineView() override = default;
++
++  void OnPaint(gfx::Canvas* canvas) override {
++    gfx::RectF content_rect(GetLocalBounds());
++    if (content_rect.IsEmpty()) {
++      return;
++    }
++    content_rect.Inset(0.5f);
++
++    cc::PaintFlags content_outline_flags;
++    content_outline_flags.setAntiAlias(true);
++    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
++    content_outline_flags.setStrokeWidth(1.0f);
++    content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
++    canvas->DrawRoundRect(content_rect, kYeeContentCornerRadius,
++                          content_outline_flags);
++  }
++};
++
++BEGIN_METADATA(YeeContentOutlineView)
++END_METADATA
++
+ // The visible height of the shadow above the tabs. Clicks in this area are
+ // treated as clicks to the frame, rather than clicks to the tab.
+ const int kTabShadowSize = 2;
+@@ -1095,6 +1131,10 @@ BrowserView::BrowserView(Browser* browser)
+     vertical_tab_strip_state_controller->SetExpandOnHoverEnabled(true);
+ 
+     SetBackground(std::make_unique<YeeShellBackground>(multi_contents_view_));
++
++    auto content_outline = std::make_unique<YeeContentOutlineView>();
++    content_outline->SetProperty(views::kViewIgnoredByLayoutKey, true);
++    AddChildView(std::move(content_outline));
+   }
+ 
+   // Create do-nothing view for the sake of controlling the z-order of the find
+@@ -4894,6 +4934,16 @@ void BrowserView::Layout(PassKey) {
+ 
+   LayoutSuperclass<views::View>(this);
+ 
++  if (views::View* const content_outline =
++          GetViewByID(kYeeContentOutlineViewId)) {
++    const bool show_outline =
++        multi_contents_view_ && multi_contents_view_->GetVisible();
++    content_outline->SetVisible(show_outline);
++    if (show_outline) {
++      content_outline->SetBoundsRect(multi_contents_view_->bounds());
++    }
++  }
++
+   // TODO(jamescook): Why was this in the middle of layout code?
+   toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
+   GetFrameView()->UpdateMinimumSize();
+@@ -5140,7 +5190,7 @@ void BrowserView::AddedToWidget() {
+         /*show_container_background=*/false,
+         /*trailing_accessory_spacing=*/kYeeTitlebarControlGap};
+     layout_views.content_layout_config = BrowserContentLayoutConfig{
+-        gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeContentGutter,
++        gfx::Insets::TLBR(kYeeTitlebarHeight,
+                           kYeeSidebarWidth + kYeeContentGutter,
+                           kYeeContentGutter, kYeeContentGutter),
+         gfx::RoundedCornersF(kYeeContentCornerRadius),
+@@ -5151,7 +5201,7 @@ void BrowserView::AddedToWidget() {
+         /*show_vertical_tab_strip_corners=*/false};
+     layout_views.vertical_tab_strip_layout_config =
+         BrowserVerticalTabStripLayoutConfig{
+-            gfx::Insets::TLBR(kYeeTitlebarHeight + kYeeContentGutter, 0,
++            gfx::Insets::TLBR(kYeeTitlebarHeight, 0,
+                               kYeeContentGutter, 0),
+             /*collapsed_width=*/kYeeCollapsedSidebarWidth};
+   }
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index b574a95..966e675 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -8,6 +8,7 @@
+ #include <optional>
+ 
+ #include "base/callback_list.h"
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/i18n/number_formatting.h"
+ #include "base/i18n/rtl.h"
+@@ -78,6 +79,8 @@
+ #include "ui/views/view_utils.h"
+ 
+ namespace {
++constexpr char kDisableYeeShellScaffoldSwitch[] =
++    "disable-yee-shell-scaffold";
+ constexpr int kResizeAreaWidth = 5;
+ constexpr int kCollapsedResizeAreaWidth = 2;
+ constexpr int kKeyboardResizeWidth = 50;
+@@ -92,6 +95,11 @@ constexpr ShadowFrameView::ShadowAlpha kExpandOnHoverShadowAlpha(
+      .dark_key = 0.36,
+      .dark_ambient = 0.08});
+ 
++bool IsYeeShellScaffoldEnabled() {
++  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
++      kDisableYeeShellScaffoldSwitch);
++}
++
+ // The hover-expanded tab strip is translated into the content area. Extend its
+ // hit region back to the window edge so the pointer has a continuous path from
+ // the edge trigger into the visible flyout throughout the animation.
+@@ -183,6 +191,15 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+               LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
+           region_horizontal_padding, 0, region_horizontal_padding));
+ 
++  // Yee owns sidebar toggle and new-item actions in the titlebar. Chromium's
++  // stock vertical-tab launchers would duplicate those controls and introduce
++  // section dividers that are absent from the pilot.
++  if (IsYeeShellScaffoldEnabled()) {
++    top_button_container_->SetVisible(false);
++    top_button_separator_->SetVisible(false);
++    bottom_button_container_->SetVisible(false);
++  }
++
+   gemini_button_ = AddChildView(std::make_unique<views::View>());
+ 
+   resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
+@@ -449,7 +466,13 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+     return GetTabAnchorViewAt(active_index);
+   }
+ 
+-  return top_button_container_;
++  if (top_button_container_->GetVisible()) {
++    return top_button_container_;
++  }
++  if (tab_strip_view()) {
++    return tab_strip_view();
++  }
++  return this;
+ }
+ 
+ gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
+@@ -825,7 +848,7 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+   // The expanded Yee sidebar uses spacing between its native sections instead
+   // of a full-width rule below the launcher controls. Keep Chromium's divider
+   // only for the compact rail where it still separates two icon regions.
+-  top_button_separator_->SetVisible(collapsed);
++  top_button_separator_->SetVisible(!IsYeeShellScaffoldEnabled() && collapsed);
+ 
+   resize_area_->SetVisible(!collapsed ||
+                            !state_controller_->IsExpandOnHoverEnabled() ||
+@@ -881,7 +904,9 @@ gfx::Rect VerticalTabStripRegionView::GetTabStripDraggableBounds() const {
+   gfx::Rect tab_strip_draggable_bounds = tab_strip_view()->GetBoundsInScreen();
+   tab_strip_draggable_bounds.set_height(
+       GetBoundsInScreen().bottom() -
+-      bottom_button_container_->GetMinimumSize().height() -
++      (bottom_button_container_->GetVisible()
++           ? bottom_button_container_->GetMinimumSize().height()
++           : 0) -
+       flex_layout_->interior_margin().height() -
+       tab_strip_draggable_bounds.y());
+   return tab_strip_draggable_bounds;
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 8910afb..6aea5da 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -498,6 +498,7 @@ void ToolbarView::ConfigureForCompactShell() {
+   const size_t location_bar_index = GetIndexOf(location_bar_view_).value();
+   compact_shell_leading_divider_ =
+       AddChildViewAt(std::make_unique<ToolbarDivider>(), location_bar_index);
++  compact_shell_leading_divider_->SetVisible(false);
+ 
+   if (forward_) {
+     forward_->SetVisible(true);
+@@ -2096,7 +2097,9 @@ void ToolbarView::LayoutCommon() {
+ 
+   if (toolbar_divider_ && extensions_container_) {
+     views::ManualLayoutUtil(layout_manager_)
+-        .SetViewHidden(toolbar_divider_, !extensions_container_->GetVisible());
++        .SetViewHidden(toolbar_divider_,
++                       compact_shell_mode_ ||
++                           !extensions_container_->GetVisible());
+   }
+   // Cast button visibility is controlled externally.
+ }

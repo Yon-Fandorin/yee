@@ -26,8 +26,37 @@ $patchFiles = @(
     (Join-Path $scriptDir 'patches\0011-align-floating-tab-sidebar-hit-region.patch'),
     (Join-Path $scriptDir 'patches\0012-sync-floating-tab-sidebar-foreground-opacity.patch'),
     (Join-Path $scriptDir 'patches\0013-match-pilot-tabs-and-location-bar.patch'),
-    (Join-Path $scriptDir 'patches\0014-fix-windows-protoc-python-aliases.patch')
+    (Join-Path $scriptDir 'patches\0014-port-pilot-tabs-to-latest-chromium.patch'),
+    (Join-Path $scriptDir 'patches\0015-fix-windows-protoc-python-aliases.patch'),
+    (Join-Path $scriptDir 'patches\0016-match-pilot-glass-material.patch'),
+    (Join-Path $scriptDir 'patches\0017-reserve-native-caption-controls.patch'),
+    (Join-Path $scriptDir 'patches\0018-unify-rounded-content-surface.patch'),
+    (Join-Path $scriptDir 'patches\0019-use-native-shell-layout-geometry.patch'),
+    (Join-Path $scriptDir 'patches\0020-unify-pinned-sidebar-and-content-gutter.patch'),
+    (Join-Path $scriptDir 'patches\0021-integrate-non-sidebar-shell-layout.patch'),
+    (Join-Path $scriptDir 'patches\0022-let-explicit-content-own-corner-material.patch'),
+    (Join-Path $scriptDir 'patches\0023-fit-native-caption-buttons-to-titlebar.patch'),
+    (Join-Path $scriptDir 'patches\0024-match-latest-pilot-toolbar.patch'),
+    (Join-Path $scriptDir 'patches\0025-suppress-focused-window-border.patch'),
+    (Join-Path $scriptDir 'patches\0026-remove-restored-window-frame-bands.patch'),
+    (Join-Path $scriptDir 'patches\0027-refine-pilot-omnibox.patch'),
+    (Join-Path $scriptDir 'patches\0028-restore-borderless-window-shadow.patch'),
+    (Join-Path $scriptDir 'patches\0029-match-pilot-sidebar-sections.patch'),
+    (Join-Path $scriptDir 'patches\0030-align-pilot-shell-separators.patch')
 )
+
+function Get-PatchOptions {
+    param([Parameter(Mandatory = $true)][string] $PatchFile)
+
+    if ((Split-Path -Leaf $PatchFile) -eq
+        '0013-match-pilot-tabs-and-location-bar.patch') {
+        return @(
+            '--exclude=chrome/browser/ui/views/tabs/common/tab_view.cc',
+            '--exclude=chrome/browser/ui/views/tabs/common/tab_view.h'
+        )
+    }
+    return @()
+}
 
 function Invoke-GitApply {
     param(
@@ -67,10 +96,13 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
+$shellPatchIndexes = @(0) + @(2..13) + @(15..29)
 $shellSeriesAppliedThrough = -1
-for ($patchIndex = 12; $patchIndex -ge 2; $patchIndex--) {
-    $reverseCheck = Invoke-GitApply -Arguments @(
-        '--reverse', '--check', $patchFiles[$patchIndex]
+for ($shellIndex = $shellPatchIndexes.Count - 1; $shellIndex -ge 0; $shellIndex--) {
+    $patchIndex = $shellPatchIndexes[$shellIndex]
+    $patchOptions = @(Get-PatchOptions -PatchFile $patchFiles[$patchIndex])
+    $reverseCheck = Invoke-GitApply -Arguments (
+        $patchOptions + @('--reverse', '--check', $patchFiles[$patchIndex])
     ) -Quiet
     if ($reverseCheck.Success) {
         $shellSeriesAppliedThrough = $patchIndex
@@ -81,19 +113,25 @@ for ($patchIndex = 12; $patchIndex -ge 2; $patchIndex--) {
 for ($patchIndex = 0; $patchIndex -lt $patchFiles.Count; $patchIndex++) {
     $patchFile = $patchFiles[$patchIndex]
     $patchName = Split-Path -Leaf $patchFile
+    $patchOptions = @(Get-PatchOptions -PatchFile $patchFile)
 
-    if ($patchIndex -ge 2 -and $patchIndex -le $shellSeriesAppliedThrough) {
+    if ($shellPatchIndexes -contains $patchIndex -and
+        $patchIndex -le $shellSeriesAppliedThrough) {
         Write-Host "Already applied: $patchName"
         continue
     }
 
-    $reverseCheck = Invoke-GitApply -Arguments @('--reverse', '--check', $patchFile) -Quiet
+    $reverseCheck = Invoke-GitApply -Arguments (
+        $patchOptions + @('--reverse', '--check', $patchFile)
+    ) -Quiet
     if ($reverseCheck.Success) {
         Write-Host "Already applied: $patchName"
         continue
     }
 
-    $forwardCheck = Invoke-GitApply -Arguments @('--check', $patchFile) -Quiet
+    $forwardCheck = Invoke-GitApply -Arguments (
+        $patchOptions + @('--check', $patchFile)
+    ) -Quiet
     if (-not $forwardCheck.Success) {
         $forwardCheck.Output | ForEach-Object { Write-Host $_ }
         throw "Cannot apply $patchName; its target files have unexpected changes."
@@ -104,7 +142,7 @@ for ($patchIndex = 0; $patchIndex -lt $patchFiles.Count; $patchIndex++) {
         continue
     }
 
-    $applyResult = Invoke-GitApply -Arguments @($patchFile)
+    $applyResult = Invoke-GitApply -Arguments ($patchOptions + @($patchFile))
     if (-not $applyResult.Success) {
         throw "Failed to apply $patchName."
     }

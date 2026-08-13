@@ -12,6 +12,12 @@ const STATIC_PAGES = Object.freeze({
   mojo: { address: "chromium.googlesource.com/mojo", title: "Mojo interfaces", page: "blank" },
 });
 
+const ITEM_PRESETS = Object.freeze({
+  tab: { icon: "+", iconClass: "blank", title: "New tab", detail: "Ready to browse" },
+  chat: { icon: "✦", iconClass: "chat", title: "New chat", detail: "Conversation ready" },
+  note: { icon: "N", iconClass: "note", title: "Untitled note", detail: "Local note" },
+});
+
 export function createTabSidebarController(shell) {
   const tabList = requireElement(shell, '[data-region="tab-list"]');
   const looseTabs = requireElement(tabList, '[data-region="loose-tabs"]');
@@ -24,8 +30,12 @@ export function createTabSidebarController(shell) {
   const documentTitle = requireElement(documentPage, '[data-field="page-title"]');
   const blankPage = requireElement(shell, '[data-page="blank"]');
   const blankTitle = requireElement(blankPage, '[data-field="blank-title"]');
-  const newTabButtons = elements(shell, '[data-action="new-tab"]');
+  const createMenu = requireElement(shell, '[data-region="create-menu"]');
+  const createMenuTitle = requireElement(createMenu, '[data-field="create-menu-title"]');
   let newTabSequence = 0;
+  let newGroupSequence = 0;
+  let createTargetGroup;
+  let createMenuTrigger;
 
   function tabs() {
     return elements(tabList, '[data-action="select-tab"]');
@@ -35,8 +45,10 @@ export function createTabSidebarController(shell) {
     tabCount.textContent = String(tabs().length);
 
     elements(tabList, "[data-group]").forEach((group) => {
-      const groupCount = requireElement(group, '[data-field="group-count"]');
-      groupCount.textContent = String(elements(group, '[data-action="select-tab"]').length);
+      const groupCount = group.querySelector('[data-field="group-count"]');
+      if (groupCount) {
+        groupCount.textContent = String(elements(group, '[data-action="select-tab"]').length);
+      }
     });
 
     shell.dispatchEvent(new CustomEvent("workspace:tabs-changed"));
@@ -113,9 +125,45 @@ export function createTabSidebarController(shell) {
     return true;
   }
 
-  function createTab() {
+  function closeCreateMenu({ restoreFocus = false } = {}) {
+    if (createMenu.hidden) return;
+    createMenu.hidden = true;
+    if (!isSidebarOpen()) setSidebarOpen(true);
+    createMenuTrigger?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) createMenuTrigger?.focus();
+    createMenuTrigger = undefined;
+    createTargetGroup = undefined;
+  }
+
+  function openCreateMenu(trigger) {
+    if (!createMenu.hidden && createMenuTrigger === trigger) {
+      closeCreateMenu({ restoreFocus: true });
+      return;
+    }
+
+    createMenuTrigger?.setAttribute("aria-expanded", "false");
+    createMenuTrigger = trigger;
+    createTargetGroup = trigger.dataset.targetGroup;
+    const group = createTargetGroup
+      ? tabList.querySelector(`[data-group="${createTargetGroup}"]`)
+      : null;
+    const groupName = group?.querySelector(".tab-group-toggle > span:nth-child(2)")?.textContent;
+    createMenuTitle.textContent = groupName ? `Add to ${groupName}` : "Create new";
+    requireElement(createMenu, '[data-action="create-group"]').hidden = Boolean(groupName);
+    trigger.setAttribute("aria-expanded", "true");
+    createMenu.hidden = false;
+
+    const sidebarRect = requireElement(shell, ".tab-sidebar").getBoundingClientRect();
+    const triggerRect = trigger.getBoundingClientRect();
+    const top = Math.min(triggerRect.bottom - sidebarRect.top + 4, sidebarRect.height - createMenu.offsetHeight - 10);
+    createMenu.style.top = `${Math.max(8, top)}px`;
+    createMenu.querySelector('[role="menuitem"]')?.focus();
+  }
+
+  function createItem(kind = "tab", targetGroupName) {
+    const preset = ITEM_PRESETS[kind] ?? ITEM_PRESETS.tab;
     newTabSequence += 1;
-    const tabId = `new-tab-${newTabSequence}`;
+    const tabId = `${kind}-${newTabSequence}`;
     const tab = document.createElement("button");
     tab.className = "tab-item";
     tab.type = "button";
@@ -123,12 +171,23 @@ export function createTabSidebarController(shell) {
     tab.setAttribute("aria-selected", "false");
     tab.dataset.tab = tabId;
     tab.dataset.action = "select-tab";
+    tab.dataset.kind = kind;
     tab.innerHTML = `
-      <span class="favicon blank">+</span>
-      <span class="tab-copy"><strong>New tab</strong><small>Ready to browse</small></span>
+      <span class="favicon ${preset.iconClass}">${preset.icon}</span>
+      <span class="tab-copy"><strong>${preset.title}</strong><small>${preset.detail}</small></span>
       <span class="tab-side"><span class="tab-close" aria-hidden="true" data-action="close-tab">×</span></span>
     `;
-    looseTabs.append(tab);
+    const targetGroup = targetGroupName
+      ? tabList.querySelector(`[data-group="${targetGroupName}"]`)
+      : null;
+    const targetContainer = targetGroup?.querySelector(".tab-group-items") ?? looseTabs;
+
+    if (targetGroup) {
+      targetGroup.dataset.groupState = "open";
+      setBooleanAttribute(requireElement(targetGroup, '[data-action="toggle-tab-group"]'), "aria-expanded", true);
+    }
+
+    targetContainer.append(tab);
     updateCount();
     selectTab(tab);
 
@@ -136,6 +195,59 @@ export function createTabSidebarController(shell) {
       tab.focus();
       tab.scrollIntoView({ block: "nearest" });
     }
+
+    closeCreateMenu();
+    return tab;
+  }
+
+  function createTab(targetGroupName) {
+    return createItem("tab", targetGroupName);
+  }
+
+  function createGroup() {
+    newGroupSequence += 1;
+    const groupId = `collection-${newGroupSequence}`;
+    const group = document.createElement("section");
+    group.className = "tab-group is-new-group";
+    group.dataset.group = groupId;
+    group.dataset.groupState = "open";
+    group.setAttribute("role", "presentation");
+    group.innerHTML = `
+      <div class="tab-group-heading">
+        <button class="tab-group-toggle" type="button" aria-controls="group-${groupId}-items" aria-expanded="true" data-action="toggle-tab-group">
+          <span class="group-mark" aria-hidden="true"></span>
+          <span class="group-name"><input type="text" value="New group" aria-label="그룹 이름" /></span>
+          <small data-field="group-count">0</small>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+        </button>
+        <button class="group-add-tab" type="button" aria-label="새 그룹에 항목 추가" aria-controls="sidebar-create-menu" aria-expanded="false" title="그룹에 항목 추가" data-action="toggle-create-menu" data-target-group="${groupId}">
+          <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 4v10M4 9h10" /></svg>
+        </button>
+      </div>
+      <div class="tab-group-items" id="group-${groupId}-items" role="presentation"></div>
+    `;
+    tabList.append(group);
+    updateCount();
+    closeCreateMenu();
+
+    const input = requireElement(group, ".group-name input");
+    input.focus();
+    input.select();
+    const commitName = () => {
+      const name = input.value.trim() || `Group ${newGroupSequence}`;
+      const label = document.createElement("span");
+      label.textContent = name;
+      input.replaceWith(label);
+      requireElement(group, ".group-add-tab").setAttribute("aria-label", `${name} 그룹에 항목 추가`);
+    };
+    input.addEventListener("blur", commitName, { once: true });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") input.blur();
+      if (event.key === "Escape") {
+        input.value = `Group ${newGroupSequence}`;
+        input.blur();
+      }
+    });
   }
 
   function closeTab(tab) {
@@ -161,9 +273,23 @@ export function createTabSidebarController(shell) {
   }
 
   tabList.addEventListener("click", (event) => {
+    if (event.target.closest(".group-name input")) {
+      return;
+    }
+
+    const bookmarksToggle = event.target.closest('[data-action="toggle-bookmarks"]');
     const groupToggle = event.target.closest('[data-action="toggle-tab-group"]');
     const closeButton = event.target.closest('[data-action="close-tab"]');
     const tab = event.target.closest('[data-action="select-tab"]');
+
+    if (bookmarksToggle) {
+      const section = bookmarksToggle.closest(".bookmarks-section");
+      const isOpen = section.dataset.bookmarksState === "open";
+      section.dataset.bookmarksState = isOpen ? "collapsed" : "open";
+      setBooleanAttribute(bookmarksToggle, "aria-expanded", !isOpen);
+      requireElement(section, ".bookmark-items").hidden = isOpen;
+      return;
+    }
 
     if (groupToggle) {
       toggleGroup(groupToggle.closest("[data-group]"));
@@ -185,11 +311,77 @@ export function createTabSidebarController(shell) {
 
   sidebarToggle.addEventListener("click", toggleSidebar);
   sidebarEdgeTrigger.addEventListener("click", pinSidebarFromEdge);
-  newTabButtons.forEach((button) => button.addEventListener("click", createTab));
+  function showAgentActivity() {
+    setSidebarOpen(true);
+    const agentGroup = shell.querySelector(".agent-activity-group");
+    if (!agentGroup) return;
+    agentGroup.dataset.groupState = "open";
+    setBooleanAttribute(requireElement(agentGroup, '[data-action="toggle-tab-group"]'), "aria-expanded", true);
+    agentGroup.scrollIntoView({ block: "nearest" });
+    requireElement(agentGroup, ".agent-task-item").focus();
+  }
+  shell.addEventListener("workspace:show-agent-request", showAgentActivity);
+  shell.addEventListener("workspace:create-item-request", (event) => {
+    createItem(event.detail?.kind ?? "tab", event.detail?.targetGroup);
+  });
+  shell.addEventListener("workspace:create-group-request", () => createGroup());
+  shell.addEventListener("workspace:toggle-sidebar-request", toggleSidebar);
+
+  shell.addEventListener("click", (event) => {
+    const quickNewTab = event.target.closest('[data-action="quick-new-tab"]');
+    const pinnedApp = event.target.closest('[data-action="open-pinned"]');
+    const createTrigger = event.target.closest('[data-action="toggle-create-menu"]');
+    const createItemButton = event.target.closest('[data-action="create-item"]');
+    const createGroupButton = event.target.closest('[data-action="create-group"]');
+
+    if (quickNewTab) {
+      createItem("tab");
+      return;
+    }
+
+    if (pinnedApp) {
+      const tab = createItem("tab");
+      tab.dataset.kind = "pinned";
+      tab.querySelector(".favicon").className = `favicon ${pinnedApp.dataset.iconClass}`;
+      tab.querySelector(".favicon").textContent = pinnedApp.dataset.icon;
+      tab.querySelector(".tab-copy strong").textContent = pinnedApp.dataset.title;
+      tab.querySelector(".tab-copy small").textContent = pinnedApp.dataset.host;
+      renderPage(tab);
+      return;
+    }
+
+    if (createTrigger) {
+      openCreateMenu(createTrigger);
+      return;
+    }
+
+    if (createItemButton) {
+      createItem(createItemButton.dataset.kind, createTargetGroup);
+      return;
+    }
+
+    if (createGroupButton) {
+      createGroup();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!createMenu.hidden
+      && !createMenu.contains(event.target)
+      && !event.target.closest('[data-action="toggle-create-menu"]')) {
+      closeCreateMenu();
+    }
+  });
 
   shell.addEventListener("workspace:select-tab", (event) => selectTab(event.detail.tabId));
 
   function handleKeydown(event) {
+    if (event.key === "Escape" && !createMenu.hidden) {
+      event.preventDefault();
+      closeCreateMenu({ restoreFocus: true });
+      return true;
+    }
+
     const isSidebarShortcut = (event.metaKey || event.ctrlKey)
       && !event.shiftKey
       && event.key.toLowerCase() === "b";
@@ -206,7 +398,7 @@ export function createTabSidebarController(shell) {
 
     if (isNewTabShortcut) {
       event.preventDefault();
-      createTab();
+      createItem("tab");
       return true;
     }
 

@@ -1,0 +1,260 @@
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
+index 756215be15..ab9725c40e 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
+@@ -12,6 +12,7 @@
+ #include "base/metrics/histogram_functions.h"
+ #include "base/metrics/user_metrics.h"
+ #include "base/metrics/user_metrics_action.h"
++#include "base/strings/utf_string_conversions.h"
+ #include "base/time/time.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_controller.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_view.h"
+@@ -73,6 +74,7 @@
+ #include "ui/events/types/event_type.h"
+ #include "ui/gfx/geometry/insets.h"
+ #include "ui/gfx/geometry/rect.h"
++#include "ui/gfx/geometry/rect_f.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+@@ -92,6 +94,7 @@
+ 
+ namespace {
+ constexpr int kIconDesignWidth = 16;
++constexpr int kVerticalIconDesignWidth = 24;
+ constexpr int kTitleMinWidth = 10;
+ constexpr int kHorizontalInset = 8;
+ constexpr int kDefaultPadding = 4;
+@@ -289,7 +292,6 @@ TabView::TabView(TabCollectionNode* collection_node)
+     : HoverCardAnchorTarget(this),
+       collection_node_(collection_node),
+       icon_(AddChildView(std::make_unique<TabIcon>())),
+-      title_(AddChildView(std::make_unique<TabTitle>())),
+       alert_indicator_(
+           AddChildView(std::make_unique<AlertIndicatorButton>(this))),
+       close_button_(AddChildView(std::make_unique<TabCloseButton>(
+@@ -304,6 +306,39 @@ TabView::TabView(TabCollectionNode* collection_node)
+                             : nullptr) {
+   tab_styling_ = TabStyleViews::Create(CreateStyleDelegate(this),
+                                        collection_node_->orientation());
++  const bool is_vertical =
++      collection_node_->orientation() == TabStripOrientation::kVertical;
++  if (is_vertical) {
++    auto text_container = std::make_unique<views::View>();
++    text_container->SetCanProcessEventsWithinSubtree(false);
++    auto* text_layout =
++        text_container->SetLayoutManager(std::make_unique<views::FlexLayout>());
++    text_layout->SetOrientation(views::LayoutOrientation::kVertical)
++        .SetMainAxisAlignment(views::LayoutAlignment::kCenter)
++        .SetCrossAxisAlignment(views::LayoutAlignment::kStretch);
++
++    title_ = text_container->AddChildView(std::make_unique<TabTitle>());
++    title_->SetFontList(title_->font_list().Derive(-1, gfx::Font::NORMAL,
++                                                   gfx::Font::Weight::MEDIUM));
++    title_->SetLineHeight(13);
++
++    auto subtitle = std::make_unique<views::Label>();
++    subtitle->SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
++    subtitle->SetElideBehavior(gfx::ELIDE_TAIL);
++    subtitle->SetHandlesTooltips(false);
++    subtitle->SetAutoColorReadabilityEnabled(false);
++    subtitle->SetBackgroundColor(SK_ColorTRANSPARENT);
++    subtitle->SetSkipSubpixelRenderingOpacityCheck(true);
++    subtitle->SetCanProcessEventsWithinSubtree(false);
++    subtitle->SetFontList(subtitle->font_list().Derive(
++        -3, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL));
++    subtitle->SetLineHeight(10);
++    subtitle_ = text_container->AddChildView(std::move(subtitle));
++    text_container_ = AddChildView(std::move(text_container));
++  } else {
++    title_ = AddChildView(std::make_unique<TabTitle>());
++  }
++
+   tabs::TabInterface* tab = const_cast<tabs::TabInterface*>(GetTabInterface());
+   BrowserWindowInterface* browser_window = tab->GetBrowserWindowInterface();
+   if (browser_window &&
+@@ -332,10 +367,13 @@ TabView::TabView(TabCollectionNode* collection_node)
+       TabChildConfig(alert_indicator_, kIconDesignWidth, kDefaultPadding,
+                      /*align_leading=*/false,
+                      /*expand=*/false, /*decorate_on_collapse=*/true),
+-      TabChildConfig(icon_, kIconDesignWidth, kHorizontalInset,
++      TabChildConfig(icon_,
++                     is_vertical ? kVerticalIconDesignWidth : kIconDesignWidth,
++                     kHorizontalInset,
+                      /*align_leading=*/true,
+                      /*expand=*/false),
+-      TabChildConfig(title_, kTitleMinWidth, kDefaultPadding,
++      TabChildConfig(is_vertical ? text_container_ : title_, kTitleMinWidth,
++                     kDefaultPadding,
+                      /*align_leading=*/true,
+                      /*expand=*/true)};
+ 
+@@ -689,6 +727,19 @@ void TabView::OnPaint(gfx::Canvas* canvas) {
+ 
+   tab_styling()->PaintTab(canvas);
+ 
++  const bool is_vertical =
++      collection_node_ &&
++      collection_node_->orientation() == TabStripOrientation::kVertical;
++  if (is_vertical && icon_->GetVisible()) {
++    const gfx::Point icon_center = icon_->bounds().CenterPoint();
++    cc::PaintFlags tile_flags;
++    tile_flags.setAntiAlias(true);
++    tile_flags.setColor(SkColorSetARGB(0x52, 0xFF, 0xFF, 0xFF));
++    canvas->DrawRoundRect(gfx::RectF(icon_center.x() - 12.0f,
++                                     icon_center.y() - 12.0f, 24.0f, 24.0f),
++                          7.0f, tile_flags);
++  }
++
+   views::View::OnPaint(canvas);
+ }
+ 
+@@ -801,11 +852,9 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
+   int preferred_height;
+   if (config.expand) {
+     preferred_width = container.width() - config.padding;
+-    // The only expandable view is the views::Label. Just get the line height to
+-    // make calculating bounds cheaper.
+-    views::Label* label = views::AsViewClass<views::Label>(config.view);
+-    CHECK(label);
+-    preferred_height = label->GetLineHeight();
++    // Vertical tabs use a compact two-line text container while horizontal
++    // tabs keep the original single Label.
++    preferred_height = config.view->GetPreferredSize().height();
+   } else {
+     const gfx::Size preferred_size = config.view->GetPreferredSize();
+     preferred_width = preferred_size.width();
+@@ -832,7 +881,7 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
+ 
+ bool TabView::IsChildVisible(const views::View* child_view,
+                              const int width) const {
+-  if (child_view == title_) {
++  if (child_view == title_ || child_view == text_container_) {
+     // Pinned titles should be visible in the expand on hover state when the
+     // width is sufficient to show the title.
+     return !pinned_ || IsInExpandOnHover(width);
+@@ -1155,6 +1204,7 @@ void TabView::UpdateTabData(const tabs::TabInterface* tab) {
+   icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
+                       tab_data_.needs_attention);
+   UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
++  UpdateSubtitle();
+   alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
+   SetHoverCardDataFrom(tab_data_);
+ }
+@@ -1171,6 +1221,7 @@ void TabView::SetDataForTesting(tabs::TabData data) {
+   icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
+                       tab_data_.needs_attention);
+   UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
++  UpdateSubtitle();
+   alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
+   SetHoverCardDataFrom(tab_data_);
+ }
+@@ -1187,6 +1238,16 @@ void TabView::UpdateTitle(std::u16string title,
+   title_->SetText(title);
+ }
+ 
++void TabView::UpdateSubtitle() {
++  if (!subtitle_) {
++    return;
++  }
++
++  const std::string host(tab_data_.visible_url.host());
++  subtitle_->SetText(base::UTF8ToUTF16(host));
++  subtitle_->SetVisible(!host.empty());
++}
++
+ void TabView::UpdateBorder() {
+   if (pinned_) {
+     if (split_) {
+@@ -1213,6 +1274,9 @@ void TabView::UpdateColors() {
+   }
+   TabStyle::TabColors colors = tab_styling()->CalculateTargetColors();
+   title_->SetEnabledColor(colors.foreground_color);
++  if (subtitle_) {
++    subtitle_->SetEnabledColor(SkColorSetA(colors.foreground_color, 0x98));
++  }
+   close_button_->SetColors(colors);
+   alert_indicator_->OnParentTabButtonColorChanged();
+ 
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.h b/chrome/browser/ui/views/tabs/common/tab_view.h
+index 390e4b4060..e75671014c 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_view.h
+@@ -39,6 +39,10 @@ class TabTitle;
+ class TabStyleViews;
+ class TabStyleViewDelegate;
+ 
++namespace views {
++class Label;
++}  // namespace views
++
+ namespace base {
+ class TimeDelta;
+ }  // namespace base
+@@ -187,6 +191,7 @@ class TabView : public views::View,
+   void UpdateTabData(const tabs::TabInterface* tab);
+ 
+   void UpdateTitle(std::u16string title, bool should_render_loading_title);
++  void UpdateSubtitle();
+   void UpdateBorder();
+   void UpdateColors();
+   void UpdateContrastRatioValues();
+@@ -225,7 +230,9 @@ class TabView : public views::View,
+   std::unique_ptr<TabStyleViews> tab_styling_;
+ 
+   const raw_ptr<TabIcon> icon_;
+-  const raw_ptr<TabTitle> title_;
++  raw_ptr<views::View> text_container_ = nullptr;
++  raw_ptr<TabTitle> title_ = nullptr;
++  raw_ptr<views::Label> subtitle_ = nullptr;
+   const raw_ptr<AlertIndicatorButton> alert_indicator_;
+   const raw_ptr<TabCloseButton> close_button_;
+   raw_ptr<glic::TabUnderlineView> glic_tab_underline_view_ = nullptr;
+diff --git a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
+index cbec9de4fa..112d32e25e 100644
+--- a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
+@@ -22,6 +22,7 @@
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/scoped_canvas.h"
++#include "ui/native_theme/native_theme.h"
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/widget.h"
+ 
+@@ -83,6 +84,16 @@ void VerticalTabStyleViews::PaintTab(gfx::Canvas* canvas) const {
+     PaintTabBackgroundFill(canvas, GetSelectionState(),
+                            delegate_->IsHoverAnimationActive(), std::nullopt);
+   }
++
++  if (GetSelectionState() == TabStyle::TabSelectionState::kActive) {
++    const gfx::Rect bounds = delegate_->GetView()->GetLocalBounds();
++    cc::PaintFlags indicator_flags;
++    indicator_flags.setAntiAlias(true);
++    indicator_flags.setColor(SkColorSetRGB(85, 124, 116));
++    canvas->DrawRoundRect(
++        gfx::RectF(0.0f, (bounds.height() - 16.0f) * 0.5f, 2.0f, 16.0f),
++        1.0f, indicator_flags);
++  }
+ }
+ 
+ void VerticalTabStyleViews::PaintTabBackgroundWithImages(
+@@ -142,7 +153,16 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+                                     hovered)) {
+     cc::PaintFlags flags;
+     flags.setAntiAlias(true);
+-    flags.setColor(GetCurrentTabBackgroundColor(selection_state));
++    SkColor background_color = GetCurrentTabBackgroundColor(selection_state);
++    if (delegate_->GetView()->GetNativeTheme()->preferred_contrast() !=
++        ui::NativeTheme::PreferredContrast::kMore) {
++      const SkAlpha alpha =
++          selection_state == TabStyle::TabSelectionState::kActive
++              ? 0x7A
++              : (hovered ? 0x47 : SkColorGetA(background_color));
++      background_color = SkColorSetA(background_color, alpha);
++    }
++    flags.setColor(background_color);
+     canvas->DrawRect(gfx::ScaleToEnclosingRect(
+                          delegate_->GetView()->GetLocalBounds(), scale),
+                      flags);

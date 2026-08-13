@@ -1,0 +1,78 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -670,23 +670,14 @@ class YeeShellScaffoldView : public views::View {
+     // surfaces never reveal the active frame's saturated accent color.
+     canvas->FillRect(bounds, SkColorSetRGB(238, 241, 239));
+ 
+-    // Match the pilot's frosted titlebar and sidebar tints. The shell view is
+-    // installed below the interactive Chromium views, so these fills provide
+-    // material without washing out toolbar or tab content.
++    // Match the pilot's frosted titlebar tint. The shell view is installed
++    // below the interactive Chromium views, so this fill provides material
++    // without washing out toolbar content.
+     canvas->FillRect(gfx::Rect(0, 0, bounds.width(), kYeeTitlebarHeight),
+                      SkColorSetARGB(224, 246, 249, 247));
+-    // Content layout is the source of truth for the animated sidebar edge.
+-    // Expanded content starts after tab width + gutter; collapsed content
+-    // starts at the gutter, so this stays exact without replaying animation
+-    // math in the paint layer.
+-    const int sidebar_width =
+-        std::max(0, content_bounds_.x() - kYeeShellGutter);
+-    if (sidebar_width > 0) {
+-      canvas->FillRect(
+-          gfx::Rect(0, kYeeTitlebarHeight, sidebar_width,
+-                    std::max(0, bounds.height() - kYeeTitlebarHeight)),
+-          SkColorSetARGB(158, 232, 240, 237));
+-    }
++    // The pinned tab sidebar is transparent in the pilot. Keeping the shell
++    // base uninterrupted here lets the sidebar, content gutter, and the space
++    // exposed by rounded WebContents corners read as one continuous material.
+ 
+     cc::PaintFlags surface_flags;
+     surface_flags.setAntiAlias(true);
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1518,10 +1518,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+   CustomCorners::ColorChoiceWithAlpha frame_color(CustomCorners::FrameTheme(),
+                                                   1.0f);
+   if (views().content_layout_config) {
+-    // Yee's shell uses the toolbar palette as a translucent porcelain tint.
+-    // Keeping this independent of the active frame color prevents the Windows
+-    // accent color from leaking into the tab rail and content gutter.
++    // The pinned sidebar is transparent over Yee's continuous porcelain
++    // shell. Only the detached hover flyout receives its own glass surface.
+     frame_color = CustomCorners::ColorChoiceWithAlpha(
+-        CustomCorners::ToolbarTheme(), 0.72f);
++        CustomCorners::ToolbarTheme(), 0.0f);
+   }
+   if (layout_data_->tab_strip_type == TabStripType::kVertical) {
+@@ -1555,7 +1553,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+     CHECK(vertical_tabs_background)
+         << "Expected vertical tab strip to have a CustomCornersBackground.";
+ 
+-    if (in_glass_mode()) {
++    if (views().content_layout_config) {
++      vertical_tabs_background->SetPrimaryColor(
++          CustomCorners::ColorChoiceWithAlpha(
++              CustomCorners::ToolbarTheme(),
++              static_cast<float>(0.46 *
++                                 animation.expand_on_hover_width)));
++    } else if (in_glass_mode()) {
+       if (!is_fullscreen(layout_data_->window_state)) {
+         frame_color.opacity = 0.0f;
+       }
+@@ -1733,8 +1737,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+       // portable backdrop blur, which gives Yee's floating sidebar the same
+       // frosted treatment when it moves over page content on Windows.
+-      vertical_tabs_background->SetUseBackgroundBlur(true);
++      const bool use_background_blur =
++          animation.expand_on_hover_width > 0.0;
++      vertical_tabs_background->SetUseBackgroundBlur(use_background_blur);
+       views().vertical_tab_strip_region_view->layer()->SetBackgroundBlur(
+-          18.0f);
++          use_background_blur ? 18.0f : 0.0f);
+     }
+   } else if (layout_data_->tab_strip_type == TabStripType::kHorizontal &&
+              !is_fullscreen(layout_data_->window_state) && in_glass_mode()) {

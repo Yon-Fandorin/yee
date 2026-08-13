@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <title>yee — Browser shell pilot</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=33" />
   </head>
   <body>
     <div class="browser-shell" data-ui="browser-shell" data-titlebar-density="regular" data-tenant-shape="offset" data-sidebar-state="open">
@@ -16,43 +16,55 @@
           <button class="window-control maximize" type="button" aria-label="창 확대"></button>
         </div>
 
-        <div class="titlebar-context">
-          <button class="identity-switcher" type="button" aria-haspopup="menu" aria-label="Northstar Labs 테넌트, Product 워크스페이스 전환" title="Northstar Labs / Product workspace" data-role="tenant-context">
-            <span class="context-images" aria-hidden="true">
-              <span class="tenant-image">N</span>
-            </span>
-            <span class="identity-copy">
-              <small>Northstar Labs</small>
-              <strong>Product</strong>
-            </span>
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-          </button>
-        </div>
-
         <div class="launcher-shelf" aria-label="Yee Command Runway">
-          <button class="sidebar-toggle" type="button" aria-label="탭 사이드바 숨기기" aria-controls="tab-sidebar" aria-expanded="true" title="탭 사이드바 전환 · ⌘B" data-action="toggle-sidebar">
-            <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="2.5" y="3.5" width="13" height="11" rx="2" /><path d="M7 3.5v11" /></svg>
-          </button>
-          <div class="runway-navigation" aria-label="페이지 탐색">
-            <button class="toolbar-button" type="button" aria-label="뒤로" title="뒤로">
-              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="m10.5 4.5-4.5 4.5 4.5 4.5M6 9h7" /></svg>
+          <div class="toolbar-leading">
+            <button class="sidebar-toggle" type="button" aria-label="탭 사이드바 숨기기" aria-controls="tab-sidebar" aria-expanded="true" title="탭 사이드바 전환 · ⌘B" data-action="toggle-sidebar">
+              <svg viewBox="0 0 18 18" aria-hidden="true"><rect x="2.5" y="3.5" width="13" height="11" rx="2" /><path d="M7 3.5v11" /></svg>
             </button>
-            <button class="toolbar-button is-muted" type="button" aria-label="앞으로" title="앞으로">
-              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="m7.5 4.5 4.5 4.5-4.5 4.5M12 9H5" /></svg>
+            <button class="toolbar-create" type="button" aria-label="새 항목 만들기" aria-controls="sidebar-create-menu" aria-expanded="false" title="새 항목 만들기 · Ctrl T로 새 탭" data-action="toggle-create-menu">
+              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" /></svg>
             </button>
-            <button class="toolbar-button" type="button" aria-label="새로고침" title="새로고침">
-              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M14 7a5.5 5.5 0 1 0 .2 3.4M14 3v4h-4" /></svg>
+            <button class="toolbar-agent" type="button" aria-label="에이전트 및 계정 허브 열기, 결과 2개 및 사용량 경고 1개, Ctrl K" aria-controls="launcher-popover" aria-expanded="false" title="허브 열기 · Ctrl K" data-action="open-yee-hub">
+              <span class="toolbar-agent-pulse" aria-hidden="true"><span></span></span>
+              <span class="toolbar-agent-count" aria-hidden="true">2</span>
             </button>
+            <div class="runway-navigation" aria-label="페이지 탐색">
+              <button class="toolbar-button" type="button" aria-label="뒤로" title="뒤로">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="m10.5 4.5-4.5 4.5 4.5 4.5M6 9h7" /></svg>
+              </button>
+              <button class="toolbar-button is-muted" type="button" aria-label="앞으로" title="앞으로">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="m7.5 4.5 4.5 4.5-4.5 4.5M12 9H5" /></svg>
+              </button>
+              <button class="toolbar-button" type="button" aria-label="새로고침" title="새로고침">
+                <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M14 7a5.5 5.5 0 1 0 .2 3.4M14 3v4h-4" /></svg>
+              </button>
+            </div>
+            <span class="runway-divider" aria-hidden="true"></span>
           </div>
-          <span class="runway-divider" aria-hidden="true"></span>
-          <button class="command-launcher" type="button" aria-label="주소, 검색 및 명령 열기" aria-controls="launcher-popover" aria-expanded="false" data-action="toggle-launcher">
-            <span class="launcher-orbit" aria-hidden="true"><span></span></span>
-            <span class="launcher-copy">
-              <strong data-field="launcher-title">Multi-process architecture</strong>
-              <small data-field="launcher-address">chromium.org</small>
-            </span>
-            <span class="runway-shortcuts" aria-hidden="true"><kbd>⌘L</kbd><kbd>⌘K</kbd></span>
-          </button>
+          <div class="command-launcher" data-region="omnibox" aria-label="주소 표시줄">
+            <button class="site-info-trigger" type="button" aria-label="사이트 정보 보기, 연결이 안전함" aria-controls="site-info-popover" aria-expanded="false" title="사이트 정보 보기" data-action="toggle-site-info">
+              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h7M13 5h2M3 9h2M8 9h7M3 13h6M12 13h3" /><circle cx="11.5" cy="5" r="1.5" /><circle cx="6.5" cy="9" r="1.5" /><circle cx="10.5" cy="13" r="1.5" /></svg>
+            </button>
+            <button class="address-trigger" type="button" aria-label="주소 편집 및 검색" aria-controls="launcher-popover" aria-expanded="false" data-action="toggle-launcher">
+              <span class="launcher-copy">
+                <strong data-field="launcher-title">Multi-process architecture</strong>
+                <small data-field="launcher-address">chromium.org</small>
+              </span>
+            </button>
+            <button class="bookmark-page-trigger" type="button" aria-label="이 페이지 북마크" aria-pressed="false" title="이 페이지 북마크" data-action="toggle-page-bookmark">
+              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="m9 2.8 1.9 3.8 4.2.6-3 3 .7 4.2L9 12.4l-3.8 2 .7-4.2-3-3 4.2-.6L9 2.8Z" /></svg>
+            </button>
+            <div class="site-info-popover" id="site-info-popover" role="dialog" aria-label="사이트 정보" hidden>
+              <div class="site-info-heading">
+                <span class="site-info-secure" aria-hidden="true"><svg viewBox="0 0 18 18"><path d="M5.5 8V6.2a3.5 3.5 0 0 1 7 0V8" /><rect x="4" y="8" width="10" height="7" rx="2" /></svg></span>
+                <span><strong>Connection is secure</strong><small>chromium.org</small></span>
+              </div>
+              <p>Your information is private when it is sent to this site.</p>
+              <button type="button"><span>Cookies and site data</span><small>3 in use</small><b>›</b></button>
+              <button type="button"><span>Site permissions</span><small>Default</small><b>›</b></button>
+              <button type="button"><span>Certificate</span><small>Valid</small><b>›</b></button>
+            </div>
+          </div>
           <div class="extension-dock" aria-label="고정된 확장 프로그램">
             <button class="extension-action is-active" type="button" aria-label="Privacy Shield, 현재 사이트에서 활성" title="Privacy Shield · Active">
               <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2.8 14 4.7v3.7c0 3.2-1.9 5.5-5 6.8-3.1-1.3-5-3.6-5-6.8V4.7L9 2.8Z" /><path d="m6.7 8.8 1.5 1.5 3.2-3.3" /></svg>
@@ -68,7 +80,7 @@
           </div>
         </div>
 
-        <div class="titlebar-end" aria-label="브라우저 상태">
+        <div class="titlebar-end" aria-label="브라우저 상태" hidden>
           <div class="agent-session" data-agent-state="working" aria-label="에이전트 실행 중">
             <button class="agent-state" type="button" aria-label="브라우저 엔진 탭 3개 비교 중, 결과 2개 확인 가능">
               <span class="agent-pulse" aria-hidden="true"><span></span><b class="agent-count">2</b></span>
@@ -81,41 +93,102 @@
           </div>
         </div>
 
-        <div class="launcher-popover" id="launcher-popover" role="dialog" aria-label="검색 및 명령 런처" data-region="launcher-popover" hidden>
+        <div class="launcher-popover" id="launcher-popover" role="dialog" aria-label="주소 및 검색" data-region="launcher-popover" data-launcher-mode="browse" hidden>
           <label class="launcher-search" for="launcher-input">
+            <span class="launcher-mode-badge" data-field="launcher-mode">Address</span>
             <svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="8" cy="8" r="4.5" /><path d="m11.5 11.5 3 3" /></svg>
             <input id="launcher-input" type="text" placeholder="Search, enter a URL, or run a command" autocomplete="off" />
             <kbd>esc</kbd>
           </label>
           <div class="launcher-results">
-            <span class="launcher-result-label">Open tabs</span>
-            <button class="launcher-result is-selected" type="button" data-action="choose-launcher-result" data-tab-target="chromium">
-              <span class="favicon chromium">C</span>
-              <span><strong>Chromium architecture</strong><small>chromium.org</small></span>
-              <kbd>↵</kbd>
-            </button>
-            <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="servo">
-              <span class="favicon servo">S</span>
-              <span><strong>Servo embedding</strong><small>servo.org</small></span>
-            </button>
-            <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="security">
-              <span class="favicon security">W</span>
-              <span><strong>Browser agent security</strong><small>openreview.net</small></span>
-            </button>
-            <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="notes">
-              <span class="favicon notes">N</span>
-              <span><strong>Engine notes</strong><small>Local note</small></span>
-            </button>
-            <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="mojo">
-              <span class="favicon mojo">M</span>
-              <span><strong>Mojo interfaces</strong><small>chromium.googlesource.com</small></span>
-            </button>
+            <div class="launcher-command-results" data-region="launcher-command-results" hidden>
+              <div class="yee-hub-overview" data-region="yee-hub-overview">
+                <button class="yee-agent-summary" type="button" data-action="choose-launcher-command" data-command="show-agent">
+                  <span class="yee-summary-mark" aria-hidden="true"><span></span><b>2</b></span>
+                  <span class="yee-summary-copy">
+                    <small>Agent activity</small>
+                    <strong>2 findings ready</strong>
+                    <em>Comparing browser engines · running 4m</em>
+                  </span>
+                  <span class="yee-summary-action">Review</span>
+                </button>
+                <section class="yee-usage-card" aria-label="연결된 구독 계정 사용량">
+                  <div class="yee-usage-heading">
+                    <span><small>Connected usage</small><strong>2 accounts</strong></span>
+                    <span class="yee-usage-warning">1 low</span>
+                  </div>
+                  <div class="yee-usage-account">
+                    <span class="yee-account-mark openai">O</span>
+                    <span class="yee-account-copy"><strong>OpenAI Team</strong><small>Resets in 7 days</small></span>
+                    <span class="yee-usage-value">68% left</span>
+                    <span class="yee-usage-track"><i style="--usage:68%"></i></span>
+                  </div>
+                  <div class="yee-usage-account is-low">
+                    <span class="yee-account-mark claude">C</span>
+                    <span class="yee-account-copy"><strong>Claude Pro</strong><small>Resets tomorrow</small></span>
+                    <span class="yee-usage-value">18% left</span>
+                    <span class="yee-usage-track"><i style="--usage:18%"></i></span>
+                  </div>
+                  <div class="yee-usage-foot">Updated 2m ago · usage is shown per account</div>
+                </section>
+              </div>
+              <span class="launcher-result-label">Quick actions</span>
+              <div class="launcher-command-grid">
+                <button class="launcher-result launcher-command" type="button" data-action="choose-launcher-command" data-command="new-tab">
+                  <span class="launcher-command-icon">＋</span>
+                  <span><strong>New tab</strong><small>Open a blank browser tab</small></span>
+                  <kbd>Ctrl T</kbd>
+                </button>
+                <button class="launcher-result launcher-command" type="button" data-action="choose-launcher-command" data-command="new-group">
+                  <span class="launcher-command-icon">G</span>
+                  <span><strong>New group</strong><small>Organize tabs in the sidebar</small></span>
+                </button>
+                <button class="launcher-result launcher-command" type="button" data-action="choose-launcher-command" data-command="new-note">
+                  <span class="launcher-command-icon">N</span>
+                  <span><strong>New note</strong><small>Capture a note in this workspace</small></span>
+                </button>
+                <button class="launcher-result launcher-command" type="button" data-action="choose-launcher-command" data-command="toggle-sidebar">
+                  <span class="launcher-command-icon">◫</span>
+                  <span><strong>Toggle sidebar</strong><small>Show or hide the workspace rail</small></span>
+                  <kbd>Ctrl B</kbd>
+                </button>
+              </div>
+            </div>
+            <div class="launcher-tab-results" data-region="launcher-tab-results">
+              <span class="launcher-result-label" data-field="launcher-results-label">Suggestions</span>
+              <button class="launcher-result is-selected" type="button" data-action="choose-launcher-result" data-tab-target="chromium">
+                <span class="favicon chromium">C</span>
+                <span><strong>Chromium architecture</strong><small>chromium.org</small></span>
+                <kbd>↵</kbd>
+              </button>
+              <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="servo">
+                <span class="favicon servo">S</span>
+                <span><strong>Servo embedding</strong><small>servo.org</small></span>
+              </button>
+              <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="security">
+                <span class="favicon security">W</span>
+                <span><strong>Browser agent security</strong><small>openreview.net</small></span>
+              </button>
+              <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="notes">
+                <span class="favicon notes">N</span>
+                <span><strong>Engine notes</strong><small>Local note</small></span>
+              </button>
+              <button class="launcher-result" type="button" data-action="choose-launcher-result" data-tab-target="mojo">
+                <span class="favicon mojo">M</span>
+                <span><strong>Mojo interfaces</strong><small>chromium.googlesource.com</small></span>
+              </button>
+            </div>
             <p class="launcher-empty" hidden>No open tabs match.</p>
           </div>
-          <div class="launcher-popover-footer">
+          <div class="launcher-popover-footer launcher-footer-command">
             <span><kbd>↑↓</kbd> navigate</span>
-            <span><kbd>↵</kbd> open</span>
+            <span><kbd>↵</kbd> run</span>
             <span>Product workspace</span>
+          </div>
+          <div class="launcher-popover-footer launcher-footer-browse">
+            <span><kbd>↵</kbd> open</span>
+            <span><kbd>Tab</kbd> suggestions</span>
+            <span>Secure address editing</span>
           </div>
         </div>
       </header>
@@ -123,26 +196,68 @@
       <div class="workspace">
         <button class="sidebar-edge-trigger" type="button" aria-label="탭 사이드바 미리보기 및 고정" aria-controls="tab-sidebar" title="가리키면 미리보기 · 클릭하면 고정" data-action="pin-sidebar-from-edge"></button>
         <aside class="tab-sidebar" id="tab-sidebar" aria-label="탭 사이드바">
-          <div class="sidebar-heading">
-            <div>
-              <span>Tabs</span>
-              <strong data-field="tab-count">5</strong>
+          <strong class="visually-hidden" data-field="tab-count">5</strong>
+
+          <div class="sidebar-create-menu" id="sidebar-create-menu" role="menu" aria-label="새 항목 만들기" data-region="create-menu" hidden>
+            <div class="create-menu-heading">
+              <span data-field="create-menu-title">Create new</span>
+              <kbd>esc</kbd>
             </div>
-            <button class="new-tab-button" type="button" aria-label="새 탭 열기" title="새 탭" data-action="new-tab">
-              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" /></svg>
+            <button type="button" role="menuitem" data-action="create-item" data-kind="tab">
+              <span class="create-kind-icon tab">＋</span>
+              <span><strong>New tab</strong><small>Browse a page</small></span>
+              <kbd>Ctrl T</kbd>
+            </button>
+            <button type="button" role="menuitem" data-action="create-item" data-kind="note">
+              <span class="create-kind-icon note">N</span>
+              <span><strong>New note</strong><small>Capture an idea</small></span>
+            </button>
+            <span class="create-menu-separator" role="separator"></span>
+            <button type="button" role="menuitem" data-action="create-group">
+              <span class="create-kind-icon group">▱</span>
+              <span><strong>New group</strong><small>Organize workspace items</small></span>
             </button>
           </div>
 
           <nav class="tab-list" aria-label="열린 탭" data-region="tab-list" role="tablist" aria-orientation="vertical">
+            <section class="pinned-section" aria-label="즐겨찾는 앱">
+              <div class="section-label"><span>Favorites</span></div>
+              <div class="pinned-apps">
+                <button type="button" aria-label="Gmail 열기" title="Gmail" data-action="open-pinned" data-title="Gmail" data-host="mail.google.com" data-icon="M" data-icon-class="gmail"><span class="pinned-icon gmail">M</span><small>Gmail</small></button>
+                <button type="button" aria-label="Figma 열기" title="Figma" data-action="open-pinned" data-title="Figma" data-host="figma.com" data-icon="F" data-icon-class="figma"><span class="pinned-icon figma">F</span><small>Figma</small></button>
+                <button type="button" aria-label="Notion 열기" title="Notion" data-action="open-pinned" data-title="Notion" data-host="notion.so" data-icon="N" data-icon-class="notion"><span class="pinned-icon notion">N</span><small>Notion</small></button>
+                <button type="button" aria-label="GitHub 열기" title="GitHub" data-action="open-pinned" data-title="GitHub" data-host="github.com" data-icon="G" data-icon-class="github"><span class="pinned-icon github">G</span><small>GitHub</small></button>
+              </div>
+            </section>
+
+            <section class="bookmarks-section" data-bookmarks-state="collapsed" aria-label="북마크">
+              <button class="bookmarks-toggle" type="button" aria-controls="bookmark-items" aria-expanded="false" data-action="toggle-bookmarks">
+                <svg class="bookmarks-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 5 5-5 5" /></svg>
+                <svg class="bookmarks-icon" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3.5h8v11L9 12l-4 2.5v-11Z" /></svg>
+                <span>Bookmarks</span>
+                <small>12</small>
+              </button>
+              <div class="bookmark-items" id="bookmark-items" role="list" hidden>
+                <button type="button" role="listitem"><span class="bookmark-folder design">D</span><span>Design references</span><small>5</small></button>
+                <button type="button" role="listitem"><span class="bookmark-folder docs">⌘</span><span>Developer docs</span><small>4</small></button>
+                <button type="button" role="listitem"><span class="bookmark-folder reading">R</span><span>Reading list</span><small>3</small></button>
+              </div>
+            </section>
+
             <div class="loose-tabs" data-region="loose-tabs" role="presentation"></div>
 
             <section class="tab-group" data-group="engine-research" data-group-state="open" role="presentation">
-              <button class="tab-group-toggle" type="button" aria-controls="group-engine-tabs" aria-expanded="true" data-action="toggle-tab-group">
-                <span class="group-mark" aria-hidden="true"></span>
-                <span>Engine research</span>
-                <small data-field="group-count">3</small>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-              </button>
+              <div class="tab-group-heading">
+                <button class="tab-group-toggle" type="button" aria-controls="group-engine-tabs" aria-expanded="true" data-action="toggle-tab-group">
+                  <span class="group-mark" aria-hidden="true"></span>
+                  <span>Engine research</span>
+                  <small data-field="group-count">3</small>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+                </button>
+                <button class="group-add-tab" type="button" aria-label="Engine research 그룹에 항목 추가" aria-controls="sidebar-create-menu" aria-expanded="false" title="그룹에 항목 추가" data-action="toggle-create-menu" data-target-group="engine-research">
+                  <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 4v10M4 9h10" /></svg>
+                </button>
+              </div>
               <div class="tab-group-items" id="group-engine-tabs" role="presentation">
             <button class="tab-item is-active" type="button" role="tab" aria-selected="true" data-tab="chromium" data-action="select-tab">
               <span class="favicon chromium">C</span>
@@ -176,14 +291,22 @@
               </div>
             </section>
 
-            <section class="tab-group is-secondary" data-group="agent-integration" data-group-state="open" role="presentation">
-              <button class="tab-group-toggle" type="button" aria-controls="group-agent-tabs" aria-expanded="true" data-action="toggle-tab-group">
-                <span class="group-mark" aria-hidden="true"></span>
-                <span>Agent integration</span>
-                <small data-field="group-count">2</small>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-              </button>
+            <section class="tab-group is-secondary agent-activity-group" data-group="agent-integration" data-group-state="open" role="presentation">
+              <div class="tab-group-heading">
+                <button class="tab-group-toggle" type="button" aria-controls="group-agent-tabs" aria-expanded="true" data-action="toggle-tab-group">
+                  <span class="group-mark" aria-hidden="true"></span>
+                  <span>Agent activity</span>
+                  <small>1 active</small>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+                </button>
+              </div>
               <div class="tab-group-items" id="group-agent-tabs" role="presentation">
+            <button class="agent-task-item" type="button" aria-label="Comparing browser engines 작업, 결과 2개 검토 가능">
+              <span class="task-status-dot" aria-hidden="true"></span>
+              <span class="agent-task-copy"><strong>Comparing browser engines</strong><small>2 findings ready · running 4m</small></span>
+              <span class="task-review-badge">Review</span>
+            </button>
+            <span class="agent-context-label">Context tabs</span>
             <button class="tab-item" type="button" role="tab" aria-selected="false" data-tab="security" data-action="select-tab">
               <span class="favicon security">W</span>
               <span class="tab-copy">
@@ -205,11 +328,18 @@
             </section>
           </nav>
 
-          <button class="sidebar-new-tab" type="button" data-action="new-tab">
-            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" /></svg>
-            <span>New tab</span>
-            <kbd>⌘T</kbd>
-          </button>
+          <div class="sidebar-footer">
+            <button class="identity-switcher" type="button" aria-haspopup="menu" aria-label="Northstar Labs 테넌트, Product 워크스페이스 전환" title="Northstar Labs / Product workspace" data-role="tenant-context">
+              <span class="context-images" aria-hidden="true">
+                <span class="tenant-image">N</span>
+              </span>
+              <span class="identity-copy">
+                <small>Northstar Labs</small>
+                <strong>Product</strong>
+              </span>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+            </button>
+          </div>
         </aside>
 
         <main class="browser-main">
@@ -252,6 +382,6 @@
       </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=19"></script>
   </body>
 </html>

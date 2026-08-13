@@ -25,6 +25,14 @@ $process = $null
 
 New-Item -ItemType Directory -Path $smokeProfile -Force | Out-Null
 try {
+    # Some cross-platform launchers can pass both Path and PATH into a Windows
+    # process. PowerShell's Start-Process treats those names case-insensitively
+    # and otherwise throws before Chromium starts. Rebuild one canonical entry.
+    $processPath = $env:Path
+    [Environment]::SetEnvironmentVariable('PATH', $null, [EnvironmentVariableTarget]::Process)
+    [Environment]::SetEnvironmentVariable('Path', $null, [EnvironmentVariableTarget]::Process)
+    [Environment]::SetEnvironmentVariable('Path', $processPath, [EnvironmentVariableTarget]::Process)
+
     $versionInfo = (Get-Item -LiteralPath $script:YeeBrowserBin).VersionInfo
     Write-Host "Binary: $($versionInfo.FileDescription) $($versionInfo.ProductVersion)"
     $arguments = @(
