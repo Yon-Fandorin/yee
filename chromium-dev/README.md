@@ -61,6 +61,7 @@ $env:YEE_OUT_NAME = 'Default'
 ```powershell
 .\chromium-dev\sync.ps1
 .\chromium-dev\configure.ps1
+.\chromium-dev\build-ui.ps1
 .\chromium-dev\build.ps1
 .\chromium-dev\smoke-test.ps1
 .\chromium-dev\run.ps1
@@ -157,6 +158,7 @@ macOS and prevent a nearly-full volume from failing late in the workflow.
 ```sh
 ./chromium-dev/sync.sh
 ./chromium-dev/configure.sh
+./chromium-dev/build-ui.sh
 ./chromium-dev/build.sh
 ./chromium-dev/smoke-test.sh
 ./chromium-dev/run.sh
@@ -166,10 +168,19 @@ macOS and prevent a nearly-full volume from failing late in the workflow.
 인자 없이 `run.sh`를 실행하면 기본 페이지로 `https://example.com`을 연다.
 다른 URL이나 Chromium 플래그를 넘기면 전달한 인자를 그대로 사용한다.
 
+`build-ui.sh`는 `//chrome/browser/ui/views/yee:yee_ui`만 빌드한다. Yee의 배경,
+콘텐츠 외곽선, Agent activity 버튼처럼 분리된 시각 코드를 수정할 때 사용하는
+빠른 컴파일 경로이며 기존 `out/YeePilot` 산출물을 그대로 재사용한다. 이 명령은
+앱을 다시 링크하지 않는다. 실제 브라우저에서 결과를 확인할 시점에만
+`build.sh`로 `chrome`을 증분 링크한다. PowerShell에서는 동일하게
+`build-ui.ps1`을 사용한다.
+
 `run.sh`는 macOS 26에서 Chromium의 native `GlassFrame`과 Yee의 옅은 민트
-theme seed를 활성화한다. 이 효과는 프레임과 Toolbar, vertical Tab sidebar처럼
-실제 `WebContents`가 차지하지 않는 브라우저 UI 표면에만 적용된다. Light tint는
-38%, expand-on-hover 표면은 72%와 18px blur로 시작해 뒤 배경이 읽히도록 한다.
+theme seed를 활성화한다. native material은 vertical Tab sidebar에 한정하지 않고
+창 전체를 받치며, Yee의 배경 코드는 지원 환경에서 불투명 바탕 대신 낮은 농도의
+민트 tint를 그린다. 지원되지 않는 환경은 기존 단색 바탕으로 자동 전환된다. 이
+효과는 실제 `WebContents`가 차지하지 않는 브라우저 UI 표면에서 드러난다. Light
+tint는 38%, expand-on-hover 표면은 72%와 18px blur로 시작해 뒤 배경이 읽히도록 한다.
 Yee Shell은 직접 실행할 때도 기본으로 켜진다. vertical tab 내용은 후속
 sidebar UI를 위한 자리로 유지하고, Titlebar·Context·Status·Sidebar 구획을 표시한다. 중앙
 Runway에는 별도 모형을 그리지 않고 Chromium의 실제 Toolbar를 compact하게

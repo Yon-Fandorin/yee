@@ -24,7 +24,19 @@ Windows PowerShell:
 ```
 
 The script checks each patch before applying it, skips patches that are already
-present, and refuses mismatched target files. The overlay currently changes:
+present, and refuses mismatched target files.
+
+The patch series is intentionally kept at three responsibility boundaries:
+
+- `0001-integrate-yee-shell.patch`: native browser shell and Chromium UI wiring
+- `0002-brand-yee-application.patch`: product naming metadata
+- `0003-fix-windows-protoc-python-aliases.patch`: Windows build compatibility
+
+Yee-owned UI source lives under `yee-ui/` and is copied into the Chromium
+checkout by the platform-specific installer, rather than being duplicated in
+incremental refinement patches.
+
+The resulting Chromium checkout changes:
 
 - `prefs::kVerticalTabsEnabled`: `false` → `true` for new profiles
 - `kVerticalTabStripDefaultUncollapsedWidth`: `240` → `244`
@@ -32,6 +44,11 @@ present, and refuses mismatched target files. The overlay currently changes:
 - macOS app icon and Chromium product logos to the v8c Yee dinosaur mark
 - a compact native `ToolbarView` with sidebar toggle, new tab, agent activity,
   navigation, Omnibox, and extension dock
+- an isolated `//chrome/browser/ui/views/yee:yee_ui` source target for Yee's
+  visual substrate, content outline, and agent activity control
+- a frame-derived window-controls safe area that keeps macOS traffic lights,
+  Windows caption buttons, and Linux client-side decorations outside the Yee
+  toolbar without platform-specific shell padding
 - a rounded `MultiContentsView` surface on the Windows 11 shell background
 - a pinned or edge-hovering native vertical tab sidebar whose real pinned
   tabs, bookmarks entry, groups, and tabs match the pilot section rhythm

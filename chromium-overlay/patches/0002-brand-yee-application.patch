@@ -1,7 +1,8 @@
 diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
+index f8363d5b29..96c6293104 100644
 --- a/chrome/app/theme/chromium/BRANDING
 +++ b/chrome/app/theme/chromium/BRANDING
-@@ -1,8 +1,8 @@
+@@ -1,9 +1,9 @@
  COMPANY_FULLNAME=The Chromium Authors
  COMPANY_SHORTNAME=The Chromium Authors
 -PRODUCT_FULLNAME=Chromium

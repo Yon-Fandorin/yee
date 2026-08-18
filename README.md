@@ -39,6 +39,7 @@ Chromium 소스, `depot_tools`, 빌드 산출물은 모두 Git에서 제외된
 ./chromium-dev/doctor.sh
 ./chromium-dev/checkout.sh
 ./chromium-dev/configure.sh
+./chromium-dev/build-ui.sh
 ./chromium-dev/build.sh
 ./chromium-dev/smoke-test.sh
 ```
@@ -50,6 +51,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\chromium-dev\doctor.ps1
 .\chromium-dev\checkout.ps1
 .\chromium-dev\configure.ps1
+.\chromium-dev\build-ui.ps1
 .\chromium-dev\build.ps1
 .\chromium-dev\smoke-test.ps1
 ```
@@ -62,6 +64,11 @@ layout and installer target.
 전체 Git 이력과 별도 Git cache를 받지 않으며, 디버그 심볼을 만들지 않고
 `out/YeePilot` 하나만 유지한다. 상세한 용량 정책과 일상 명령은
 [`chromium-dev/README.md`](chromium-dev/README.md)에 있다.
+
+Yee 고유 시각 컴포넌트는 Chromium 핵심 `BrowserView`와 `ToolbarView`에서
+`//chrome/browser/ui/views/yee:yee_ui` 타깃으로 분리되어 있다. 평소 UI 컴파일
+확인은 `build-ui.sh`로 끝내고, 실제 앱 링크와 통합 확인이 필요할 때만
+`build.sh`를 실행한다.
 
 정적 셸 프로토타입과 함께 실제 Chromium `WebContents`를 사용하는 Yee 빌드를
 검증하고 있다. 현재 구현 범위는 Title bar, native Toolbar, Tab sidebar와

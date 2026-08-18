@@ -1,0 +1,22 @@
+# Copyright 2026 The Yee Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+assert(is_win || is_mac || is_linux || is_chromeos)
+
+source_set("yee_ui") {
+  public = [ "yee_ui.h" ]
+  sources = [ "yee_ui.cc" ]
+
+  public_deps = [ "//ui/views" ]
+
+  deps = [
+    "//base",
+    "//cc/paint",
+    "//chrome/browser/ui/views/toolbar",
+    "//skia",
+    "//ui/base",
+    "//ui/compositor",
+    "//ui/gfx",
+  ]
+}

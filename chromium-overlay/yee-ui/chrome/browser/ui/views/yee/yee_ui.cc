@@ -1,0 +1,290 @@
+// Copyright 2026 The Yee Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "chrome/browser/ui/views/yee/yee_ui.h"
+
+#include <string>
+#include <utility>
+
+#include "base/command_line.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
+#include "cc/paint/paint_flags.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+#include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/ui_base_features.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/compositor/layer.h"
+#include "ui/gfx/canvas.h"
+#include "ui/gfx/font_list.h"
+#include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/vector2d.h"
+#include "ui/gfx/shadow_value.h"
+#include "ui/gfx/skia_paint_util.h"
+#include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/background.h"
+#include "ui/views/view.h"
+
+namespace {
+
+constexpr char kAgentStatusDemoSwitch[] = "yee-agent-status-demo";
+constexpr char kAgentStatusSwitch[] = "yee-agent-status";
+
+enum class ShellBackgroundStyle {
+  kSolid,
+  kGlow,
+};
+
+constexpr SkColor kSolidShellColor = SkColorSetRGB(243, 243, 243);
+constexpr SkColor kGlowShellTint = SkColorSetARGB(22, 225, 235, 232);
+constexpr float kShellControlCornerRadius = 8.0f;
+
+ShellBackgroundStyle GetShellBackgroundStyle() {
+  return features::IsGlassFrameEnabled() ? ShellBackgroundStyle::kGlow
+                                         : ShellBackgroundStyle::kSolid;
+}
+
+class YeeShellBackground : public views::Background {
+ public:
+  explicit YeeShellBackground(ShellBackgroundStyle style) : style_(style) {}
+  YeeShellBackground(const YeeShellBackground&) = delete;
+  YeeShellBackground& operator=(const YeeShellBackground&) = delete;
+  ~YeeShellBackground() override = default;
+
+  void Paint(gfx::Canvas* canvas, views::View* view) const override {
+    const gfx::Rect bounds = view->GetLocalBounds();
+    if (bounds.IsEmpty()) {
+      return;
+    }
+
+    // Native glass supplies the blur and desktop sampling. Yee owns the visual
+    // treatment above it: a restrained mint wash when glass is available and
+    // the existing opaque shell color everywhere else.
+    canvas->FillRect(bounds, style_ == ShellBackgroundStyle::kGlow
+                                 ? kGlowShellTint
+                                 : kSolidShellColor);
+    const views::View* const content_outline =
+        view->GetViewByID(yee::kContentOutlineViewId);
+    if (!content_outline) {
+      return;
+    }
+    gfx::RectF content_rect(content_outline->bounds());
+    if (content_rect.IsEmpty()) {
+      return;
+    }
+    content_rect.Inset(0.5f);
+
+    cc::PaintFlags content_surface_flags;
+    content_surface_flags.setAntiAlias(true);
+    content_surface_flags.setColor(SK_ColorWHITE);
+    content_surface_flags.setStyle(cc::PaintFlags::kFill_Style);
+    content_surface_flags.setLooper(gfx::CreateShadowDrawLooper({
+        gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0,
+                         SkColorSetARGB(13, 0, 0, 0)),
+    }));
+    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+                          content_surface_flags);
+
+    cc::PaintFlags content_outline_flags;
+    content_outline_flags.setAntiAlias(true);
+    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
+    content_outline_flags.setStrokeWidth(1.0f);
+    content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
+    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+                          content_outline_flags);
+  }
+
+ private:
+  const ShellBackgroundStyle style_;
+};
+
+class YeeContentOutlineView : public views::View {
+  METADATA_HEADER(YeeContentOutlineView, views::View)
+
+ public:
+  YeeContentOutlineView() {
+    SetID(yee::kContentOutlineViewId);
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    SetCanProcessEventsWithinSubtree(false);
+  }
+  YeeContentOutlineView(const YeeContentOutlineView&) = delete;
+  YeeContentOutlineView& operator=(const YeeContentOutlineView&) = delete;
+  ~YeeContentOutlineView() override = default;
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    gfx::RectF content_rect(GetLocalBounds());
+    if (content_rect.IsEmpty()) {
+      return;
+    }
+    content_rect.Inset(0.5f);
+
+    cc::PaintFlags content_outline_flags;
+    content_outline_flags.setAntiAlias(true);
+    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
+    content_outline_flags.setStrokeWidth(1.0f);
+    content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
+    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+                          content_outline_flags);
+  }
+};
+
+BEGIN_METADATA(YeeContentOutlineView)
+END_METADATA
+
+class YeeShellToolbarButton : public ToolbarButton {
+ public:
+  explicit YeeShellToolbarButton(PressedCallback callback)
+      : ToolbarButton(std::move(callback)) {}
+  YeeShellToolbarButton(const YeeShellToolbarButton&) = delete;
+  YeeShellToolbarButton& operator=(const YeeShellToolbarButton&) = delete;
+  ~YeeShellToolbarButton() override = default;
+
+  float GetCornerRadiusFor(Edge) const override {
+    return kShellControlCornerRadius;
+  }
+};
+
+class YeeAgentToolbarButton : public YeeShellToolbarButton {
+ public:
+  enum class Status {
+    kReady,
+    kWorking,
+    kNeedsInput,
+  };
+
+  explicit YeeAgentToolbarButton(PressedCallback callback)
+      : YeeShellToolbarButton(std::move(callback)) {
+    const base::CommandLine* const command_line =
+        base::CommandLine::ForCurrentProcess();
+    const std::string requested_status =
+        command_line->GetSwitchValueASCII(kAgentStatusSwitch);
+    if (requested_status == "working") {
+      status_ = Status::kWorking;
+    } else if (requested_status == "needs-input") {
+      status_ = Status::kNeedsInput;
+    }
+    UpdateAccessibleText();
+
+    if (requested_status.empty() &&
+        command_line->HasSwitch(kAgentStatusDemoSwitch)) {
+      demo_timer_.Start(FROM_HERE, base::Seconds(2.5), this,
+                        &YeeAgentToolbarButton::AdvanceDemo);
+    }
+  }
+
+  YeeAgentToolbarButton(const YeeAgentToolbarButton&) = delete;
+  YeeAgentToolbarButton& operator=(const YeeAgentToolbarButton&) = delete;
+  ~YeeAgentToolbarButton() override = default;
+
+ protected:
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    ToolbarButton::PaintButtonContents(canvas);
+
+    SkColor status_color = SkColorSetRGB(91, 148, 134);
+    if (status_ == Status::kNeedsInput) {
+      status_color = SkColorSetRGB(190, 132, 78);
+    }
+
+    cc::PaintFlags halo_flags;
+    halo_flags.setAntiAlias(true);
+    halo_flags.setColor(SkColorSetA(status_color, 34));
+    halo_flags.setStyle(cc::PaintFlags::kFill_Style);
+    canvas->DrawCircle(gfx::PointF(15.0f, 15.0f), 7.0f, halo_flags);
+
+    cc::PaintFlags pulse_flags;
+    pulse_flags.setAntiAlias(true);
+    pulse_flags.setColor(status_color);
+    pulse_flags.setStyle(cc::PaintFlags::kFill_Style);
+    canvas->DrawCircle(gfx::PointF(15.0f, 15.0f), 4.0f, pulse_flags);
+
+    if (status_ == Status::kReady) {
+      return;
+    }
+
+    gfx::RectF badge_rect(17.0f, 1.0f, 13.0f, 13.0f);
+    cc::PaintFlags badge_border_flags;
+    badge_border_flags.setAntiAlias(true);
+    badge_border_flags.setColor(SkColorSetRGB(243, 243, 243));
+    badge_border_flags.setStyle(cc::PaintFlags::kFill_Style);
+    canvas->DrawRoundRect(badge_rect, 6.5f, badge_border_flags);
+
+    badge_rect.Inset(1.5f);
+    cc::PaintFlags badge_flags;
+    badge_flags.setAntiAlias(true);
+    badge_flags.setColor(status_ == Status::kWorking
+                             ? SkColorSetRGB(15, 108, 92)
+                             : SkColorSetRGB(166, 105, 48));
+    badge_flags.setStyle(cc::PaintFlags::kFill_Style);
+    canvas->DrawRoundRect(badge_rect, 5.0f, badge_flags);
+
+    const gfx::FontList badge_font = gfx::FontList().Derive(
+        -5, gfx::Font::NORMAL, gfx::Font::Weight::BOLD);
+    canvas->DrawStringRectWithFlags(
+        status_ == Status::kWorking ? u"2" : u"!", badge_font, SK_ColorWHITE,
+        gfx::Rect(18, 1, 11, 12), gfx::Canvas::TEXT_ALIGN_CENTER);
+  }
+
+ private:
+  void AdvanceDemo() {
+    switch (status_) {
+      case Status::kReady:
+        status_ = Status::kWorking;
+        break;
+      case Status::kWorking:
+        status_ = Status::kNeedsInput;
+        break;
+      case Status::kNeedsInput:
+        status_ = Status::kReady;
+        break;
+    }
+    UpdateAccessibleText();
+    SchedulePaint();
+  }
+
+  void UpdateAccessibleText() {
+    std::u16string label;
+    switch (status_) {
+      case Status::kReady:
+        label = u"Agent activity, ready";
+        break;
+      case Status::kWorking:
+        label = u"Agent activity, 2 findings ready";
+        break;
+      case Status::kNeedsInput:
+        label = u"Agent activity, needs input";
+        break;
+    }
+    SetTooltipText(label);
+    GetViewAccessibility().SetName(label);
+  }
+
+  Status status_ = Status::kReady;
+  base::RepeatingTimer demo_timer_;
+};
+
+}  // namespace
+
+namespace yee {
+
+std::unique_ptr<views::Background> CreateShellBackground() {
+  return std::make_unique<YeeShellBackground>(GetShellBackgroundStyle());
+}
+
+std::unique_ptr<views::View> CreateContentOutlineView() {
+  return std::make_unique<YeeContentOutlineView>();
+}
+
+std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
+    views::Button::PressedCallback callback) {
+  return std::make_unique<YeeShellToolbarButton>(std::move(callback));
+}
+
+std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
+    views::Button::PressedCallback callback) {
+  return std::make_unique<YeeAgentToolbarButton>(std::move(callback));
+}
+
+}  // namespace yee

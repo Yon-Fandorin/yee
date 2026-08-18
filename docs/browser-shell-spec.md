@@ -4,6 +4,9 @@
 옮길 때 사용하는 기준 문서다. CSS의 현재 모습보다 이 문서의 **불변 조건**을
 우선한다. 치수나 구조를 바꾸면 프로토타입과 native 구현을 함께 갱신한다.
 
+레이아웃 요소와 제품 범위의 표준 명칭은
+[`browser-shell-layout-glossary.md`](./browser-shell-layout-glossary.md)를 따른다.
+
 ## 1. 제품 원칙
 
 1. OS는 창 프레임을 소유하고 Yee는 제품 UI를 소유한다.
@@ -19,6 +22,7 @@
 | 항목 | 기준 | 구현 메모 |
 | --- | ---: | --- |
 | Expanded sidebar | 244 DIP | prototype과 native shell이 같은 기본 폭 token을 사용한다. |
+| Sidebar header | Expanded sidebar와 동일 | Shell Controls와 Tab Sidebar가 하나의 Sidebar Column 경계를 공유한다. |
 | Browser content gutter | 6 DIP | 우·하 및 sidebar와 content 사이에 사용한다. 상단은 Omnibox 하단 inset과 공유한다. |
 | Shell inset | 6 DIP | Omnibox의 상·하 여백과 Browser Content 외부 gutter가 같은 token을 사용한다. |
 | Sidebar 내부 좌우 padding | 8 DIP | section 자체는 추가로 좌우 4 DIP inset을 사용할 수 있다. |
@@ -35,14 +39,21 @@ Sidebar가 펼쳐져 있을 때 Omnibox의 왼쪽 경계와 Browser Content의 �
 항상 같은 x 좌표여야 한다.
 
 ```text
-content_start_x = window_left + sidebar_width + content_gutter
-omnibox_start_x = content_start_x
+sidebar_column_width = sidebar_width
+sidebar_header_width = sidebar_column_width
+tab_sidebar_width = sidebar_column_width
+content_column_start_x = window_left + sidebar_column_width
+content_start_x = content_column_start_x + content_gutter
+browser_toolbar_start_x = content_start_x
+omnibox_start_x = browser_toolbar_start_x
+                 + navigation_controls_width + navigation_omnibox_gap
 ```
 
-Sidebar toggle, New item, Agent activity, Back, Forward, Reload는 이 기준선의
-왼쪽 `leading rail` 안에서만 배치한다. 창 크기나 OS caption controls 때문에
-공간이 부족하면 leading action의 크기나 간격을 줄인다. Omnibox를 오른쪽으로
-밀어 기준선을 깨지 않는다.
+Sidebar Toggle, New Tab과 Agent Control은 Sidebar Header의 `Shell Controls`에
+배치한다. Back, Forward와 Reload는 Content Column의 Browser Toolbar에 배치한다.
+창 크기나 OS Window Controls 때문에 공간이 부족하면 Shell Controls의 크기나
+간격을 줄인다. Navigation Controls의 시작점을 오른쪽으로 밀어 Sidebar Column
+경계를 깨지 않는다.
 
 Sidebar가 닫히면 고정 기준선은 해제하고 Omnibox와 Browser Content가 남은 폭을
 사용한다. Hover flyout은 페이지 폭을 변경하지 않는다.
@@ -105,7 +116,8 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
 
 - Title bar: 52 DIP
 - Traffic lights: 왼쪽, Close → Minimize → Zoom
-- Traffic lights는 leading rail 위에 고정하고 product action과 겹치지 않는다.
+- Traffic lights는 Sidebar Header의 Window Controls Safe Area에 두고 Shell
+  Controls와 겹치지 않는다.
 - Leading actions는 필요하면 26 DIP까지 압축할 수 있다.
 - Glass/blur는 browser chrome에만 적용하고 `WebContents`는 불투명하게 유지한다.
 - 단축키: `⌘K`, `⌘T`
@@ -211,8 +223,8 @@ page title을 ellipsis 처리한다. Site info와 Bookmark는 숨기지 않는�
 
 ### Yee Hub discoverability
 
-- Omnibox에는 native browser 기능만 둔다. Yee Hub 진입점은 toolbar leading action에
-  배치해 주소·보안·bookmark 기능과 제품 명령을 분리한다.
+- Omnibox에는 native browser 기능만 둔다. Yee Hub 진입점은 Sidebar Header의
+  Shell Controls에 배치해 주소·보안·bookmark 기능과 제품 명령을 분리한다.
 - 모든 폭에서 30 × 30 DIP의 icon-only button을 사용한다. 제품명 label을 toolbar에
   반복하지 않는다. macOS는 traffic light 영역 때문에 28 × 28 DIP를 쓴다.
 - click과 `Ctrl/⌘ K`는 완전히 같은 Yee Hub를 연다. tooltip과 accessible name에
