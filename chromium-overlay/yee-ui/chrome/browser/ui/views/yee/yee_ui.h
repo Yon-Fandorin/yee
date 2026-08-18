@@ -25,6 +25,39 @@ inline constexpr int kShellControlSize = 30;
 inline constexpr int kShellControlCornerRadius = 8;
 inline constexpr int kShellControlHorizontalMargin = 1;
 
+// Geometry owned by Yee's vertical sidebar presentation. Keeping these values
+// together lets Chromium's native tab and group views consume one stable
+// visual contract without owning product-specific measurements.
+struct SidebarMetrics {
+  int expanded_width = 244;
+  int collapsed_width = 8;
+
+  int tab_icon_design_width = 24;
+  int tab_title_font_delta = -1;
+  int tab_title_line_height = 13;
+  int tab_subtitle_font_delta = -3;
+  int tab_subtitle_line_height = 10;
+
+  int section_horizontal_inset = 8;
+  int section_label_font_delta = -4;
+  int section_label_height = 18;
+  int section_label_bottom_spacing = 4;
+  int section_gap = 10;
+
+  int bookmarks_row_height = 30;
+  int bookmarks_row_corner_radius = 6;
+  int bookmarks_row_horizontal_padding = 6;
+  int bookmarks_icon_size = 16;
+  int bookmarks_image_label_spacing = 6;
+
+  int group_header_corner_radius = 6;
+  int group_header_horizontal_inset = 5;
+};
+
+inline constexpr SidebarMetrics kSidebarMetrics;
+inline constexpr int kSidebarFavoritesLabelViewId = 92001;
+inline constexpr int kSidebarBookmarksButtonViewId = 92002;
+
 enum class ShellCreateAction {
   kNewTab,
   kNewGroup,
