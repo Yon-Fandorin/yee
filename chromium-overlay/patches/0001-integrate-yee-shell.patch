@@ -1494,7 +1494,7 @@ index 6af7471a6d..6265dc516f 100644
    base::RetainingOneShotTimer expand_on_hover_heuristic_timer_;
    std::optional<gfx::Point> point_at_expand_on_hover_timer_start_;
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 07fdd70a0b..a485f21f11 100644
+index 07fdd70a0b..7070b74526 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -142,6 +142,7 @@
@@ -1519,7 +1519,7 @@ index 07fdd70a0b..a485f21f11 100644
  int IncrementalMinimumWidth(const views::View* view) {
    return (view && view->GetVisible()) ? view->GetMinimumSize().width() : 0;
  }
-@@ -491,7 +499,27 @@ bool LocationBarView::IsInitialized() const {
+@@ -491,7 +499,36 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
 
@@ -1528,8 +1528,17 @@ index 07fdd70a0b..a485f21f11 100644
 +    return;
 +  }
 +  compact_shell_mode_ = true;
-+  views::InstallRoundRectHighlightPathGenerator(
-+      this, gfx::Insets(), kCompactShellLocationBarRadius);
++
++  const gfx::RoundedCornersF control_radii(kCompactShellLocationBarRadius);
++  location_icon_view_->SetCornerRadii(control_radii);
++  selected_keyword_view_->SetCornerRadii(control_radii);
++  for (ContentSettingImageView* content_setting_view : content_setting_views_) {
++    content_setting_view->SetCornerRadii(control_radii);
++  }
++  page_action_container_->SetPageActionCornerRadii(control_radii);
++
++  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
++                                                kCompactShellLocationBarRadius);
 +  if (auto* const focus_ring = views::FocusRing::Get(this)) {
 +    // The stock Omnibox uses a pill focus path. Yee's command surface shares
 +    // the content card's tighter radius and uses a quiet one-DIP focus stroke.
@@ -1547,7 +1556,7 @@ index 07fdd70a0b..a485f21f11 100644
    return ComputeBorderRadius(size());
  }
 
-@@ -661,7 +689,10 @@ bool LocationBarView::HasFocus() const {
+@@ -661,7 +698,10 @@ bool LocationBarView::HasFocus() const {
  }
 
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -1559,7 +1568,7 @@ index 07fdd70a0b..a485f21f11 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -688,7 +719,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -688,7 +728,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
 
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -1571,7 +1580,7 @@ index 07fdd70a0b..a485f21f11 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -1305,7 +1339,7 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1305,7 +1348,7 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
 
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -1580,7 +1589,7 @@ index 07fdd70a0b..a485f21f11 100644
    gfx::Rect bounds_without_endcaps(GetLocalBounds());
    bounds_without_endcaps.Inset(gfx::Insets::VH(0, border_radius));
    return bounds_without_endcaps;
-@@ -1324,14 +1358,26 @@ void LocationBarView::RefreshBackground() {
+@@ -1324,14 +1367,26 @@ void LocationBarView::RefreshBackground() {
    SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
    SkColor hovered =
        color_provider->GetColor(kColorLocationBarBackgroundHovered);
@@ -1609,7 +1618,7 @@ index 07fdd70a0b..a485f21f11 100644
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1354,13 +1400,27 @@ void LocationBarView::RefreshBackground() {
+@@ -1354,13 +1409,27 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
 
@@ -1641,7 +1650,7 @@ index 07fdd70a0b..a485f21f11 100644
    }
 
    // Keep the views::Textfield in sync. It needs an opaque background to
-@@ -2242,7 +2302,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2242,7 +2311,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
 
@@ -1689,6 +1698,38 @@ index ed7711207f..bbe0e5d2cd 100644
    SkColor background_color_ = gfx::kPlaceholderColor;
 
    // The focus manager associated with this view. The focus manager is expected
+diff --git a/chrome/browser/ui/views/page_action/page_action_container_view.cc b/chrome/browser/ui/views/page_action/page_action_container_view.cc
+index 3b91b76bcd..ce970bdc2f 100644
+--- a/chrome/browser/ui/views/page_action/page_action_container_view.cc
++++ b/chrome/browser/ui/views/page_action/page_action_container_view.cc
+@@ -88,6 +88,13 @@ PageActionView* PageActionContainerView::GetPageActionView(
+   return id_to_view != page_action_views_.end() ? id_to_view->second : nullptr;
+ }
+
++void PageActionContainerView::SetPageActionCornerRadii(
++    const gfx::RoundedCornersF& radii) {
++  for (auto& [action_id, page_action_view] : page_action_views_) {
++    page_action_view->SetCornerRadii(radii);
++  }
++}
++
+ void PageActionContainerView::OnPageActionStateChanged(PageActionView* view) {
+   NormalizePageActionViewOrder();
+ }
+diff --git a/chrome/browser/ui/views/page_action/page_action_container_view.h b/chrome/browser/ui/views/page_action/page_action_container_view.h
+index e3e17701f8..6571e78fb0 100644
+--- a/chrome/browser/ui/views/page_action/page_action_container_view.h
++++ b/chrome/browser/ui/views/page_action/page_action_container_view.h
+@@ -43,6 +43,9 @@ class PageActionContainerView : public views::View {
+   // nullptr if not found.
+   PageActionView* GetPageActionView(actions::ActionId page_action_id);
+
++  // Applies the same corner radii to every page action owned by the container.
++  void SetPageActionCornerRadii(const gfx::RoundedCornersF& radii);
++
+  private:
+   // Invoked when the chip or anchored message state changes. We show the
+   // anchored message (if any), then suggestion chips then all other page action
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 index cfaf18f54f..6bf58acbda 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
