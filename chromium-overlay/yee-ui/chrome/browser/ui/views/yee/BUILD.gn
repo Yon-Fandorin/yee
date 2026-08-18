@@ -13,7 +13,9 @@ source_set("yee_ui") {
   deps = [
     "//base",
     "//cc/paint",
+    "//chrome/app/vector_icons",
     "//chrome/browser/ui/views/toolbar",
+    "//components/vector_icons",
     "//skia",
     "//ui/base",
     "//ui/compositor",

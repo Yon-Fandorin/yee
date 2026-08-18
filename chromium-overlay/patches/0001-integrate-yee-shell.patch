@@ -1,3 +1,73 @@
+diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
+index 90e572fe4e..51bb429235 100644
+--- a/chrome/browser/metrics/chrome_feature_list_creator.cc
++++ b/chrome/browser/metrics/chrome_feature_list_creator.cc
+@@ -11,6 +11,7 @@
+ #include "base/memory/scoped_refptr.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/path_service.h"
++#include "base/scoped_add_feature_flags.h"
+ #include "base/time/default_clock.h"
+ #include "base/time/default_tick_clock.h"
+ #include "base/time/time.h"
+@@ -22,6 +23,8 @@
+ #include "chrome/browser/metrics/chrome_metrics_services_manager_client.h"
+ #include "chrome/browser/prefs/browser_prefs.h"
+ #include "chrome/browser/prefs/chrome_pref_service_factory.h"
++#include "chrome/browser/ui/ui_features.h"
++#include "chrome/common/chrome_features.h"
+ #include "chrome/common/chrome_paths.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "chrome/installer/util/initial_preferences.h"
+@@ -52,6 +55,38 @@
+ #include "chromeos/ash/components/dbus/dbus_thread_manager.h"
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+
++namespace {
++
++#if !BUILDFLAG(IS_ANDROID)
++void ApplyYeeNativeToolbarPolicy() {
++  base::ScopedAddFeatureFlags feature_flags(
++      base::CommandLine::ForCurrentProcess());
++  const auto disable = [&feature_flags](const base::Feature& feature) {
++    feature_flags.DisableIfNotSet(feature);
++  };
++
++  // Yee owns the browser toolbar as one native Views surface. Keep all of its
++  // controls on the same implementation unless a developer explicitly opts
++  // into a WebUI toolbar feature on the command line.
++  disable(features::kWebUIToolbarProcessOverheadExperiment);
++  disable(features::kWebUIToolbar);
++  disable(features::kWebUIReloadButton);
++  disable(features::kWebUIHomeButton);
++  disable(features::kWebUIBatterySaverButton);
++  disable(features::kWebUIPerformanceInterventionButton);
++  disable(features::kWebUIAppMenuButton);
++  disable(features::kWebUIBackForwardButton);
++  disable(features::kWebUIPinnedToolbarActions);
++  disable(features::kWebUIExtensionsContainer);
++  disable(features::kWebUISplitTabsButton);
++  disable(features::kWebUILocationBar);
++  disable(features::kWebUIAvatarButton);
++  disable(features::kWebUIMediaButton);
++}
++#endif  // !BUILDFLAG(IS_ANDROID)
++
++}  // namespace
++
+ // static
+ ChromeFeatureListCreator* ChromeFeatureListCreator::GetInstance() {
+   static base::NoDestructor<ChromeFeatureListCreator> instance;
+@@ -63,6 +98,9 @@ ChromeFeatureListCreator::~ChromeFeatureListCreator() = default;
+ void ChromeFeatureListCreator::CreateFeatureList() {
+   CreatePrefService();
+   ConvertFlagsToSwitches();
++#if !BUILDFLAG(IS_ANDROID)
++  ApplyYeeNativeToolbarPolicy();
++#endif
+   CreateMetricsServices();
+   SetupInitialPrefs();
+   SetUpFieldTrials();
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 0b066f56e3..3bb15b914b 100644
 --- a/chrome/browser/ui/BUILD.gn
@@ -43,9 +113,9 @@ index 9f151cf8e3..e1f92367c9 100644
 --- a/chrome/browser/ui/tabs/features.cc
 +++ b/chrome/browser/ui/tabs/features.cc
 @@ -39,7 +39,7 @@ BASE_FEATURE(kVerticalTabsPreviewBadge, base::FEATURE_DISABLED_BY_DEFAULT);
- 
+
  BASE_FEATURE(kVerticalTabsNewBadge, base::FEATURE_ENABLED_BY_DEFAULT);
- 
+
 -BASE_FEATURE(kVerticalTabsExpandOnHover, base::FEATURE_DISABLED_BY_DEFAULT);
 +BASE_FEATURE(kVerticalTabsExpandOnHover, base::FEATURE_ENABLED_BY_DEFAULT);
  BASE_FEATURE_PARAM(bool,
@@ -69,12 +139,12 @@ index b46ad7ecdf..173e08dc18 100644
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state.h
 +++ b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
 @@ -7,7 +7,7 @@
- 
+
  namespace tabs {
- 
+
 -inline constexpr int kVerticalTabStripDefaultUncollapsedWidth = 240;
 +inline constexpr int kVerticalTabStripDefaultUncollapsedWidth = 244;
- 
+
  // Per-window state for the vertical tab strip.
  struct VerticalTabStripState {
 diff --git a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
@@ -82,23 +152,23 @@ index aee47b704b..09871ab366 100644
 --- a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
 @@ -4,11 +4,13 @@
- 
+
  #include "chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.h"
- 
+
 +#include <dwmapi.h>
  #include <windows.h>
- 
+
  #include <memory>
  #include <utility>
- 
+
 +#include "base/command_line.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/memory/ref_counted_delete_on_sequence.h"
 @@ -54,6 +56,34 @@
- 
+
  namespace {
- 
+
 +constexpr char kDisableYeeShellScaffoldSwitch[] =
 +    "disable-yee-shell-scaffold";
 +
@@ -161,7 +231,7 @@ index aee47b704b..09871ab366 100644
 @@ -398,9 +442,19 @@ bool BrowserDesktopWindowTreeHostWin::GetDwmFrameInsetsInPixels(
      return false;
    }
- 
+
 -  // Don't extend the glass in at all if it won't be visible.
 -  if (!ShouldUseNativeFrame() || GetWidget()->IsFullscreen() ||
 -      ShouldBrowserCustomDrawTitlebar(browser_view_)) {
@@ -188,15 +258,15 @@ index 5883589f63..ed1cf734e3 100644
 @@ -10,6 +10,7 @@
  #include <memory>
  #include <utility>
- 
+
 +#include "base/command_line.h"
  #include "base/memory/raw_ref.h"
  #include "base/scoped_observation.h"
  #include "base/trace_event/common/trace_event_common.h"
 @@ -65,6 +66,21 @@ std::array<HICON, BrowserFrameViewWin::kThrobberIconCount>
- 
+
  namespace {
- 
+
 +constexpr char kDisableYeeShellScaffoldSwitch[] =
 +    "disable-yee-shell-scaffold";
 +
@@ -218,7 +288,7 @@ index 5883589f63..ed1cf734e3 100644
 @@ -375,9 +391,27 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
            ? FrameTopBorderThickness(false)
            : GetLayoutConstant(LayoutConstant::kTabStripPadding);
- 
+
 +  // Restored Yee windows extend their client surface through the native side
 +  // and bottom frame so no dark DWM band is visible. Preserve the corresponding
 +  // resize targets inside that client surface. Maximized, fullscreen, and high
@@ -243,11 +313,11 @@ index 5883589f63..ed1cf734e3 100644
 -      top_border_thickness, kResizeCornerWidth - FrameBorderThickness(),
 +      point, resize_border, top_border_thickness, resize_corner_width,
        browser_widget()->widget_delegate()->CanResize());
- 
+
    const int frame_component =
 @@ -408,10 +442,12 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
      }
- 
+
      // If the clientview registers a hit within its bounds, it's still possible
 -    // that the hit target should be top resize since the tabstrip region paints
 -    // to the top of the frame. If the frame registered a hit for the Top
@@ -265,7 +335,7 @@ index 5883589f63..ed1cf734e3 100644
 @@ -885,16 +921,27 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
            ? 0
            : caption_button_metrics_->GetCaptionButtonWidth();
- 
+
 -  const int height =
 +  const auto frame_elements = GetClientFrameElementInfo();
 +  int caption_y = WindowTopY();
@@ -282,7 +352,7 @@ index 5883589f63..ed1cf734e3 100644
 +    caption_y = 0;
 +    height = TitlebarMaximizedVisualHeight();
 +  }
- 
+
    caption_button_container_->SetBounds(
        CaptionButtonsOnLeadingEdge()
            ? system_caption_buttons_width
@@ -290,7 +360,7 @@ index 5883589f63..ed1cf734e3 100644
 -      WindowTopY(), preferred_size.width(), height);
 +      caption_y, preferred_size.width(), height);
  }
- 
+
  void BrowserFrameViewWin::LayoutClientView() {
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 index 6a1b79d4b2..8bc1123f2c 100644
@@ -299,7 +369,7 @@ index 6a1b79d4b2..8bc1123f2c 100644
 @@ -101,6 +101,9 @@ bool ShouldHandleKeyboardEvent(const input::NativeWebKeyboardEvent& event) {
    return event.os_event && event.os_event.Get().type == NSEventTypeKeyDown;
  }
- 
+
 +const base::FeatureParam<bool> kGlassFrameFullWindow{
 +    &features::kGlassFrame, "GlassFrameFullWindow", false};
 +
@@ -308,7 +378,7 @@ index 6a1b79d4b2..8bc1123f2c 100644
                               ? features::kGlassTintOpacityForDarkMode.Get()
 @@ -293,6 +296,14 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
  }
- 
+
  std::optional<int> BrowserNativeWidgetMac::GetGlassFrameWidth() const {
 +  // Shells that expose a continuous native material behind their chrome and
 +  // content gutter need the glass view to span the whole window. Keep this a
@@ -322,7 +392,7 @@ index 6a1b79d4b2..8bc1123f2c 100644
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index bfae037bfe..1d92a79bd2 100644
+index bfae037bfe..7244ed0e51 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -229,6 +229,7 @@
@@ -334,9 +404,9 @@ index bfae037bfe..1d92a79bd2 100644
  #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 @@ -414,6 +415,19 @@ using web_modal::WebContentsModalDialogHost;
- 
+
  namespace {
- 
+
 +constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
 +constexpr int kYeeTitlebarHeight = 48;
 +constexpr int kYeeSidebarWidth = 244;
@@ -356,7 +426,7 @@ index bfae037bfe..1d92a79bd2 100644
 @@ -1013,6 +1027,17 @@ BrowserView::BrowserView(Browser* browser)
                                  base::Unretained(this)));
    }
- 
+
 +  if (IsYeeShellScaffoldEnabled() && vertical_tab_strip_region_view_) {
 +    vertical_tab_strip_region_view_->SetHideCollapsedRail(true);
 +    vertical_tab_strip_state_controller->SetExpandOnHoverEnabled(true);
@@ -388,15 +458,15 @@ index bfae037bfe..1d92a79bd2 100644
 @@ -1936,7 +1968,6 @@ bool BrowserView::IsLoadingAnimationRunning() const {
    return !loading_animation_start_.is_null();
  }
- 
+
 -
  void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       content::WebContents* new_contents,
                                       int index,
 @@ -4814,6 +4845,16 @@ void BrowserView::Layout(PassKey) {
- 
+
    LayoutSuperclass<views::View>(this);
- 
+
 +  if (views::View* const content_outline =
 +          GetViewByID(yee::kContentOutlineViewId)) {
 +    const bool show_outline =
@@ -411,9 +481,9 @@ index bfae037bfe..1d92a79bd2 100644
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
    GetFrameView()->UpdateMinimumSize();
 @@ -4956,6 +4997,10 @@ void BrowserView::AddedToWidget() {
- 
+
    toolbar_->Init();
- 
+
 +  if (IsYeeShellScaffoldEnabled()) {
 +    toolbar_->ConfigureForCompactShell();
 +  }
@@ -421,7 +491,7 @@ index bfae037bfe..1d92a79bd2 100644
    if (omnibox::IsWebUIOmniboxInBrowserViewEnabled()) {
      // When the WebUI Omnibox is embedded directly in the `BrowserView` (instead
      // of being a separate popup widget), the popup view needs a reference to
-@@ -5039,10 +5084,38 @@ void BrowserView::AddedToWidget() {
+@@ -5039,10 +5084,36 @@ void BrowserView::AddedToWidget() {
    layout_views.vertical_tab_strip_top_corner = vertical_tab_strip_top_corner_;
    layout_views.organizer_panel_container = organizer_panel_container_;
    layout_views.toolbar = toolbar_;
@@ -436,8 +506,7 @@ index bfae037bfe..1d92a79bd2 100644
 +  if (IsYeeShellScaffoldEnabled()) {
 +    layout_views.toolbar_layout_config = BrowserToolbarLayoutConfig{
 +        gfx::Insets::TLBR((kYeeTitlebarHeight - 40) / 2,
-+                          kYeeToolbarLeadingInset, 0,
-+                          kYeeTitlebarControlGap),
++                          kYeeToolbarLeadingInset, 0, kYeeTitlebarControlGap),
 +        /*height=*/40, kYeeTitlebarHeight,
 +        /*show_container_background=*/false,
 +        /*trailing_accessory_spacing=*/kYeeTitlebarControlGap};
@@ -453,12 +522,11 @@ index bfae037bfe..1d92a79bd2 100644
 +        /*show_vertical_tab_strip_corners=*/false};
 +    layout_views.vertical_tab_strip_layout_config =
 +        BrowserVerticalTabStripLayoutConfig{
-+            gfx::Insets::TLBR(kYeeTitlebarHeight, 0,
-+                              kYeeContentGutter, 0),
++            gfx::Insets::TLBR(kYeeTitlebarHeight, 0, kYeeContentGutter, 0),
 +            /*collapsed_width=*/kYeeCollapsedSidebarWidth};
 +  }
    // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)
- 
+
    SetLayoutManager(BrowserViewLayout::CreateLayout(
 diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
 index 6c1080488d..69b21af7ea 100644
@@ -467,7 +535,7 @@ index 6c1080488d..69b21af7ea 100644
 @@ -478,7 +478,11 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
      return layouts;
    }
- 
+
 -  gfx::Rect full_contents_bounds = GetContentsBounds();
 +  // Proposed layouts can be calculated before this view receives its new
 +  // bounds from the parent. Derive the content rect from `size_bounds` so the
@@ -483,10 +551,10 @@ index 263ca8ae6d..e6859ffc85 100644
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_layout.h
 @@ -6,11 +6,14 @@
  #define CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_LAYOUT_H_
- 
+
  #include <memory>
 +#include <optional>
- 
+
  #include "base/memory/raw_ptr.h"
  #include "chrome/browser/ui/views/frame/custom_floating_corner.h"
  #include "ui/base/interaction/element_identifier.h"
@@ -499,7 +567,7 @@ index 263ca8ae6d..e6859ffc85 100644
 @@ -37,6 +40,41 @@ namespace web_modal {
  class WebContentsModalDialogHost;
  }
- 
+
 +// Optional structural treatment for the browser content surface. The layout
 +// engine consumes these values without knowing which product or shell supplied
 +// them.
@@ -547,7 +615,7 @@ index 263ca8ae6d..e6859ffc85 100644
    raw_ptr<MultiContentsView> multi_contents_view = nullptr;
    raw_ptr<SidePanel> side_panel = nullptr;
    raw_ptr<views::View> side_panel_animation_content = nullptr;
- 
+
 +  std::optional<BrowserContentLayoutConfig> content_layout_config;
 +  std::optional<BrowserToolbarLayoutConfig> toolbar_layout_config;
 +  std::optional<BrowserVerticalTabStripLayoutConfig>
@@ -573,22 +641,22 @@ index 8a35c869b1..35fbce93df 100644
  // meaning the outline disappears completely.
  constexpr double kVerticalTabStripOutlineFadeOnHover = 0.5;
 +constexpr int kFloatingVerticalTabStripCornerRadius = 18;
- 
+
  // Increases the leading or trailing exclusion padding to `minimum`.
  void IncreasePaddingToMinimum(BrowserLayoutParams& params, int minimum) {
 @@ -561,7 +563,7 @@ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumMainAreaSize(
- 
+
    int width = std::max({toolbar_size.width(), bookmark_bar_size.width(),
                          infobar_container_size.width(),
 -                            kContentsContainerMinimumWidth});
 +                        kContentsContainerMinimumWidth});
    const int height = toolbar_size.height() + bookmark_bar_size.height() +
                       infobar_container_size.height() + contents_size.height();
- 
+
 @@ -694,6 +696,31 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    const bool adjust_for_cracking = AvoidCrackingForFractionalDisplay();
    const HorizontalLayout& horizontal_layout = layout_data_->horizontal_layout;
- 
+
 +  // Shell-defined titlebar accessories participate in the same proposed
 +  // layout as the toolbar and native caption exclusion. This keeps them out of
 +  // BrowserView's imperative Layout() path and prevents control overlap.
@@ -620,7 +688,7 @@ index 8a35c869b1..35fbce93df 100644
 @@ -738,6 +765,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
            horizontal_layout.vertical_tab_strip_width +
            vertical_tab_strip_hover_width;
- 
+
 +      if (views().vertical_tab_strip_layout_config) {
 +        const BrowserVerticalTabStripLayoutConfig& config =
 +            *views().vertical_tab_strip_layout_config;
@@ -640,7 +708,7 @@ index 8a35c869b1..35fbce93df 100644
 @@ -756,13 +796,25 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          last_vertical_tab_strip_width_ = vertical_tab_strip_width;
        }
- 
+
 -      vertical_tab_strip_bounds =
 -          gfx::Rect(params.visual_client_area.x(),
 -                    params.visual_client_area.y() +
@@ -667,7 +735,7 @@ index 8a35c869b1..35fbce93df 100644
 +                      params.visual_client_area.height() -
 +                          vertical_tab_strip_animation.top_offset);
 +      }
- 
+
        if (layout_data_->window_state == WindowState::kFullscreenWithToolbar &&
            layout_data_->separator_info.adjust_for_missing_separator) {
 @@ -779,10 +831,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
@@ -687,7 +755,7 @@ index 8a35c869b1..35fbce93df 100644
              0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
        } else {
 @@ -797,6 +850,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
- 
+
    if (IsParentedTo(views().vertical_tab_strip_background_blur_backdrop,
                     views().browser_view)) {
 +    if (views().vertical_tab_strip_layout_config) {
@@ -708,7 +776,7 @@ index 8a35c869b1..35fbce93df 100644
 +        show_vertical_tab_strip_corners &&
          layout_data_->tab_strip_type == TabStripType::kVertical &&
          vertical_tab_strip_animation.top_corner > 0.0;
- 
+
 @@ -832,7 +893,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    if (IsParentedTo(views().vertical_tab_strip_bottom_corner,
                     views().browser_view)) {
@@ -724,7 +792,7 @@ index 8a35c869b1..35fbce93df 100644
 @@ -889,20 +954,24 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      auto& top_container_layout =
          layout.AddChild(views().top_container, gfx::Rect());
- 
+
 -    // Calculate the params for laying out the top container.
 -    auto top_container_params =
 -        params.InLocalCoordinates(params.visual_client_area);
@@ -734,7 +802,7 @@ index 8a35c869b1..35fbce93df 100644
 +        views().toolbar_layout_config ? browser_params : params;
 +    auto top_container_params = top_container_parent_params.InLocalCoordinates(
 +        top_container_parent_params.visual_client_area);
- 
+
      const gfx::Rect top_container_local_bounds = CalculateTopContainerLayout(
          top_container_layout, top_container_params, needs_exclusion);
 -    top_container_layout.bounds =
@@ -742,7 +810,7 @@ index 8a35c869b1..35fbce93df 100644
 +    top_container_layout.bounds = GetTopContainerBoundsInParent(
 +        top_container_local_bounds, top_container_parent_params);
      params.SetTop(top_container_layout.bounds.bottom());
- 
+
      // Possibly bump the leading margin of the top container out to cover the
      // caption buttons, leaving all of the child views in the same absolute
      // position.
@@ -785,7 +853,7 @@ index 8a35c869b1..35fbce93df 100644
 +        top_container_local_bounds, top_container_parent_params);
      params.SetTop(top_container_layout.bounds.bottom());
    }
- 
+
 @@ -1068,8 +1145,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // especially obvious in split view, where turning the separator off provides
    // the required top padding.
@@ -795,7 +863,7 @@ index 8a35c869b1..35fbce93df 100644
 -      separator_info.multi_contents_separator);
 +      separator_info.multi_contents_separator &&
 +      (!content_config || content_config->show_top_separator));
- 
+
    // Updating the top, left and right insets for contents container view when
    // in split view. This is dependent on a number of other browser states.
 @@ -1099,7 +1178,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
@@ -808,7 +876,7 @@ index 8a35c869b1..35fbce93df 100644
 +          TabStripAnimations::kExpand ||
 +      vertical_tab_strip_animation.current_motion ==
 +          TabStripAnimations::kCollapse);
- 
+
    // Lay out contents container. The contents container contains the multi-
    // contents view when multi-contents are enabled. The checks here are to
 @@ -1122,11 +1205,26 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
@@ -839,13 +907,13 @@ index 8a35c869b1..35fbce93df 100644
 -                                content_right - content_left,
 -                                params.visual_client_area.height()));
 +      layout.AddChild(views().multi_contents_view, contents_bounds);
- 
+
    // Maybe expand and clip the web contents to avoid issues during animation.
    if (features::UseSidePanelFlyoverAnimation()) {
 @@ -1169,8 +1267,13 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      }
    }
- 
+
 -  // If the window goes out of glass mode, these changes won't hurt anything.
 -  if (in_glass_mode()) {
 +  if (content_config) {
@@ -937,7 +1005,7 @@ index 8a35c869b1..35fbce93df 100644
 +  }
    if (layout_data_->tab_strip_type == TabStripType::kVertical) {
      side_panel_start = views().vertical_tab_strip_region_view->bounds().right();
- 
+
 @@ -1431,6 +1577,22 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      // collapsed or there are no caption buttons on the leading edge.
      const VerticalTabStripAnimation& animation =
@@ -964,7 +1032,7 @@ index 8a35c869b1..35fbce93df 100644
 @@ -1438,7 +1600,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      CHECK(vertical_tabs_background)
          << "Expected vertical tab strip to have a CustomCornersBackground.";
- 
+
 -    if (in_glass_mode()) {
 +    if (views().content_layout_config) {
 +      vertical_tabs_background->SetPrimaryColor(
@@ -979,7 +1047,7 @@ index 8a35c869b1..35fbce93df 100644
 @@ -1494,6 +1662,23 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
- 
+
 +    if (tab_strip_config && tab_strip_config->collapsed_width > 0 &&
 +        animation.expand_on_hover_width > 0.0) {
 +      const int radius =
@@ -998,7 +1066,7 @@ index 8a35c869b1..35fbce93df 100644
 +    }
 +
      vertical_tabs_background->SetCorners(vertical_tabs_corners);
- 
+
      // When the organizer panel is animating open or closed and does not appear
 @@ -1551,6 +1736,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_outline.top = true;
@@ -1034,7 +1102,7 @@ index 8a35c869b1..35fbce93df 100644
 +        CustomCorners::ColorChoiceWithAlpha(CustomCorners::ToolbarTheme(),
 +                                            0.88f));
 +  }
- 
+
    // Set toolbar corners.
    CustomCornersBackground::Corners toolbar_corners;
 @@ -1651,6 +1852,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
@@ -1046,7 +1114,7 @@ index 8a35c869b1..35fbce93df 100644
 +        CustomCorners::ColorChoiceWithAlpha(CustomCorners::ToolbarTheme(),
 +                                            0.88f));
 +  }
- 
+
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
@@ -1054,9 +1122,9 @@ index c8ecd225df..a7bff81b50 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
 @@ -4,6 +4,8 @@
- 
+
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.h"
- 
+
 +#include <algorithm>
 +
  #include "cc/paint/paint_flags.h"
@@ -1068,12 +1136,12 @@ index c8ecd225df..a7bff81b50 100644
    layer()->SetFillsBoundsOpaquely(false);
 +  collapsed_width_ = VerticalTabStripRegionView::kCollapsedWidth;
  }
- 
+
  VerticalTabStripBackgroundBlurBackdrop::
 @@ -35,6 +38,16 @@ void VerticalTabStripBackgroundBlurBackdrop::UpdateGeometry(
    }
  }
- 
+
 +void VerticalTabStripBackgroundBlurBackdrop::SetCollapsedWidth(
 +    int collapsed_width) {
 +  collapsed_width = std::max(0, collapsed_width);
@@ -1086,7 +1154,7 @@ index c8ecd225df..a7bff81b50 100644
 +
  void VerticalTabStripBackgroundBlurBackdrop::OnPaint(gfx::Canvas* canvas) {
    View::OnPaint(canvas);
- 
+
 @@ -53,7 +66,7 @@ void VerticalTabStripBackgroundBlurBackdrop::OnPaint(gfx::Canvas* canvas) {
    auto color = GetColorProvider()->GetColor(kColorToolbar);
    color = SkColorSetA(color, base::ClampRound(alpha_ * 255.0f));
@@ -1095,7 +1163,7 @@ index c8ecd225df..a7bff81b50 100644
 +  rect.set_width(std::min(collapsed_width_, rect.width()));
    rect = GetMirroredRect(rect);
    canvas->FillRect(rect, color);
- 
+
 @@ -62,9 +75,10 @@ void VerticalTabStripBackgroundBlurBackdrop::OnPaint(gfx::Canvas* canvas) {
    // over. This partly mimics the MacOS edge effect on window frames in Glass
    // mode.
@@ -1114,27 +1182,27 @@ index dee6d3a0ce..eb84cfd273 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.h
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.h
 @@ -21,12 +21,14 @@ class VerticalTabStripBackgroundBlurBackdrop : public views::View {
- 
+
    // Call after the vertical tab strip background is configured.
    void UpdateGeometry(const VerticalTabStripRegionView* from, float alpha);
 +  void SetCollapsedWidth(int collapsed_width);
- 
+
    // views::View:
    void OnPaint(gfx::Canvas* canvas) override;
- 
+
   private:
    float alpha_ = 1.0f;
 +  int collapsed_width_ = 0;
    SkPath border_path_;
  };
- 
+
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 index 90a43ba48c..e19709a02d 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -8,6 +8,7 @@
  #include <optional>
- 
+
  #include "base/callback_list.h"
 +#include "base/command_line.h"
  #include "base/functional/bind.h"
@@ -1155,7 +1223,7 @@ index 90a43ba48c..e19709a02d 100644
 +#include "ui/views/view_targeter.h"
 +#include "ui/views/view_targeter_delegate.h"
  #include "ui/views/view_utils.h"
- 
+
  namespace {
 +constexpr char kDisableYeeShellScaffoldSwitch[] =
 +    "disable-yee-shell-scaffold";
@@ -1163,7 +1231,7 @@ index 90a43ba48c..e19709a02d 100644
  constexpr int kCollapsedResizeAreaWidth = 2;
  constexpr int kKeyboardResizeWidth = 50;
 @@ -82,12 +88,41 @@ constexpr int kSnapDistance = 15;
- 
+
  // Shadow is used in expand-on-hover mode. Shadow radius and opacity are dynamic
  // and set by the layout.
 -constexpr int kExpandOnHoverShadowElevation = 4;
@@ -1207,7 +1275,7 @@ index 90a43ba48c..e19709a02d 100644
 +  }
 +};
  }  // namespace
- 
+
  DEFINE_CLASS_CUSTOM_ELEMENT_EVENT_TYPE(VerticalTabStripRegionView,
 @@ -106,6 +141,8 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
    SetPaintToLayer();
@@ -1215,13 +1283,13 @@ index 90a43ba48c..e19709a02d 100644
    layer()->SetFillsBoundsOpaquely(false);
 +  SetEventTargeter(std::make_unique<views::ViewTargeter>(
 +      std::make_unique<FloatingTabStripTargeter>()));
- 
+
    const int region_horizontal_padding =
        GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
 @@ -154,6 +191,15 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
                LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
            region_horizontal_padding, 0, region_horizontal_padding));
- 
+
 +  // Yee owns sidebar toggle and new-item actions in the titlebar. Chromium's
 +  // stock vertical-tab launchers would duplicate those controls and introduce
 +  // section dividers that are absent from the pilot.
@@ -1232,7 +1300,7 @@ index 90a43ba48c..e19709a02d 100644
 +  }
 +
    gemini_button_ = AddChildView(std::make_unique<views::View>());
- 
+
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
 @@ -207,6 +253,30 @@ bool VerticalTabStripRegionView::IsAnimatingSize() const {
  void VerticalTabStripRegionView::OnAnimationProgressed(
@@ -1305,7 +1373,7 @@ index 90a43ba48c..e19709a02d 100644
 @@ -337,6 +412,11 @@ void VerticalTabStripRegionView::SetTransitionButtonOpacity(float opacity) {
    }
  }
- 
+
 +void VerticalTabStripRegionView::SetHideCollapsedRail(bool hide) {
 +  hide_collapsed_rail_ = hide;
 +  UpdateCollapsedRailVisibility();
@@ -1317,7 +1385,7 @@ index 90a43ba48c..e19709a02d 100644
 @@ -386,7 +466,13 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
      return GetTabAnchorViewAt(active_index);
    }
- 
+
 -  return top_button_container_;
 +  if (top_button_container_->GetVisible()) {
 +    return top_button_container_;
@@ -1327,12 +1395,12 @@ index 90a43ba48c..e19709a02d 100644
 +  }
 +  return this;
  }
- 
+
  gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
 @@ -685,8 +771,6 @@ void VerticalTabStripRegionView::RequestCollapse(bool collapse) {
        ->Start(TabStripAnimations::kVerticalTabStrip, motion);
  }
- 
+
 -
 -
  VerticalTabStripRegionView::RegionViewFocusListener::RegionViewFocusListener(
@@ -1341,7 +1409,7 @@ index 90a43ba48c..e19709a02d 100644
 @@ -767,6 +851,11 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
    // the collapsing state.
    bool collapsed = state != tabs::VerticalTabStripCollapseState::kExpanded;
- 
+
 +  // The expanded Yee sidebar uses spacing between its native sections instead
 +  // of a full-width rule below the launcher controls. Keep Chromium's divider
 +  // only for the compact rail where it still separates two icon regions.
@@ -1356,7 +1424,7 @@ index 90a43ba48c..e19709a02d 100644
    }
 +  UpdateCollapsedRailVisibility();
  }
- 
+
  void VerticalTabStripRegionView::UpdateColors() {
 @@ -827,7 +917,9 @@ gfx::Rect VerticalTabStripRegionView::GetTabStripDraggableBounds() const {
    gfx::Rect tab_strip_draggable_bounds = tab_strip_view()->GetBoundsInScreen();
@@ -1372,7 +1440,7 @@ index 90a43ba48c..e19709a02d 100644
 @@ -1033,6 +1125,10 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
    is_expanded_on_hover_ = expand;
    ResetExpandOnHoverTimers();
- 
+
 +  if (expand) {
 +    UpdateCollapsedRailVisibility();
 +  }
@@ -1383,7 +1451,7 @@ index 90a43ba48c..e19709a02d 100644
 @@ -1054,6 +1150,14 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
                       : TabStripAnimations::kCollapseOnHover);
  }
- 
+
 +void VerticalTabStripRegionView::UpdateCollapsedRailVisibility() {
 +  const bool visible = !hide_collapsed_rail_ || is_expanded_on_hover_ ||
 +                       state_controller_->GetCollapseState() !=
@@ -1407,14 +1475,14 @@ index 6af7471a6d..6265dc516f 100644
 +  // painted again while expanding, expanded, or expanded-on-hover.
 +  void SetHideCollapsedRail(bool hide);
    bool WillWrapDueToOverflow(int available_width) const;
- 
+
    // views::View:
 @@ -223,6 +226,7 @@ class VerticalTabStripRegionView final
    void CalculateMouseVelocityForExpandOnHover();
    void ResetExpandOnHoverTimers();
    void AnimateExpandOnHover(bool expand);
 +  void UpdateCollapsedRailVisibility();
- 
+
    void RegisterExpandOnHoverLock(VerticalTabStripExpandOnHoverLock* lock);
    void UnregisterExpandOnHoverLock(VerticalTabStripExpandOnHoverLock* lock);
 @@ -273,6 +277,7 @@ class VerticalTabStripRegionView final
@@ -1438,9 +1506,9 @@ index 07fdd70a0b..a485f21f11 100644
  #include "ui/gfx/image/image.h"
  #include "ui/gfx/paint_vector_icon.h"
 @@ -173,6 +174,13 @@
- 
+
  namespace {
- 
+
 +constexpr int kCompactShellLocationBarHeight = 36;
 +constexpr int kCompactShellLocationBarRadius = 8;
 +constexpr SkColor kCompactShellLocationBarBorder =
@@ -1454,7 +1522,7 @@ index 07fdd70a0b..a485f21f11 100644
 @@ -491,7 +499,27 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
- 
+
 +void LocationBarView::ConfigureForCompactShell() {
 +  if (compact_shell_mode_) {
 +    return;
@@ -1478,10 +1546,10 @@ index 07fdd70a0b..a485f21f11 100644
 +  }
    return ComputeBorderRadius(size());
  }
- 
+
 @@ -661,7 +689,10 @@ bool LocationBarView::HasFocus() const {
  }
- 
+
  gfx::Size LocationBarView::GetMinimumSize() const {
 -  const int height = GetLayoutConstant(LayoutConstant::kLocationBarHeight);
 +  const int height =
@@ -1492,7 +1560,7 @@ index 07fdd70a0b..a485f21f11 100644
      return gfx::Size(0, height);
    }
 @@ -688,7 +719,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
- 
+
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
 -  const int height = GetLayoutConstant(LayoutConstant::kLocationBarHeight);
@@ -1505,7 +1573,7 @@ index 07fdd70a0b..a485f21f11 100644
    }
 @@ -1305,7 +1339,7 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
- 
+
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
 -  const int border_radius = height() / 2;
 +  const int border_radius = GetBorderRadius();
@@ -1528,7 +1596,7 @@ index 07fdd70a0b..a485f21f11 100644
 +      hovered = SK_ColorWHITE;
 +    }
 +  }
- 
+
    background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
 -  if (is_caret_visible) {
 +  if (is_caret_visible && !compact_shell_mode_) {
@@ -1544,7 +1612,7 @@ index 07fdd70a0b..a485f21f11 100644
 @@ -1354,13 +1400,27 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
- 
+
 +  if (compact_shell_mode_ && !high_contrast) {
 +    border_color = use_compact_light_surface
 +                       ? gfx::Tween::ColorValueBetween(
@@ -1571,12 +1639,12 @@ index 07fdd70a0b..a485f21f11 100644
 +                             /*should_border_scale=*/true);
 +    SetBackground(CreateBackgroundFromPainter(std::move(painter)));
    }
- 
+
    // Keep the views::Textfield in sync. It needs an opaque background to
 @@ -2242,7 +2302,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
- 
+
 -
  BEGIN_METADATA(LocationBarView)
  ADD_READONLY_PROPERTY_METADATA(int, BorderRadius)
@@ -1588,18 +1656,18 @@ index ed7711207f..bbe0e5d2cd 100644
 @@ -140,6 +140,10 @@ class LocationBarView
    // Initializes the LocationBarView.
    void Init();
- 
+
 +  // Applies Yee's compact shell presentation without changing omnibox
 +  // behavior. The native edit model, popup, and page actions remain intact.
 +  void ConfigureForCompactShell();
 +
    bool in_popup_state_transition() const override;
- 
+
    // Returns a background that paints an (optionally stroked) rounded rect with
 @@ -188,7 +192,6 @@ class LocationBarView
- 
+
    const OmniboxController* GetOmniboxController() const;
- 
+
 -
    // Controls the permission dashboard in the LocationBarView.
    PermissionDashboardController* permission_dashboard_controller() {
@@ -1607,27 +1675,27 @@ index ed7711207f..bbe0e5d2cd 100644
 @@ -578,7 +581,6 @@ class LocationBarView
    // Shown if the user has selected a keyword.
    raw_ptr<SelectedKeywordView> selected_keyword_view_ = nullptr;
- 
+
 -
    // The content setting views.
    ContentSettingViews content_setting_views_;
- 
+
 @@ -602,6 +604,8 @@ class LocationBarView
- 
+
    bool is_initialized_ = false;
- 
+
 +  bool compact_shell_mode_ = false;
 +
    SkColor background_color_ = gfx::kPlaceholderColor;
- 
+
    // The focus manager associated with this view. The focus manager is expected
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f..7bab89e4d4 100644
+index cfaf18f54f..6bf58acbda 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -47,8 +47,8 @@
  #include "ui/views/widget/widget.h"
- 
+
  namespace {
 -constexpr int kGroupHeaderCornerRadius = 8;
 -constexpr int kGroupHeaderHorizontalInset = 8;
@@ -1636,7 +1704,17 @@ index cfaf18f54f..7bab89e4d4 100644
  constexpr int kIconSize = 16;
  constexpr int kFocusRingInset = 2;
  constexpr int kAttentionIndicatorWidth = 8;
-@@ -388,6 +388,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+@@ -159,6 +159,9 @@ TabGroupHeaderView::TabGroupHeaderView(
+   SetNotifyEnterExitOnChild(true);
+
+   if (editor_bubble_button_) {
++    // Vertical group headers use a translucent shell surface, so their text
++    // cannot use subpixel rendering, which requires an opaque backing layer.
++    group_header_label_->SetSubpixelRenderingEnabled(false);
+     ConfigureEditorBubbleButton(editor_bubble_button_);
+     editor_bubble_button_->SetVisible(delegate_->IsGroupFocused());
+   }
+@@ -388,6 +391,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    }
    UpdateEditorBubbleButtonVisibility();
@@ -1648,9 +1726,9 @@ index cfaf18f54f..7bab89e4d4 100644
 +        SkColorSetA(group_color, 0x2E), kGroupHeaderCornerRadius));
 +  }
  }
- 
+
  void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
-@@ -398,6 +405,13 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
+@@ -398,6 +408,13 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
  #else
    UpdateEditorBubbleButtonVisibility();
  #endif
@@ -1662,11 +1740,11 @@ index cfaf18f54f..7bab89e4d4 100644
 +        SkColorSetA(group_color, 0x18), kGroupHeaderCornerRadius));
 +  }
  }
- 
+
  void TabGroupHeaderView::OnFocus() {
-@@ -570,8 +584,11 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -570,8 +587,11 @@ void TabGroupHeaderView::OnDataChanged(
      }
- 
+
      // Update background.
 -    SetBackground(views::CreateRoundedRectBackground(background_color,
 -                                                     kGroupHeaderCornerRadius));
@@ -1678,8 +1756,8 @@ index cfaf18f54f..7bab89e4d4 100644
      UpdateAttentionState(
          data_sharing::features::IsDataSharingFunctionalityEnabled() &&
          tab_group_data.needs_attention);
-@@ -673,6 +690,12 @@ void TabGroupHeaderView::UpdateAccessibleName() {
- 
+@@ -673,6 +693,12 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
 +    if (orientation_ == TabStripOrientation::kVertical) {
@@ -1697,7 +1775,7 @@ index 8eefd99313..81097386ee 100644
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 @@ -24,11 +24,11 @@
  #include "ui/views/view_utils.h"
- 
+
  namespace {
 -constexpr int kTabVerticalPadding = 2;
 +constexpr int kTabVerticalPadding = 3;
@@ -1708,7 +1786,7 @@ index 8eefd99313..81097386ee 100644
 +constexpr int kGroupHeaderHeight = 30;
 +constexpr int kGroupHeaderVerticalMargin = 0;
  }  // namespace
- 
+
  TabGroupViewLayout::TabGroupViewLayout(TabStripOrientation orientation)
 @@ -149,6 +149,8 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
      group_line_bounds.set_height(height - group_line_bounds.y());
@@ -1754,9 +1832,9 @@ index 0f3fd08221..6e0e1ce6bc 100644
  #include "ui/views/controls/separator.h"
  #include "ui/views/layout/layout_types.h"
 @@ -39,6 +48,10 @@
- 
+
  namespace {
- 
+
 +constexpr int kYeeFavoritesLabelViewId = 92001;
 +constexpr int kYeeBookmarksButtonViewId = 92002;
 +constexpr int kYeeSidebarRowRadius = 6;
@@ -1767,7 +1845,7 @@ index 0f3fd08221..6e0e1ce6bc 100644
 @@ -189,6 +202,53 @@ TabStripView::TabStripView(TabCollectionNode* collection_node)
        views::ScrollView::ScrollWithLayers::kEnabled));
    SetScrollViewProperties(unpinned_tabs_scroll_view_);
- 
+
 +  if (IsVerticalOrientation(collection_node_)) {
 +    auto favorites_label = std::make_unique<views::Label>(u"FAVORITES");
 +    favorites_label->SetID(kYeeFavoritesLabelViewId);
@@ -1817,15 +1895,15 @@ index 0f3fd08221..6e0e1ce6bc 100644
 +
    collection_node->set_add_child_to_node(base::BindRepeating(
        &TabStripView::AddScrollViewContents, base::Unretained(this)));
- 
+
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 index b85a9a5d21..87de39786e 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 @@ -17,6 +17,13 @@
- 
+
  namespace {
- 
+
 +constexpr int kYeeFavoritesLabelViewId = 92001;
 +constexpr int kYeeBookmarksButtonViewId = 92002;
 +constexpr int kYeeSectionLabelHeight = 18;
@@ -1837,9 +1915,9 @@ index b85a9a5d21..87de39786e 100644
  // available space unless the unpinned container will not fill that space.
  // When pinned tabs are present, the size must be at least as large as the min
 @@ -172,6 +179,11 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
- 
+
    int y = 0;
- 
+
 +  const views::View* favorites_label =
 +      tab_strip_view->GetViewByID(kYeeFavoritesLabelViewId);
 +  const views::View* bookmarks_button =
@@ -1851,7 +1929,7 @@ index b85a9a5d21..87de39786e 100644
 @@ -186,11 +198,36 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
                                       unpinned_preferred_height != 0 &&
                                       is_collapsed;
- 
+
 +  const bool show_pilot_sections = !is_collapsed && favorites_label &&
 +                                   bookmarks_button;
 +  const bool show_favorites_label =
@@ -1888,7 +1966,7 @@ index b85a9a5d21..87de39786e 100644
 @@ -231,6 +268,20 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
      }
    }
- 
+
 +  gfx::Rect bookmarks_button_bounds;
 +  if (show_pilot_sections) {
 +    bookmarks_button_bounds = gfx::Rect(
@@ -1927,7 +2005,7 @@ index c223b50fab..b067ce8d26 100644
  #include "ui/gfx/geometry/size.h"
  #include "ui/gfx/geometry/skia_conversions.h"
 @@ -93,6 +95,7 @@
- 
+
  namespace {
  constexpr int kIconDesignWidth = 16;
 +constexpr int kVerticalIconDesignWidth = 24;
@@ -1997,11 +2075,11 @@ index c223b50fab..b067ce8d26 100644
 +                     kDefaultPadding,
                       /*align_leading=*/true,
                       /*expand=*/true)};
- 
+
 @@ -698,6 +736,19 @@ void TabView::OnPaint(gfx::Canvas* canvas) {
- 
+
    tab_styling()->PaintTab(canvas);
- 
+
 +  const bool is_vertical =
 +      collection_node_ &&
 +      collection_node_->orientation() == TabStripOrientation::kVertical;
@@ -2017,7 +2095,7 @@ index c223b50fab..b067ce8d26 100644
 +
    views::View::OnPaint(canvas);
  }
- 
+
 @@ -812,11 +863,9 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
    int preferred_height;
    if (config.expand) {
@@ -2034,7 +2112,7 @@ index c223b50fab..b067ce8d26 100644
      const gfx::Size preferred_size = config.view->GetPreferredSize();
      preferred_width = preferred_size.width();
 @@ -843,7 +892,7 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
- 
+
  bool TabView::IsChildVisible(const views::View* child_view,
                               const int width) const {
 -  if (child_view == title_) {
@@ -2061,7 +2139,7 @@ index c223b50fab..b067ce8d26 100644
 @@ -1195,6 +1246,16 @@ void TabView::UpdateTitle(std::u16string title,
    title_->SetText(title);
  }
- 
+
 +void TabView::UpdateSubtitle() {
 +  if (!subtitle_) {
 +    return;
@@ -2084,7 +2162,7 @@ index c223b50fab..b067ce8d26 100644
 +  }
    close_button_->SetColors(colors);
    alert_indicator_->OnParentTabButtonColorChanged();
- 
+
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.h b/chrome/browser/ui/views/tabs/common/tab_view.h
 index 162310f13a..6fd4d618ab 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.h
@@ -2092,7 +2170,7 @@ index 162310f13a..6fd4d618ab 100644
 @@ -40,6 +40,10 @@ class TabTitle;
  class TabStyleViews;
  class TabStyleViewDelegate;
- 
+
 +namespace views {
 +class Label;
 +}  // namespace views
@@ -2102,7 +2180,7 @@ index 162310f13a..6fd4d618ab 100644
  }  // namespace base
 @@ -188,6 +192,7 @@ class TabView : public views::View,
    void UpdateTabData(const tabs::TabInterface* tab);
- 
+
    void UpdateTitle(std::u16string title, bool should_render_loading_title);
 +  void UpdateSubtitle();
    void UpdateBorder();
@@ -2110,7 +2188,7 @@ index 162310f13a..6fd4d618ab 100644
    void UpdateContrastRatioValues();
 @@ -227,7 +232,9 @@ class TabView : public views::View,
    std::unique_ptr<TabStyleViews> tab_styling_;
- 
+
    const raw_ptr<TabIcon> icon_;
 -  const raw_ptr<TabTitle> title_;
 +  raw_ptr<views::View> text_container_ = nullptr;
@@ -2133,7 +2211,7 @@ index cbec9de4fa..8bfda04e0e 100644
 +#include "ui/native_theme/native_theme.h"
  #include "ui/views/view_utils.h"
  #include "ui/views/widget/widget.h"
- 
+
 @@ -83,6 +85,16 @@ void VerticalTabStyleViews::PaintTab(gfx::Canvas* canvas) const {
      PaintTabBackgroundFill(canvas, GetSelectionState(),
                             delegate_->IsHoverAnimationActive(), std::nullopt);
@@ -2149,7 +2227,7 @@ index cbec9de4fa..8bfda04e0e 100644
 +        2.0f, indicator_flags);
 +  }
  }
- 
+
  void VerticalTabStyleViews::PaintTabBackgroundWithImages(
 @@ -142,7 +154,25 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
                                      hovered)) {
@@ -2190,8 +2268,177 @@ index 72399b5bd5..f7f61bae38 100644
      "//chrome/browser/ui/waap",
      "//chrome/browser/ui/waap:manager",
      "//chrome/browser/ui/waap:window_metrics_manager",
+diff --git a/chrome/browser/ui/views/toolbar/back_forward_button.cc b/chrome/browser/ui/views/toolbar/back_forward_button.cc
+index 8c1e1344e5..888fe72f03 100644
+--- a/chrome/browser/ui/views/toolbar/back_forward_button.cc
++++ b/chrome/browser/ui/views/toolbar/back_forward_button.cc
+@@ -77,6 +77,10 @@ BackForwardButton::BackForwardButton(Direction direction,
+
+ BackForwardButton::~BackForwardButton() = default;
+
++void BackForwardButton::SetClickAnimationEnabled(bool enabled) {
++  click_animation_enabled_ = enabled;
++}
++
+ const std::u16string BackForwardButton::GetAccessiblePageLoadingMessage() {
+   // If we don't have a model, there is no menu from which to obtain the title
+   // of the page that is about to be loaded.
+@@ -114,7 +118,8 @@ void BackForwardButton::NotifyClick(const ui::Event& event) {
+     base::RecordAction(base::UserMetricsAction("Toolbar_BackButton_Clicked"));
+   }
+
+-  bool play_animation = features::IsToolbarGlowUpBackForwardEnabled() &&
++  bool play_animation = click_animation_enabled_ &&
++                        features::IsToolbarGlowUpBackForwardEnabled() &&
+                         !ui::TouchUiController::Get()->touch_ui() &&
+                         event.IsMouseEvent() &&
+                         event.AsMouseEvent()->IsOnlyLeftMouseButton();
+diff --git a/chrome/browser/ui/views/toolbar/back_forward_button.h b/chrome/browser/ui/views/toolbar/back_forward_button.h
+index 62f921c224..989871ea01 100644
+--- a/chrome/browser/ui/views/toolbar/back_forward_button.h
++++ b/chrome/browser/ui/views/toolbar/back_forward_button.h
+@@ -25,6 +25,8 @@ class BackForwardButton : public ToolbarButton {
+   BackForwardButton& operator=(const BackForwardButton&) = delete;
+   ~BackForwardButton() override;
+
++  void SetClickAnimationEnabled(bool enabled);
++
+  private:
+   // views::Button:
+   void NotifyClick(const ui::Event& event) override;
+@@ -37,6 +39,7 @@ class BackForwardButton : public ToolbarButton {
+
+   const raw_ptr<Browser> browser_;
+   const Direction direction_;
++  bool click_animation_enabled_ = true;
+
+   // Reflects whether any modifiers are down, which would affect which tab would
+   // be navigated, at the time of a mouse enter on the back button. This is only
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_button.cc b/chrome/browser/ui/views/toolbar/toolbar_button.cc
+index d4c4f01c14..1ea6287523 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_button.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_button.cc
+@@ -27,8 +27,6 @@
+ #include "chrome/browser/ui/views/chrome_typography.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
+ #include "components/user_education/common/user_education_class_properties.h"
+-#include "third_party/skia/include/core/SkPath.h"
+-#include "third_party/skia/include/core/SkRRect.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/accessibility/ax_node_data.h"
+ #include "ui/actions/actions.h"
+@@ -44,6 +42,8 @@
+ #include "ui/display/screen.h"
+ #include "ui/gfx/color_utils.h"
+ #include "ui/gfx/geometry/insets.h"
++#include "ui/gfx/geometry/rect_conversions.h"
++#include "ui/gfx/geometry/rrect_f.h"
+ #include "ui/gfx/paint_vector_icon.h"
+ #include "ui/gfx/text_utils.h"
+ #include "ui/views/animation/ink_drop.h"
+@@ -71,25 +71,18 @@ class ToolbarButtonHighlightPathGenerator
+       : toolbar_button_(toolbar_button) {}
+
+   // HighlightPathGenerator:
+-  SkPath GetHighlightPath(const views::View* view) override {
+-    gfx::Rect rect(view->size());
+-    rect.Inset(GetToolbarInkDropInsets(view));
+-
+-    const SkScalar top_left_radius =
+-        toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kTopLeft);
+-    const SkScalar bottom_right_radius =
+-        toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kBottomRight);
+-    const SkScalar top_right_radius =
+-        toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kTopRight);
+-    const SkScalar bottom_left_radius =
+-        toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kBottomLeft);
+-    const SkVector radii[4] = {{top_left_radius, top_left_radius},
+-                               {top_right_radius, top_right_radius},
+-                               {bottom_right_radius, bottom_right_radius},
+-                               {bottom_left_radius, bottom_left_radius}};
+-
+-    return SkPath::RRect(
+-        SkRRect::MakeRectRadii(gfx::RectToSkRect(rect), radii));
++  std::optional<gfx::RRectF> GetRoundRect(const gfx::RectF& rect) override {
++    gfx::Rect bounds = gfx::ToEnclosingRect(rect);
++    bounds.Inset(GetToolbarInkDropInsets(toolbar_button_));
++    return gfx::RRectF(
++        gfx::RectF(bounds),
++        gfx::RoundedCornersF(
++            toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kTopLeft),
++            toolbar_button_->GetCornerRadiusFor(ToolbarButton::Edge::kTopRight),
++            toolbar_button_->GetCornerRadiusFor(
++                ToolbarButton::Edge::kBottomRight),
++            toolbar_button_->GetCornerRadiusFor(
++                ToolbarButton::Edge::kBottomLeft)));
+   }
+
+  private:
+@@ -114,8 +107,8 @@ ToolbarButton::ToolbarButton(PressedCallback callback,
+       tab_strip_model_(tab_strip_model),
+       trigger_menu_on_long_press_(trigger_menu_on_long_press),
+       highlight_color_animation_(this) {
+-  ConfigureInkDrop(
+-      this, std::make_unique<ToolbarButtonHighlightPathGenerator>(this));
++  ConfigureInkDrop(this,
++                   std::make_unique<ToolbarButtonHighlightPathGenerator>(this));
+
+   set_context_menu_controller(this);
+
+@@ -165,6 +158,9 @@ void ToolbarButton::ClearHighlight() {
+ }
+
+ int ToolbarButton::GetRoundedCornerRadius() const {
++  if (custom_corner_radius_) {
++    return *custom_corner_radius_;
++  }
+   return ChromeLayoutProvider::Get()->GetCornerRadiusMetric(
+       views::Emphasis::kMaximum, GetTargetSize());
+ }
+@@ -174,6 +170,17 @@ float ToolbarButton::GetCornerRadiusFor(ToolbarButton::Edge edge) const {
+   return GetRoundedCornerRadius();
+ }
+
++void ToolbarButton::SetCustomCornerRadius(int corner_radius) {
++  CHECK_GE(corner_radius, 0);
++  custom_corner_radius_ = corner_radius;
++  auto* const ink_drop = views::InkDrop::Get(this);
++  if (ink_drop->HasInkDrop()) {
++    ink_drop->GetInkDrop()->HostSizeChanged(size());
++  }
++  UpdateColorsAndInsets();
++  SchedulePaint();
++}
++
+ void ToolbarButton::SetDefaultBackgroundColorId(ChromeColorIds color_id) {
+   default_background_color_id_ = color_id;
+ }
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_button.h b/chrome/browser/ui/views/toolbar/toolbar_button.h
+index 0fcdbfa57b..94e716e258 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_button.h
++++ b/chrome/browser/ui/views/toolbar/toolbar_button.h
+@@ -120,6 +120,10 @@ class ToolbarButton : public views::LabelButton,
+   // Returns the button's corner radius for `edge`.
+   virtual float GetCornerRadiusFor(ToolbarButton::Edge edge) const;
+
++  // Overrides the standard radius for callers that provide a custom surface.
++  // Buttons that do not opt in retain the native radius.
++  void SetCustomCornerRadius(int corner_radius);
++
+   // Gets/Sets |layout_insets_|, see comment there.
+   std::optional<gfx::Insets> GetLayoutInsets() const;
+   void SetLayoutInsets(const std::optional<gfx::Insets>& insets);
+@@ -375,6 +379,8 @@ class ToolbarButton : public views::LabelButton,
+   // match the expected touchable UI.
+   gfx::Insets layout_inset_delta_;
+
++  std::optional<int> custom_corner_radius_;
++
+   // Used to ensure the button remains highlighted while the menu is active.
+   std::optional<Button::ScopedAnchorHighlight> menu_anchor_higlight_;
+
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 09b381e46e..748a36bc7d 100644
+index 09b381e46e..4db11c64f7 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -19,9 +19,11 @@
@@ -2214,23 +2461,50 @@ index 09b381e46e..748a36bc7d 100644
  #include "chrome/browser/ui/views/zoom/zoom_view_controller.h"
  #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
-@@ -212,6 +215,12 @@ constexpr int kInsideBorderAroundGlicButtons = 2;
+@@ -212,6 +215,39 @@ constexpr int kInsideBorderAroundGlicButtons = 2;
  constexpr int kOutsideBorderAroundGlicButtons = 11;
  constexpr int kGlicButtonMargin = 5;
- 
+
 +constexpr int kYeeCompactLocationBarDefaultMargin = 5;
 +constexpr int kYeeCompactContentGutter = 6;
 +constexpr int kYeeCompactToolbarInteriorInset = 4;
 +constexpr int kYeeCompactShellControlCount = 3;
 +constexpr int kYeeCompactControlSpan = 30;
 +
++void ShowYeeAgentActivity(Browser* browser, int event_flags) {
++  auto* const controller = tabs::VerticalTabStripStateController::From(browser);
++  if (controller && controller->GetCollapseState() !=
++                        tabs::VerticalTabStripCollapseState::kExpanded) {
++    chrome::ExecuteCommandWithDisposition(
++        browser, IDC_TOGGLE_VERTICAL_TABS_COLLAPSE,
++        ui::DispositionFromEventFlags(event_flags));
++  }
++}
++
++void ExecuteYeeCreateAction(Browser* browser,
++                            yee::ShellCreateAction action,
++                            int event_flags) {
++  switch (action) {
++    case yee::ShellCreateAction::kNewTab:
++      chrome::ExecuteCommandWithDisposition(
++          browser, IDC_NEW_TAB, ui::DispositionFromEventFlags(event_flags));
++      break;
++    case yee::ShellCreateAction::kNewGroup:
++      chrome::ExecuteCommand(browser, IDC_CREATE_NEW_TAB_GROUP);
++      break;
++    case yee::ShellCreateAction::kChat:
++      ShowYeeAgentActivity(browser, event_flags);
++      break;
++  }
++}
++
  // Returns whether `point` should be treated as part of the caption area in
  // `view`. Recursively traverses into icon containers to correctly handle
  // padding between buttons.
-@@ -305,6 +314,228 @@ ToolbarView::~ToolbarView() {
+@@ -305,6 +341,194 @@ ToolbarView::~ToolbarView() {
    }
  }
- 
+
 +void ToolbarView::ConfigureForCompactShell() {
 +  CHECK(initialized_);
 +  CHECK_EQ(display_mode_, DisplayMode::kNormal);
@@ -2250,31 +2524,15 @@ index 09b381e46e..748a36bc7d 100644
 +      &ToolbarView::ToggleCompactShellSidebar, base::Unretained(this)));
 +  sidebar_button->SetVectorIcon(kDockToLeftIcon);
 +
-+  const auto compact_shell_command = [](Browser* browser, int command,
-+                                        const ui::Event& event) {
-+    chrome::ExecuteCommandWithDisposition(
-+        browser, command, ui::DispositionFromEventFlags(event.flags()));
-+  };
-+  auto new_tab_button = yee::CreateShellToolbarButton(base::BindRepeating(
-+      compact_shell_command, browser_, IDC_NEW_TAB));
-+  new_tab_button->SetVectorIcon(kAddIcon);
-+  const std::u16string new_tab_label =
-+      l10n_util::GetStringUTF16(IDS_TOOLTIP_NEW_TAB);
-+  new_tab_button->SetTooltipText(new_tab_label);
-+  new_tab_button->GetViewAccessibility().SetName(new_tab_label);
-+  ToolbarButton* const compact_shell_new_tab_button =
-+      AddChildViewAt(std::move(new_tab_button), 0);
++  auto add_button = yee::CreateShellAddButton(
++      base::BindRepeating(&ExecuteYeeCreateAction, browser_));
++  add_button->SetVectorIcon(kAddIcon);
++  ToolbarButton* const compact_shell_add_button =
++      AddChildViewAt(std::move(add_button), 0);
 +
 +  const auto show_agent_activity = [](Browser* browser,
 +                                      const ui::Event& event) {
-+    auto* const controller =
-+        tabs::VerticalTabStripStateController::From(browser);
-+    if (controller && controller->GetCollapseState() !=
-+                          tabs::VerticalTabStripCollapseState::kExpanded) {
-+      chrome::ExecuteCommandWithDisposition(
-+          browser, IDC_TOGGLE_VERTICAL_TABS_COLLAPSE,
-+          ui::DispositionFromEventFlags(event.flags()));
-+    }
++    ShowYeeAgentActivity(browser, event.flags());
 +  };
 +  auto agent_button = yee::CreateAgentToolbarButton(
 +      base::BindRepeating(show_agent_activity, browser_));
@@ -2344,41 +2602,22 @@ index 09b381e46e..748a36bc7d 100644
 +
 +  location_bar_view_->ConfigureForCompactShell();
 +
-+  const gfx::Size kCompactControlSize(30, 30);
-+  compact_shell_sidebar_button_->SetPreferredSize(kCompactControlSize);
-+  compact_shell_new_tab_button->SetPreferredSize(kCompactControlSize);
-+  compact_shell_agent_button->SetPreferredSize(kCompactControlSize);
++  yee::ApplyShellControlStyle(*compact_shell_add_button);
++  yee::ApplyShellControlStyle(*compact_shell_agent_button);
++  yee::ApplyShellControlStyle(*compact_shell_sidebar_button_);
 +  if (back_) {
-+    back_->SetPreferredSize(kCompactControlSize);
++    yee::ApplyShellControlStyle(*back_);
++    static_cast<BackForwardButton*>(back_)->SetClickAnimationEnabled(false);
 +  }
 +  if (forward_) {
-+    forward_->SetPreferredSize(kCompactControlSize);
++    yee::ApplyShellControlStyle(*forward_);
++    static_cast<BackForwardButton*>(forward_)->SetClickAnimationEnabled(false);
 +  }
 +  if (reload_) {
-+    reload_->SetPreferredSize(kCompactControlSize);
++    yee::ApplyShellControlStyle(*reload_);
 +  }
 +  if (extensions_container_) {
-+    extensions_container_->GetExtensionsButton()->SetPreferredSize(
-+        kCompactControlSize);
-+  }
-+
-+  constexpr int kControlMargin = 1;
-+  compact_shell_sidebar_button_->SetProperty(
-+      views::kMarginsKey, gfx::Insets::VH(0, kControlMargin));
-+  compact_shell_new_tab_button->SetProperty(
-+      views::kMarginsKey, gfx::Insets::VH(0, kControlMargin));
-+  compact_shell_agent_button->SetProperty(
-+      views::kMarginsKey, gfx::Insets::VH(0, kControlMargin));
-+  if (back_) {
-+    back_->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kControlMargin));
-+  }
-+  if (forward_) {
-+    forward_->SetProperty(views::kMarginsKey,
-+                          gfx::Insets::VH(0, kControlMargin));
-+  }
-+  if (reload_) {
-+    reload_->SetProperty(views::kMarginsKey,
-+                         gfx::Insets::VH(0, kControlMargin));
++    yee::ApplyShellControlStyle(*extensions_container_->GetExtensionsButton());
 +  }
 +  compact_shell_leading_divider_->SetProperty(views::kMarginsKey,
 +                                              gfx::Insets::VH(0, 7));
@@ -2430,7 +2669,8 @@ index 09b381e46e..748a36bc7d 100644
 +  }
 +
 +  int spacer_width = 0;
-+  auto* const controller = tabs::VerticalTabStripStateController::From(browser_);
++  auto* const controller =
++      tabs::VerticalTabStripStateController::From(browser_);
 +  if (controller && controller->GetCollapseState() ==
 +                        tabs::VerticalTabStripCollapseState::kExpanded) {
 +    // Keep the Sidebar Header and pinned Tab Sidebar on one column boundary.
@@ -2438,8 +2678,8 @@ index 09b381e46e..748a36bc7d 100644
 +    // measure its real origin instead of duplicating an OS-specific inset.
 +    gfx::Point toolbar_origin;
 +    views::View::ConvertPointToTarget(this, browser_view_, &toolbar_origin);
-+    const int browser_toolbar_start = controller->GetUncollapsedWidth() +
-+                                      kYeeCompactContentGutter;
++    const int browser_toolbar_start =
++        controller->GetUncollapsedWidth() + kYeeCompactContentGutter;
 +    const int shell_controls_span =
 +        kYeeCompactToolbarInteriorInset +
 +        kYeeCompactShellControlCount * kYeeCompactControlSpan;
@@ -2456,8 +2696,8 @@ index 09b381e46e..748a36bc7d 100644
  void ToolbarView::Init() {
  #if defined(USE_AURA)
    // Avoid generating too many occlusion tracking calculation events before this
-@@ -1269,6 +1500,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
- 
+@@ -1269,6 +1493,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
+
  bool ToolbarView::IsPositionInWindowCaption(
      const gfx::Point& test_point) const {
 +  if (compact_shell_mode_ && compact_shell_column_spacer_ &&
@@ -2466,21 +2706,21 @@ index 09b381e46e..748a36bc7d 100644
 +  }
    return IsPositionInWindowCaptionForView(this, test_point);
  }
- 
-@@ -1439,10 +1674,11 @@ void ToolbarView::Layout(PassKey) {
+
+@@ -1439,10 +1667,11 @@ void ToolbarView::Layout(PassKey) {
    }
- 
+
    if (display_mode_ == DisplayMode::kNormal) {
 +    UpdateCompactShellColumnSpacer();
      LayoutCommon();
    }
- 
+
 -  if (toolbar_controller_) {
 +  if (toolbar_controller_ && !compact_shell_mode_) {
      // Need to determine whether the overflow button should be visible, and only
      // update it if the visibility changes.
      const bool was_overflow_button_visible =
-@@ -1704,6 +1940,13 @@ void ToolbarView::LayoutCommon() {
+@@ -1704,6 +1933,13 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
@@ -2492,37 +2732,37 @@ index 09b381e46e..748a36bc7d 100644
 +    }
 +  }
    layout_manager_->SetInteriorMargin(interior_margin);
- 
+
    // Extend buttons to the window edge if we're either in a maximized or
-@@ -1751,7 +1994,9 @@ void ToolbarView::LayoutCommon() {
- 
+@@ -1751,7 +1987,9 @@ void ToolbarView::LayoutCommon() {
+
    if (toolbar_divider_ && extensions_container_) {
      views::ManualLayoutUtil(layout_manager_)
 -        .SetViewHidden(toolbar_divider_, !extensions_container_->GetVisible());
-+        .SetViewHidden(toolbar_divider_,
-+                       compact_shell_mode_ ||
-+                           !extensions_container_->GetVisible());
++        .SetViewHidden(
++            toolbar_divider_,
++            compact_shell_mode_ || !extensions_container_->GetVisible());
    }
    // Cast button visibility is controlled externally.
  }
-@@ -1931,7 +2176,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
+@@ -1931,7 +2169,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
    return reload_;
  }
- 
+
 -
  ToolbarButton* ToolbarView::GetDownloadButton() {
    return pinned_toolbar_actions_container_
               ? pinned_toolbar_actions_container_->GetButtonFor(
-@@ -1988,7 +2232,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
- 
+@@ -1988,7 +2225,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
+
  void ToolbarView::OnShowHomeButtonChanged() {
    if (home_) {
 -    home_->SetVisible(show_home_button_.GetValue());
 +    home_->SetVisible(!compact_shell_mode_ && show_home_button_.GetValue());
    }
  }
- 
-@@ -2004,8 +2248,12 @@ void ToolbarView::OnTouchUiChanged() {
+
+@@ -2004,8 +2241,12 @@ void ToolbarView::OnTouchUiChanged() {
      layout_manager_->SetDefault(views::kMarginsKey,
                                  gfx::Insets::VH(0, default_margin));
      if (location_bar_view_) {
@@ -2535,11 +2775,11 @@ index 09b381e46e..748a36bc7d 100644
 +            views::kMarginsKey, gfx::Insets::VH(0, location_bar_margin));
 +      }
      }
- 
+
      LoadImages();
-@@ -2014,6 +2262,9 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2014,6 +2255,9 @@ void ToolbarView::OnTouchUiChanged() {
  }
- 
+
  void ToolbarView::SetForwardButtonVisibility(bool visible) {
 +  if (compact_shell_mode_) {
 +    visible = true;
@@ -2554,30 +2794,30 @@ index 12d37b4f6c..123f840758 100644
 @@ -79,6 +79,10 @@ class GlicButtonInterface;
  class GlicSplitButtonController;
  }  // namespace glic
- 
+
 +namespace tabs {
 +enum class VerticalTabStripCollapseState;
 +}  // namespace tabs
 +
  class GlicAndActorButtonsContainer;
- 
+
  enum class ExpansionMode {
 @@ -190,6 +194,11 @@ class ToolbarView : public views::AccessiblePaneView,
    MediaToolbarButton* media_button() const { return media_button_; }
    HomeButton* home_button() const { return home_; }
- 
+
 +  // Reduces the toolbar to its core browsing controls for shells that provide
 +  // profile, app, and task surfaces elsewhere. The controls remain native and
 +  // retain their existing command and accessibility behavior.
 +  void ConfigureForCompactShell();
 +
    views::LabelButton* GetGlicButton();
- 
+
    // TODO(crbug.com/513238408): Remove this once toolbar layout/overflow is
 @@ -340,6 +349,12 @@ class ToolbarView : public views::AccessiblePaneView,
- 
+
    void SetForwardButtonVisibility(bool visible);
- 
+
 +  void ToggleCompactShellSidebar(const ui::Event& event);
 +  void UpdateCompactShellSidebarButton(
 +      tabs::VerticalTabStripCollapseState state);
@@ -2585,7 +2825,7 @@ index 12d37b4f6c..123f840758 100644
 +  void UpdateCompactShellLocationBarMargins();
 +
    gfx::Size GetBackForwardButtonSize(bool minimum_size = false) const;
- 
+
    std::unique_ptr<glic::ToolbarGlicButton> CreateGlicButton();
 @@ -386,6 +401,10 @@ class ToolbarView : public views::AccessiblePaneView,
    raw_ptr<LocationBar> location_bar_ = nullptr;
@@ -2601,7 +2841,7 @@ index 12d37b4f6c..123f840758 100644
 @@ -399,6 +418,8 @@ class ToolbarView : public views::AccessiblePaneView,
    raw_ptr<MediaToolbarButton> media_button_ = nullptr;
    raw_ptr<BrowserAppMenuButton> app_menu_button_ = nullptr;
- 
+
 +  bool compact_shell_mode_ = false;
 +
    // The button currently holding the lock to be shown/hidden.

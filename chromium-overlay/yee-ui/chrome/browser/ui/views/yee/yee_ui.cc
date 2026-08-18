@@ -8,24 +8,33 @@
 #include <utility>
 
 #include "base/command_line.h"
+#include "base/functional/bind.h"
+#include "base/notreached.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+#include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "ui/base/ui_base_features.h"
+#include "ui/base/menu_source_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
+#include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/shadow_value.h"
 #include "ui/gfx/skia_paint_util.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/view.h"
+#include "ui/views/view_class_properties.h"
 
 namespace {
 
@@ -39,7 +48,13 @@ enum class ShellBackgroundStyle {
 
 constexpr SkColor kSolidShellColor = SkColorSetRGB(243, 243, 243);
 constexpr SkColor kGlowShellTint = SkColorSetARGB(22, 225, 235, 232);
-constexpr float kShellControlCornerRadius = 8.0f;
+constexpr int kShellMenuIconSize = 16;
+
+enum class ShellCreateCommand {
+  kNewTab = 1,
+  kNewGroup,
+  kChat,
+};
 
 ShellBackgroundStyle GetShellBackgroundStyle() {
   return features::IsGlassFrameEnabled() ? ShellBackgroundStyle::kGlow
@@ -81,8 +96,7 @@ class YeeShellBackground : public views::Background {
     content_surface_flags.setColor(SK_ColorWHITE);
     content_surface_flags.setStyle(cc::PaintFlags::kFill_Style);
     content_surface_flags.setLooper(gfx::CreateShadowDrawLooper({
-        gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0,
-                         SkColorSetARGB(13, 0, 0, 0)),
+        gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0, SkColorSetARGB(13, 0, 0, 0)),
     }));
     canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
                           content_surface_flags);
@@ -137,14 +151,73 @@ END_METADATA
 class YeeShellToolbarButton : public ToolbarButton {
  public:
   explicit YeeShellToolbarButton(PressedCallback callback)
-      : ToolbarButton(std::move(callback)) {}
+      : ToolbarButton(std::move(callback)) {
+    yee::ApplyShellControlStyle(*this);
+  }
+  YeeShellToolbarButton(PressedCallback callback,
+                        std::unique_ptr<ui::MenuModel> menu_model)
+      : ToolbarButton(std::move(callback),
+                      std::move(menu_model),
+                      nullptr,
+                      /*trigger_menu_on_long_press=*/false) {
+    yee::ApplyShellControlStyle(*this);
+  }
   YeeShellToolbarButton(const YeeShellToolbarButton&) = delete;
   YeeShellToolbarButton& operator=(const YeeShellToolbarButton&) = delete;
   ~YeeShellToolbarButton() override = default;
+};
 
-  float GetCornerRadiusFor(Edge) const override {
-    return kShellControlCornerRadius;
+class YeeShellAddButton : public ui::SimpleMenuModel::Delegate,
+                          public YeeShellToolbarButton {
+ public:
+  explicit YeeShellAddButton(yee::ShellCreateCallback callback)
+      : YeeShellToolbarButton(base::BindRepeating(&YeeShellAddButton::OpenMenu,
+                                                  base::Unretained(this)),
+                              std::make_unique<ui::SimpleMenuModel>(this)),
+        callback_(std::move(callback)) {
+    auto* const menu = static_cast<ui::SimpleMenuModel*>(menu_model());
+    menu->AddItemWithIcon(
+        static_cast<int>(ShellCreateCommand::kNewTab), u"New tab",
+        ui::ImageModel::FromVectorIcon(kTabIcon, ui::kColorMenuIcon,
+                                       kShellMenuIconSize));
+    menu->AddItemWithIcon(
+        static_cast<int>(ShellCreateCommand::kNewGroup), u"New group",
+        ui::ImageModel::FromVectorIcon(kGroupCustomIcon, ui::kColorMenuIcon,
+                                       kShellMenuIconSize));
+    menu->AddItemWithIcon(
+        static_cast<int>(ShellCreateCommand::kChat), u"Chat",
+        ui::ImageModel::FromVectorIcon(vector_icons::kChatIcon,
+                                       ui::kColorMenuIcon, kShellMenuIconSize));
+
+    SetTooltipText(u"Create");
+    GetViewAccessibility().SetName(u"Create");
   }
+
+  YeeShellAddButton(const YeeShellAddButton&) = delete;
+  YeeShellAddButton& operator=(const YeeShellAddButton&) = delete;
+  ~YeeShellAddButton() override = default;
+
+  void ExecuteCommand(int command_id, int event_flags) override {
+    switch (static_cast<ShellCreateCommand>(command_id)) {
+      case ShellCreateCommand::kNewTab:
+        callback_.Run(yee::ShellCreateAction::kNewTab, event_flags);
+        return;
+      case ShellCreateCommand::kNewGroup:
+        callback_.Run(yee::ShellCreateAction::kNewGroup, event_flags);
+        return;
+      case ShellCreateCommand::kChat:
+        callback_.Run(yee::ShellCreateAction::kChat, event_flags);
+        return;
+    }
+    NOTREACHED();
+  }
+
+ private:
+  void OpenMenu(const ui::Event& event) {
+    ShowDropDownMenu(ui::GetMenuSourceTypeForEvent(event));
+  }
+
+  yee::ShellCreateCallback callback_;
 };
 
 class YeeAgentToolbarButton : public YeeShellToolbarButton {
@@ -220,8 +293,8 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
     badge_flags.setStyle(cc::PaintFlags::kFill_Style);
     canvas->DrawRoundRect(badge_rect, 5.0f, badge_flags);
 
-    const gfx::FontList badge_font = gfx::FontList().Derive(
-        -5, gfx::Font::NORMAL, gfx::Font::Weight::BOLD);
+    const gfx::FontList badge_font =
+        gfx::FontList().Derive(-5, gfx::Font::NORMAL, gfx::Font::Weight::BOLD);
     canvas->DrawStringRectWithFlags(
         status_ == Status::kWorking ? u"2" : u"!", badge_font, SK_ColorWHITE,
         gfx::Rect(18, 1, 11, 12), gfx::Canvas::TEXT_ALIGN_CENTER);
@@ -277,9 +350,21 @@ std::unique_ptr<views::View> CreateContentOutlineView() {
   return std::make_unique<YeeContentOutlineView>();
 }
 
+void ApplyShellControlStyle(ToolbarButton& button) {
+  button.SetPreferredSize(gfx::Size(kShellControlSize, kShellControlSize));
+  button.SetCustomCornerRadius(kShellControlCornerRadius);
+  button.SetProperty(views::kMarginsKey,
+                     gfx::Insets::VH(0, kShellControlHorizontalMargin));
+}
+
 std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
     views::Button::PressedCallback callback) {
   return std::make_unique<YeeShellToolbarButton>(std::move(callback));
+}
+
+std::unique_ptr<ToolbarButton> CreateShellAddButton(
+    ShellCreateCallback callback) {
+  return std::make_unique<YeeShellAddButton>(std::move(callback));
 }
 
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(

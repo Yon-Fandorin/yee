@@ -24,6 +24,7 @@ $arguments = @(
     "--user-data-dir=$profileDir",
     '--no-first-run',
     '--no-default-browser-check',
+    '--hide-crash-restore-bubble',
     '--disable-sync',
     '--disable-features=ChromeWhatsNewUI',
     '--enable-features=VerticalTabs,VerticalTabsLaunch',
