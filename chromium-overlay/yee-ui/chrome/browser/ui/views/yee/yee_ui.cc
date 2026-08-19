@@ -25,6 +25,7 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/outsets.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/vector2d.h"
@@ -348,6 +349,13 @@ std::unique_ptr<views::Background> CreateShellBackground() {
 
 std::unique_ptr<views::View> CreateContentOutlineView() {
   return std::make_unique<YeeContentOutlineView>();
+}
+
+gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect& bounds) {
+  gfx::Rect adjusted = bounds;
+  adjusted.Outset(
+      gfx::Outsets().set_right(kSidebarMetrics.tab_hover_card_offset));
+  return adjusted;
 }
 
 void ApplyShellControlStyle(ToolbarButton& button) {

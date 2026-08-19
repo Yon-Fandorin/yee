@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "base/functional/callback_forward.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/button.h"
 
 class ToolbarButton;
@@ -32,7 +33,14 @@ struct SidebarMetrics {
   int expanded_width = 244;
   int collapsed_width = 8;
 
-  int tab_icon_design_width = 24;
+  int tab_icon_design_width = 16;
+  int tab_row_height = 32;
+  int tab_content_vertical_padding = 3;
+  int tab_content_horizontal_padding = 8;
+  int tab_strip_horizontal_padding = 8;
+  int tab_to_content_gap = 8;
+  int tab_row_margin = 2;
+  int tab_hover_card_offset = 4;
   int tab_title_font_delta = -1;
   int tab_title_line_height = 13;
   int tab_subtitle_font_delta = -3;
@@ -71,6 +79,11 @@ std::unique_ptr<views::Background> CreateShellBackground();
 std::unique_ptr<views::View> CreateContentOutlineView();
 
 void ApplyShellControlStyle(ToolbarButton& button);
+
+// Nudges a vertical-tab hover card away from the sidebar. Chromium's slide
+// animator reads View::GetAnchorBoundsInScreen(), so TabView applies this
+// there instead of inside the bubble.
+gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect& bounds);
 
 std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
     views::Button::PressedCallback callback);
