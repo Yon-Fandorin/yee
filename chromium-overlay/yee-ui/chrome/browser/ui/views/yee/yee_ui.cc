@@ -41,6 +41,7 @@ namespace {
 
 constexpr char kAgentStatusDemoSwitch[] = "yee-agent-status-demo";
 constexpr char kAgentStatusSwitch[] = "yee-agent-status";
+constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
 
 enum class ShellBackgroundStyle {
   kSolid,
@@ -342,6 +343,15 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
 }  // namespace
 
 namespace yee {
+
+bool IsShellEnabled() {
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+      kDisableYeeShellScaffoldSwitch);
+}
+
+bool UsesExpandedSidebarPresentation() {
+  return IsShellEnabled();
+}
 
 std::unique_ptr<views::Background> CreateShellBackground() {
   return std::make_unique<YeeShellBackground>(GetShellBackgroundStyle());

@@ -58,8 +58,13 @@ struct SidebarMetrics {
   int bookmarks_icon_size = 16;
   int bookmarks_image_label_spacing = 6;
 
-  int group_header_corner_radius = 6;
-  int group_header_horizontal_inset = 5;
+  int group_header_corner_radius = 8;
+  int group_header_horizontal_inset = 8;
+  int group_mark_size = 8;
+  int group_mark_slot_size = 16;
+  int group_mark_trailing_margin = 4;
+  int group_unread_dot_size = 5;
+  int group_header_hover_alpha = 51;
 };
 
 inline constexpr SidebarMetrics kSidebarMetrics;
@@ -79,6 +84,13 @@ std::unique_ptr<views::Background> CreateShellBackground();
 std::unique_ptr<views::View> CreateContentOutlineView();
 
 void ApplyShellControlStyle(ToolbarButton& button);
+
+bool IsShellEnabled();
+
+// Yee's collapsed sidebar is an 8px edge target, not Chromium's 56px icon
+// rail. Tab, group, and favorites presentation therefore stays on the
+// expanded contract when the strip is pinned open or revealed on hover.
+bool UsesExpandedSidebarPresentation();
 
 // Nudges a vertical-tab hover card away from the sidebar. Chromium's slide
 // animator reads View::GetAnchorBoundsInScreen(), so TabView applies this

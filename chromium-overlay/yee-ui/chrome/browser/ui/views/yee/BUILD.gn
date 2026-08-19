@@ -7,16 +7,21 @@ assert(is_win || is_mac || is_linux || is_chromeos)
 source_set("yee_ui") {
   public = [
     "sidebar_sections.h",
+    "vertical_group_color_mark.h",
     "vertical_tab_text_view.h",
     "yee_ui.h",
   ]
   sources = [
     "sidebar_sections.cc",
+    "vertical_group_color_mark.cc",
     "vertical_tab_text_view.cc",
     "yee_ui.cc",
   ]
 
-  public_deps = [ "//ui/views" ]
+  public_deps = [
+    "//ui/gfx/animation",
+    "//ui/views",
+  ]
 
   deps = [
     "//base",
@@ -29,5 +34,6 @@ source_set("yee_ui") {
     "//ui/base",
     "//ui/compositor",
     "//ui/gfx",
+    "//ui/gfx/animation",
   ]
 }

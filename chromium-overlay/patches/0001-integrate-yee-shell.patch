@@ -112,6 +112,25 @@ index a8b7ef6800..0b1408fd60 100644
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
        return 8;
      case LayoutConstant::kVerticalTabStripComboButtonIconSize:
+diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
+index f36f4c8bcb..85535744c7 100644
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -195,11 +195,14 @@ if (!is_android) {
+       "//chrome/browser/ui/color:color_headers",
+       "//chrome/browser/ui/dialogs",
+       "//chrome/browser/ui/tabs:tab_strip",
++      "//chrome/browser/ui/tabs/alert:tab_alert",
++      "//chrome/browser/ui/tabs/alert:impl",
+       "//chrome/browser/ui/tabs/saved_tab_groups",
+       "//chrome/browser/ui/toasts",
+       "//chrome/browser/ui/toasts/api:toasts",
+       "//components/saved_tab_groups/internal:tab_group_sync_bridge",
+       "//components/tab_groups",
++      "//net",
+     ]
+   }
+ 
 diff --git a/chrome/browser/ui/tabs/features.cc b/chrome/browser/ui/tabs/features.cc
 index 9f151cf8e3..e1f92367c9 100644
 --- a/chrome/browser/ui/tabs/features.cc
@@ -125,6 +144,303 @@ index 9f151cf8e3..e1f92367c9 100644
  BASE_FEATURE_PARAM(bool,
                     kVerticalTabsExpandOnHoverDefaultEnabled,
                     &kVerticalTabsExpandOnHover,
+diff --git a/chrome/browser/ui/tabs/tab_group_data.cc b/chrome/browser/ui/tabs/tab_group_data.cc
+index fb3b38de03..c493b44af2 100644
+--- a/chrome/browser/ui/tabs/tab_group_data.cc
++++ b/chrome/browser/ui/tabs/tab_group_data.cc
+@@ -8,20 +8,27 @@
+ #include <optional>
+ #include <string>
+ #include <unordered_set>
++#include <vector>
+ 
+ #include "base/check_op.h"
+ #include "base/functional/callback_forward.h"
++#include "base/functional/callback_helpers.h"
++#include "base/notreached.h"
+ #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/tab_ui_helper.h"
++#include "chrome/browser/ui/tabs/alert/tab_alert_controller.h"
+ #include "chrome/browser/ui/tabs/tab_group_features.h"
+ #include "chrome/browser/ui/tabs/tab_group_model.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "components/saved_tab_groups/public/saved_tab_group.h"
+ #include "components/saved_tab_groups/public/tab_group_sync_service.h"
+ #include "components/tab_groups/tab_group_id.h"
++#include "components/tabs/public/tab_alert.h"
+ #include "components/tabs/public/tab_group.h"
+ #include "components/tabs/public/tab_interface.h"
++#include "net/base/url_util.h"
++#include "url/gurl.h"
+ 
+ namespace {
+ tabs::TabGroupTabData GetTabData(tabs::TabInterface* tab_interface) {
+@@ -34,6 +41,85 @@ tabs::TabGroupTabData GetTabData(tabs::TabInterface* tab_interface) {
+   tab_group_tab_data.title = tab_ui_helper->GetTitle();
+   return tab_group_tab_data;
+ }
++
++std::vector<tabs::TabInterface*> GetTabsInGroup(TabGroup* group) {
++  tabs::TabInterface* const first_tab = group->GetFirstTab();
++  if (!first_tab) {
++    return {};
++  }
++  return first_tab->GetBrowserWindowInterface()
++      ->GetTabStripModel()
++      ->GetTabsAtIndices(group->ListTabs().ToIntVector());
++}
++
++bool IsBrowserMediaAlert(tabs::TabAlert alert) {
++  switch (alert) {
++    case tabs::TabAlert::kAudioPlaying:
++    case tabs::TabAlert::kPipPlaying:
++    case tabs::TabAlert::kMediaRecording:
++    case tabs::TabAlert::kAudioRecording:
++    case tabs::TabAlert::kVideoRecording:
++    case tabs::TabAlert::kTabCapturing:
++    case tabs::TabAlert::kDesktopCapturing:
++      return true;
++    case tabs::TabAlert::kAudioMuting:
++    case tabs::TabAlert::kBluetoothConnected:
++    case tabs::TabAlert::kBluetoothScanActive:
++    case tabs::TabAlert::kUsbConnected:
++    case tabs::TabAlert::kHidConnected:
++    case tabs::TabAlert::kSerialConnected:
++    case tabs::TabAlert::kVrPresentingInHeadset:
++    case tabs::TabAlert::kGlicSharing:
++    case tabs::TabAlert::kGlicAccessing:
++    case tabs::TabAlert::kActorAccessing:
++    case tabs::TabAlert::kActorWaitingOnUser:
++      return false;
++  }
++  NOTREACHED();
++}
++
++bool IsAgentWaitingAlert(tabs::TabAlert alert) {
++  return alert == tabs::TabAlert::kActorWaitingOnUser;
++}
++
++bool IsAgentAccessingAlert(tabs::TabAlert alert) {
++  return alert == tabs::TabAlert::kActorAccessing ||
++         alert == tabs::TabAlert::kGlicAccessing ||
++         alert == tabs::TabAlert::kGlicSharing;
++}
++
++GURL GetTabUrl(tabs::TabInterface* tab) {
++  TabUIHelper* const helper = TabUIHelper::From(tab);
++  if (!helper) {
++    return GURL();
++  }
++  const GURL visible = helper->GetVisibleURL();
++  return visible.is_empty() ? helper->GetLastCommittedURL() : visible;
++}
++
++// Local file fixtures can request browser mark states that HTML cannot
++// raise through Chromium tab alerts, such as unread.
++void ApplyFileDemoSignals(const GURL& url,
++                          bool& has_audio,
++                          bool& needs_input,
++                          bool& unread) {
++  if (!url.SchemeIsFile()) {
++    return;
++  }
++  std::string signal;
++  if (!net::GetValueForKeyInQuery(url, "yee-signal", &signal)) {
++    return;
++  }
++  if (signal.find("audio") != std::string::npos) {
++    has_audio = true;
++  }
++  if (signal.find("input") != std::string::npos) {
++    needs_input = true;
++  }
++  if (signal.find("unread") != std::string::npos) {
++    unread = true;
++  }
++}
+ }  // namespace
+ 
+ namespace tabs {
+@@ -94,6 +180,7 @@ TabGroupDataObserver::TabGroupDataObserver(TabGroup* group)
+   tab_group_data_.visual_data = *tab_group_->visual_data();
+   tab_group_data_.num_tabs_in_group = tab_group_->tab_count();
+   RefreshTabData();
++  RefreshGroupSignals();
+   attention_indicator_observation_.Observe(
+       tab_group_->GetTabGroupFeatures()->attention_indicator());
+ 
+@@ -119,10 +206,8 @@ void TabGroupDataObserver::OnVisualDataChanged() {
+ }
+ 
+ void TabGroupDataObserver::OnAttentionStateChanged() {
+-  tab_group_data_.needs_attention = tab_group_->GetTabGroupFeatures()
+-                                        ->attention_indicator()
+-                                        ->GetHasAttention();
+   tab_group_data_.is_sharing_group = IsTabGroupShared();
++  RefreshGroupSignals();
+   tab_group_data_changed_callback_list_.Notify();
+ }
+ 
+@@ -134,42 +219,41 @@ void TabGroupDataObserver::OnGroupChanged() {
+   }
+ 
+   const bool tab_data_change = RefreshTabData();
+-  if (num_tab_change || tab_data_change) {
++  const bool signal_change = RefreshGroupSignals();
++  if (num_tab_change || tab_data_change || signal_change) {
+     tab_group_data_changed_callback_list_.Notify();
+   }
+ }
+ 
+ void TabGroupDataObserver::OnTabDataChanged() {
+-  if (RefreshTabData()) {
++  if (RefreshTabData() || RefreshGroupSignals()) {
+     tab_group_data_changed_callback_list_.Notify();
+   }
+ }
+ 
+-bool TabGroupDataObserver::RefreshTabData() {
+-  std::vector<tabs::TabInterface*> tabs;
+-  tabs::TabInterface* const first_tab_in_group = tab_group_->GetFirstTab();
+-  if (first_tab_in_group) {
+-    TabStripModel* const tab_strip_model =
+-        first_tab_in_group->GetBrowserWindowInterface()->GetTabStripModel();
+-    tabs =
+-        tab_strip_model->GetTabsAtIndices(tab_group_->ListTabs().ToIntVector());
++void TabGroupDataObserver::OnTabAlertChanged() {
++  if (RefreshGroupSignals()) {
++    tab_group_data_changed_callback_list_.Notify();
+   }
++}
++
++bool TabGroupDataObserver::RefreshTabData() {
++  std::vector<tabs::TabInterface*> tabs = GetTabsInGroup(tab_group_);
+ 
+   std::vector<TabGroupTabData> tab_data;
+   std::unordered_set<tabs::TabInterface*> tabs_to_observe;
+-  const size_t min_tab_count =
+-      std::min(static_cast<size_t>(tab_group_->tab_count()), tabs.size());
+   const size_t num_tabs_to_show =
+-      std::min(min_tab_count, TabGroupData::kMaxTabs);
+-  CHECK_LE(num_tabs_to_show, tabs.size());
+-  for (size_t i = 0; i < num_tabs_to_show; i++) {
++      std::min(tabs.size(), TabGroupData::kMaxTabs);
++  for (size_t i = 0; i < tabs.size(); i++) {
+     tabs::TabInterface* const tab = tabs[i];
+     if (!tab_data_observers_.contains(tab)) {
+       tab_data_observers_[tab] = std::make_unique<TabDataObserver>(
+           tab, base::BindRepeating(&TabGroupDataObserver::OnTabDataChanged,
+                                    base::Unretained(this)));
+     }
+-    tab_data.push_back(tab_data_observers_[tab]->tab_group_tab_data());
++    if (i < num_tabs_to_show) {
++      tab_data.push_back(tab_data_observers_[tab]->tab_group_tab_data());
++    }
+     tabs_to_observe.insert(tab);
+   }
+ 
+@@ -185,6 +269,62 @@ bool TabGroupDataObserver::RefreshTabData() {
+   return changed;
+ }
+ 
++bool TabGroupDataObserver::RefreshGroupSignals() {
++  const std::vector<tabs::TabInterface*> tabs = GetTabsInGroup(tab_group_);
++  std::unordered_set<tabs::TabInterface*> tabs_to_observe;
++  bool has_audio = false;
++  bool needs_input = false;
++  bool unread = tab_group_->GetTabGroupFeatures()
++                    ->attention_indicator()
++                    ->GetHasAttention();
++  bool agent_waiting = false;
++  bool agent_accessing = false;
++
++  for (tabs::TabInterface* const tab : tabs) {
++    tabs_to_observe.insert(tab);
++    ApplyFileDemoSignals(GetTabUrl(tab), has_audio, needs_input, unread);
++    if (TabUIHelper* const helper = TabUIHelper::From(tab)) {
++      unread = unread || helper->needs_attention();
++    }
++    tabs::TabAlertController* const controller =
++        tabs::TabAlertController::From(tab);
++    if (!controller) {
++      continue;
++    }
++    if (!alert_subscriptions_.contains(tab)) {
++      alert_subscriptions_[tab] = controller->AddAlertToShowChangedCallback(
++          base::IgnoreArgs<std::optional<tabs::TabAlert>>(base::BindRepeating(
++              &TabGroupDataObserver::OnTabAlertChanged,
++              base::Unretained(this))));
++    }
++    for (const tabs::TabAlert alert : controller->GetAllActiveAlerts()) {
++      if (IsBrowserMediaAlert(alert)) {
++        has_audio = true;
++      } else if (IsAgentWaitingAlert(alert)) {
++        agent_waiting = true;
++      } else if (IsAgentAccessingAlert(alert)) {
++        agent_accessing = true;
++      }
++    }
++  }
++
++  std::erase_if(alert_subscriptions_, [&](const auto& pair) {
++    return !tabs_to_observe.contains(pair.first);
++  });
++
++  const bool changed = tab_group_data_.has_audio != has_audio ||
++                       tab_group_data_.needs_input != needs_input ||
++                       tab_group_data_.needs_attention != unread ||
++                       tab_group_data_.agent_waiting != agent_waiting ||
++                       tab_group_data_.agent_accessing != agent_accessing;
++  tab_group_data_.has_audio = has_audio;
++  tab_group_data_.needs_input = needs_input;
++  tab_group_data_.needs_attention = unread;
++  tab_group_data_.agent_waiting = agent_waiting;
++  tab_group_data_.agent_accessing = agent_accessing;
++  return changed;
++}
++
+ bool TabGroupDataObserver::IsTabGroupShared() {
+   tabs::TabInterface* const first_tab_in_group = tab_group_->GetFirstTab();
+   if (!first_tab_in_group) {
+diff --git a/chrome/browser/ui/tabs/tab_group_data.h b/chrome/browser/ui/tabs/tab_group_data.h
+index a9aa75a173..fc9a38e649 100644
+--- a/chrome/browser/ui/tabs/tab_group_data.h
++++ b/chrome/browser/ui/tabs/tab_group_data.h
+@@ -51,8 +51,17 @@ struct TabGroupData {
+   TabGroupData(TabGroupData&&);
+   TabGroupData& operator=(TabGroupData&&);
+ 
+-  bool needs_attention = false;
+   bool is_sharing_group = false;
++
++  // Browser-owned signals for the group color mark. These stay visible
++  // whether the group is expanded or collapsed.
++  bool has_audio = false;
++  bool needs_input = false;
++  bool needs_attention = false;
++
++  // Agent-owned signals. The group mark does not paint these.
++  bool agent_waiting = false;
++  bool agent_accessing = false;
+   std::vector<TabGroupTabData> tab_data;
+   tab_groups::TabGroupVisualData visual_data;
+   int num_tabs_in_group = 0;
+@@ -87,10 +96,14 @@ class TabGroupDataObserver : public TabGroupAttentionIndicator::Observer {
+ 
+   void OnGroupChanged();
+   void OnVisualDataChanged();
++  void OnTabAlertChanged();
++  bool RefreshGroupSignals();
+ 
+   raw_ptr<TabGroup> tab_group_;
+   std::unordered_map<TabInterface*, std::unique_ptr<TabDataObserver>>
+       tab_data_observers_;
++  std::unordered_map<TabInterface*, base::CallbackListSubscription>
++      alert_subscriptions_;
+   base::RepeatingClosureList tab_group_data_changed_callback_list_;
+   TabGroupData tab_group_data_;
+   base::ScopedObservation<TabGroupAttentionIndicator,
 diff --git a/chrome/browser/ui/tabs/tab_strip_prefs.cc b/chrome/browser/ui/tabs/tab_strip_prefs.cc
 index 24873dd76b..c4fd5bab32 100644
 --- a/chrome/browser/ui/tabs/tab_strip_prefs.cc
@@ -1798,19 +2114,95 @@ index 3c52548396..932334e674 100644
      "//chrome/browser/ui/window_metadata",
      "//components/contextual_tasks/public:feature_list",
      "//components/performance_manager",
+diff --git a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
+index af4cd825d4..961bfc24ee 100644
+--- a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
++++ b/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
+@@ -15,6 +15,7 @@
+ #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_view.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/controls/scroll_view.h"
+@@ -117,8 +118,10 @@ gfx::Size PinnedTabContainerView::GetMinimumSize() const {
+   auto collapse_state = GetTabStripCollapseState();
+   const int num_children = collection_node_->GetDirectChildren().size();
+   const float min_rows = std::min(
+-      (collapse_state != tabs::VerticalTabStripCollapseState::kExpanded ? 1.5f
+-                                                                        : 1.0f),
++      (!yee::UsesExpandedSidebarPresentation() &&
++               collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
++           ? 1.5f
++           : 1.0f),
+       static_cast<float>(num_children));
+   const int min_height =
+       base::ClampCeil(GetLayoutConstant(LayoutConstant::kVerticalTabHeight) *
+@@ -166,7 +169,8 @@ PinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
+     }
+   } else {
+     auto collapse_state = GetTabStripCollapseState();
+-    if (collapse_state != tabs::VerticalTabStripCollapseState::kExpanded) {
++    if (!yee::UsesExpandedSidebarPresentation() &&
++        collapse_state != tabs::VerticalTabStripCollapseState::kExpanded) {
+       if (auto index = GetLinkDropIndexForCollapsed(loc_in_container)) {
+         return index;
+       }
+@@ -411,7 +415,8 @@ views::ProposedLayout PinnedTabContainerView::CalculateVerticalLayout(
+     // When we are in collapsed state, only one child should be shown per row.
+     // During collapse animation and other cases, fit as many as possible.
+     children_on_row =
+-        tabs::IsVerticalTabsExpandOnHoverFeatureEnabled() &&
++        !yee::UsesExpandedSidebarPresentation() &&
++                tabs::IsVerticalTabsExpandOnHoverFeatureEnabled() &&
+                 collapse_state ==
+                     tabs::VerticalTabStripCollapseState::kCollapsed
+             ? 1
+diff --git a/chrome/browser/ui/views/tabs/common/split_tab_view.cc b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+index f744d68482..3e3113a362 100644
+--- a/chrome/browser/ui/views/tabs/common/split_tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+@@ -14,6 +14,7 @@
+ #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_view.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/browser/ui/views/tabs/hovercard/tab_hover_card_controller.h"
+ #include "chrome/browser/ui/views/tabs/tab/glow_hover_controller.h"
+ #include "components/tabs/public/tab_collection.h"
+@@ -351,7 +352,8 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+ 
+ void SplitTabView::OnCollapseStateChanged(
+     tabs::VerticalTabStripCollapseState state) {
+-  collapsed_ = state == tabs::VerticalTabStripCollapseState::kCollapsed;
++  collapsed_ = !yee::UsesExpandedSidebarPresentation() &&
++               state == tabs::VerticalTabStripCollapseState::kCollapsed;
+ }
+ 
+ std::unique_ptr<views::View> SplitTabView::RemoveChildViewForReparenting(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f..bcea4b7426 100644
+index cfaf18f54f..b376dac192 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-@@ -17,6 +17,7 @@
+@@ -17,6 +17,8 @@
  #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
  #include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_tracker.h"
  #include "chrome/browser/ui/views/tabs/hovercard/tab_hover_card_controller.h"
++#include "chrome/browser/ui/views/yee/vertical_group_color_mark.h"
 +#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/grit/generated_resources.h"
  #include "components/data_sharing/public/features.h"
  #include "components/strings/grit/components_strings.h"
-@@ -47,8 +48,6 @@
+@@ -29,6 +31,7 @@
+ #include "ui/base/mojom/menu_source_type.mojom-shared.h"
+ #include "ui/base/ui_base_features.h"
+ #include "ui/color/color_provider.h"
++#include "third_party/skia/include/core/SkColor.h"
+ #include "ui/gfx/color_utils.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/animation/ink_drop.h"
+@@ -47,8 +50,6 @@
  #include "ui/views/widget/widget.h"
  
  namespace {
@@ -1819,7 +2211,18 @@ index cfaf18f54f..bcea4b7426 100644
  constexpr int kIconSize = 16;
  constexpr int kFocusRingInset = 2;
  constexpr int kAttentionIndicatorWidth = 8;
-@@ -159,6 +158,9 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -137,6 +138,10 @@ TabGroupHeaderView::TabGroupHeaderView(
+     const tab_groups::TabGroupVisualData* tab_group_visual_data)
+     : HoverCardAnchorTarget(this),
+       tab_group_visual_data_(*tab_group_visual_data),
++      color_mark_(orientation == TabStripOrientation::kVertical
++                      ? AddChildView(
++                            std::make_unique<yee::VerticalGroupColorMark>())
++                      : nullptr),
+       sync_icon_(AddChildView(std::make_unique<views::ImageView>())),
+       group_header_label_(
+           AddChildView(std::make_unique<TabGroupHeaderLabel>())),
+@@ -159,6 +164,9 @@ TabGroupHeaderView::TabGroupHeaderView(
    SetNotifyEnterExitOnChild(true);
  
    if (editor_bubble_button_) {
@@ -1829,7 +2232,7 @@ index cfaf18f54f..bcea4b7426 100644
      ConfigureEditorBubbleButton(editor_bubble_button_);
      editor_bubble_button_->SetVisible(delegate_->IsGroupFocused());
    }
-@@ -170,7 +172,8 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -170,7 +178,8 @@ TabGroupHeaderView::TabGroupHeaderView(
            &TabGroupHeaderView::OnBubbleClosed, base::Unretained(this)));
  
    SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
@@ -1839,7 +2242,35 @@ index cfaf18f54f..bcea4b7426 100644
    SetDefault(views::kFlexBehaviorKey,
               views::FlexSpecification(
                   views::MinimumFlexSizeRule::kScaleToMinimumSnapToZero,
-@@ -218,7 +221,8 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -202,10 +211,27 @@ TabGroupHeaderView::TabGroupHeaderView(
+     collapse_icon_->SetVisible(!delegate_->IsGroupFocused());
+   }
+ 
++  if (color_mark_) {
++    color_mark_->SetProperty(
++        views::kFlexBehaviorKey,
++        views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
++                                 views::MaximumFlexSizeRule::kPreferred));
++    color_mark_->SetProperty(
++        views::kMarginsKey,
++        gfx::Insets::TLBR(0, 0, 0,
++                          yee::kSidebarMetrics.group_mark_trailing_margin));
++  }
++  if (editor_bubble_button_) {
++    editor_bubble_button_->SetProperty(views::kMarginsKey,
++                                       gfx::Insets::TLBR(0, 0, 0, 4));
++  }
+   sync_icon_->SetProperty(views::kMarginsKey,
+                           gfx::Insets::TLBR(0, 0, 0, kSyncIconLabelPadding));
+   attention_indicator_->SetProperty(
+       views::kMarginsKey, gfx::Insets::TLBR(0, kSyncIconLabelPadding, 0, 0));
++  if (orientation_ == TabStripOrientation::kVertical) {
++    attention_indicator_->SetVisible(false);
++  }
+ 
+   // Add accessibility and focus ring for the header.
+   SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
+@@ -218,7 +244,8 @@ TabGroupHeaderView::TabGroupHeaderView(
    // Rounds the corners of the focus ring to match the header's shape
    views::HighlightPathGenerator::Install(
        this, std::make_unique<views::RoundRectHighlightPathGenerator>(
@@ -1849,7 +2280,7 @@ index cfaf18f54f..bcea4b7426 100644
  }
  
  TabGroupHeaderView::~TabGroupHeaderView() = default;
-@@ -249,7 +253,7 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
+@@ -249,7 +276,7 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
      non_label_width += attention_indicator_->GetPreferredSize().width() +
                         (margins ? margins->width() : 0);
    }
@@ -1858,51 +2289,68 @@ index cfaf18f54f..bcea4b7426 100644
  
    int label_width =
        group_header_label_ ? group_header_label_->GetPreferredSize().width() : 0;
-@@ -388,6 +392,14 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+@@ -388,6 +415,7 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    }
    UpdateEditorBubbleButtonVisibility();
-+  if (orientation_ == TabStripOrientation::kVertical && GetColorProvider()) {
-+    const SkColor group_color = GetColorProvider()->GetColor(
-+        GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
-+                                   GetWidget()->ShouldPaintAsActive()));
-+    SetBackground(views::CreateRoundedRectBackground(
-+        SkColorSetA(group_color, 0x2E),
-+        yee::kSidebarMetrics.group_header_corner_radius));
-+  }
++  UpdateVerticalHoverBackground(true);
  }
  
  void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
-@@ -398,6 +410,14 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
+@@ -398,6 +426,7 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
  #else
    UpdateEditorBubbleButtonVisibility();
  #endif
-+  if (orientation_ == TabStripOrientation::kVertical && GetColorProvider()) {
-+    const SkColor group_color = GetColorProvider()->GetColor(
-+        GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
-+                                   GetWidget()->ShouldPaintAsActive()));
-+    SetBackground(views::CreateRoundedRectBackground(
-+        SkColorSetA(group_color, 0x18),
-+        yee::kSidebarMetrics.group_header_corner_radius));
-+  }
++  UpdateVerticalHoverBackground(false);
  }
  
  void TabGroupHeaderView::OnFocus() {
-@@ -570,8 +590,11 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -540,7 +569,8 @@ void TabGroupHeaderView::OnDataChanged(
+                                             : kPeopleGroupOldIcon,
+           foreground_color, kIconSize));
+     }
+-    if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
++    if (orientation_ != TabStripOrientation::kVertical &&
++        tab_group_visual_data_.is_collapsed() && needs_attention_) {
+       attention_indicator_->SetVisible(true);
+       attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
+           kDefaultTouchFaviconMaskCustomIcon, foreground_color,
+@@ -569,14 +599,21 @@ void TabGroupHeaderView::OnDataChanged(
+           foreground_color, kIconSize));
      }
  
-     // Update background.
+-    // Update background.
 -    SetBackground(views::CreateRoundedRectBackground(background_color,
 -                                                     kGroupHeaderCornerRadius));
-+    SetBackground(views::CreateRoundedRectBackground(
-+        orientation_ == TabStripOrientation::kVertical
-+            ? SkColorSetA(background_color, 0x18)
-+            : background_color,
-+        yee::kSidebarMetrics.group_header_corner_radius));
++    if (color_mark_) {
++      color_mark_->SetMarkColor(background_color);
++    }
++    if (orientation_ == TabStripOrientation::kVertical) {
++      UpdateVerticalHoverBackground(IsMouseHovered());
++    } else {
++      SetBackground(views::CreateRoundedRectBackground(
++          background_color, yee::kSidebarMetrics.group_header_corner_radius));
++    }
      UpdateAttentionState(
          data_sharing::features::IsDataSharingFunctionalityEnabled() &&
          tab_group_data.needs_attention);
-@@ -673,6 +696,12 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+   }
+ 
++  UpdateColorMark(tab_group_data);
+   UpdateIsCollapsed();
+   UpdateAccessibleName();
+ 
+@@ -615,7 +652,8 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+   }
+   needs_attention_ = needs_attention;
+ 
+-  if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
++  if (orientation_ != TabStripOrientation::kVertical &&
++      tab_group_visual_data_.is_collapsed() && needs_attention_) {
+     attention_indicator_->SetVisible(true);
+     attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
+         kDefaultTouchFaviconMaskCustomIcon, GetForegroundColor(),
+@@ -673,6 +711,12 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
@@ -1915,8 +2363,72 @@ index cfaf18f54f..bcea4b7426 100644
      SkColor background_color = GetColorProvider()->GetColor(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
+@@ -681,6 +725,30 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
+   return SK_ColorBLACK;
+ }
+ 
++void TabGroupHeaderView::UpdateVerticalHoverBackground(bool hovered) {
++  if (orientation_ != TabStripOrientation::kVertical) {
++    return;
++  }
++  if (hovered) {
++    SetBackground(views::CreateRoundedRectBackground(
++        SkColorSetARGB(yee::kSidebarMetrics.group_header_hover_alpha, 255, 255,
++                       255),
++        yee::kSidebarMetrics.group_header_corner_radius));
++  } else {
++    SetBackground(nullptr);
++  }
++}
++
++void TabGroupHeaderView::UpdateColorMark(
++    const tabs::TabGroupData& tab_group_data) {
++  if (!color_mark_) {
++    return;
++  }
++  color_mark_->SetNeedsInput(tab_group_data.needs_input);
++  color_mark_->SetAudioActive(tab_group_data.has_audio);
++  color_mark_->SetUnread(tab_group_data.needs_attention);
++}
++
+ void TabGroupHeaderView::UpdateEditorBubbleButtonVisibility() {
+   // The editor bubble button only exists in the vertical orientation.
+   if (!editor_bubble_button_) {
+diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
+index 982370f7cd..6bd0ec16d8 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
+@@ -27,6 +27,10 @@ struct TabGroupData;
+ class VerticalTabStripStateController;
+ }  // namespace tabs
+ 
++namespace yee {
++class VerticalGroupColorMark;
++}  // namespace yee
++
+ namespace views {
+ class LabelButton;
+ class ImageView;
+@@ -124,6 +128,8 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+ 
+  private:
+   void UpdateEditorBubbleButtonVisibility();
++  void UpdateVerticalHoverBackground(bool hovered);
++  void UpdateColorMark(const tabs::TabGroupData& tab_group_data);
+   void OnBubbleOpened();
+   void OnBubbleClosed();
+   // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
+@@ -141,6 +147,8 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+   bool needs_attention_ = false;
+   bool is_shared_ = false;
+ 
++  const raw_ptr<yee::VerticalGroupColorMark> color_mark_ = nullptr;
++
+   // The sync icon that is displayed in the tab group header of saved groups in
+   // the tabstrip.
+   const raw_ptr<views::ImageView> sync_icon_ = nullptr;
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-index 8eefd99313..b59adf1c67 100644
+index 8eefd99313..d7ac889ed7 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 @@ -9,6 +9,7 @@
@@ -1927,7 +2439,7 @@ index 8eefd99313..b59adf1c67 100644
  #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
  #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
-@@ -24,11 +25,11 @@
+@@ -24,11 +25,17 @@
  #include "ui/views/view_utils.h"
  
  namespace {
@@ -1937,22 +2449,60 @@ index 8eefd99313..b59adf1c67 100644
  constexpr int kGroupLineCollapsedLeadingPadding = 6;
 -constexpr int kGroupHeaderHeight = 26;
 -constexpr int kGroupHeaderVerticalMargin = 4;
-+constexpr int kGroupHeaderHeight = 30;
++constexpr int kGroupHeaderHeight = yee::kSidebarMetrics.tab_row_height;
 +constexpr int kGroupHeaderVerticalMargin = 0;
++
++bool UseCollapsedStripPresentation(
++    tabs::VerticalTabStripCollapseState state) {
++  return !yee::UsesExpandedSidebarPresentation() &&
++         state != tabs::VerticalTabStripCollapseState::kExpanded;
++}
  }  // namespace
  
  TabGroupViewLayout::TabGroupViewLayout(TabStripOrientation orientation)
-@@ -149,6 +150,8 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+@@ -74,9 +81,9 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+   group_line_bounds.set_width(kGroupLineWidth);
+ 
+   // If the tab strip is collapsed then the group line should appear on the
+-  // leading side of all grouped tabs and the header.
+-  if (tab_strip_collapse_state !=
+-      tabs::VerticalTabStripCollapseState::kExpanded) {
++  // leading side of all grouped tabs and the header. Yee keeps the expanded
++  // mark/name header instead of Chromium's compact color rail.
++  if (UseCollapsedStripPresentation(tab_strip_collapse_state)) {
+     group_line_bounds.set_x(kGroupLineCollapsedLeadingPadding);
+     group_line_bounds.set_y(height);
+     header_bounds.set_x(
+@@ -99,8 +106,7 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+ 
+   // If the tab strip is not collapsed then the group line is below and left
+   // aligned with the header.
+-  if (tab_strip_collapse_state ==
+-      tabs::VerticalTabStripCollapseState::kExpanded) {
++  if (!UseCollapsedStripPresentation(tab_strip_collapse_state)) {
+     group_line_bounds.set_x(
+         (TabGroupView::kTabLeadingPadding - kGroupLineWidth) / 2);
+     group_line_bounds.set_y(height);
+@@ -125,8 +131,7 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+     // If the tab strip is not collapsed and not focused then the groups tabs
+     // should be inset.
+     int child_x = 0;
+-    if (tab_strip_collapse_state !=
+-        tabs::VerticalTabStripCollapseState::kExpanded) {
++    if (UseCollapsedStripPresentation(tab_strip_collapse_state)) {
+       child_x =
+           GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
+     } else if (!is_focused) {
+@@ -149,6 +154,7 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
      group_line_bounds.set_height(height - group_line_bounds.y());
    }
    const bool show_group_line =
-+      tab_strip_collapse_state !=
-+          tabs::VerticalTabStripCollapseState::kExpanded &&
++      UseCollapsedStripPresentation(tab_strip_collapse_state) &&
        !tab_group_view->IsGroupFocused() && !tab_group_view->is_collapsed();
    layouts.child_layouts.emplace_back(tab_group_view->group_line_.get(),
                                       show_group_line, group_line_bounds);
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
-index 0f3fd08221..42054ad5a5 100644
+index 0f3fd08221..599d6fd11a 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 @@ -25,10 +25,12 @@
@@ -1990,8 +2540,18 @@ index 0f3fd08221..42054ad5a5 100644
    collection_node->set_add_child_to_node(base::BindRepeating(
        &TabStripView::AddScrollViewContents, base::Unretained(this)));
  
+@@ -431,6 +448,9 @@ UnpinnedTabContainerView* TabStripView::GetUnpinnedTabsContainer() const {
+ }
+ 
+ void TabStripView::SetCollapsedState(bool is_collapsed) {
++  if (yee::UsesExpandedSidebarPresentation()) {
++    is_collapsed = false;
++  }
+   if (is_collapsed != is_collapsed_) {
+     is_collapsed_ = is_collapsed;
+     InvalidateLayout();
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
-index b85a9a5d21..1a81d70429 100644
+index b85a9a5d21..f07717ffd1 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 @@ -11,6 +11,7 @@
@@ -2002,7 +2562,17 @@ index b85a9a5d21..1a81d70429 100644
  #include "ui/views/controls/scroll_view.h"
  #include "ui/views/controls/separator.h"
  #include "ui/views/view_utils.h"
-@@ -172,6 +173,9 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+@@ -158,7 +159,8 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+   views::ScrollView* unpinned_tabs_scroll_view =
+       tab_strip_view->unpinned_tabs_scroll_view();
+   views::Separator* tabs_separator = tab_strip_view->GetTabsSeparator();
+-  const bool is_collapsed = tab_strip_view->is_collapsed_;
++  const bool is_collapsed = tab_strip_view->is_collapsed_ &&
++                            !yee::UsesExpandedSidebarPresentation();
+ 
+   if (!size_bounds.width().is_bounded()) {
+     return layouts;
+@@ -172,6 +174,9 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
  
    int y = 0;
  
@@ -2012,7 +2582,7 @@ index b85a9a5d21..1a81d70429 100644
    // Determine container preferred heights.
    views::SizeBounds pinned_tab_container_size_bounds =
        size_bounds.Inset(gfx::Insets::TLBR(0, region_horizontal_padding, 0, 0));
-@@ -186,11 +190,34 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+@@ -186,11 +191,34 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
                                       unpinned_preferred_height != 0 &&
                                       is_collapsed;
  
@@ -2048,7 +2618,7 @@ index b85a9a5d21..1a81d70429 100644
        remaining_height -= region_vertical_padding;
      }
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
-index c223b50fab..e2c14a4d7b 100644
+index c223b50fab..25f15ab675 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
 @@ -12,6 +12,7 @@
@@ -2157,7 +2727,17 @@ index c223b50fab..e2c14a4d7b 100644
  views::BubbleAnchor TabView::GetAnchor() {
    if (split_ && !collapsed_) {
      return views::BubbleAnchor(parent());
-@@ -1163,6 +1184,7 @@ void TabView::UpdateTabData(const tabs::TabInterface* tab) {
+@@ -1097,7 +1118,8 @@ void TabView::OnAXNameChanged(ax::mojom::StringAttribute attribute,
+ 
+ void TabView::OnCollapseStateChanged(
+     tabs::VerticalTabStripCollapseState state) {
+-  collapsed_ = state == tabs::VerticalTabStripCollapseState::kCollapsed;
++  collapsed_ = !yee::UsesExpandedSidebarPresentation() &&
++               state == tabs::VerticalTabStripCollapseState::kCollapsed;
+ }
+ 
+ void TabView::OnTabStateChanged() {
+@@ -1163,6 +1185,7 @@ void TabView::UpdateTabData(const tabs::TabInterface* tab) {
    icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
                        tab_data_.needs_attention);
    UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
@@ -2165,7 +2745,7 @@ index c223b50fab..e2c14a4d7b 100644
    alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
    SetHoverCardDataFrom(tab_data_);
  }
-@@ -1179,6 +1201,7 @@ void TabView::SetDataForTesting(tabs::TabData data) {
+@@ -1179,6 +1202,7 @@ void TabView::SetDataForTesting(tabs::TabData data) {
    icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
                        tab_data_.needs_attention);
    UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
@@ -2173,7 +2753,7 @@ index c223b50fab..e2c14a4d7b 100644
    alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
    SetHoverCardDataFrom(tab_data_);
  }
-@@ -1192,7 +1215,19 @@ void TabView::UpdateTitle(std::u16string title,
+@@ -1192,7 +1216,19 @@ void TabView::UpdateTitle(std::u16string title,
    } else {
      title = WindowMetadataController::FormatTitleForDisplay(title);
    }
@@ -2194,7 +2774,7 @@ index c223b50fab..e2c14a4d7b 100644
  }
  
  void TabView::UpdateBorder() {
-@@ -1220,7 +1255,12 @@ void TabView::UpdateColors() {
+@@ -1220,7 +1256,12 @@ void TabView::UpdateColors() {
          ThemeProperties::SHOULD_FILL_BACKGROUND_TAB_COLOR);
    }
    TabStyle::TabColors colors = tab_styling()->CalculateTargetColors();
@@ -2250,7 +2830,7 @@ index 162310f13a..8c5efd4c9e 100644
    const raw_ptr<TabCloseButton> close_button_;
    raw_ptr<glic::TabUnderlineView> glic_tab_underline_view_ = nullptr;
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d84a..609ee936d9 100644
+index 6c4e35d84a..51eb8ddc17 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 @@ -10,6 +10,7 @@
@@ -2270,6 +2850,14 @@ index 6c4e35d84a..609ee936d9 100644
  }  // namespace
  
  UnpinnedTabContainerViewLayout::UnpinnedTabContainerViewLayout(
+@@ -169,6 +170,7 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+   for (auto* child : children) {
+     int x =
+         views::AsViewClass<TabGroupView>(child) &&
++                !yee::UsesExpandedSidebarPresentation() &&
+                 collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
+             ? 0
+             : horizontal_padding;
 diff --git a/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc b/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc
 index 8699ee4682..de0e3ee74a 100644
 --- a/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc
