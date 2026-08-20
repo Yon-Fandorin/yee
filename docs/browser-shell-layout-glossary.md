@@ -122,6 +122,8 @@ Shell Controls에 속한다.
 | **Sidebar Column** | Sidebar Header와 Tab Sidebar가 공유하는 고정 폭 열 | Yee shell layout column |
 | **Content Column** | Browser Toolbar와 Browser Content가 공유하는 가변 폭 열 | Yee shell layout column |
 | **Tab Sidebar** | 탭과 관련된 사용자 도구가 놓이는 세로 사이드바 | `VerticalTabStripRegionView` 기반 |
+| **Favorites** | 자주 여는 사이트를 아이콘 독으로 두는 영역. Chromium pinned tab이 백킹이다 | pinned tab container, Yee dock |
+| **Pins** | Arc 스타일 pinned tabs용 예약 슬롯. Favorites와 같은 말이 아니다 | `SidebarSection::kPins`, 아직 뷰 없음 |
 | **Vertical Tab Strip** | 실제 브라우저 Tab을 세로로 배치하는 내부 컴포넌트 | Chromium 구현 용어 |
 | **Pinned Sidebar** | Browser Content의 폭을 확보한 채 고정 표시되는 Sidebar 상태 | expanded/pinned vertical tabs |
 | **Collapsed Edge Rail** | Sidebar가 닫혔을 때 다시 열 수 있도록 남는 얇은 가장자리 target | collapsed vertical tab strip |
@@ -189,4 +191,5 @@ Tenant
 - 새로운 별칭을 만들기 전에 이 문서의 기존 용어로 표현할 수 있는지 확인한다.
 
 치수, 색상, 인터랙션의 구체적인 계약은
-[`browser-shell-spec.md`](./browser-shell-spec.md)를 따른다.
+[`browser-shell-spec.md`](./browser-shell-spec.md)를 따른다. Tab Sidebar에서
+이미 고른 UX 결정은 [`sidebar/`](./sidebar/)를 따른다.

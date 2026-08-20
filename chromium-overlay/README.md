@@ -1,6 +1,7 @@
 # Chromium source overlay
 
 > UI 패치를 추가하거나 갱신하기 전에
+> [`../AGENTS.md`](../AGENTS.md), [`AGENTS.md`](./AGENTS.md),
 > [`../docs/browser-shell-spec.md`](../docs/browser-shell-spec.md)의 불변 조건과
 > 구현 완료 체크리스트를 확인한다. 프로토타입의 시각적 결과만 복사하지 않는다.
 

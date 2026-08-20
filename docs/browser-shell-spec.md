@@ -6,6 +6,8 @@
 
 레이아웃 요소와 제품 범위의 표준 명칭은
 [`browser-shell-layout-glossary.md`](./browser-shell-layout-glossary.md)를 따른다.
+Tab Sidebar에서 이미 고른 UX 결정은
+[`sidebar/`](./sidebar/)를 따른다.
 
 ## 1. 제품 원칙
 
@@ -141,6 +143,21 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
 
 `Tabs` 같은 중복 섹션 제목은 사용하지 않는다. 화면 자체가 tab sidebar이므로
 추가 제목은 정보를 늘리지 않는다.
+
+Favorites가 0개면 유휴 상태에서 독과 빈 영역을 모두 숨긴다. 실제 Tab
+드래그가 시작된 동안에만 빈 Favorites 드롭존을 표시하고, 드래그가 끝나거나
+취소되면 다시 숨긴다. Group 드래그에는 표시하지 않는다. 마지막 Favorite을
+집으면 즉시 같은 88 DIP 드롭존으로 교체한다. 포인터가 Tab 영역으로 넘어가도
+드래그가 끝날 때까지 드롭존과 레이아웃 공간을 유지한다. 모델의 unpin 커밋
+중에도 한 칸 독으로 바꾸지 않고, 커밋이 끝나면 높이 애니메이션 없이 드롭존을
+즉시 제거한다. 빈 드롭존의 hit magnet은 아래로 늘리지 않아 첫 Tab의 위쪽을
+첫 번째 Tab 삽입 위치로 보존한다.
+Favorites와 Tab 목록 사이를 넘는 드롭은 보였던 삽입 빈자리의 순서를 그대로
+모델에 커밋한다. 독 바로 아래 경계는 첫 Tab 앞이며, 첫 Tab 아래에 놓은
+Favorite을 첫 번째 Tab으로 되돌리지 않는다. 목록 끝 빈자리는 원본 위치와
+무관하게 실제 마지막 순서로 커밋한다.
+Expanded Sidebar의 Tab 영역은 남은 세로 공간을 모두 채우며, 마지막 Tab 아래
+빈 공간도 목록 끝 드롭 타깃으로 유지한다.
 
 ### Group contract
 

@@ -42,8 +42,8 @@ inline constexpr int kSidebarPinsViewId = 92004;
 inline constexpr int kSidebarChatViewId = 92005;
 inline constexpr int kSidebarAgentHistoryViewId = 92006;
 
-// Current FAVORITES + pinned tabs are Chromium stand-ins, not `kPins`.
-// `kPins` stays reserved until the Arc-like pin system is placed.
+// Chromium pinned tabs are presented as the Favorites icon dock at the
+// top of the sidebar. `kPins` stays reserved for Arc-style pinned tabs.
 inline constexpr std::array<SidebarSectionSlot, 6> kSidebarSectionSlots{{
     {SidebarSection::kPins, kSidebarPinsViewId,
      SidebarSectionPlacement::kReserved},

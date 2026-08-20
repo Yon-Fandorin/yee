@@ -65,11 +65,31 @@ struct SidebarMetrics {
   int group_mark_trailing_margin = 4;
   int group_unread_dot_size = 5;
   int group_header_hover_alpha = 51;
+
+  int favorites_cell_size = 32;
+  int favorites_cell_vertical_padding = 8;
+  int favorites_cell_gap = 8;
+  int favorites_max_columns = 4;
+  int favorites_max_count = 12;
+  int favorites_dock_insets = 6;
+  int favorites_dock_corner_radius = 8;
+  int favorites_dock_fill_alpha = 36;
+  int favorites_cell_fill_alpha = 110;
+  int favorites_cell_hover_fill_alpha = 150;
+  int favorites_cell_active_fill_alpha = 220;
+  int favorites_cell_stroke_alpha = 72;
+  int favorites_cell_active_stroke_alpha = 140;
+  int favorites_drop_zone_height = 88;
+  int favorites_drop_zone_transition_duration_ms = 100;
+  int favorites_shift_duration_ms = 420;
 };
 
 inline constexpr SidebarMetrics kSidebarMetrics;
 inline constexpr int kSidebarFavoritesLabelViewId = 92001;
 inline constexpr int kSidebarBookmarksButtonViewId = 92002;
+inline constexpr int kSidebarFavoritesDropZoneViewId = 92007;
+inline constexpr int kSidebarFavoritesDockViewId = 92008;
+inline constexpr int kSidebarFavoritesDragPreviewViewId = 92009;
 
 enum class ShellCreateAction {
   kNewTab,
@@ -91,6 +111,12 @@ bool IsShellEnabled();
 // rail. Tab, group, and favorites presentation therefore stays on the
 // expanded contract when the strip is pinned open or revealed on hover.
 bool UsesExpandedSidebarPresentation();
+
+// `adding` is how many currently unpinned tabs would become favorites.
+inline bool CanAddFavorite(int pinned_count, int adding = 1) {
+  return adding <= 0 ||
+         pinned_count + adding <= kSidebarMetrics.favorites_max_count;
+}
 
 // Nudges a vertical-tab hover card away from the sidebar. Chromium's slide
 // animator reads View::GetAnchorBoundsInScreen(), so TabView applies this
