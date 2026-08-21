@@ -50,7 +50,7 @@ The resulting Chromium checkout changes:
 - a frame-derived window-controls safe area that keeps macOS traffic lights,
   Windows caption buttons, and Linux client-side decorations outside the Yee
   toolbar without platform-specific shell padding
-- a rounded `MultiContentsView` surface on the Windows 11 shell background
+- a guttered `MultiContentsView` pane with one fixed content-corner token
 - a pinned or edge-hovering native vertical tab sidebar whose real pinned
   tabs, bookmarks entry, groups, and tabs match the pilot section rhythm
 - no duplicate stock vertical-tab launchers or full-shell toolbar separators;
@@ -63,9 +63,9 @@ and Chromium's lightweight ICNS packer. Windows uses `System.Drawing` to
 generate the multi-resolution `chromium.ico` and bundled product-logo PNGs.
 Generated Chromium assets stay in the local checkout rather than this repo.
 
-The Windows shell follows the latest pilot's 48px titlebar, 6px content gutter,
-and 8px content radius. Tenant/workspace identity is no longer duplicated in
-the titlebar; it belongs to the future sidebar pass. The central runway is
+The Windows shell follows the latest pilot's 48px titlebar and 6px content
+gutter. Tenant/workspace identity is no longer duplicated in the
+titlebar; it belongs to the future sidebar pass. The central runway is
 Chromium's real `ToolbarView`, compactly laid out as
 sidebar toggle, new tab, compact agent activity, back, forward, reload,
 native Omnibox, and extension dock. It does not paint a second
@@ -94,8 +94,8 @@ the collapsed 8px edge width and gains four rounded corners plus a shallow
 shadow. This creates a detached glass flyout rather than a sheet attached to
 the window edge. The blur helper also derives its fill and edge stroke from the
 configured 8px target instead of Chromium's stock 56px collapsed rail. The
-flyout uses an 18px radius, deliberately distinct from the content frame's
-13px radius. Its shadow uses a broader elevation with lower key opacity so the
+flyout uses an 18px radius, deliberately distinct from the content frame. Its
+shadow uses a broader elevation with lower key opacity so the
 surface separates softly instead of reading as a heavy nested card.
 The flyout now moves through the Views transform path, keeping its visible tabs
 and input coordinates aligned. Its hit region extends back by the same offset,
@@ -121,10 +121,10 @@ The Yee composition hides Chromium's stock vertical-tab top launcher row and
 bottom New Tab row because Sidebar and New Tab already live in the 48 DIP
 titlebar. It also suppresses the native Toolbar dividers that would otherwise
 draw unmatched vertical rules. The content and sidebar begin directly below
-that titlebar at 48 DIP; their own 6 DIP horizontal gutter remains intact. The
-content shadow stays behind the renderer, while a transparent, non-interactive
-composited sibling paints the pilot's `#dfdfdf` one-DIP rounded outline above
-opaque WebContents. This keeps the boundary visible without tinting page pixels.
+that titlebar at 48 DIP; the page keeps a 6 DIP gutter on its leading, trailing,
+and bottom sides. A transparent, non-interactive composited sibling paints a
+theme-derived one-DIP outline above opaque WebContents. The outline, page
+backing, and renderer clip share the same fixed 12 DIP corner token.
 
 The refined Windows Omnibox uses the pilot's white paper surface and
 `#dfdfdf` line, interpolating to `#cfcfcf` on hover. Its native focus ring now
@@ -175,32 +175,34 @@ affordance through `BrowserFrameViewWin` hit testing inside the painted edge.
 Maximized, fullscreen, and system high-contrast windows keep Chromium's stock
 Windows frame calculations.
 
-The rounded content surface now follows `MultiContentsView`'s actual laid-out
-bounds instead of recomputing an edge from the nominal sidebar width. This keeps
-restored tab widths from exposing a second-colored strip around the clipped
-page corners. A white paper backing, `#dfdfdf` outline, and quiet 1px/3px shadow
-match the Windows pilot while keeping the surrounding gutter on the single
-Fluent shell color.
+The content boundary follows `MultiContentsView`'s actual laid-out bounds
+instead of recomputing an edge from the nominal sidebar width. A white page
+backing, theme-derived one-DIP outline, quiet 1px/3px shadow, and renderer clip
+share the fixed 12 DIP radius from `yee::kSidebarMetrics`. Automatically
+following native window corners is deferred until macOS Zoom and
+Windows/Linux maximize, fullscreen, and tiling states can be verified against
+the real WebContents compositor without platform-specific presentation hacks.
 
 The layout now has one geometry owner. Chromium's final content bounds drive
-the animated sidebar surface and the rounded paper backing. The titlebar does
+the animated sidebar surface and rounded page backing. The titlebar does
 not replay vertical-tab geometry, so user-resized or restored tab widths cannot
 shift the Toolbar. The latest pilot moves tenant/workspace identity into the
 sidebar footer; its obsolete titlebar Context Switcher has been removed from
 the native shell and will be implemented with the sidebar work later.
 
-The pinned tab sidebar is intentionally transparent over the same Fluent
-base as the content gutter. Chromium's additional 72%-opaque toolbar-theme
+The pinned tab sidebar is intentionally transparent over the same frame surface
+as the content gutter.
+Chromium's additional 72%-opaque toolbar-theme
 paint and the scaffold's second sidebar tint were removed, so the exposed areas
-around the content's upper-left and lower-left curves no longer form lighter
-end caps. The 18px blur and translucent surface now activate only while the
+around the content curves no longer form lighter end caps. The 18px blur and
+translucent surface now activate only while the
 sidebar is detached as an expand-on-hover flyout.
 
 Explicit shell content also disables Chromium's theme-colored
 `MainBackgroundRegionView` and the two vertical-tab `CustomFloatingCorner`
 helpers. Those stock cracking/corner layers otherwise remain visible precisely
-inside the rounded content surface's upper-left and lower-left cutouts,
-producing two differently colored end caps at fractional Windows scale. Stock
+inside the content surface's rounded cutouts, producing differently colored
+strips at fractional Windows scale. Stock
 Chromium layouts keep both helpers enabled by default.
 
 The compact Agent activity button is currently a UI-only contract with three

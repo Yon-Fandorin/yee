@@ -746,7 +746,7 @@ index 6a1b79d4b2..21976091b5 100644
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index bfae037bfe..bc510d3831 100644
+index bfae037bfe..aba3ff64c7 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -229,6 +229,7 @@
@@ -757,16 +757,12 @@ index bfae037bfe..bc510d3831 100644
  #include "chrome/browser/ui/waap/initial_web_ui_manager.h"
  #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
-@@ -414,6 +415,20 @@ using web_modal::WebContentsModalDialogHost;
+@@ -414,6 +415,16 @@ using web_modal::WebContentsModalDialogHost;
  
  namespace {
  
 +constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
 +constexpr int kYeeTitlebarHeight = 48;
-+constexpr int kYeeContentGutter = 6;
-+constexpr int kYeeTabToContentSpacing =
-+    yee::kSidebarMetrics.tab_to_content_gap -
-+    yee::kSidebarMetrics.tab_strip_horizontal_padding;
 +constexpr int kYeeToolbarLeadingInset = 10;
 +constexpr int kYeeTitlebarControlGap = 8;
 +
@@ -778,7 +774,7 @@ index bfae037bfe..bc510d3831 100644
  // The visible height of the shadow above the tabs. Clicks in this area are
  // treated as clicks to the frame, rather than clicks to the tab.
  const int kTabShadowSize = 2;
-@@ -1013,6 +1028,17 @@ BrowserView::BrowserView(Browser* browser)
+@@ -1013,6 +1024,17 @@ BrowserView::BrowserView(Browser* browser)
                                  base::Unretained(this)));
    }
  
@@ -796,7 +792,7 @@ index bfae037bfe..bc510d3831 100644
    // Create do-nothing view for the sake of controlling the z-order of the find
    // bar widget.
    find_bar_host_view_ = AddChildView(std::make_unique<View>());
-@@ -1231,6 +1257,13 @@ ClientFrameElementInfo BrowserView::GetFrameElementInfo() const {
+@@ -1231,6 +1253,13 @@ ClientFrameElementInfo BrowserView::GetFrameElementInfo() const {
            : 0;
    if (toolbar_ && ShouldDrawVerticalTabStrip()) {
      info.toolbar_minimum_height = toolbar_->GetMinimumSize().height();
@@ -810,7 +806,7 @@ index bfae037bfe..bc510d3831 100644
    } else if (web_app_frame_toolbar_ && ShouldDrawWebAppFrameToolbar()) {
      info.toolbar_minimum_height =
          web_app_frame_toolbar_->GetMinimumSize().height();
-@@ -1936,7 +1969,6 @@ bool BrowserView::IsLoadingAnimationRunning() const {
+@@ -1936,7 +1965,6 @@ bool BrowserView::IsLoadingAnimationRunning() const {
    return !loading_animation_start_.is_null();
  }
  
@@ -818,7 +814,7 @@ index bfae037bfe..bc510d3831 100644
  void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       content::WebContents* new_contents,
                                       int index,
-@@ -4814,6 +4846,16 @@ void BrowserView::Layout(PassKey) {
+@@ -4814,6 +4842,16 @@ void BrowserView::Layout(PassKey) {
  
    LayoutSuperclass<views::View>(this);
  
@@ -835,7 +831,7 @@ index bfae037bfe..bc510d3831 100644
    // TODO(jamescook): Why was this in the middle of layout code?
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
    GetFrameView()->UpdateMinimumSize();
-@@ -4956,6 +4998,10 @@ void BrowserView::AddedToWidget() {
+@@ -4956,6 +4994,10 @@ void BrowserView::AddedToWidget() {
  
    toolbar_->Init();
  
@@ -846,7 +842,7 @@ index bfae037bfe..bc510d3831 100644
    if (omnibox::IsWebUIOmniboxInBrowserViewEnabled()) {
      // When the WebUI Omnibox is embedded directly in the `BrowserView` (instead
      // of being a separate popup widget), the popup view needs a reference to
-@@ -5039,10 +5085,38 @@ void BrowserView::AddedToWidget() {
+@@ -5039,10 +5081,42 @@ void BrowserView::AddedToWidget() {
    layout_views.vertical_tab_strip_top_corner = vertical_tab_strip_top_corner_;
    layout_views.organizer_panel_container = organizer_panel_container_;
    layout_views.toolbar = toolbar_;
@@ -868,18 +864,22 @@ index bfae037bfe..bc510d3831 100644
 +    layout_views.content_layout_config = BrowserContentLayoutConfig{
 +        gfx::Insets::TLBR(
 +            kYeeTitlebarHeight,
-+            yee::kSidebarMetrics.expanded_width + kYeeTabToContentSpacing,
-+            kYeeContentGutter, kYeeContentGutter),
-+        gfx::RoundedCornersF(yee::kContentCornerRadius),
++            yee::kSidebarMetrics.expanded_width +
++                yee::kSidebarMetrics.content_gutter,
++            yee::kSidebarMetrics.content_gutter,
++            yee::kSidebarMetrics.content_gutter),
++        gfx::RoundedCornersF(yee::kSidebarMetrics.content_corner_radius),
 +        /*show_top_separator=*/false,
-+        /*collapsed_vertical_tab_strip_leading_inset=*/kYeeContentGutter,
-+        /*vertical_tab_strip_spacing=*/kYeeTabToContentSpacing,
++        /*collapsed_vertical_tab_strip_leading_inset=*/
++            yee::kSidebarMetrics.content_gutter,
++        /*vertical_tab_strip_spacing=*/yee::kSidebarMetrics.content_gutter,
 +        /*show_main_background=*/false,
 +        /*show_vertical_tab_strip_corners=*/false,
 +        /*show_bookmark_bar=*/false};
 +    layout_views.vertical_tab_strip_layout_config =
 +        BrowserVerticalTabStripLayoutConfig{
-+            gfx::Insets::TLBR(kYeeTitlebarHeight, 0, kYeeContentGutter, 0),
++            gfx::Insets::TLBR(kYeeTitlebarHeight, 0,
++                              yee::kSidebarMetrics.content_gutter, 0),
 +            /*collapsed_width=*/yee::kSidebarMetrics.collapsed_width};
 +  }
    // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)

@@ -26,7 +26,6 @@ class View;
 namespace yee {
 
 inline constexpr int kContentOutlineViewId = 92003;
-inline constexpr float kContentCornerRadius = 8.0f;
 inline constexpr int kShellControlSize = 30;
 inline constexpr int kShellControlCornerRadius = 8;
 inline constexpr int kShellControlHorizontalMargin = 1;
@@ -37,6 +36,8 @@ inline constexpr int kShellControlHorizontalMargin = 1;
 struct SidebarMetrics {
   int expanded_width = 244;
   int collapsed_width = 8;
+  int content_gutter = 6;
+  int content_corner_radius = 12;
 
   int tab_icon_design_width = 16;
   int tab_row_height = 32;

@@ -36,7 +36,7 @@ Title Bar의 New Tab / Sidebar Toggle을 Sidebar 안쪽에 다시 두지 않는�
 | 상태 | 폭 | 페이지 |
 | --- | --- | --- |
 | Pinned Sidebar | 244 DIP + content gutter 6 DIP | 페이지가 폭을 내준다 |
-| Collapsed Edge Rail | 8 DIP 가장자리 target | 남은 폭은 Browser Content |
+| Collapsed Edge Rail | 8 DIP 가장자리 target + gutter 6 DIP | 남은 폭은 Browser Content |
 | Sidebar Flyout | 펼친 표현이 페이지 위에 뜬다 | 페이지 폭을 바꾸지 않는다 |
 
 접힌 8 DIP는 Chromium 기본 56 DIP 아이콘 레일이 아니다. 펼쳐 고정했거나

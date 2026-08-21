@@ -25,14 +25,14 @@ Tab Sidebar에서 이미 고른 UX 결정은
 | --- | ---: | --- |
 | Expanded sidebar | 244 DIP | prototype과 native shell이 같은 기본 폭 token을 사용한다. |
 | Sidebar header | Expanded sidebar와 동일 | Shell Controls와 Tab Sidebar가 하나의 Sidebar Column 경계를 공유한다. |
-| Browser content gutter | 6 DIP | 우·하 및 sidebar와 content 사이에 사용한다. 상단은 Omnibox 하단 inset과 공유한다. |
+| Browser content gutter | 6 DIP | 우·하 및 Sidebar와 Content 사이에 사용한다. 상단은 Omnibox 하단 inset과 공유한다. |
 | Shell inset | 6 DIP | Omnibox의 상·하 여백과 Browser Content 외부 gutter가 같은 token을 사용한다. |
 | Sidebar 내부 좌우 padding | 8 DIP | section 자체는 추가로 좌우 4 DIP inset을 사용할 수 있다. |
 | Sidebar section gap | 10 DIP | Favorites, Bookmarks, Group, Agent 영역 사이의 기본 리듬이다. |
 | Group heading | 30 DIP | disclosure, mark, title, count의 수직 중심을 공유한다. |
 | Tab row | 40 DIP | title + hostname 두 줄, favicon tile 포함. |
 | Agent task row | 최소 50 DIP | 일반 tab과 구분되는 실행 상태 카드다. |
-| Chrome surface radius | Windows 8 / macOS 10 / Linux 9 DIP | Omnibox와 Browser Content가 같은 OS별 radius를 사용한다. |
+| Browser content radius | 12 DIP | page backing, renderer clip, outline과 shadow가 같은 고정 token을 사용한다. |
 | Active indicator | 3 × 20 DIP | tab 왼쪽, 행 중앙 정렬. |
 
 ### 공통 수직 기준선
@@ -60,7 +60,7 @@ Sidebar Toggle, New Tab과 Agent Control은 Sidebar Header의 `Shell Controls`�
 Sidebar가 닫히면 고정 기준선은 해제하고 Omnibox와 Browser Content가 남은 폭을
 사용한다. Hover flyout은 페이지 폭을 변경하지 않는다.
 
-### 공통 inset
+### 공통 inset과 content 곡률
 
 Omnibox와 Browser Content는 동일한 `shell_inset`을 사용한다.
 
@@ -75,19 +75,22 @@ Linux 38 DIP다. Title bar 높이가 바뀌더라도 상·하 inset을 별도 �
 않고 같은 계산식을 사용한다.
 
 Omnibox와 Browser Content가 수직으로 맞닿는 구간에서는 두 개의 6 DIP 여백을
-더하지 않는다. Content의 top margin은 0이고 Omnibox의 bottom inset 6 DIP를
-두 영역의 공유 gap으로 사용한다. 따라서 실제 표면 사이 거리는 12 DIP가 아니라
-6 DIP다. Content의 right, bottom, sidebar-side gutter는 계속 6 DIP다.
+더하지 않는다. Content의 top margin은 0이고 Omnibox의 bottom inset 6 DIP를 두
+영역의 공유 gap으로 사용한다. Content의 right, bottom, Sidebar-side gutter는 6 DIP다.
 
-좌표가 같더라도 두 표면의 radius나 border 색이 다르면 곡선의 접점 때문에
-시각적으로 어긋나 보인다. Omnibox와 Browser Content는 `chrome_surface_radius`와
-`chrome_line`도 공유해야 한다.
+현재 native checkpoint는 Browser Content의 네 모서리에 12 DIP 고정 곡률을
+사용한다. page backing, renderer clip, outline과 shadow는
+`yee::kSidebarMetrics.content_corner_radius` 하나를 공유한다.
+
+OS 창 모서리와 Content 곡률을 자동으로 맞추는 방식은 보류한다. macOS Zoom,
+Windows/Linux 최대화·전체 화면·타일링처럼 창 상태의 의미가 서로 달라, 실제
+WebContents 합성 결과까지 검증한 뒤 별도 결정으로 추가해야 한다.
 
 ## 3. 표면과 색상
 
 각 OS는 하나의 `chrome_bg`를 가진다. Browser frame, Title bar, pinned Sidebar와
-content gutter는 동일한 값을 사용한다. Title bar 아래에 border, shadow 또는
-별도 tint를 추가해 수평 seam을 만들지 않는다.
+content gutter는 동일한 값을 사용한다. Browser Content는 불투명한 page pane이며
+theme-derived 1 DIP outline과 얕은 1px/3px shadow로 chrome에서 분리한다.
 
 | OS | `chrome_bg` | `chrome_line` | 특징 |
 | --- | --- | --- | --- |
@@ -106,8 +109,8 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
   유지한다. 1px transparent top-frame extension은 shadow를 위한 합성 힌트일
   뿐이며 client surface 안에 검은 선이나 별도 inset을 만들지 않는다.
 - Hover: 해당 OS chrome보다 한 단계만 밝거나 어둡게 한다.
-- 구분선은 Sidebar 내부 section과 white content outline에만 사용한다.
-- Title bar와 workspace 사이의 수평 구분선은 금지한다.
+- Browser Content의 outline은 현재 theme의 content separator 색을 사용한다.
+- page backing, renderer clip, outline과 shadow는 같은 12 DIP corner token을 사용한다.
 
 ## 4. OS별 허용 차이
 
@@ -420,10 +423,9 @@ native 구현은 Chromium의 model, accelerator, theme, focus manager와 accessi
 - [ ] Expanded 상태에서 Omnibox와 Browser Content 왼쪽 경계가 1 DIP 이내로 맞는다.
 - [ ] Omnibox와 Browser Content 사이의 공유 gap이 6 DIP다.
 - [ ] Content의 우·하 및 Sidebar 쪽 gutter가 6 DIP다.
-- [ ] Omnibox의 상·하 inset과 Browser Content 외부 gutter가 모두 6 DIP다.
-- [ ] Omnibox와 Browser Content의 radius와 border token이 같다.
-- [ ] Title bar와 workspace 사이에 선, 다른 tint, 1 DIP seam이 없다.
-- [ ] Sidebar와 gutter가 같은 `chrome_bg`를 사용한다.
+- [ ] Browser Content의 네 모서리가 실제 WebContents 위에서 12 DIP 곡률로 보인다.
+- [ ] page backing, renderer clip, outline과 shadow의 corner token이 같다.
+- [ ] outline은 theme-derived 1 DIP이고 shadow는 얕은 1px/3px다.
 - [ ] Caption controls가 content나 extension dock 위로 겹치지 않는다.
 - [ ] 창 resize, maximize/restore, DPI 100/125/150/200%에서 정렬이 유지된다.
 - [ ] Sidebar collapse/expand 중 page viewport가 panel과 함께 연속 resize된다.

@@ -61,10 +61,10 @@ omnibox_start_x = browser_toolbar_start_x
 ```
 
 `Content Gutter`는 Sidebar Column의 폭에 포함하지 않는다. Content Column 안쪽에서
-Browser Toolbar의 첫 Navigation Control과 Browser Content에 동일하게 적용한다.
+Browser Content 둘레에 적용하며, 상단 간격은 Omnibox의 bottom inset과 공유한다.
 Omnibox는 Navigation Controls 다음에 놓이므로 Browser Content와 직접 정렬하지
-않는다. 위 규칙은 펼쳐져 고정된 Sidebar를 기준으로 하며, Collapsed Edge Rail과
-Sidebar Flyout은 별도 상태 규칙을 따른다.
+않는다. Collapsed Edge Rail은 페이지 폭을 줄이지 않는 가장자리 target이고 Sidebar
+Flyout은 Browser Content 위에 표시된다.
 
 ## 2. Window Frame과 Title Bar
 
@@ -132,7 +132,8 @@ Shell Controls에 속한다.
 | **Tab** | URL과 `WebContents`에 연결된 실제 브라우저 탭 | `TabStripModel` entry |
 | **Agent Activity** | Agent Task의 상태, 결과와 연결된 Context Tabs를 보여주는 상세 영역 | Yee product UI; runtime 연동 예정 |
 | **Browser Content** | 현재 선택된 Tab의 페이지가 렌더링되는 표면 | `MultiContentsView`, `WebContents` |
-| **Content Gutter** | Browser Content와 셸 사이에 남기는 외부 간격 | Yee content layout inset |
+| **Content Gutter** | Browser Content와 셸 사이에 남기는 6 DIP 외부 간격 | Yee content layout inset |
+| **Content Boundary** | Browser Content와 Gutter의 경계 | 고정 12 DIP 곡률, theme-derived 1 DIP outline과 얕은 shadow |
 | **Chrome Surface** | Title Bar, Tab Sidebar와 Gutter가 공유하는 브라우저 셸 재질 | Browser chrome background |
 
 제품 문서에서는 전체 영역을 `Tab Sidebar`라고 부른다. Chromium 코드나 클래스와

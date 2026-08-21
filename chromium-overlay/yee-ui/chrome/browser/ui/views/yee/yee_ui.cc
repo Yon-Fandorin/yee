@@ -15,6 +15,7 @@
 #include "base/timer/timer.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -105,23 +106,26 @@ class YeeShellBackground : public views::Background {
       return;
     }
     content_rect.Inset(0.5f);
-
     cc::PaintFlags content_surface_flags;
     content_surface_flags.setAntiAlias(true);
     content_surface_flags.setColor(SK_ColorWHITE);
     content_surface_flags.setStyle(cc::PaintFlags::kFill_Style);
     content_surface_flags.setLooper(gfx::CreateShadowDrawLooper({
-        gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0, SkColorSetARGB(13, 0, 0, 0)),
+        gfx::ShadowValue(gfx::Vector2d(0, 1), 3.0,
+                         SkColorSetARGB(13, 0, 0, 0)),
     }));
-    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+    canvas->DrawRoundRect(content_rect,
+                          yee::kSidebarMetrics.content_corner_radius,
                           content_surface_flags);
 
     cc::PaintFlags content_outline_flags;
     content_outline_flags.setAntiAlias(true);
-    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
+    content_outline_flags.setColor(
+        color_provider->GetColor(kColorToolbarContentAreaSeparator));
     content_outline_flags.setStrokeWidth(1.0f);
     content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
-    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+    canvas->DrawRoundRect(content_rect,
+                          yee::kSidebarMetrics.content_corner_radius,
                           content_outline_flags);
   }
 
@@ -147,13 +151,15 @@ class YeeContentOutlineView : public views::View {
       return;
     }
     content_rect.Inset(0.5f);
-
     cc::PaintFlags content_outline_flags;
     content_outline_flags.setAntiAlias(true);
-    content_outline_flags.setColor(SkColorSetRGB(223, 223, 223));
+    content_outline_flags.setColor(
+        GetColorProvider()->GetColor(kColorToolbarContentAreaSeparator));
     content_outline_flags.setStrokeWidth(1.0f);
     content_outline_flags.setStyle(cc::PaintFlags::kStroke_Style);
-    canvas->DrawRoundRect(content_rect, yee::kContentCornerRadius,
+
+    canvas->DrawRoundRect(content_rect,
+                          yee::kSidebarMetrics.content_corner_radius,
                           content_outline_flags);
   }
 };
