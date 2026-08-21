@@ -8,10 +8,15 @@
 #include <memory>
 
 #include "base/functional/callback_forward.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/button.h"
 
 class ToolbarButton;
+
+namespace ui {
+class ColorProvider;
+}  // namespace ui
 
 namespace views {
 class Background;
@@ -79,9 +84,14 @@ struct SidebarMetrics {
   int favorites_cell_active_fill_alpha = 220;
   int favorites_cell_stroke_alpha = 72;
   int favorites_cell_active_stroke_alpha = 140;
-  int favorites_drop_zone_height = 88;
-  int favorites_drop_zone_transition_duration_ms = 100;
+  int favorites_drop_zone_height = 76;
+  int favorites_drop_zone_open_duration_ms = 160;
+  int favorites_drop_zone_surface_delay_ms = 30;
+  int favorites_drop_zone_close_duration_ms = 120;
+  int favorites_drop_zone_commit_fade_duration_ms = 90;
   int favorites_shift_duration_ms = 420;
+  int cross_region_arrival_offset = 10;
+  int cross_region_arrival_duration_ms = 240;
 };
 
 inline constexpr SidebarMetrics kSidebarMetrics;
@@ -101,6 +111,16 @@ using ShellCreateCallback =
     base::RepeatingCallback<void(ShellCreateAction action, int event_flags)>;
 
 std::unique_ptr<views::Background> CreateShellBackground();
+
+// Returns an opaque, theme-resolved proxy for the shell surface. Translucent
+// Yee surfaces use this to calculate contrast without sampling desktop pixels.
+SkColor ResolveShellContrastBackground(const ui::ColorProvider& color_provider);
+
+// Native macOS glass and Yee's Views background share one opacity contract.
+// The native host uses this tint value; Yee calculates the remaining surface
+// alpha required to reach the product's effective shell opacity.
+double GetNativeGlassTintOpacity(bool is_dark_mode);
+
 std::unique_ptr<views::View> CreateContentOutlineView();
 
 void ApplyShellControlStyle(ToolbarButton& button);
@@ -111,6 +131,15 @@ bool IsShellEnabled();
 // rail. Tab, group, and favorites presentation therefore stays on the
 // expanded contract when the strip is pinned open or revealed on hover.
 bool UsesExpandedSidebarPresentation();
+
+// A lone tab starts as a sidebar organization drag so Favorites and the Tab
+// list get first refusal. Leaving the sidebar still hands the drag back to
+// Chromium's normal window move path. Group-header drags keep Chromium's
+// all-tabs behavior.
+bool ShouldPrioritizeSidebarTabDrag(int dragged_tab_count,
+                                    int source_tab_count,
+                                    bool is_group_drag,
+                                    bool uses_vertical_tab_strip);
 
 // `adding` is how many currently unpinned tabs would become favorites.
 inline bool CanAddFavorite(int pinned_count, int adding = 1) {

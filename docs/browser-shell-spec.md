@@ -91,11 +91,16 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
 
 | OS | `chrome_bg` | `chrome_line` | 특징 |
 | --- | --- | --- | --- |
-| Windows | `#f3f3f3` | `#dfdfdf` | Fluent neutral, 불투명 |
-| macOS | `#eef1f0` 상당의 glass tint | `rgba(54,93,85,.10)` | frame 영역에만 blur/saturation 허용 |
-| Linux | `#f1f0ef` | `#d8d6d4` | Adwaita 계열의 불투명 neutral |
+| Windows | 현재 theme frame 색, 기본 `#f3f3f3` | `#dfdfdf` | Fluent 계열, 불투명 |
+| macOS | 현재 theme frame 색의 native glass tint | theme-derived separator | Light 약 43% / Dark 약 74% 유효 불투명도 |
+| Linux | 현재 theme frame 색, 기본 `#f1f0ef` | `#d8d6d4` | Adwaita 계열, 불투명 |
 
 - Web content backing: `#ffffff`
+- Glass 활성화, 전체 창 적용 범위, tint 불투명도는 Yee 코드의 제품 기본값이다.
+  실행 스크립트와 강제 theme seed에 의존하지 않는다.
+- macOS 26 미만, Windows, Linux와 macOS의 ‘투명도 줄이기’ 환경에서는 현재 theme
+  frame 색을 불투명하게 그린다. 지원되는 macOS의 활성 창만 native material을
+  사용하며 비활성 창은 같은 색의 불투명 표면으로 전환한다.
 - Active tab: 약 88% white, 얕은 1px/3px shadow
 - Windows restored window: visible outline 없이 DWM의 둥근 시스템 shadow를
   유지한다. 1px transparent top-frame extension은 shadow를 위한 합성 힌트일
@@ -121,7 +126,9 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
 - Traffic lights는 Sidebar Header의 Window Controls Safe Area에 두고 Shell
   Controls와 겹치지 않는다.
 - Leading actions는 필요하면 26 DIP까지 압축할 수 있다.
-- Glass/blur는 browser chrome에만 적용하고 `WebContents`는 불투명하게 유지한다.
+- Glass/blur는 지원되는 macOS의 browser chrome에만 적용하고 `WebContents`는
+  불투명하게 유지한다. 시스템의 ‘투명도 줄이기’ 설정에서는 즉시 불투명 셸로
+  전환한다.
 - 단축키: `⌘K`, `⌘T`
 
 ### Linux
@@ -146,18 +153,36 @@ content gutter는 동일한 값을 사용한다. Title bar 아래에 border, sha
 
 Favorites가 0개면 유휴 상태에서 독과 빈 영역을 모두 숨긴다. 실제 Tab
 드래그가 시작된 동안에만 빈 Favorites 드롭존을 표시하고, 드래그가 끝나거나
-취소되면 다시 숨긴다. Group 드래그에는 표시하지 않는다. 마지막 Favorite을
-집으면 즉시 같은 88 DIP 드롭존으로 교체한다. 포인터가 Tab 영역으로 넘어가도
-드래그가 끝날 때까지 드롭존과 레이아웃 공간을 유지한다. 모델의 unpin 커밋
-중에도 한 칸 독으로 바꾸지 않고, 커밋이 끝나면 높이 애니메이션 없이 드롭존을
-즉시 제거한다. 빈 드롭존의 hit magnet은 아래로 늘리지 않아 첫 Tab의 위쪽을
-첫 번째 Tab 삽입 위치로 보존한다.
+취소되면 다시 숨긴다. 드롭존은 160ms 동안 0에서 76 DIP로 펼쳐지고 표면은
+30ms 뒤에 나타나기 시작한다. 취소할 때는 높이와 표면 투명도를 120ms 동안
+함께 접는다. Group 드래그에는 표시하지 않는다. 마지막 Favorite을 집으면
+즉시 같은 76 DIP 드롭존으로 교체한다. 포인터가 Tab 영역으로 넘어가도 드래그가
+끝날 때까지 드롭존과 레이아웃 공간을 유지한다. 모델의 unpin 커밋 중에도 한 칸
+독으로 바꾸지 않는다. 커밋이 끝나면 드롭존의 레이아웃 공간은 즉시 제거하고,
+레이아웃에 참여하지 않는 표면 잔상만 90ms 동안 사라지게 한다. 삭제 애니메이션을
+위해 남은 View는 Favorite 존재 여부에 포함하지 않아, 드롭존과 한 칸 독이
+순서대로 사라지는 이중 전환을 만들지 않는다. 빈 드롭존의 hit magnet은 아래로
+늘리지 않아 첫 Tab의 위쪽을 첫 번째 Tab 삽입 위치로 보존한다. 모션 감소 설정에서는
+드롭존의 모든 전환을 즉시 반영한다. 드롭존의 안내색은 고정 RGB를 쓰지 않는다.
+현재 Chromium 테마의 frame과 label 색을 Yee shell tint 및 드롭존 fill 위에 합성해
+매 paint마다 도출한다. 제목은 최소 7:1, 설명은 최소 4.5:1 대비를 유지하고,
+별과 점선은 계산된 제목색에서 파생한다.
 Favorites와 Tab 목록 사이를 넘는 드롭은 보였던 삽입 빈자리의 순서를 그대로
 모델에 커밋한다. 독 바로 아래 경계는 첫 Tab 앞이며, 첫 Tab 아래에 놓은
 Favorite을 첫 번째 Tab으로 되돌리지 않는다. 목록 끝 빈자리는 원본 위치와
 무관하게 실제 마지막 순서로 커밋한다.
+영역을 넘어 도착한 Favorite과 Tab은 처음부터 최종 크기와 레이아웃 공간을
+차지한다. 도착 요소의 레이어만 최종 위치의 왼쪽 10 DIP에서 시작해 240ms 동안
+빠르게 감속하며 오른쪽으로 이동하고 동시에 불투명해진다. 같은 영역 안의
+재배치와 주변 요소 이동은 기존 컨테이너 애니메이션을 유지한다.
 Expanded Sidebar의 Tab 영역은 남은 세로 공간을 모두 채우며, 마지막 Tab 아래
 빈 공간도 목록 끝 드롭 타깃으로 유지한다.
+탭이 하나뿐인 창에서 Tab을 드래그하면 창 이동보다 Sidebar 내부 정리를 먼저
+시작한다. 같은 Sidebar 안에서는 Favorite 등록·해제와 Tab 배치를 처리하고,
+Sidebar를 벗어나면 지연 없이 Chromium의 기존 창 이동·다른 창 연결 경로로
+전환한다. 빈 바탕화면에서는 현재 단일 Tab 창 자체를 이동하며, 다른 창의
+Favorites 독에 놓으면 목적지 창의 Favorite으로 등록한다. Group 헤더 드래그와
+여러 Tab 전체 선택 드래그에는 이 예외를 적용하지 않는다.
 
 ### Group contract
 

@@ -7,9 +7,13 @@
 #include <algorithm>
 #include <cmath>
 
+#include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/weak_ptr.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/path_effect.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -350,6 +354,162 @@ void PaintFavoritesCellBackground(gfx::Canvas* canvas,
   canvas->DrawRoundRect(card, radius, stroke);
 }
 
+namespace {
+
+constexpr SkColor kFavoritesDropZoneFill = SkColorSetARGB(54, 54, 93, 85);
+constexpr float kFavoritesDropZoneTitleContrastRatio = 7.0f;
+
+struct FavoritesDropZonePalette {
+  SkColor fill;
+  SkColor stroke;
+  SkColor badge;
+  SkColor star;
+  SkColor title;
+  SkColor subtitle;
+};
+
+FavoritesDropZonePalette ResolveFavoritesDropZonePalette(
+    const ui::ColorProvider& color_provider) {
+  const SkColor surface = color_utils::GetResultingPaintColor(
+      kFavoritesDropZoneFill, ResolveShellContrastBackground(color_provider));
+  const SkColor title =
+      color_utils::BlendForMinContrast(
+          color_provider.GetColor(ui::kColorLabelForeground), surface,
+          std::nullopt, kFavoritesDropZoneTitleContrastRatio)
+          .color;
+  const SkColor subtitle =
+      color_utils::BlendForMinContrast(
+          color_provider.GetColor(ui::kColorLabelForegroundSecondary), surface,
+          std::nullopt, color_utils::kMinimumReadableContrastRatio)
+          .color;
+  return {
+      .fill = kFavoritesDropZoneFill,
+      .stroke = SkColorSetA(title, 88),
+      .badge = SkColorSetA(title, 38),
+      .star = SkColorSetA(title, 210),
+      .title = title,
+      .subtitle = subtitle,
+  };
+}
+
+void PaintFavoritesDropZoneSurface(gfx::Canvas* canvas,
+                                   const gfx::Rect& bounds,
+                                   const ui::ColorProvider& color_provider) {
+  const FavoritesDropZonePalette palette =
+      ResolveFavoritesDropZonePalette(color_provider);
+  gfx::RectF card(bounds);
+  card.Inset(0.5f);
+  const float radius =
+      static_cast<float>(kSidebarMetrics.favorites_dock_corner_radius);
+
+  cc::PaintFlags fill;
+  fill.setAntiAlias(true);
+  fill.setColor(palette.fill);
+  canvas->DrawRoundRect(card, radius, fill);
+
+  cc::PaintFlags stroke;
+  stroke.setAntiAlias(true);
+  stroke.setStyle(cc::PaintFlags::kStroke_Style);
+  stroke.setStrokeWidth(1.25f);
+  stroke.setColor(palette.stroke);
+  const float intervals[] = {3.5f, 3.5f};
+  stroke.setPathEffect(cc::PathEffect::MakeDash(intervals, 2, 0));
+  canvas->DrawRoundRect(card, radius, stroke);
+
+  const gfx::PointF star_center(card.CenterPoint().x(), card.y() + 18.0f);
+  cc::PaintFlags badge;
+  badge.setAntiAlias(true);
+  badge.setColor(palette.badge);
+  canvas->DrawCircle(star_center, 10.0f, badge);
+
+  SkPathBuilder star;
+  for (int i = 0; i < 5; ++i) {
+    const float angle =
+        static_cast<float>(i) * 4.0f * 3.14159265f / 5.0f - 3.14159265f / 2.0f;
+    const gfx::PointF p(star_center.x() + 5.5f * std::cos(angle),
+                        star_center.y() + 5.5f * std::sin(angle));
+    if (i == 0) {
+      star.moveTo(p.x(), p.y());
+    } else {
+      star.lineTo(p.x(), p.y());
+    }
+  }
+  star.close();
+  cc::PaintFlags star_paint;
+  star_paint.setAntiAlias(true);
+  star_paint.setColor(palette.star);
+  canvas->DrawPath(star.detach(), star_paint);
+
+  gfx::FontList title_font =
+      gfx::FontList().Derive(0, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM);
+  gfx::FontList subtitle_font =
+      gfx::FontList().Derive(-2, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL);
+
+  const int text_width = std::max(0, bounds.width() - 24);
+  gfx::Rect title_bounds(12, static_cast<int>(star_center.y()) + 12, text_width,
+                         16);
+  gfx::Rect subtitle_bounds(12, title_bounds.bottom() + 1, text_width, 24);
+  canvas->DrawStringRectWithFlags(u"Favorites로 끌어다 놓기", title_font,
+                                  palette.title, title_bounds,
+                                  gfx::Canvas::TEXT_ALIGN_CENTER);
+  canvas->DrawStringRectWithFlags(
+      u"자주 쓰는 사이트와 앱을 가까이 둡니다", subtitle_font, palette.subtitle,
+      subtitle_bounds,
+      gfx::Canvas::TEXT_ALIGN_CENTER | gfx::Canvas::MULTI_LINE);
+}
+
+class FavoritesDropZoneGhost : public views::View,
+                               public gfx::AnimationDelegate {
+ public:
+  FavoritesDropZoneGhost(const gfx::Rect& bounds, float opacity) {
+    SetCanProcessEventsWithinSubtree(false);
+    SetProperty(views::kViewIgnoredByLayoutKey, true);
+    SetBoundsRect(bounds);
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    fade_animation_.SetTweenType(gfx::Tween::FAST_OUT_LINEAR_IN);
+    fade_animation_.SetSlideDuration(base::Milliseconds(
+        kSidebarMetrics.favorites_drop_zone_commit_fade_duration_ms));
+    fade_animation_.Reset(opacity);
+    layer()->SetOpacity(opacity);
+  }
+  FavoritesDropZoneGhost(const FavoritesDropZoneGhost&) = delete;
+  FavoritesDropZoneGhost& operator=(const FavoritesDropZoneGhost&) = delete;
+  ~FavoritesDropZoneGhost() override { fade_animation_.Stop(); }
+
+  void Start() { fade_animation_.Hide(); }
+
+  void AnimationProgressed(const gfx::Animation*) override {
+    layer()->SetOpacity(static_cast<float>(fade_animation_.GetCurrentValue()));
+  }
+
+  void AnimationEnded(const gfx::Animation*) override {
+    AnimationProgressed(nullptr);
+    if (fade_animation_.GetCurrentValue() != 0.0) {
+      return;
+    }
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<FavoritesDropZoneGhost> ghost) {
+                         if (ghost && ghost->parent()) {
+                           ghost->parent()->RemoveChildViewT(ghost.get());
+                         }
+                       },
+                       weak_factory_.GetWeakPtr()));
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    PaintFavoritesDropZoneSurface(canvas, GetLocalBounds(),
+                                  *GetColorProvider());
+  }
+
+ private:
+  gfx::SlideAnimation fade_animation_{this};
+  base::WeakPtrFactory<FavoritesDropZoneGhost> weak_factory_{this};
+};
+
+}  // namespace
+
 class FavoritesDropZone : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(FavoritesDropZone, views::View)
 
@@ -361,35 +521,68 @@ class FavoritesDropZone : public views::View, public gfx::AnimationDelegate {
     layer()->SetFillsBoundsOpaquely(false);
     layer()->SetOpacity(0.0f);
     SetVisible(false);
-    reveal_animation_.SetTweenType(gfx::Tween::ACCEL_20_DECEL_100);
-    reveal_animation_.SetSlideDuration(base::Milliseconds(
-        kSidebarMetrics.favorites_drop_zone_transition_duration_ms));
+    layout_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+    surface_animation_.SetTweenType(gfx::Tween::LINEAR_OUT_SLOW_IN);
   }
   FavoritesDropZone(const FavoritesDropZone&) = delete;
   FavoritesDropZone& operator=(const FavoritesDropZone&) = delete;
-  ~FavoritesDropZone() override { reveal_animation_.Stop(); }
+  ~FavoritesDropZone() override {
+    surface_reveal_timer_.Stop();
+    layout_animation_.Stop();
+    surface_animation_.Stop();
+  }
 
   void SetOpen(bool open, bool animate) {
     if (open_ == open) {
       return;
     }
     open_ = open;
+    surface_reveal_timer_.Stop();
 
-    const bool should_animate = animate &&
-                                gfx::Animation::ShouldRenderRichAnimation() &&
+    const bool rich_animation = gfx::Animation::ShouldRenderRichAnimation() &&
                                 !gfx::Animation::PrefersReducedMotion();
+    if (!open && !animate && rich_animation) {
+      CreateCommitFadeGhost();
+      SnapTo(false);
+      return;
+    }
+
+    const bool should_animate = animate && rich_animation;
     if (!should_animate) {
-      reveal_animation_.Reset(open ? 1.0 : 0.0);
-      SetVisible(open);
-      UpdateReveal();
+      SnapTo(open);
       return;
     }
 
     if (open) {
       SetVisible(true);
-      reveal_animation_.Show();
+      layout_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+      layout_animation_.SetSlideDuration(base::Milliseconds(
+          kSidebarMetrics.favorites_drop_zone_open_duration_ms));
+      layout_animation_.Show();
+
+      surface_animation_.SetTweenType(gfx::Tween::LINEAR_OUT_SLOW_IN);
+      surface_animation_.SetSlideDuration(base::Milliseconds(std::max(
+          1, kSidebarMetrics.favorites_drop_zone_open_duration_ms -
+                 kSidebarMetrics.favorites_drop_zone_surface_delay_ms)));
+      if (surface_animation_.GetCurrentValue() > 0.0) {
+        surface_animation_.Show();
+      } else {
+        surface_reveal_timer_.Start(
+            FROM_HERE,
+            base::Milliseconds(
+                kSidebarMetrics.favorites_drop_zone_surface_delay_ms),
+            base::BindOnce(&FavoritesDropZone::StartSurfaceReveal,
+                           base::Unretained(this)));
+      }
     } else {
-      reveal_animation_.Hide();
+      layout_animation_.SetTweenType(gfx::Tween::FAST_OUT_LINEAR_IN);
+      layout_animation_.SetSlideDuration(base::Milliseconds(
+          kSidebarMetrics.favorites_drop_zone_close_duration_ms));
+      surface_animation_.SetTweenType(gfx::Tween::FAST_OUT_LINEAR_IN);
+      surface_animation_.SetSlideDuration(base::Milliseconds(
+          kSidebarMetrics.favorites_drop_zone_close_duration_ms));
+      layout_animation_.Hide();
+      surface_animation_.Hide();
     }
   }
 
@@ -400,90 +593,66 @@ class FavoritesDropZone : public views::View, public gfx::AnimationDelegate {
         2 * kSidebarMetrics.section_horizontal_inset);
     return gfx::Size(
         width, base::ClampRound(kSidebarMetrics.favorites_drop_zone_height *
-                                reveal_animation_.GetCurrentValue()));
+                                layout_animation_.GetCurrentValue()));
   }
 
-  void AnimationProgressed(const gfx::Animation*) override { UpdateReveal(); }
+  void AnimationProgressed(const gfx::Animation* animation) override {
+    UpdateReveal(animation == &layout_animation_);
+  }
 
-  void AnimationEnded(const gfx::Animation*) override {
-    UpdateReveal();
-    if (reveal_animation_.GetCurrentValue() == 0.0) {
+  void AnimationEnded(const gfx::Animation* animation) override {
+    UpdateReveal(animation == &layout_animation_);
+    if (!open_ && layout_animation_.GetCurrentValue() == 0.0) {
       SetVisible(false);
     }
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    gfx::RectF card(GetLocalBounds());
-    card.Inset(0.5f);
-    const float radius =
-        static_cast<float>(kSidebarMetrics.favorites_dock_corner_radius);
-
-    cc::PaintFlags fill;
-    fill.setAntiAlias(true);
-    fill.setColor(SkColorSetARGB(48, 54, 93, 85));
-    canvas->DrawRoundRect(card, radius, fill);
-
-    cc::PaintFlags stroke;
-    stroke.setAntiAlias(true);
-    stroke.setStyle(cc::PaintFlags::kStroke_Style);
-    stroke.setStrokeWidth(1.25f);
-    stroke.setColor(SkColorSetARGB(72, 255, 255, 255));
-    const float intervals[] = {3.5f, 3.5f};
-    stroke.setPathEffect(cc::PathEffect::MakeDash(intervals, 2, 0));
-    canvas->DrawRoundRect(card, radius, stroke);
-
-    const gfx::PointF star_center(card.CenterPoint().x(), card.y() + 22.0f);
-    cc::PaintFlags badge;
-    badge.setAntiAlias(true);
-    badge.setColor(SkColorSetARGB(38, 255, 255, 255));
-    canvas->DrawCircle(star_center, 10.0f, badge);
-
-    SkPathBuilder star;
-    for (int i = 0; i < 5; ++i) {
-      const float angle = static_cast<float>(i) * 4.0f * 3.14159265f / 5.0f -
-                          3.14159265f / 2.0f;
-      const gfx::PointF p(star_center.x() + 5.5f * std::cos(angle),
-                          star_center.y() + 5.5f * std::sin(angle));
-      if (i == 0) {
-        star.moveTo(p.x(), p.y());
-      } else {
-        star.lineTo(p.x(), p.y());
-      }
-    }
-    star.close();
-    cc::PaintFlags star_paint;
-    star_paint.setAntiAlias(true);
-    star_paint.setColor(SkColorSetARGB(210, 255, 255, 255));
-    canvas->DrawPath(star.detach(), star_paint);
-
-    gfx::FontList title_font = gfx::FontList().Derive(
-        -1, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM);
-    gfx::FontList subtitle_font = gfx::FontList().Derive(
-        -3, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL);
-
-    const int text_width = std::max(0, width() - 24);
-    gfx::Rect title_bounds(12, static_cast<int>(star_center.y()) + 14,
-                           text_width, 16);
-    gfx::Rect subtitle_bounds(12, title_bounds.bottom() + 2, text_width, 28);
-    canvas->DrawStringRectWithFlags(u"Favorites로 끌어다 놓기", title_font,
-                                    SkColorSetARGB(230, 255, 255, 255),
-                                    title_bounds,
-                                    gfx::Canvas::TEXT_ALIGN_CENTER);
-    canvas->DrawStringRectWithFlags(
-        u"자주 쓰는 사이트와 앱을 가까이 둡니다", subtitle_font,
-        SkColorSetARGB(160, 255, 255, 255), subtitle_bounds,
-        gfx::Canvas::TEXT_ALIGN_CENTER | gfx::Canvas::MULTI_LINE);
+    PaintFavoritesDropZoneSurface(canvas, GetLocalBounds(),
+                                  *GetColorProvider());
   }
 
  private:
-  void UpdateReveal() {
+  void StartSurfaceReveal() {
+    if (open_) {
+      surface_animation_.Show();
+    }
+  }
+
+  void SnapTo(bool open) {
+    layout_animation_.Reset(open ? 1.0 : 0.0);
+    surface_animation_.Reset(open ? 1.0 : 0.0);
+    SetVisible(open);
+    UpdateReveal(true);
+  }
+
+  void CreateCommitFadeGhost() {
+    if (!parent() || bounds().IsEmpty() || !GetVisible()) {
+      return;
+    }
+    const float opacity = layer()->opacity();
+    if (opacity <= 0.0f) {
+      return;
+    }
+    std::unique_ptr<views::View> ghost =
+        std::make_unique<FavoritesDropZoneGhost>(bounds(), opacity);
+    auto* ghost_ptr = static_cast<FavoritesDropZoneGhost*>(ghost.get());
+    parent()->AddChildView(std::move(ghost));
+    ghost_ptr->Start();
+  }
+
+  void UpdateReveal(bool preferred_size_changed) {
     layer()->SetOpacity(
-        static_cast<float>(reveal_animation_.GetCurrentValue()));
-    PreferredSizeChanged();
+        static_cast<float>(surface_animation_.GetCurrentValue()));
+    if (preferred_size_changed) {
+      PreferredSizeChanged();
+    }
   }
 
   bool open_ = false;
-  gfx::SlideAnimation reveal_animation_{this};
+  gfx::SlideAnimation layout_animation_{this};
+  gfx::SlideAnimation surface_animation_{this};
+  base::OneShotTimer surface_reveal_timer_;
 };
 
 BEGIN_METADATA(FavoritesDropZone)

@@ -27,8 +27,9 @@ Electron, CEF, `<webview>`를 사용하지 않으며 탭과 페이지는 실제
 
 [`chromium-overlay/`](chromium-overlay/)에는 동일한 native vertical-tab 기본값을
 upstream Chromium checkout에 적용하는 최소 source patch와 GN 설정을 둔다.
-macOS 26에서는 Chromium의 native `GlassFrame` 합성을 실행 시 활성화해 웹
-콘텐츠를 제외한 프레임, 툴바, Tab sidebar가 뒤 배경을 비추도록 한다.
+macOS 26에서는 Chromium의 native `GlassFrame` 합성이 Yee 제품 기본값으로
+활성화된다. 실행 스크립트는 시각 정책이나 테마를 강제하지 않으며, 지원되지 않는
+플랫폼과 시스템의 ‘투명도 줄이기’ 환경은 테마 기반 불투명 셸로 전환한다.
 
 ## Local Chromium build
 

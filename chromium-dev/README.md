@@ -175,12 +175,15 @@ macOS and prevent a nearly-full volume from failing late in the workflow.
 `build.sh`로 `chrome`을 증분 링크한다. PowerShell에서는 동일하게
 `build-ui.ps1`을 사용한다.
 
-`run.sh`는 macOS 26에서 Chromium의 native `GlassFrame`과 Yee의 옅은 민트
-theme seed를 활성화한다. native material은 vertical Tab sidebar에 한정하지 않고
-창 전체를 받치며, Yee의 배경 코드는 지원 환경에서 불투명 바탕 대신 낮은 농도의
-민트 tint를 그린다. 지원되지 않는 환경은 기존 단색 바탕으로 자동 전환된다. 이
-효과는 실제 `WebContents`가 차지하지 않는 브라우저 UI 표면에서 드러난다. Light
-tint는 38%, expand-on-hover 표면은 72%와 18px blur로 시작해 뒤 배경이 읽히도록 한다.
+`run.sh`는 프로필과 개발용 lifecycle 인자만 전달하며 Glass, 색상, 투명도나
+테마를 지정하지 않는다. macOS 26의 native `GlassFrame`은 Yee 코드의 제품
+기본값이고 vertical Tab sidebar에 한정하지 않고 창 전체를 받친다. Yee 배경은
+현재 Chromium frame theme 색을 사용하며 native tint와 Views tint를 합성해 초기
+pilot과 같은 Light 약 43%, Dark 약 74%의 셸 불투명도를 만든다. macOS의
+‘투명도 줄이기’가 켜졌거나
+Glass가 지원되지 않는 Windows·Linux에서는 같은 테마 색을 불투명하게 그린다.
+따라서 `run.sh`, Finder/Dock 직접 실행과 테스트 실행의 시각 결과가 같다.
+이 효과는 실제 `WebContents`가 차지하지 않는 브라우저 UI 표면에서만 드러난다.
 Yee Shell은 직접 실행할 때도 기본으로 켜진다. vertical tab 내용은 후속
 sidebar UI를 위한 자리로 유지하고, Titlebar·Context·Status·Sidebar 구획을 표시한다. 중앙
 Runway에는 별도 모형을 그리지 않고 Chromium의 실제 Toolbar를 compact하게

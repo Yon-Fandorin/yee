@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "base/check.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/notreached.h"
@@ -21,6 +22,8 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/ui_base_features.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
@@ -32,10 +35,12 @@
 #include "ui/gfx/shadow_value.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/menus/simple_menu_model.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/widget/widget.h"
 
 namespace {
 
@@ -43,13 +48,12 @@ constexpr char kAgentStatusDemoSwitch[] = "yee-agent-status-demo";
 constexpr char kAgentStatusSwitch[] = "yee-agent-status";
 constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
 
-enum class ShellBackgroundStyle {
-  kSolid,
-  kGlow,
-};
-
-constexpr SkColor kSolidShellColor = SkColorSetRGB(243, 243, 243);
-constexpr SkColor kGlowShellTint = SkColorSetARGB(22, 225, 235, 232);
+// Restore the pilot's original material strength while keeping both layers
+// theme-derived. Native tint at 38%/72% plus Yee's 22/255 surface tint yields
+// approximately 43% light and 74% dark effective opacity.
+constexpr double kNativeGlassTintOpacityLight = 0.38;
+constexpr double kNativeGlassTintOpacityDark = 0.72;
+constexpr int kGlassSurfaceTintAlpha = 22;
 constexpr int kShellMenuIconSize = 16;
 
 enum class ShellCreateCommand {
@@ -58,14 +62,9 @@ enum class ShellCreateCommand {
   kChat,
 };
 
-ShellBackgroundStyle GetShellBackgroundStyle() {
-  return features::IsGlassFrameEnabled() ? ShellBackgroundStyle::kGlow
-                                         : ShellBackgroundStyle::kSolid;
-}
-
 class YeeShellBackground : public views::Background {
  public:
-  explicit YeeShellBackground(ShellBackgroundStyle style) : style_(style) {}
+  YeeShellBackground() = default;
   YeeShellBackground(const YeeShellBackground&) = delete;
   YeeShellBackground& operator=(const YeeShellBackground&) = delete;
   ~YeeShellBackground() override = default;
@@ -76,12 +75,26 @@ class YeeShellBackground : public views::Background {
       return;
     }
 
-    // Native glass supplies the blur and desktop sampling. Yee owns the visual
-    // treatment above it: a restrained mint wash when glass is available and
-    // the existing opaque shell color everywhere else.
-    canvas->FillRect(bounds, style_ == ShellBackgroundStyle::kGlow
-                                 ? kGlowShellTint
-                                 : kSolidShellColor);
+    const ui::ColorProvider* const color_provider = view->GetColorProvider();
+    CHECK(color_provider);
+    const views::Widget* const widget = view->GetWidget();
+    const bool is_active = !widget || widget->IsActive();
+    SkColor shell_color = color_provider->GetColor(
+        is_active ? ui::kColorFrameActive : ui::kColorFrameInactive);
+
+    const ui::NativeTheme* const native_theme = view->GetNativeTheme();
+    const bool use_glass =
+        is_active && features::IsGlassFrameEnabled() && native_theme &&
+        !native_theme->prefers_reduced_transparency();
+    if (use_glass) {
+      shell_color = SkColorSetA(shell_color, kGlassSurfaceTintAlpha);
+    }
+
+    // The native material supplies blur and desktop sampling on supported
+    // macOS versions. Yee supplies the theme tint and opacity above it. Other
+    // platforms, inactive windows, and reduced-transparency mode paint the
+    // same theme color fully opaque.
+    canvas->FillRect(bounds, shell_color);
     const views::View* const content_outline =
         view->GetViewByID(yee::kContentOutlineViewId);
     if (!content_outline) {
@@ -112,8 +125,6 @@ class YeeShellBackground : public views::Background {
                           content_outline_flags);
   }
 
- private:
-  const ShellBackgroundStyle style_;
 };
 
 class YeeContentOutlineView : public views::View {
@@ -353,8 +364,29 @@ bool UsesExpandedSidebarPresentation() {
   return IsShellEnabled();
 }
 
+bool ShouldPrioritizeSidebarTabDrag(int dragged_tab_count,
+                                    int source_tab_count,
+                                    bool is_group_drag,
+                                    bool uses_vertical_tab_strip) {
+  return UsesExpandedSidebarPresentation() && uses_vertical_tab_strip &&
+         !is_group_drag && dragged_tab_count == 1 && source_tab_count == 1;
+}
+
 std::unique_ptr<views::Background> CreateShellBackground() {
-  return std::make_unique<YeeShellBackground>(GetShellBackgroundStyle());
+  return std::make_unique<YeeShellBackground>();
+}
+
+SkColor ResolveShellContrastBackground(
+    const ui::ColorProvider& color_provider) {
+  // Both native tint and Yee's overlay use this color, so their composition
+  // resolves to the same opaque contrast anchor without sampling desktop
+  // pixels. This keeps text contrast stable while a glass window moves.
+  return color_provider.GetColor(ui::kColorFrameActive);
+}
+
+double GetNativeGlassTintOpacity(bool is_dark_mode) {
+  return is_dark_mode ? kNativeGlassTintOpacityDark
+                      : kNativeGlassTintOpacityLight;
 }
 
 std::unique_ptr<views::View> CreateContentOutlineView() {

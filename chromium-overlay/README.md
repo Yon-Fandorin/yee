@@ -135,10 +135,15 @@ Content boundary after user resizing; collapsed mode returns to the compact
 default margin.
 
 Windows cannot use Chromium's native `GlassFrame`, which is restricted to
-macOS 26. The Yee overlay therefore paints the latest Windows pilot's neutral
-`#f3f3f3` Fluent surface below Chromium's real controls. The existing 18px
-Views compositor blur remains scoped to the floating tab-sidebar state; the
-pinned shell and content gutter use one continuous Windows background.
+macOS 26. Glass is a compiled Yee product default rather than a launcher flag,
+and the launch scripts do not force a theme seed. On supported macOS systems,
+the native frame tint and Yee's theme-derived Views tint restore the pilot's
+original material strength: approximately 43% effective opacity in light mode
+and 74% in dark mode. Reduced-transparency mode disables
+the native material and uses the same frame color opaquely. Windows and Linux
+also paint their current theme frame color as an opaque shell. The existing
+18px Views compositor blur remains scoped to the floating tab-sidebar state;
+the pinned shell and content gutter use one continuous platform background.
 
 The latest pilot uses one compact Toolbar instead of a second trailing status
 surface. Agent activity is a native 30 DIP toolbar button beside New Tab, so
