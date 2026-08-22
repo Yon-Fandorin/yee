@@ -14,18 +14,19 @@ Window Frame
 ├─ Title Bar
 │  ├─ Sidebar Header [Sidebar Column]
 │  │  ├─ Window Controls Safe Area [leading platform controls]
-│  │  └─ Shell Controls
-│  │     ├─ Sidebar Toggle
+│  │  └─ Sidebar Header Controls
 │  │     ├─ New Tab
 │  │     └─ Agent Control
-│  ├─ Browser Toolbar [Content Column]
-│  │  ├─ Navigation Controls
-│  │  │  ├─ Back
-│  │  │  ├─ Forward
-│  │  │  └─ Reload
-│  │  ├─ Omnibox
-│  │  ├─ Extension Dock
-│  │  └─ Toolbar Actions
+│  ├─ Browser Surface Header [Content Column]
+│  │  └─ Browser Toolbar
+│  │     ├─ Sidebar Toggle
+│  │     ├─ Navigation Controls
+│  │     │  ├─ Back
+│  │     │  ├─ Forward
+│  │     │  └─ Reload
+│  │     ├─ Omnibox
+│  │     ├─ Extension Dock
+│  │     └─ Toolbar Actions
 │  └─ Window Controls Safe Area [trailing platform controls]
 └─ Browser Body
    ├─ Tab Sidebar [Sidebar Column]
@@ -36,8 +37,9 @@ Window Frame
    │  ├─ Agent Activity
    │  └─ Context Switcher
    └─ Content Column
-      ├─ Content Gutter
-      └─ Browser Content
+      ├─ Content Gutter [outside]
+      └─ Browser Surface
+         └─ Browser Content
 ```
 
 이 구조는 정보 관계를 설명한다. Context Switcher나 Agent Control의 최종 위치는
@@ -49,22 +51,25 @@ Window Frame
 | --- | --- | --- |
 | **Sidebar Column** | Sidebar Header와 Tab Sidebar가 공유하는 고정 열 | 펼쳐진 상태에서 `Sidebar Header width = Tab Sidebar width` |
 | **Content Column** | Browser Toolbar와 Browser Content가 공유하는 가변 열 | Sidebar Column 다음부터 창 오른쪽 Safe Area 전까지 확장 |
-| **Sidebar Header** | Shell Controls가 배치되는 Sidebar Column의 상단 영역 | Sidebar Column과 동일한 폭 |
+| **Sidebar Header** | New Tab·Agent Control이 배치되는 Sidebar Column의 상단 영역 | Sidebar Column과 동일한 폭 |
 
 ```text
 sidebar_header_width = tab_sidebar_width = sidebar_column_width
 content_column_start_x = window_left + sidebar_column_width
-browser_toolbar_start_x = browser_content_start_x
+browser_surface_start_x = browser_toolbar_start_x
+                        = browser_content_start_x
                         = content_column_start_x + content_gutter
 omnibox_start_x = browser_toolbar_start_x
+                 + sidebar_toggle_width
                  + navigation_controls_width + navigation_omnibox_gap
 ```
 
-`Content Gutter`는 Sidebar Column의 폭에 포함하지 않는다. Content Column 안쪽에서
-Browser Content 둘레에 적용하며, 상단 간격은 Omnibox의 bottom inset과 공유한다.
-Omnibox는 Navigation Controls 다음에 놓이므로 Browser Content와 직접 정렬하지
-않는다. Collapsed Edge Rail은 페이지 폭을 줄이지 않는 가장자리 target이고 Sidebar
-Flyout은 Browser Content 위에 표시된다.
+`Content Gutter`는 Sidebar Column의 폭에 포함하지 않는다. 결합된 Browser
+Surface의 바깥에 적용한다. Omnibox는 Sidebar Toggle과 Navigation Controls 다음에
+놓이므로 Browser Content와 직접 정렬하지 않는다. Collapsed Edge Rail은 페이지
+폭을 줄이지 않는 가장자리 target이고 Sidebar Flyout은 Browser Content 위에 표시된다.
+상단에서도 Content Gutter는 Browser Surface 바깥 공간이다. 따라서 Omnibox는 Title
+Bar 전체가 아니라 gutter 아래의 Browser Surface Header 안에서 수직 중앙 정렬한다.
 
 ## 2. Window Frame과 Title Bar
 
@@ -72,7 +77,7 @@ Flyout은 Browser Content 위에 표시된다.
 | --- | --- | --- |
 | **Window Frame** | OS 창과 Yee 셸을 포함하는 최외곽 창 구조 | `BrowserFrameView`, native window frame |
 | **Title Bar** | 창 최상단의 Window Controls와 Browser Toolbar가 놓이는 영역 | native/custom title bar |
-| **Sidebar Header** | Title Bar 안에서 Sidebar Column과 폭을 공유하며 Shell Controls를 담는 영역 | 현재는 `ToolbarView`의 leading segment |
+| **Sidebar Header** | Title Bar 안에서 Sidebar Column과 폭을 공유하며 New Tab·Agent Control을 담는 영역 | 현재는 `ToolbarView`의 leading segment |
 | **Window Controls** | 닫기·최소화·확대 또는 최대화 버튼의 통칭 | macOS Traffic Light Buttons, Windows/Linux Caption Buttons |
 | **Window Controls Safe Area** | Window Controls와 제품 UI가 겹치지 않도록 프레임이 예약한 영역 | `BrowserLayoutParams.leading_exclusion`, `trailing_exclusion` |
 | **Window Controls Gutter** | Safe Area와 첫 제품 컨트롤 사이의 의도적인 간격 | toolbar inset 또는 control gap |
@@ -96,13 +101,13 @@ exclusion을 Window Controls Safe Area로 사용한다. 전체화면이나 서�
 
 **Browser Toolbar**는 Content Column 상단에서 탐색 버튼, 주소창과 확장 기능을
 제공하는 인터랙티브한 한 줄이다. Yee에서는 Title Bar 안에 통합되지만 Title Bar
-자체와 같은 말은 아니다. Sidebar 버튼과 Agent 버튼은 인접한 Sidebar Header의
-Shell Controls에 속한다.
+자체와 같은 말은 아니다. Sidebar Toggle은 Browser Toolbar의 첫 컨트롤이고 New
+Tab과 Agent Control은 인접한 Sidebar Header에 남는다.
 
 | 표준 용어 | 의미 | Chromium 대응 |
 | --- | --- | --- |
 | **Browser Toolbar** | Content Column에서 브라우저 탐색과 페이지 기능을 제공하는 상단 컨트롤 행 | 현재 `ToolbarView`의 main segment |
-| **Shell Controls** | Sidebar Header에서 Yee 셸 자체를 제어하는 버튼 묶음 | Sidebar Toggle, New Tab, Agent Control |
+| **Shell Controls** | Yee 셸 자체를 제어하는 버튼의 역할 범주 | Sidebar Toggle, New Tab, Agent Control; 배치는 역할마다 다름 |
 | **Sidebar Toggle** | Tab Sidebar의 pinned/open 상태를 전환하는 버튼 | vertical tab/sidebar toggle |
 | **New Tab** | 현재 Group 또는 기본 위치에 새 브라우저 Tab을 만드는 버튼 | new-tab action |
 | **Agent Control** | Agent 상태를 간결하게 표시하고 상세 화면을 여는 버튼 | Yee agent `ToolbarButton` |
@@ -132,8 +137,10 @@ Shell Controls에 속한다.
 | **Tab** | URL과 `WebContents`에 연결된 실제 브라우저 탭 | `TabStripModel` entry |
 | **Agent Activity** | Agent Task의 상태, 결과와 연결된 Context Tabs를 보여주는 상세 영역 | Yee product UI; runtime 연동 예정 |
 | **Browser Content** | 현재 선택된 Tab의 페이지가 렌더링되는 표면 | `MultiContentsView`, `WebContents` |
-| **Content Gutter** | Browser Content와 셸 사이에 남기는 6 DIP 외부 간격 | Yee content layout inset |
-| **Content Boundary** | Browser Content와 Gutter의 경계 | 고정 12 DIP 곡률, theme-derived 1 DIP outline과 얕은 shadow |
+| **Browser Surface** | Browser Toolbar와 Browser Content를 하나의 외곽 경계로 묶는 표면 | Yee backing + `ToolbarView` + `MultiContentsView` |
+| **Browser Surface Header** | Browser Surface 안에서 Sidebar Toggle, 탐색과 Omnibox를 담는 상단 띠 | `ToolbarView`의 Content Column segment |
+| **Content Gutter** | Browser Surface와 셸 사이에 남기는 6 DIP 외부 간격 | Yee content layout inset |
+| **Browser Surface Boundary** | Browser Surface와 Gutter의 경계 | 고정 12 DIP 곡률, theme-derived 1 DIP outline과 얕은 shadow |
 | **Chrome Surface** | Title Bar, Tab Sidebar와 Gutter가 공유하는 브라우저 셸 재질 | Browser chrome background |
 
 제품 문서에서는 전체 영역을 `Tab Sidebar`라고 부른다. Chromium 코드나 클래스와

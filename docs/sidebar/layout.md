@@ -29,7 +29,8 @@ Favorites에도 `FAVORITES` 라벨을 두지 않는다. 아이콘 독이 곧 그
 Favorites와 Tab 목록 사이에 1px 구분선을 두지 않는다. 독 칸의 dimmed 카드가
 영역을 나눈다.
 
-Title Bar의 New Tab / Sidebar Toggle을 Sidebar 안쪽에 다시 두지 않는다.
+Title Bar의 New Tab과 Agent Control은 Sidebar Header에 남기되 Sidebar 본문 안에
+다시 두지 않는다. Sidebar Toggle은 Browser Surface Header의 첫 컨트롤로 옮긴다.
 
 ## 세 상태
 

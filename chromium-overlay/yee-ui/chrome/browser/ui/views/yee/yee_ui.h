@@ -6,9 +6,13 @@
 #define CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_
 
 #include <memory>
+#include <optional>
+#include <string_view>
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/scoped_refptr.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/button.h"
 
@@ -25,10 +29,7 @@ class View;
 
 namespace yee {
 
-inline constexpr int kContentOutlineViewId = 92003;
-inline constexpr int kShellControlSize = 30;
-inline constexpr int kShellControlCornerRadius = 8;
-inline constexpr int kShellControlHorizontalMargin = 1;
+inline constexpr int kCombinedSurfaceOutlineViewId = 92003;
 
 // Geometry owned by Yee's vertical sidebar presentation. Keeping these values
 // together lets Chromium's native tab and group views consume one stable
@@ -38,6 +39,35 @@ struct SidebarMetrics {
   int collapsed_width = 8;
   int content_gutter = 6;
   int content_corner_radius = 12;
+  int titlebar_height = 48;
+  int toolbar_height = 40;
+  int toolbar_leading_inset = 10;
+  int toolbar_trailing_gap = 8;
+  int toolbar_interior_inset = 4;
+  int location_bar_margin = 5;
+  int location_bar_focus_stroke_inset = 2;
+  int sidebar_header_control_count = 2;
+  int shell_control_size = 30;
+  int shell_control_corner_radius = 8;
+  int shell_control_horizontal_margin = 1;
+
+  // The combined Browser Surface starts below the shell gutter, so its
+  // Header is shorter than the window titlebar. Center the native Toolbar in
+  // that visible Header instead of centering it against the window edge.
+  constexpr int browser_surface_header_height() const {
+    return titlebar_height - content_gutter;
+  }
+  constexpr int titlebar_toolbar_top_inset() const {
+    return (titlebar_height - toolbar_height) / 2;
+  }
+  constexpr int browser_surface_toolbar_top_inset() const {
+    return content_gutter +
+           (browser_surface_header_height() - toolbar_height) / 2;
+  }
+  constexpr int browser_surface_toolbar_offset() const {
+    return browser_surface_toolbar_top_inset() -
+           titlebar_toolbar_top_inset();
+  }
 
   int tab_icon_design_width = 16;
   int tab_row_height = 32;
@@ -111,7 +141,48 @@ enum class ShellCreateAction {
 using ShellCreateCallback =
     base::RepeatingCallback<void(ShellCreateAction action, int event_flags)>;
 
-std::unique_ptr<views::Background> CreateShellBackground();
+using PageSurfaceColorCallback =
+    base::RepeatingCallback<std::optional<SkColor>()>;
+
+struct BrowserSurfaceHeaderColors {
+  SkColor primary;
+  SkColor secondary;
+  SkColor disabled;
+};
+
+// Uses the page's rendered surface color as the Browser Surface Header, falling
+// back to the current Toolbar color when the page does not provide one.
+SkColor ResolveBrowserSurfaceHeaderColor(
+    const ui::ColorProvider& color_provider,
+    std::optional<SkColor> page_surface_color);
+
+// Derives readable text and control colors from the exact page-aware Header
+// surface. Primary and secondary roles keep minimum contrast guarantees while
+// disabled controls intentionally remain quieter.
+BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
+    SkColor surface_color);
+
+// Returns a quiet one-DIP focus stroke derived from the page-aware Header.
+// Light surfaces prefer a darker stroke; surfaces too dark to distinguish a
+// darker stroke switch to the light endpoint to retain non-text contrast.
+SkColor ResolveBrowserSurfaceFocusStrokeColor(SkColor surface_color);
+
+// Paints the compact Omnibox's full-height surface while keeping its optional
+// one-DIP focus stroke inset from the control edge. This makes focus read as an
+// internal state without changing native bounds or hit testing.
+std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
+    SkColor background_color,
+    SkColor focus_stroke_color);
+
+// Wraps the browser theme with page-aware neutral Omnibox result colors. The
+// popup remains Chromium-owned; only its surface palette follows Yee's Header.
+scoped_refptr<ui::ColorProviderKey::ThemeInitializerSupplier>
+CreateBrowserSurfaceOmniboxPopupTheme(
+    ui::ColorProviderKey::ThemeInitializerSupplier* base_theme,
+    SkColor surface_color);
+
+std::unique_ptr<views::Background> CreateShellBackground(
+    PageSurfaceColorCallback page_surface_color_callback);
 
 // Returns an opaque, theme-resolved proxy for the shell surface. Translucent
 // Yee surfaces use this to calculate contrast without sampling desktop pixels.
@@ -122,7 +193,17 @@ SkColor ResolveShellContrastBackground(const ui::ColorProvider& color_provider);
 // alpha required to reach the product's effective shell opacity.
 double GetNativeGlassTintOpacity(bool is_dark_mode);
 
-std::unique_ptr<views::View> CreateContentOutlineView();
+std::unique_ptr<views::View> CreateCombinedSurfaceOutlineView(
+    PageSurfaceColorCallback page_surface_color_callback);
+
+// Non-interactive resting presentation layered over Chromium's real Omnibox.
+// The native editor remains mounted underneath and is revealed on focus.
+std::unique_ptr<views::View> CreateOmniboxRestingTextView();
+void UpdateOmniboxRestingTextView(views::View& view,
+                                  std::u16string_view title,
+                                  std::u16string_view origin,
+                                  SkColor background_color,
+                                  bool visible);
 
 void ApplyShellControlStyle(ToolbarButton& button);
 

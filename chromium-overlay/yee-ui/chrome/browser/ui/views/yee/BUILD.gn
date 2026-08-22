@@ -6,6 +6,7 @@ assert(is_win || is_mac || is_linux || is_chromeos)
 
 source_set("yee_ui") {
   public = [
+    "browser_surface_color_controller.h",
     "favorites.h",
     "group_mark_signals.h",
     "sidebar_sections.h",
@@ -14,6 +15,7 @@ source_set("yee_ui") {
     "yee_ui.h",
   ]
   sources = [
+    "browser_surface_color_controller.cc",
     "favorites.cc",
     "group_mark_signals.cc",
     "sidebar_sections.cc",
@@ -35,10 +37,13 @@ source_set("yee_ui") {
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/toolbar",
     "//components/tabs:public",
+    "//components/viz/common",
     "//components/vector_icons",
+    "//content/public/browser",
     "//net",
     "//skia",
     "//ui/base",
+    "//ui/color",
     "//ui/compositor",
     "//ui/gfx",
     "//ui/gfx/animation",

@@ -43,14 +43,16 @@ The resulting Chromium checkout changes:
 - `kVerticalTabStripDefaultUncollapsedWidth`: `240` → `244`
 - Chromium product and installer names to `Yee`, producing `Yee.app` on macOS
 - macOS app icon and Chromium product logos to the v8c Yee dinosaur mark
-- a compact native `ToolbarView` with sidebar toggle, new tab, agent activity,
+- a compact native `ToolbarView` whose sidebar header keeps New Tab and agent
+  activity while the combined content header starts with the sidebar toggle,
   navigation, Omnibox, and extension dock
 - an isolated `//chrome/browser/ui/views/yee:yee_ui` source target for Yee's
-  visual substrate, content outline, and agent activity control
+  visual substrate, combined surface outline, and agent activity control
 - a frame-derived window-controls safe area that keeps macOS traffic lights,
   Windows caption buttons, and Linux client-side decorations outside the Yee
   toolbar without platform-specific shell padding
-- a guttered `MultiContentsView` pane with one fixed content-corner token
+- a guttered combined browser surface joining Toolbar and `MultiContentsView`
+  under one fixed outer-corner token
 - a pinned or edge-hovering native vertical tab sidebar whose real pinned
   tabs, bookmarks entry, groups, and tabs match the pilot section rhythm
 - no duplicate stock vertical-tab launchers or full-shell toolbar separators;
@@ -63,13 +65,13 @@ and Chromium's lightweight ICNS packer. Windows uses `System.Drawing` to
 generate the multi-resolution `chromium.ico` and bundled product-logo PNGs.
 Generated Chromium assets stay in the local checkout rather than this repo.
 
-The Windows shell follows the latest pilot's 48px titlebar and 6px content
-gutter. Tenant/workspace identity is no longer duplicated in the
-titlebar; it belongs to the future sidebar pass. The central runway is
-Chromium's real `ToolbarView`, compactly laid out as
-sidebar toggle, new tab, compact agent activity, back, forward, reload,
-native Omnibox, and extension dock. It does not paint a second
-imitation toolbar over Chromium controls. The
+The Windows shell follows the latest pilot's 48px titlebar and 6px browser
+surface gutter. Tenant/workspace identity is no longer duplicated in the
+titlebar; it belongs to the future sidebar pass. Chromium's real `ToolbarView`
+keeps New Tab and compact agent activity in the Sidebar Header, then starts the
+Browser Surface Header with sidebar toggle, back, forward, reload, native
+Omnibox, and extension dock. It does not paint a second imitation toolbar over
+Chromium controls. The
 existing `MultiContentsView` is retained and placed inside the Browser Content
 region. The Yee shell is the application default so Finder, Dock, and test-tool
 launches share the same composition. `--disable-yee-shell-scaffold` explicitly
@@ -109,30 +111,88 @@ onto Chromium rather than claiming pixel parity. Expanded tabs are 40px tall
 with a title and hostname line, a 28px favicon tile, a 7px radius, and the pilot
 mint active indicator. Real pinned tabs form Favorites, Bookmarks opens the
 real bookmark manager, and groups and tabs continue to use `TabStripModel`.
-The current checkpoint intentionally omits the sidebar Agent section and leaves
-extension, page-status, and site-information icons unchanged. The Omnibox keeps
-its native edit model, security state,
+The current checkpoint intentionally omits the sidebar Agent section. Extension,
+page-status, and site-information controls keep their native behavior; Yee only
+lets the neutral site-information button rest on the shared Header color while
+preserving its hover, focus, warning, and popover states. The Omnibox keeps its
+native edit model, security state,
 suggestions, page actions, and extension integration while using the Windows
-pilot's 36px height and 8px radius. High-contrast mode continues to use
+pilot's compact height and the shared 12px Browser Surface radius. High-contrast mode continues to use
 Chromium's system-derived colors and border behavior. Pixel parity remains an
 iterative capture checkpoint across macOS and Windows.
 
 The Yee composition hides Chromium's stock vertical-tab top launcher row and
-bottom New Tab row because Sidebar and New Tab already live in the 48 DIP
-titlebar. It also suppresses the native Toolbar dividers that would otherwise
-draw unmatched vertical rules. The content and sidebar begin directly below
-that titlebar at 48 DIP; the page keeps a 6 DIP gutter on its leading, trailing,
-and bottom sides. A transparent, non-interactive composited sibling paints a
-theme-derived one-DIP outline above opaque WebContents. The outline, page
-backing, and renderer clip share the same fixed 12 DIP corner token.
+bottom New Tab row because New Tab already lives in the Sidebar Header. The
+Sidebar Toggle moves across the column spacer to become the first control in
+the Browser Surface Header. The combined surface begins at a 6 DIP top and
+leading inset, spans Toolbar and WebContents, and retains 6 DIP trailing and
+bottom gutters. A transparent, non-interactive composited sibling paints one
+theme-derived outer outline plus a one-DIP Toolbar/Content separator above the
+opaque WebContents. The outer surface owns all four 12 DIP corners; the
+WebContents clip shares only the two lower corners.
 
-The refined Windows Omnibox uses the pilot's white paper surface and
-`#dfdfdf` line, interpolating to `#cfcfcf` on hover. Its native focus ring now
-follows the same 8 DIP rounded rectangle instead of Chromium's pill path. When
-the pinned sidebar is expanded, the existing sidebar-width notification also
-updates the Omnibox leading margin so its left edge tracks the real Browser
-Content boundary after user resizing; collapsed mode returns to the compact
-default margin.
+The Browser Surface Header and compact Omnibox use one Yee-owned color
+controller. After a navigation, load, tab switch, or page color change it takes
+small captures of the rendered page's top strip. Navigation never clears the
+last committed Header color: loading samples remain candidates, and only after
+loading stops and the same dominant flat color survives three samples across
+at least 150ms is it committed once. A window without a committed page color
+keeps the current Toolbar color during that gate. A user scroll starts a
+bounded 140ms sampling burst instead of capturing every frame; two stable
+consecutive samples are still required, and a large change converges through
+an intermediate color so the Header does not flash. Non-flat or unstable page
+samples fall back after the bounded attempts to the active page's CSS
+background, then its published theme color, and finally the current Toolbar
+color. The selected page color is used without lightness compensation so the Header
+remains visually continuous with the rendered page; resting text derives its
+foreground from that exact surface. Resting Omnibox text is a non-interactive
+origin/page-title layer over the real native editor: the origin drops a leading
+`www.`, stays the primary label, and is separated from the one-level-quieter
+page title by a dedicated one-pixel rule rather than a text glyph. The editor
+returns immediately on click or keyboard focus and unelides the full URL on
+the first pointer activation. Address text, the quieter title, site/page
+actions, and compact toolbar controls derive primary, secondary, and disabled
+foreground roles from the same resolved surface with minimum contrast floors;
+semantic security and product colors continue to win. Hover adds only a 2%
+contrast tint and there is no persistent outline. The 34 DIP Omnibox is centered
+inside the 42 DIP Browser Surface Header with four DIP above and below, rather
+than touching the surface's upper edge. Focus uses a page-aware one-DIP stroke
+inset 2 DIP from the 34 DIP control edge. Its 10 DIP inner curve reads as an
+edit-state indicator while the full-height 12 DIP Omnibox surface and native
+hit target remain unchanged. The stroke remains visible while suggestions are
+open without escaping into the gutter, prefers a darker derivative of the
+current Header, and switches light only when a dark surface cannot provide
+three-to-one non-text contrast. The native suggestions popup reuses the
+exact resolved page surface for its neutral background, text, and controls,
+adds only a 6% contrast tint to hover and selected rows, and preserves semantic
+warning and security colors. Because Chromium enables the WebUI Omnibox popup
+by default, the popup presenter's Widget supplies this page-aware color provider
+to the popup WebContents and `ThemeColorsSourceManager` uses that provider when
+generating `chrome://omnibox-popup`'s `colors.css`. A preloaded popup document is
+reloaded once after that source is attached so it cannot retain the last active
+browser's generic palette. Chromium also prewarms the popup Widget before Yee's
+compact-shell mode and active-page surface are available. Immediately before
+showing it, the presenter compares that Widget's captured mode and surface with
+the current contract and rebuilds only the hidden presentation shell when they
+differ; the WebUI contents and logical popup state remain intact. If the page
+surface resolves or changes while suggestions are already visible, the same
+Widget swaps to the current page-aware color provider in place. Chromium's
+color-change listener then refreshes the WebUI `colors.css` while the native
+frame, results background, text, and icons converge without closing or flashing
+the popup. Styling only
+the legacy Views popup does not satisfy this contract. Its transparent Omnibox
+cutout receives the actual
+compact radius instead of recomputing Chromium's pill radius, so focus no longer
+appears to punch a white capsule through the panel. The popup extends 2 DIP
+to the Omnibox's sides and bottom, keeps its top flush with the Browser Surface
+instead of breaking through it, and starts results 2 DIP below the control. Its
+cutout leaves the Omnibox's page-aware one-DIP focus outline visible, and its
+native shadow drops to MD elevation 4. The compact-shell opacity transition uses
+140ms easing rather than Chromium's
+abrupt 82ms default. When the pinned sidebar is expanded, the existing sidebar-width
+notification also updates the Omnibox leading margin so its left edge tracks
+the real Browser Content boundary after user resizing; collapsed mode returns
+to the compact default margin.
 
 Windows cannot use Chromium's native `GlassFrame`, which is restricted to
 macOS 26. Glass is a compiled Yee product default rather than a launcher flag,
@@ -175,20 +235,23 @@ affordance through `BrowserFrameViewWin` hit testing inside the painted edge.
 Maximized, fullscreen, and system high-contrast windows keep Chromium's stock
 Windows frame calculations.
 
-The content boundary follows `MultiContentsView`'s actual laid-out bounds
-instead of recomputing an edge from the nominal sidebar width. A white page
-backing, theme-derived one-DIP outline, quiet 1px/3px shadow, and renderer clip
-share the fixed 12 DIP radius from `yee::kSidebarMetrics`. Automatically
+The combined Browser Surface follows `MultiContentsView`'s actual laid-out
+horizontal and bottom bounds, extending upward to the shared 6 DIP shell inset.
+Its theme-resolved Toolbar backing, one-DIP outer outline, one-DIP internal
+separator, and quiet 1px/3px shadow use `yee::kSidebarMetrics`. The renderer
+clip uses the same fixed 12 DIP radius only on the lower corners, so Toolbar and
+page read as one outer shape rather than two stacked cards. Automatically
 following native window corners is deferred until macOS Zoom and
 Windows/Linux maximize, fullscreen, and tiling states can be verified against
 the real WebContents compositor without platform-specific presentation hacks.
 
 The layout now has one geometry owner. Chromium's final content bounds drive
-the animated sidebar surface and rounded page backing. The titlebar does
-not replay vertical-tab geometry, so user-resized or restored tab widths cannot
-shift the Toolbar. The latest pilot moves tenant/workspace identity into the
-sidebar footer; its obsolete titlebar Context Switcher has been removed from
-the native shell and will be implemented with the sidebar work later.
+the animated sidebar and the combined Browser Surface's horizontal and lower
+edges; the shared shell inset owns its upper edge. The titlebar does not replay
+vertical-tab geometry, so user-resized or restored tab widths cannot shift the
+Toolbar. The latest pilot moves tenant/workspace identity into the sidebar
+footer; its obsolete titlebar Context Switcher has been removed from the native
+shell and will be implemented with the sidebar work later.
 
 The pinned tab sidebar is intentionally transparent over the same frame surface
 as the content gutter.
