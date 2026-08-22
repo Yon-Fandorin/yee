@@ -137,10 +137,16 @@ small captures of the rendered page's top strip. Navigation never clears the
 last committed Header color: loading samples remain candidates, and only after
 loading stops and the same dominant flat color survives three samples across
 at least 150ms is it committed once. A window without a committed page color
-keeps the current Toolbar color during that gate. A user scroll starts a
-bounded 140ms sampling burst instead of capturing every frame; two stable
-consecutive samples are still required, and a large change converges through
-an intermediate color so the Header does not flash. Non-flat or unstable page
+keeps the current Toolbar color during that gate. Each `WebContents` retains
+its last committed surface for its own lifetime. Returning to an already
+sampled tab restores that tab's surface immediately, then verifies it with a
+new sample, instead of showing the previously active tab's color during the
+gate. A user scroll starts a bounded 140ms sampling burst instead of capturing
+every frame; two stable
+consecutive samples are still required. Once a new color is accepted, the
+visible Header follows it with a retargetable 200ms transition; a newer sample
+continues from the currently presented color instead of committing another
+discrete midpoint. Non-flat or unstable page
 samples fall back after the bounded attempts to the active page's CSS
 background, then its published theme color, and finally the current Toolbar
 color. The selected page color is used without lightness compensation so the Header
@@ -168,7 +174,10 @@ adds only a 6% contrast tint to hover and selected rows, and preserves semantic
 warning and security colors. Because Chromium enables the WebUI Omnibox popup
 by default, the popup presenter's Widget supplies this page-aware color provider
 to the popup WebContents and `ThemeColorsSourceManager` uses that provider when
-generating `chrome://omnibox-popup`'s `colors.css`. A preloaded popup document is
+generating `chrome://omnibox-popup`'s `colors.css`. Equal resolved surfaces use
+a process-stable supplier identity, matching Chromium's process-wide
+`ColorProvider` cache lifetime so reopening a popup cannot reuse a stale palette
+through a recycled Widget address. A preloaded popup document is
 reloaded once after that source is attached so it cannot retain the last active
 browser's generic palette. Chromium also prewarms the popup Widget before Yee's
 compact-shell mode and active-page surface are available. Immediately before

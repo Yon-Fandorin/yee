@@ -117,10 +117,15 @@ theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline�
   WebContents 최상단의 얇은 띠를 저해상도로 샘플링한다. navigation 중에는 직전에
   확정한 Header 색을 지우지 않고 새 결과를 candidate로만 유지한다. load가 끝난 뒤
   같은 평면색이 최소 150ms 동안 세 sample 연속 안정적일 때 새 색을 한 번 확정한다.
+  각 WebContents는 마지막으로 확정한 색을 자신의 수명 동안 보관한다. 이미 샘플링한
+  Tab으로 돌아오면 다른 Tab의 색을 유지하지 않고 해당 색을 즉시 복원한 뒤 새 sample로
+  검증한다.
   이전 확정 색이 없는 창은 이 구간에 현재 theme의 `kColorToolbar`를 사용한다. 사용자
   스크롤이 시작되면 매 frame을 캡처하지 않고 약 140ms 간격의 제한된 sample burst를
   실행한다. 연속한 두 결과가 안정적일 때만 현재 viewport 최상단 색으로 전환하고,
-  큰 색 변화는 중간색을 거쳐 반영해 Header가 번쩍이지 않게 한다.
+  확정된 색 사이는 약 200ms 동안 연속 보간한다. 전환 중 새 결과가 확정되면 현재
+  화면에 보이는 색에서 새 목표색으로 이어가며, 중간색을 단계적으로 확정해 보이는
+  계단식 전환은 만들지 않는다.
   bounded attempt 뒤에도 샘플이 이미지·gradient처럼 불균일하거나 안정되지 않으면
   페이지 CSS background, `theme-color`, 현재 theme의 `kColorToolbar` 순서로
   fallback한다. 선택한 페이지 색은
@@ -505,7 +510,8 @@ native 구현은 Chromium의 model, accelerator, theme, focus manager와 accessi
 - [ ] Rest 표시가 `origin | Page title` 위계를 가지며 선행 `www.`는 생략한다.
 - [ ] CSS 문서 배경과 실제 상단 띠가 다른 페이지에서도 Header와 보이는 페이지
       상단 색이 이어지고, 다른 단색 section으로 스크롤하면 약 140ms sampling으로
-      Header·주소·중립 버튼 색이 함께 전환되며 중간 frame에서 깜빡이지 않는다.
+      Header·주소·중립 버튼 색이 약 200ms 동안 함께 연속 전환되며 중간 frame에서
+      계단식 변화나 깜빡임이 없다.
 - [ ] Yee button은 findings count와 usage warning을 button bounds를 바꾸지 않고 표시한다.
 - [ ] Yee button은 모든 폭에서 icon-only이며 accessible name과 OS별 shortcut tooltip을 유지한다.
 - [ ] Yee Hub가 Agent summary와 계정별 remaining/reset/updated 값을 표시하고 quota를 합산하지 않는다.

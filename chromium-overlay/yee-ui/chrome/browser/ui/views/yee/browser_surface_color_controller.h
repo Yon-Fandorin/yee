@@ -9,6 +9,7 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -21,7 +22,9 @@ namespace yee {
 // header follow pages whose painted top band differs from their CSS document
 // background. During navigation the last committed color remains visible until
 // a new candidate survives a short stability gate. A bounded, throttled burst
-// follows a user scroll without capturing every frame.
+// follows a user scroll without capturing every frame; accepted scroll colors
+// are presented through one retargetable transition instead of discrete
+// intermediate commits.
 class BrowserSurfaceColorController : public content::WebContentsObserver {
  public:
   explicit BrowserSurfaceColorController(base::RepeatingClosure color_changed);
@@ -55,6 +58,10 @@ class BrowserSurfaceColorController : public content::WebContentsObserver {
       int generation,
       const content::CopyFromSurfaceResult& result);
   void CommitColor(SkColor color);
+  void StartColorTransition(SkColor target_color);
+  void AdvanceColorTransition();
+  void StopColorTransition();
+  void SetPresentedColor(SkColor color);
   void CommitFallbackIfReady();
   std::optional<SkColor> GetFallbackColor() const;
 
@@ -62,8 +69,13 @@ class BrowserSurfaceColorController : public content::WebContentsObserver {
   base::OneShotTimer sample_timer_;
   base::RepeatingTimer scroll_sample_timer_;
   base::OneShotTimer scroll_sampling_timeout_timer_;
+  base::RepeatingTimer color_transition_timer_;
   std::optional<SkColor> committed_color_;
+  std::optional<SkColor> presented_color_;
   std::optional<SkColor> candidate_color_;
+  std::optional<SkColor> transition_start_color_;
+  std::optional<SkColor> transition_target_color_;
+  base::TimeTicks transition_start_time_;
   int stable_candidate_count_ = 0;
   int sample_attempt_ = 0;
   int generation_ = 0;

@@ -57,6 +57,9 @@ Ask before guessing, especially for:
   changed, otherwise `build.sh`).
 - Confirm in the real Yee app with real tabs. A design mockup page is
   not proof. `file://` fixtures as actual tabs are fine.
+- Before each real-app validation, request a graceful shutdown of every
+  running Yee browser process, wait until it has exited, and then launch the
+  newly built app. Do not validate a new build through an existing process.
 - Do not invent launch URLs. Use `./chromium-dev/run.sh` only with URLs
   the user named.
 

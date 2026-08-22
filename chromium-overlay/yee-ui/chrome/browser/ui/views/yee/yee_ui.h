@@ -10,7 +10,6 @@
 #include <string_view>
 
 #include "base/functional/callback_forward.h"
-#include "base/memory/scoped_refptr.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/gfx/geometry/rect.h"
@@ -65,8 +64,7 @@ struct SidebarMetrics {
            (browser_surface_header_height() - toolbar_height) / 2;
   }
   constexpr int browser_surface_toolbar_offset() const {
-    return browser_surface_toolbar_top_inset() -
-           titlebar_toolbar_top_inset();
+    return browser_surface_toolbar_top_inset() - titlebar_toolbar_top_inset();
   }
 
   int tab_icon_design_width = 16;
@@ -174,11 +172,12 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
     SkColor background_color,
     SkColor focus_stroke_color);
 
-// Wraps the browser theme with page-aware neutral Omnibox result colors. The
-// popup remains Chromium-owned; only its surface palette follows Yee's Header.
-scoped_refptr<ui::ColorProviderKey::ThemeInitializerSupplier>
-CreateBrowserSurfaceOmniboxPopupTheme(
-    ui::ColorProviderKey::ThemeInitializerSupplier* base_theme,
+// Returns a process-stable supplier for page-aware neutral Omnibox result
+// colors. ColorProviderManager uses this address as part of its process-wide
+// cache key, so equal surfaces deliberately reuse the same supplier identity.
+// The popup remains Chromium-owned; only its neutral palette follows Yee's
+// Header.
+ui::ColorProviderKey::InitializerSupplier* GetBrowserSurfaceOmniboxPopupTheme(
     SkColor surface_color);
 
 std::unique_ptr<views::Background> CreateShellBackground(

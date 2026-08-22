@@ -16,6 +16,7 @@
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_user_data.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -32,12 +33,40 @@ constexpr base::TimeDelta kVerificationDelay = base::Milliseconds(75);
 constexpr base::TimeDelta kCaptureTimeout = base::Milliseconds(500);
 constexpr base::TimeDelta kScrollSampleInterval = base::Milliseconds(140);
 constexpr base::TimeDelta kScrollSamplingDuration = base::Milliseconds(1680);
+constexpr base::TimeDelta kScrollColorTransitionDuration =
+    base::Milliseconds(200);
+constexpr base::TimeDelta kColorTransitionFrameInterval =
+    base::Milliseconds(16);
 constexpr int kMaximumSampleAttempts = 5;
 constexpr int kRequiredStablePageSamples = 3;
 constexpr int kRequiredStableScrollSamples = 2;
 constexpr int kMinimumOpaqueAlpha = 230;
 constexpr double kMinimumDominantShare = 0.55;
 constexpr int kMaximumStableChannelDelta = 12;
+
+// Stores the last color that completed Yee's stability gate on this tab. The
+// cache is owned by WebContents so closing a background tab cannot leave a
+// dangling lookup entry, and returning to an already sampled tab can restore
+// its Header without showing another tab's color during the sampling delay.
+class BrowserSurfaceColorCache
+    : public content::WebContentsUserData<BrowserSurfaceColorCache> {
+ public:
+  ~BrowserSurfaceColorCache() override = default;
+
+  std::optional<SkColor> color() const { return color_; }
+  void set_color(SkColor color) { color_ = color; }
+
+ private:
+  explicit BrowserSurfaceColorCache(content::WebContents* web_contents)
+      : content::WebContentsUserData<BrowserSurfaceColorCache>(*web_contents) {}
+
+  friend class content::WebContentsUserData<BrowserSurfaceColorCache>;
+  WEB_CONTENTS_USER_DATA_KEY_DECL();
+
+  std::optional<SkColor> color_;
+};
+
+WEB_CONTENTS_USER_DATA_KEY_IMPL(BrowserSurfaceColorCache);
 
 struct ColorBucket {
   int count = 0;
@@ -77,8 +106,7 @@ std::optional<SkColor> FindDominantFlatColor(const SkBitmap& bitmap) {
   }
 
   const ColorBucket& dominant = buckets[winner];
-  if (considered == 0 ||
-      dominant.count < considered * kMinimumDominantShare) {
+  if (considered == 0 || dominant.count < considered * kMinimumDominantShare) {
     return std::nullopt;
   }
   return SkColorSetRGB(dominant.red / dominant.count,
@@ -87,8 +115,7 @@ std::optional<SkColor> FindDominantFlatColor(const SkBitmap& bitmap) {
 }
 
 bool ColorsAreStable(SkColor first, SkColor second) {
-  const auto channel_delta = [](uint8_t first_channel,
-                                uint8_t second_channel) {
+  const auto channel_delta = [](uint8_t first_channel, uint8_t second_channel) {
     return std::abs(static_cast<int>(first_channel) -
                     static_cast<int>(second_channel));
   };
@@ -102,6 +129,18 @@ SkColor AverageColors(SkColor first, SkColor second) {
   return SkColorSetRGB((SkColorGetR(first) + SkColorGetR(second)) / 2,
                        (SkColorGetG(first) + SkColorGetG(second)) / 2,
                        (SkColorGetB(first) + SkColorGetB(second)) / 2);
+}
+
+SkColor InterpolateColors(SkColor start, SkColor target, double progress) {
+  const auto interpolate_channel = [progress](uint8_t start_channel,
+                                               uint8_t target_channel) {
+    return static_cast<uint8_t>(std::lround(
+        start_channel + (target_channel - start_channel) * progress));
+  };
+  return SkColorSetRGB(
+      interpolate_channel(SkColorGetR(start), SkColorGetR(target)),
+      interpolate_channel(SkColorGetG(start), SkColorGetG(target)),
+      interpolate_channel(SkColorGetB(start), SkColorGetB(target)));
 }
 
 bool IsScrollInteraction(const blink::WebInputEvent& event) {
@@ -136,17 +175,29 @@ void BrowserSurfaceColorController::SetWebContents(
   if (web_contents == this->web_contents()) {
     return;
   }
+  StopColorTransition();
   Observe(web_contents);
   waiting_for_load_completion_ = web_contents && web_contents->IsLoading();
   RestartPageSampling();
-  if (!web_contents && committed_color_.has_value()) {
-    committed_color_.reset();
+
+  std::optional<SkColor> next_color = committed_color_;
+  if (!web_contents) {
+    next_color.reset();
+  } else if (const BrowserSurfaceColorCache* cache =
+                 BrowserSurfaceColorCache::FromWebContents(web_contents);
+             cache && cache->color().has_value()) {
+    next_color = cache->color();
+  }
+  const bool presentation_changed = presented_color_ != next_color;
+  committed_color_ = next_color;
+  presented_color_ = next_color;
+  if (presentation_changed) {
     color_changed_.Run();
   }
 }
 
 std::optional<SkColor> BrowserSurfaceColorController::GetColor() const {
-  return committed_color_;
+  return presented_color_;
 }
 
 void BrowserSurfaceColorController::DidFinishNavigation(
@@ -219,9 +270,8 @@ void BrowserSurfaceColorController::StartScrollSampling() {
   ResetCandidateSequence();
   is_scroll_sampling_ = true;
   CaptureTopStrip();
-  scroll_sample_timer_.Start(
-      FROM_HERE, kScrollSampleInterval, this,
-      &BrowserSurfaceColorController::CaptureTopStrip);
+  scroll_sample_timer_.Start(FROM_HERE, kScrollSampleInterval, this,
+                             &BrowserSurfaceColorController::CaptureTopStrip);
   scroll_sampling_timeout_timer_.Start(
       FROM_HERE, kScrollSamplingDuration, this,
       &BrowserSurfaceColorController::StopScrollSampling);
@@ -259,13 +309,12 @@ void BrowserSurfaceColorController::CaptureTopStrip() {
 
   ++sample_attempt_;
   capture_in_flight_ = true;
-  const gfx::Rect top_strip(
-      0, 0, viewport.width(), std::min(viewport.height(), kTopStripHeight));
-  view->CopyFromSurface(
-      top_strip, kSampleSize, kCaptureTimeout,
-      base::BindPostTaskToCurrentDefault(base::BindOnce(
-          &BrowserSurfaceColorController::OnTopStripCaptured,
-          weak_ptr_factory_.GetWeakPtr(), generation_)));
+  const gfx::Rect top_strip(0, 0, viewport.width(),
+                            std::min(viewport.height(), kTopStripHeight));
+  view->CopyFromSurface(top_strip, kSampleSize, kCaptureTimeout,
+                        base::BindPostTaskToCurrentDefault(base::BindOnce(
+                            &BrowserSurfaceColorController::OnTopStripCaptured,
+                            weak_ptr_factory_.GetWeakPtr(), generation_)));
 }
 
 void BrowserSurfaceColorController::OnTopStripCaptured(
@@ -291,9 +340,9 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
       stable_candidate_count_ = 1;
     }
 
-    const int required_stable_samples =
-        is_scroll_sampling_ ? kRequiredStableScrollSamples
-                            : kRequiredStablePageSamples;
+    const int required_stable_samples = is_scroll_sampling_
+                                            ? kRequiredStableScrollSamples
+                                            : kRequiredStablePageSamples;
     if (stable_candidate_count_ >= required_stable_samples) {
       if (!waiting_for_load_completion_) {
         CommitColor(*candidate_color_);
@@ -311,13 +360,77 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
 
 void BrowserSurfaceColorController::CommitColor(SkColor color) {
   color = SkColorSetA(color, SK_AlphaOPAQUE);
-  const SkColor next_color =
-      is_scroll_sampling_ && committed_color_.has_value() &&
-              !ColorsAreStable(*committed_color_, color)
-          ? AverageColors(*committed_color_, color)
-          : color;
-  if (!committed_color_.has_value() || *committed_color_ != next_color) {
-    committed_color_ = next_color;
+  BrowserSurfaceColorCache::GetOrCreateForWebContents(web_contents())
+      ->set_color(color);
+
+  if (committed_color_.has_value() && *committed_color_ == color) {
+    return;
+  }
+  committed_color_ = color;
+
+  if (is_scroll_sampling_ && presented_color_.has_value()) {
+    StartColorTransition(color);
+  } else {
+    StopColorTransition();
+    SetPresentedColor(color);
+  }
+}
+
+void BrowserSurfaceColorController::StartColorTransition(SkColor target_color) {
+  if (!presented_color_.has_value() || *presented_color_ == target_color) {
+    StopColorTransition();
+    SetPresentedColor(target_color);
+    return;
+  }
+
+  transition_start_color_ = presented_color_;
+  transition_target_color_ = target_color;
+  transition_start_time_ = base::TimeTicks::Now();
+  if (!color_transition_timer_.IsRunning()) {
+    color_transition_timer_.Start(
+        FROM_HERE, kColorTransitionFrameInterval, this,
+        &BrowserSurfaceColorController::AdvanceColorTransition);
+  }
+}
+
+void BrowserSurfaceColorController::AdvanceColorTransition() {
+  if (!transition_start_color_.has_value() ||
+      !transition_target_color_.has_value()) {
+    StopColorTransition();
+    return;
+  }
+
+  const double progress = std::clamp(
+      (base::TimeTicks::Now() - transition_start_time_).InMillisecondsF() /
+          kScrollColorTransitionDuration.InMillisecondsF(),
+      0.0, 1.0);
+  if (progress >= 1.0) {
+    const SkColor target_color = *transition_target_color_;
+    StopColorTransition();
+    SetPresentedColor(target_color);
+    return;
+  }
+
+  // Smoothstep avoids a visible jump at either end. If a later scroll sample
+  // selects a new target, StartColorTransition() begins from the color that is
+  // currently on screen, so the motion remains continuous instead of adding
+  // another discrete midpoint.
+  const double eased_progress = progress * progress * (3.0 - 2.0 * progress);
+  SetPresentedColor(InterpolateColors(
+      *transition_start_color_, *transition_target_color_, eased_progress));
+}
+
+void BrowserSurfaceColorController::StopColorTransition() {
+  color_transition_timer_.Stop();
+  transition_start_color_.reset();
+  transition_target_color_.reset();
+  transition_start_time_ = base::TimeTicks();
+}
+
+void BrowserSurfaceColorController::SetPresentedColor(SkColor color) {
+  color = SkColorSetA(color, SK_AlphaOPAQUE);
+  if (!presented_color_.has_value() || *presented_color_ != color) {
+    presented_color_ = color;
     color_changed_.Run();
   }
 }
@@ -331,8 +444,7 @@ void BrowserSurfaceColorController::CommitFallbackIfReady() {
   }
 }
 
-std::optional<SkColor>
-BrowserSurfaceColorController::GetFallbackColor() const {
+std::optional<SkColor> BrowserSurfaceColorController::GetFallbackColor() const {
   if (!web_contents()) {
     return std::nullopt;
   }
