@@ -45,6 +45,7 @@ source_set("yee_ui") {
     "//ui/base",
     "//ui/color",
     "//ui/compositor",
+    "//ui/compositor_extra",
     "//ui/gfx",
     "//ui/gfx/animation",
   ]

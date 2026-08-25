@@ -15,10 +15,12 @@ Tab Sidebar에서 이미 고른 UX 결정은
 2. OS별 차이는 Title bar 재질, Caption controls, 단축키 표기에 한정한다.
 3. Sidebar의 폭, 정보 구조, 행 높이, 간격과 선택 상태는 모든 OS에서 같다.
 4. Sidebar와 Browser Surface 바깥 gutter는 하나의 연속된 chrome 면이다.
-5. Browser Toolbar와 실제 웹 페이지는 하나의 외곽 Browser Surface 안에서
-   theme-derived 1 DIP separator로만 나뉜다.
+5. 일반 한 탭에서는 Browser Toolbar와 실제 웹 페이지가 하나의 외곽 Browser
+   Surface 안에서 theme-derived 1 DIP separator로만 나뉜다. 분할 탭에서는 공용
+   Browser Toolbar 행을 접고 각 카드의 Pane Header가 탐색과 주소 표시를 소유한다.
 6. Chromium의 native Omnibox, `TabStripModel`, `WebContents`, page actions와
-   caption hit testing을 대체하거나 흉내 내지 않는다.
+   caption hit testing을 대체하지 않는다. 분할 inactive Pane Header는 두 번째
+   editor가 아니라 해당 WebContents의 읽기 전용 page identity presentation이다.
 
 ## 2. 레이아웃 불변 조건
 
@@ -30,6 +32,7 @@ Tab Sidebar에서 이미 고른 UX 결정은
 | Browser Surface Header | 42 DIP | 48 DIP Title Bar에서 상단 6 DIP gutter를 제외한 실제 표면 높이다. |
 | Browser Toolbar | 40 DIP | Browser Surface Header 안에서 수직 중앙 정렬한다. |
 | Omnibox | 34 DIP | Browser Surface Header 안에서 위·아래 4 DIP 여백을 갖는다. |
+| Split Pane Header | 42 DIP | 분할 카드 내부 상단. 34 DIP 주소 표면과 사방 4 DIP inset을 포함한다. |
 | Sidebar 내부 좌우 padding | 8 DIP | section 자체는 추가로 좌우 4 DIP inset을 사용할 수 있다. |
 | Sidebar section gap | 10 DIP | Favorites, Bookmarks, Group, Agent 영역 사이의 기본 리듬이다. |
 | Group heading | 30 DIP | disclosure, mark, title, count의 수직 중심을 공유한다. |
@@ -92,9 +95,23 @@ Browser Surface는 y=6 DIP에서 시작해 Toolbar와 Content를 함께 감싼�
 Title Bar 바로 아래에서 시작하며 두 영역 사이에 별도 gap이나 중복 outline을 두지
 않는다. 현재 theme의 content separator 색으로 1 DIP 내부 선만 그린다.
 
+분할 상태는 공용 Browser Surface Header를 예약하지 않고 Content Gutter 바로 아래에
+두 카드를 배치한다. 각 카드 안에는 Pane Header가 있으며 Chromium의 native Omnibox
+하나를 active 카드에 재배치한다. inactive 카드는 동일 geometry의 읽기 전용
+`origin | title` 표면을 사용한다. 이는 두 번째 Omnibox model이 아니라 inactive
+WebContents의 페이지 정보를 보여주는 Yee presentation이다. Pane Header 표면은
+카드의 1 DIP outline 안에서 11 DIP 상단 곡률로 잘리고, Header와 WebContents는
+resolved Header surface에서 도출한 1 DIP separator로만 나뉜다. 자세한 전환과
+clip 계약은 [`sidebar/tabs.md`](./sidebar/tabs.md)를 따른다.
+
 현재 native checkpoint는 Browser Surface 외곽 네 모서리에 12 DIP 고정 곡률을
 사용한다. WebContents는 결합 표면 안에서 이어지므로 상단 곡률은 0이고 하단 두
-모서리만 같은 `yee::kSidebarMetrics.content_corner_radius`를 사용한다.
+모서리만 같은 `yee::kSidebarMetrics.content_corner_radius`를 사용한다. 이 하단
+곡률은 배경 장식이 아니라 WebContents 합성 subtree의 hard clip이며, renderer-owned
+overlay scrollbar와 page overlay도 Content Gutter로 뚫고 나오지 않아야 한다.
+단색 backing이나 scrim처럼 자식 합성 레이어가 없는 표면만 고속 rounded-corner
+경로를 사용할 수 있다. 분할 상태의 네 모서리 clip과 전환 규칙은
+[`sidebar/tabs.md`](./sidebar/tabs.md)의 분할뷰 표면 계약을 따른다.
 
 OS 창 모서리와 Content 곡률을 자동으로 맞추는 방식은 보류한다. macOS Zoom,
 Windows/Linux 최대화·전체 화면·타일링처럼 창 상태의 의미가 서로 달라, 실제
@@ -104,8 +121,11 @@ WebContents 합성 결과까지 검증한 뒤 별도 결정으로 추가해야 �
 
 각 OS는 하나의 `chrome_bg`를 가진다. Browser frame, pinned Sidebar와 Browser
 Surface 바깥 gutter는 동일한 값을 사용한다. 결합된 Browser Surface는 Toolbar
-theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline과 얕은
-1px/3px shadow로 구성한다.
+theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline과 낮은
+두 단계 shadow로 구성한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고 더 옅은
+0/2/7 DIP ambient shadow가 Gutter로 자연스럽게 풀린다. 분할 상태의 중립 canvas도
+같은 외곽 outline과 shadow를 공유하되 내부 각 Pane의 active shadow와 역할을
+겹치지 않는다.
 
 | OS | `chrome_bg` | `chrome_line` | 특징 |
 | --- | --- | --- | --- |
@@ -137,6 +157,10 @@ theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline�
   ring으로 구분한다. 주소·제목·중립 control은 고정 theme 색을 사용하지 않고 resolved
   surface에서 primary(읽기 대비), secondary(비텍스트 가시 대비), disabled 역할색을
   계산한다. 위험·보안·제품 상태의 의미 색은 이 중립 팔레트보다 우선한다.
+- 분할 상태에서는 active native Omnibox와 inactive 주소 표면이 각각 자신이 속한
+  WebContents의 resolved color를 사용한다. 두 페이지 색이 다르면 좌우 주소 표면도
+  다를 수 있다. active 상태는 주소 표면의 상시 border가 아니라 카드 전체 outline과
+  shadow로 표시한다.
 - Address suggestions의 중립 배경·텍스트·아이콘도 열리는 시점의 같은 resolved
   surface에서 계산한다. hover·선택 행은 최대 대비색을 6%만 혼합하고, 위험·보안
   상태색과 고대비 모드는 Chromium의 native 팔레트를 유지한다.
@@ -279,6 +303,16 @@ Omnibox는 Browser Surface Header에서 Sidebar Toggle과 Navigation Controls �
 이동하지 않는다. 공간이 좁아지면 page title을 먼저 ellipsis 처리하고, origin은
 최대 180 DIP까지만 사용한다. Site info와 Bookmark는 숨기지 않는다.
 
+분할 상태에서는 공용 Toolbar 행을 숨기고 같은 native `LocationBarView`를 active
+`ContentsContainerView`의 Pane Header로 재배치한다. active Header에는 Sidebar
+Toggle과 Back·Forward·Reload를 항상 표시하며, inactive Header에도
+Back·Forward·Reload를 호버와 무관하게 표시한다. inactive Pane Header는 favicon,
+`origin | title`, alert와 close를 표시하며 click·Enter·Space에서 해당 WebContents를
+먼저 활성화한 뒤 native LocationBar에 focus한다. pane 전환과 분할 해제는 View를
+복제하지 않고 같은 native LocationBar를 새 host 또는 원래 `ToolbarView`로 되돌린다.
+각 Header의 page-aware 색은 Omnibox pill만이 아니라 42 DIP Pane Header 전체를
+채우며, 상단 두 모서리는 카드 외곽 곡률로 hard clip한다.
+
 Rest의 origin은 scheme과 선행 `www.`를 생략하되 의미 있는 subdomain은 유지한다.
 Origin과 Page title 사이는 글자 `|`가 아니라 1 DIP 세로 divider로 나누며, Page
 title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 표시 layer를 즉시
@@ -353,6 +387,7 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
 | Site info open | expanded tile | unchanged | unchanged |
 | Yee Hub open | unchanged | unchanged | unchanged |
 | Keyboard focus | native focus state | page-aware 1 DIP inner stroke | native focus state |
+| Split inactive pane | favicon | origin + title, click 시 active/edit 전환 | close chip |
 
 동시에 두 개의 popup을 열지 않는다. Site info, Address suggestions, Yee Hub
 중 하나를 열면 나머지를 닫는다. Bookmark toggle은 현재 popup을 닫을 수 있지만
@@ -455,6 +490,7 @@ page action을 두 번 실행하지 않는다.
 | 제품 개념 | Chromium 구현 대상 |
 | --- | --- |
 | Toolbar / Omnibox | `ToolbarView`와 native LocationBar |
+| Split Pane Header | `MultiContentsViewMiniToolbar`가 전체 행과 탐색 command facade를 소유하고 active일 때 같은 native `LocationBarView`를 host한다. inactive는 읽기 전용 Yee presentation을 사용한다. |
 | Site info | LocationBar page action + `PageInfoBubbleView` |
 | Bookmark page | native bookmark star + `BookmarkModel` / edit bubble |
 | Yee Hub entry | Yee `ToolbarButton`, native accelerator `Ctrl/⌘ K` |
@@ -497,6 +533,8 @@ native 구현은 Chromium의 model, accelerator, theme, focus manager와 accessi
 - [ ] Toolbar와 Browser Content 사이에는 gap 없이 theme-derived 1 DIP separator만 보인다.
 - [ ] Browser Surface의 상·우·하 및 Sidebar 쪽 외부 gutter가 6 DIP다.
 - [ ] Browser Surface 외곽 네 모서리가 12 DIP이고 WebContents 하단 clip과 일치한다.
+- [ ] 일반 한 탭의 overlay scrollbar와 page overlay가 WebContents 하단 곡률 또는
+      Content Gutter를 뚫고 나오지 않는다.
 - [ ] 외곽 outline은 theme-derived 1 DIP이고 shadow는 얕은 1px/3px다.
 - [ ] Caption controls가 content나 extension dock 위로 겹치지 않는다.
 - [ ] 창 resize, maximize/restore, DPI 100/125/150/200%에서 정렬이 유지된다.
@@ -520,7 +558,19 @@ native 구현은 Chromium의 model, accelerator, theme, focus manager와 accessi
 - [ ] Address, Site info, Yee Hub popup은 동시에 두 개 이상 열리지 않는다.
 - [ ] 각 popup을 `Escape`로 닫으면 원래 trigger로 focus가 복원된다.
 - [ ] High contrast, reduced motion, screen reader name을 확인한다.
-- [ ] 실제 native Omnibox와 real `WebContents`를 사용하며 imitation control이 없다.
+- [ ] 실제 native Omnibox와 real `WebContents`를 사용하며 편집 가능한 imitation
+      Omnibox를 만들지 않는다.
+- [ ] 분할 상태에서 두 카드의 Pane Header가 항상 보이고 active 카드만 실제 native
+      Omnibox를 host한다. inactive 주소 표면 click은 pane 활성화와 주소 편집을 한 번에
+      수행한다.
+- [ ] 분할 진입 시 공용 Browser Toolbar 행과 그 빈 공간이 사라지고 두 카드가 상단
+      Content Gutter까지 올라온다. 분할 해제 시 단일 Tab Toolbar geometry가 복원된다.
+- [ ] active Header의 Sidebar Toggle·Back·Forward·Reload와 inactive Header의
+      Back·Forward·Reload가 호버 전에도 보이고 native command 상태를 따른다.
+- [ ] 분할의 두 Header 전체는 각 WebContents의 page-aware 색을 독립적으로 따르며,
+      active 카드는 강화된 outline과 얕은 shadow로 구분된다.
+- [ ] 분할 해제와 창 종료 시 native Omnibox가 원래 `ToolbarView`로 복귀하고 popup
+      anchor, Site info, Bookmark와 `Ctrl/⌘ L` 동작이 유지된다.
 
 ### Visual parity evidence
 

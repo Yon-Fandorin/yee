@@ -39,7 +39,10 @@ Window Frame
    └─ Content Column
       ├─ Content Gutter [outside]
       └─ Browser Surface
-         └─ Browser Content
+         ├─ Browser Content [single tab]
+         └─ Split Pane Card × 2 [split tabs]
+            ├─ Pane Header
+            └─ Browser Content
 ```
 
 이 구조는 정보 관계를 설명한다. Context Switcher나 Agent Control의 최종 위치는
@@ -70,6 +73,9 @@ Surface의 바깥에 적용한다. Omnibox는 Sidebar Toggle과 Navigation Contr
 폭을 줄이지 않는 가장자리 target이고 Sidebar Flyout은 Browser Content 위에 표시된다.
 상단에서도 Content Gutter는 Browser Surface 바깥 공간이다. 따라서 Omnibox는 Title
 Bar 전체가 아니라 gutter 아래의 Browser Surface Header 안에서 수직 중앙 정렬한다.
+분할 상태에서는 이 공용 상단 행을 접고 Navigation Controls와 같은 native Omnibox가
+active Split Pane Card의 Pane Header로 이동한다. inactive Pane Header도 자신의
+탐색 command와 읽기 전용 page identity를 같은 행에 표시한다.
 
 ## 2. Window Frame과 Title Bar
 
@@ -139,8 +145,10 @@ Tab과 Agent Control은 인접한 Sidebar Header에 남는다.
 | **Browser Content** | 현재 선택된 Tab의 페이지가 렌더링되는 표면 | `MultiContentsView`, `WebContents` |
 | **Browser Surface** | Browser Toolbar와 Browser Content를 하나의 외곽 경계로 묶는 표면 | Yee backing + `ToolbarView` + `MultiContentsView` |
 | **Browser Surface Header** | Browser Surface 안에서 Sidebar Toggle, 탐색과 Omnibox를 담는 상단 띠 | `ToolbarView`의 Content Column segment |
+| **Split Pane Card** | 분할된 각 WebContents와 Pane Header를 하나의 둥근 카드로 묶는 표면 | `ContentsContainerView` + Yee outline/shadow |
+| **Pane Header** | 분할 카드의 1 DIP outline 안쪽에서 11 DIP 상단 곡률로 잘리며, 탐색·주소 정보·닫기 기능을 담고 하단 1 DIP separator로 WebContents와 이어지는 42 DIP 상단 영역 | always-visible navigation command facade + active native `LocationBarView` 또는 inactive page-identity presentation |
 | **Content Gutter** | Browser Surface와 셸 사이에 남기는 6 DIP 외부 간격 | Yee content layout inset |
-| **Browser Surface Boundary** | Browser Surface와 Gutter의 경계 | 고정 12 DIP 곡률, theme-derived 1 DIP outline과 얕은 shadow |
+| **Browser Surface Boundary** | 단일 Browser Surface 또는 분할 canvas와 Gutter의 공통 경계 | 고정 12 DIP 곡률, surface-derived 1 DIP outline과 낮은 two-stage shadow |
 | **Chrome Surface** | Title Bar, Tab Sidebar와 Gutter가 공유하는 브라우저 셸 재질 | Browser chrome background |
 
 제품 문서에서는 전체 영역을 `Tab Sidebar`라고 부른다. Chromium 코드나 클래스와
