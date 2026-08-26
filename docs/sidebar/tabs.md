@@ -91,20 +91,65 @@ Omnibox로 한 번에 focus를 넘긴다. native Omnibox나 주소 편집 model�
 따른다. Omnibox나 origin label의 안쪽 pill만 색칠하지 않는다. 따라서
 서로 다른 두 페이지의 Header 색은 달라질 수 있다. active pane은
 카드 전체의 얕은 그림자와 한 단계 진한 1 DIP 외곽선으로 구분하고, 주소 표면의
-focus stroke는 실제 편집 중일 때만 표시한다. 분할 canvas 자체는 page 색과 관계없는
-불투명 중립 그레이를 유지한다. 라이트 theme에서도 canvas가 흰 카드와 합쳐져
-보이지 않을 정도로 밝아지지 않아야 하며, outline을 진하게 만들어 이를 보정하지
-않는다. 공용 Browser Surface Header가 사라지는 분할 상태에서는 이 canvas가
-Browser Surface의 상단까지 노출되므로 상단을 포함한 네 모서리를 12 DIP로
-클리핑한다. 단일 Tab으로 돌아오면 Header 아래에 이어지는 기존 하단 두 모서리
-클립만 복원한다. canvas 바깥에는 단일 Browser Surface와 같은 계산식의 1 DIP
-outline과 낮은 two-stage shadow를 유지한다. 이 외곽 깊이는 전체 Browser Surface를
-셸에서 분리하는 역할이고, 내부 active Pane shadow는 선택된 카드만 구분한다.
+focus stroke는 실제 편집 중일 때만 표시한다. Split Canvas는 page 색과 관계없는
+투명 레이아웃 영역이며 자체 fill·outline·shadow를 그리지 않는다. 뒤의 Chrome Surface가
+그대로 보이고 시각적 표면 경계는 두 Pane Card가 담당한다. 단일 Tab으로 돌아오면
+기존 Browser Surface backing, 1 DIP outline, 낮은 two-stage shadow와 Header 아래의
+하단 두 모서리 clip을 복원한다. 분할 상태의 active Pane shadow는 선택된 카드만
+구분한다.
 
-각 카드는 Yee의 6 DIP split inset 안에 놓고 12 DIP 곡률로 네 모서리를 모두
-클리핑한다. 두 카드 사이에는 Chromium의 resize hit target과 divider를 그대로
-유지하고 canvas가 그 간격에 보이게 한다. Chromium 기본 4 DIP padding + 1 DIP
-일반 outline은 중복 적용하지 않는다.
+각 카드는 별도 split inset 없이 Browser Surface의 네 변에 직접 정렬하고 12 DIP
+곡률로 네 모서리를 모두 클리핑한다. 두 카드 사이에는 Chromium의 resize hit target과
+divider만 유지한다. Chromium 기본 4 DIP padding + 1 DIP 일반 outline은 중복 적용하지
+않는다.
+
+분할선의 resize hit area는 유지하고 중앙의 회색 handle mark는 호버 전에도 dimmed
+상태로 고정한다. hover·focus에서는 중앙 marker를 옮기지 않고 fade out하며 포인터 축
+위치의 별도 active marker를 동시에 fade in한다. handle과 floating control surface는 page accent가 아니라
+시스템 라이트·다크 surface, on-surface icon, hover state 토큰을 사용한다.
+handle 영역에 hover하면 레이아웃을 밀지 않는 둥근 floating control surface가
+70ms 지연 뒤 커서 위에 가로 중앙 정렬되어 나타나며, 상단 공간이 부족할 때만 커서
+아래로 전환한다. 열린 뒤에는 커서를 따라다니지 않는다. divider, surface와 그
+사이의 짧은 간격은 하나의 hover 영역으로 취급한다. surface 바깥쪽에는 2 DIP 안정
+여백만 두고 divider와 surface 사이에만 이동 bridge를 유지하며, 이 전체 영역을
+벗어나면 최대 32ms의 pointer-exit 안정화 뒤 닫기 모션을 시작한다. 버튼으로 이동하는
+동안에는 하나의 hover 영역이 surface를 계속 유지한다.
+아이콘 순서는 `배치 변경` → `순서 변경` → `멀티탭 해제`이며, 각각 좌우/상하 배치
+전환, 두 pane의 위치 반전, 두 탭을 같은 창의 일반 탭으로 되돌리는 Chromium 명령을
+호출한다. 각 아이콘은 tooltip과 accessible name을 함께 제공한다. surface는 190ms로
+열리고 80ms opacity/scale 모션으로 닫히며, reduced-motion에서는 즉시 전환한다.
+divider의 단순
+click은 surface를 유지하고, 실제 resize drag가 시작될 때만 surface를 즉시 닫아 native
+resize를 우선한다. drag가 끝난 뒤 포인터가 divider 위에 남아 있으면 기존 reveal
+delay를 거쳐 surface를 다시 연다. divider의 더블 클릭·더블 탭은 Pane 순서를 유지한
+채 split ratio를 50:50으로 복원하며, 순서 변경은 floating surface의 두 번째 control만
+담당한다. control surface는 Pane의
+레이아웃 폭이나 resize ratio를 바꾸지 않는다.
+
+회색 resize handle mark는 rest에서 중앙 dimmed marker로 고정한다. 포인터가 divider에
+들어오면 별도의 active marker가 최초 축 좌표만 정하고, floating surface가 열릴 때 같은
+150ms opacity timing으로 fade in한다. 중앙 marker는 같은 timing으로 fade
+out하고, active marker만 이후 포인터를 추종하지 않으며 surface로 이동한 동안에는
+위치를 유지한다. surface가 닫힐 때 active marker를 150ms `FAST_OUT_LINEAR_IN`으로
+완전히 fade out한 다음 중앙 marker를 220ms `SMOOTH_IN_OUT`으로 fade in한다.
+복귀 중 두 marker의 opacity는 겹치지 않는다. 실제 drag hit area는 움직이지 않으며
+reduced-motion에서는 즉시 전환한다. 키보드 focus에서는 중앙 mark를 표시하고, 세로
+divider에서는 surface 하단과 handle 끝 사이에 6 DIP 간격을 둔다.
+
+세 아이콘은 억지로 같은 카드 조각에 화살표를 더하지 않는다. 기능마다 익숙한
+실루엣을 사용하되 선 두께, 곡률과 motion curve를 공유한다. 이동 거리가 긴 `배치 변경`과
+`순서 변경`은 500ms, `멀티탭 해제`는 320ms로 재생해 체감 속도를 맞춘다. `배치 변경`은
+둥근 분할 frame은 유지하고, hover·keyboard focus에서 목표 divider만 짧게 fade
+out한 뒤 중앙에서 양끝으로 다시 펼친다. `순서 변경`은 frame 없이 완성된 두 화살표를
+짧게 fade out하고, 위치를 바꾸지 않은 채 각 꼬리에서 화살촉 방향으로 약간의 시차를
+두고 다시 그린다. 두 아이콘 모두 geometry를 반대 방향으로 되감지 않는다.
+`멀티탭 해제`는 가운데가 끊긴 divider와 원 없는 작은 minus mark로 제거할 대상을
+표시하고,
+hover에서 온전한 split divider로 잠깐 정리된 뒤 divider가 가운데부터 사라져 하나의
+frame만 남는다. 아이콘 전체를 fade out하거나 hover out에서 역재생하지 않는다.
+action phase는 천천히 출발하는 `ACCEL_40_DECEL_100_3` 곡선을 사용한다. 마지막
+동작에 최대화 아이콘을 사용하지 않으며 reduced-motion에서는 목표 상태를 즉시
+표시한다.
 
 Pane Header의 page-aware fill은 카드 외곽 좌표부터 칠하지 않는다. 1 DIP outline
 안쪽의 x/y=1 DIP에서 시작하고 좌우도 1 DIP inset하며, 외곽 12 DIP에서 stroke를
@@ -175,21 +220,22 @@ permission/security semantic highlight 중에는 native 동작대로 숨긴다.
       1 DIP separator만 보이며 중복 gap이나 별도 pill 외곽선이 생기지 않는다.
 - [ ] active pane의 카드 전체에만 강화된 1 DIP outline과 얕은 shadow가 보이며,
       주소 focus stroke는 실제 편집 중일 때만 추가된다.
-- [ ] 라이트·다크 테마와 활성·비활성 창에서 split canvas가 완전히 불투명하고,
-      shell 또는 바탕 화면이 카드 모서리와 pane 사이로 비치지 않는다. 라이트
-      theme의 흰 카드와도 구분되는 중립 명도 차이가 유지된다.
-- [ ] 공용 Header가 없는 분할 상태에서 split canvas의 상단 좌우도 Browser
-      Surface와 같은 12 DIP로 잘리고, 단일 Tab 복귀 시 상단에 중복 곡률이나
-      빈 틈 없이 기존 하단-only 클립으로 돌아간다.
-- [ ] 단일 Browser Surface와 split canvas 바깥에 같은 surface-derived 1 DIP
-      outline과 낮은 two-stage shadow가 보이며, active Pane shadow와 겹쳐 두꺼운
-      테두리나 이중 카드처럼 보이지 않는다.
-- [ ] 각 카드 바깥에 6 DIP inset이 네 변 모두 유지되고, pane 사이에는 native
-      resize 영역만 남는다.
+- [ ] 라이트·다크 테마와 활성·비활성 창에서 Split Canvas가 완전히 투명하고 자체
+      색 띠·외곽선·그림자를 만들지 않으며 뒤의 Chrome Surface가 자연스럽게 보인다.
+- [ ] 분할 상태에서 각 Pane Card의 12 DIP clip이 외곽 모서리를 담당하고, 단일 Tab
+      복귀 시 중복 곡률이나 빈 틈 없이 기존 Browser Surface 경계로 돌아간다.
+- [ ] 분할 상태에서는 Pane Card 외곽선과 active shadow만 보이며, 제거된 Split Canvas
+      경계와 겹쳐 두꺼운 테두리나 상·하단 중복선이 생기지 않는다.
+- [ ] 각 카드가 별도 inset 없이 Browser Surface 네 변에 직접 정렬되고, pane 사이에는
+      native resize 영역만 남는다.
 - [ ] 각 pane에 일반 상태용 내부 outline/padding이 다시 생기지 않고, 바깥
       split card inset과 동일 축에 여백을 두 번 더하지 않는다.
-- [ ] 분할 진입·해제 및 비율 조절 중 네 변 inset과 canvas가 튀거나 두께가
-      바뀌지 않는다.
+- [ ] 분할 진입·해제 및 비율 조절 중 Pane Card 정렬이나 Divider 두께가 튀지 않는다.
+- [ ] 포인터가 없을 때도 중앙 Divider marker가 dimmed 상태로 식별되고, hover 시
+      중앙 marker가 깜빡이거나 이동하지 않고 자연스럽게 사라지는 동안 포인터 위치의
+      active marker가 같은 timing으로 나타난다.
+- [ ] floating control surface, icon, outline과 button hover가 page accent를 물려받지
+      않고 시스템 라이트·다크 테마의 surface/on-surface/state 색으로 함께 전환된다.
 - [ ] 두 카드의 네 모서리 모두 12 DIP로 보이고, 특히 하단 좌우가 사각형으로
       돌아가거나 page 배경이 카드 밖으로 넘치지 않는다.
 - [ ] 스크롤 가능한 일반 한 탭에서 우측 scrollbar와 하단 scrollbar corner가

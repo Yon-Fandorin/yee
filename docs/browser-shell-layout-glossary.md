@@ -40,9 +40,11 @@ Window Frame
       ├─ Content Gutter [outside]
       └─ Browser Surface
          ├─ Browser Content [single tab]
-         └─ Split Pane Card × 2 [split tabs]
-            ├─ Pane Header
-            └─ Browser Content
+         └─ Split Canvas [split tabs]
+            ├─ Split Pane Card × 2
+            │  ├─ Pane Header
+            │  └─ Browser Content
+            └─ Divider
 ```
 
 이 구조는 정보 관계를 설명한다. Context Switcher나 Agent Control의 최종 위치는
@@ -145,8 +147,10 @@ Tab과 Agent Control은 인접한 Sidebar Header에 남는다.
 | **Browser Content** | 현재 선택된 Tab의 페이지가 렌더링되는 표면 | `MultiContentsView`, `WebContents` |
 | **Browser Surface** | Browser Toolbar와 Browser Content를 하나의 외곽 경계로 묶는 표면 | Yee backing + `ToolbarView` + `MultiContentsView` |
 | **Browser Surface Header** | Browser Surface 안에서 Sidebar Toggle, 탐색과 Omnibox를 담는 상단 띠 | `ToolbarView`의 Content Column segment |
+| **Split Canvas** | 분할 상태에서 Pane Card와 Divider를 배치하는 투명 영역. 자체 배경·외곽선·그림자·inset을 만들지 않는다 | `MultiContentsView` layout |
 | **Split Pane Card** | 분할된 각 WebContents와 Pane Header를 하나의 둥근 카드로 묶는 표면 | `ContentsContainerView` + Yee outline/shadow |
 | **Pane Header** | 분할 카드의 1 DIP outline 안쪽에서 11 DIP 상단 곡률로 잘리며, 탐색·주소 정보·닫기 기능을 담고 하단 1 DIP separator로 WebContents와 이어지는 42 DIP 상단 영역 | always-visible navigation command facade + active native `LocationBarView` 또는 inactive page-identity presentation |
+| **Split Divider Controls** | 낮은 대비의 resize handle과 hover 시 커서 위에 중앙 정렬되어 나타나는 배치 변경·순서 변경·멀티탭 해제 floating toolbar | `MultiContentsResizeArea` + Yee overlay controls |
 | **Content Gutter** | Browser Surface와 셸 사이에 남기는 6 DIP 외부 간격 | Yee content layout inset |
 | **Browser Surface Boundary** | 단일 Browser Surface 또는 분할 canvas와 Gutter의 공통 경계 | 고정 12 DIP 곡률, surface-derived 1 DIP outline과 낮은 two-stage shadow |
 | **Chrome Surface** | Title Bar, Tab Sidebar와 Gutter가 공유하는 브라우저 셸 재질 | Browser chrome background |

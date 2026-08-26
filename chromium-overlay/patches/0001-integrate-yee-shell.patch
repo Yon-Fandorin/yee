@@ -2432,19 +2432,350 @@ index 6a9a34e7f8..982ab716e4 100644
    if (auto color = ThemedBackground::GetBackgroundColor(this, browser_view_)) {
      layer()->AsSolidColor()->SetColor(SkColor4f::FromColor(*color));
    }
+diff --git a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc b/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
+index 37a68df743..a570312784 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
+@@ -4,11 +4,15 @@
+ 
+ #include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
+ 
++#include <algorithm>
++
+ #include "base/i18n/number_formatting.h"
+ #include "base/i18n/rtl.h"
+ #include "base/numerics/safe_conversions.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
++#include "chrome/browser/ui/views/yee/split_pane_controls.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -51,11 +55,20 @@ MultiContentsResizeHandle::MultiContentsResizeHandle() {
+ 
+   SetBackground(views::CreateRoundedRectBackground(
+       kColorSidePanelHoverResizeAreaHandle, kHandleCornerRadius));
++  if (yee::IsShellEnabled()) {
++    layer()->SetOpacity(0.0f);
++  }
+ }
+ 
+ void MultiContentsResizeHandle::UpdateVisibility() {
+-  layer()->SetVisible(parent()->GetVisible() &&
+-                      (HasFocus() || parent()->IsMouseHovered()));
++  const bool parent_visible = parent()->GetVisible();
++  if (yee::IsShellEnabled()) {
++    layer()->SetVisible(parent_visible);
++    yee::UpdateSplitResizeHandleAppearance(*this, HasFocus());
++    return;
++  }
++  const bool emphasized = HasFocus() || parent()->IsMouseHovered();
++  layer()->SetVisible(parent_visible && emphasized);
+ }
+ 
+ void MultiContentsResizeHandle::AddedToWidget() {
+@@ -98,24 +111,86 @@ void MultiContentsResizeArea::SetLayout(split_tabs::SplitTabLayout layout) {
+   }
+ }
+ 
++void MultiContentsResizeArea::SetYeeControlsView(views::View* controls) {
++  CHECK(yee::IsShellEnabled());
++  CHECK(controls);
++  yee_controls_view_tracker_.SetView(controls);
++  yee::SetSplitPaneControlsEnabled(*controls, GetVisible());
++}
++
++void MultiContentsResizeArea::SetYeeControlsAnchored(bool anchored) {
++  if (yee_controls_anchored_ == anchored) {
++    return;
++  }
++  yee_controls_anchored_ = anchored;
++  if (anchored) {
++    if (yee_handle_anchor_) {
++      UpdateYeeResizeHandleAnchor(*yee_handle_anchor_,
++                                  /*emphasized=*/true,
++                                  /*animate=*/true);
++    }
++    return;
++  }
++  if (!IsMouseHovered() && !is_resizing() && yee_handle_at_anchor_) {
++    ResetYeeResizeHandleAnchor(/*animate=*/true);
++    yee_handle_at_anchor_ = false;
++    yee_handle_anchor_.reset();
++  }
++}
++
+ void MultiContentsResizeArea::OnGestureEvent(ui::GestureEvent* event) {
+-  // If the gesture event was a double tap and was not part of a resizing event,
+-  // swap the contents views.
++  if (views::View* controls = yee_controls_view_tracker_.view();
++      controls && (event->type() == ui::EventType::kGestureTapDown ||
++                   event->type() == ui::EventType::kGestureScrollBegin)) {
++    yee::DismissSplitPaneControls(*controls);
++  }
++  // A double tap on the divider restores an even split without changing pane
++  // order.
+   if (!is_resizing() && event->type() == ui::EventType::kGestureTap &&
+       event->details().tap_count() == 2) {
+-    multi_contents_view_->OnSwap();
++    multi_contents_view_->OnEqualizeSplit();
+   }
+   ResizeArea::OnGestureEvent(event);
+ }
+ 
++bool MultiContentsResizeArea::OnMousePressed(const ui::MouseEvent& event) {
++  return ResizeArea::OnMousePressed(event);
++}
++
++bool MultiContentsResizeArea::OnMouseDragged(const ui::MouseEvent& event) {
++  const bool was_resizing = is_resizing();
++  const bool handled = ResizeArea::OnMouseDragged(event);
++  if (yee::IsShellEnabled() && handled && !was_resizing && is_resizing()) {
++    if (views::View* controls = yee_controls_view_tracker_.view()) {
++      yee::DismissSplitPaneControls(*controls);
++    }
++    suppress_controls_while_resizing_ = true;
++  }
++  return handled;
++}
++
+ void MultiContentsResizeArea::OnMouseReleased(const ui::MouseEvent& event) {
+-  // If the mouse event was a left double click and was not part of a resizing
+-  // event, swap the contents views.
++  const bool was_resizing = is_resizing();
++  // A left-button double click on the divider restores an even split without
++  // changing pane order.
+   if (!is_resizing() && event.IsOnlyLeftMouseButton() &&
+       event.GetClickCount() == 2) {
+-    multi_contents_view_->OnSwap();
++    multi_contents_view_->OnEqualizeSplit();
+   }
+   ResizeArea::OnMouseReleased(event);
++  RestoreYeeControlsAfterResize(was_resizing);
++  if (yee::IsShellEnabled() && !IsMouseHovered() && !yee_controls_anchored_ &&
++      yee_handle_at_anchor_) {
++    ResetYeeResizeHandleAnchor(/*animate=*/true);
++    yee_handle_at_anchor_ = false;
++    yee_handle_anchor_.reset();
++  }
++}
++
++void MultiContentsResizeArea::OnMouseCaptureLost() {
++  const bool was_resizing = is_resizing();
++  ResizeArea::OnMouseCaptureLost();
++  RestoreYeeControlsAfterResize(was_resizing);
+ }
+ 
+ bool MultiContentsResizeArea::OnKeyPressed(const ui::KeyEvent& event) {
+@@ -153,15 +228,64 @@ bool MultiContentsResizeArea::OnKeyPressed(const ui::KeyEvent& event) {
+ }
+ 
+ void MultiContentsResizeArea::OnMouseMoved(const ui::MouseEvent& event) {
+-  resize_handle_->UpdateVisibility();
++  bool update_controls_anchor = false;
++  if (!yee::IsShellEnabled()) {
++    resize_handle_->UpdateVisibility();
++  } else if (!yee_handle_at_anchor_) {
++    yee_handle_anchor_ = event.location();
++    UpdateYeeResizeHandleAnchor(*yee_handle_anchor_,
++                                /*emphasized=*/false,
++                                /*animate=*/false);
++    yee_handle_at_anchor_ = true;
++    update_controls_anchor = true;
++  }
++  if (views::View* controls = yee_controls_view_tracker_.view();
++      controls && !is_resizing() && !suppress_controls_while_resizing_) {
++    if (update_controls_anchor) {
++      gfx::Point anchor = event.location();
++      views::View::ConvertPointToTarget(this, multi_contents_view_, &anchor);
++      yee::UpdateSplitPaneControlsAnchor(*controls, anchor);
++    }
++    yee::SetSplitPaneControlsAnchorHovered(*controls, true);
++  }
+ }
+ 
+ void MultiContentsResizeArea::OnMouseExited(const ui::MouseEvent& event) {
+-  resize_handle_->UpdateVisibility();
++  if (!yee::IsShellEnabled()) {
++    resize_handle_->UpdateVisibility();
++  }
++  if (!is_resizing()) {
++    suppress_controls_while_resizing_ = false;
++  }
++  if (yee::IsShellEnabled() && !yee_controls_anchored_ && !is_resizing() &&
++      yee_handle_at_anchor_) {
++    ResetYeeResizeHandleAnchor(/*animate=*/true);
++    yee_handle_at_anchor_ = false;
++    yee_handle_anchor_.reset();
++  }
++  if (views::View* controls = yee_controls_view_tracker_.view()) {
++    yee::SetSplitPaneControlsAnchorHovered(*controls, false);
++  }
+ }
+ 
+ void MultiContentsResizeArea::SetVisible(bool visible) {
+   views::View::SetVisible(visible);
++  if (views::View* controls = yee_controls_view_tracker_.view()) {
++    yee::SetSplitPaneControlsEnabled(*controls, visible);
++    if (!visible) {
++      yee::SetSplitPaneControlsAnchorHovered(*controls, false);
++      yee_controls_anchored_ = false;
++      ResetYeeResizeHandleAnchor(/*animate=*/false);
++      yee_handle_at_anchor_ = false;
++      yee_handle_anchor_.reset();
++      suppress_controls_while_resizing_ = false;
++    }
++  }
++  resize_handle_->UpdateVisibility();
++}
++
++void MultiContentsResizeArea::OnThemeChanged() {
++  views::ResizeArea::OnThemeChanged();
+   resize_handle_->UpdateVisibility();
+ }
+ 
+@@ -180,6 +304,53 @@ void MultiContentsResizeArea::OnLayoutUpdated() {
+   }
+   SetPreferredSize(preferred_size);
+   resize_handle_->SetPreferredSize(resize_handle_preferred_size);
++  if (yee::IsShellEnabled()) {
++    ResetYeeResizeHandleAnchor(/*animate=*/false);
++    yee_handle_at_anchor_ = false;
++    yee_handle_anchor_.reset();
++  }
++}
++
++void MultiContentsResizeArea::UpdateYeeResizeHandleAnchor(
++    const gfx::Point& anchor,
++    bool emphasized,
++    bool animate) {
++  const gfx::Rect handle_bounds = resize_handle_->bounds();
++  if (handle_bounds.IsEmpty()) {
++    return;
++  }
++
++  gfx::Vector2dF offset;
++  if (axis() == Axis::kHorizontal) {
++    const int half_extent = handle_bounds.height() / 2;
++    const int position = std::clamp(
++        anchor.y(), half_extent, std::max(half_extent, height() - half_extent));
++    offset.set_y(position - handle_bounds.CenterPoint().y());
++  } else {
++    const int half_extent = handle_bounds.width() / 2;
++    const int position = std::clamp(
++        anchor.x(), half_extent, std::max(half_extent, width() - half_extent));
++    offset.set_x(position - handle_bounds.CenterPoint().x());
++  }
++  yee::UpdateSplitResizeHandleAnchor(*resize_handle_, offset, emphasized,
++                                     animate);
++}
++
++void MultiContentsResizeArea::ResetYeeResizeHandleAnchor(bool animate) {
++  const bool emphasized = resize_handle_->HasFocus() || IsMouseHovered();
++  yee::UpdateSplitResizeHandleAnchor(*resize_handle_, gfx::Vector2dF(),
++                                     emphasized, animate);
++}
++
++void MultiContentsResizeArea::RestoreYeeControlsAfterResize(bool was_resizing) {
++  if (!yee::IsShellEnabled() || !was_resizing) {
++    return;
++  }
++  suppress_controls_while_resizing_ = false;
++  if (views::View* controls = yee_controls_view_tracker_.view();
++      controls && IsMouseHovered()) {
++    yee::SetSplitPaneControlsAnchorHovered(*controls, true);
++  }
+ }
+ 
+ ui::KeyboardCode MultiContentsResizeArea::DecreaseContentsSizeKeyCode() {
+diff --git a/chrome/browser/ui/views/frame/multi_contents_resize_area.h b/chrome/browser/ui/views/frame/multi_contents_resize_area.h
+index 460c40a7c5..9d09000337 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_resize_area.h
++++ b/chrome/browser/ui/views/frame/multi_contents_resize_area.h
+@@ -5,13 +5,17 @@
+ #ifndef CHROME_BROWSER_UI_VIEWS_FRAME_MULTI_CONTENTS_RESIZE_AREA_H_
+ #define CHROME_BROWSER_UI_VIEWS_FRAME_MULTI_CONTENTS_RESIZE_AREA_H_
+ 
++#include <optional>
++
+ #include "base/memory/raw_ptr.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/events/keycodes/keyboard_codes.h"
++#include "ui/gfx/geometry/point.h"
+ #include "ui/views/controls/resize_area.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/view.h"
++#include "ui/views/view_tracker.h"
+ 
+ class MultiContentsView;
+ 
+@@ -58,19 +62,30 @@ class MultiContentsResizeArea : public views::ResizeArea {
+   explicit MultiContentsResizeArea(MultiContentsView* multi_contents_view);
+ 
+   void SetLayout(split_tabs::SplitTabLayout layout);
++  void SetYeeControlsView(views::View* controls);
++  void SetYeeControlsAnchored(bool anchored);
+ 
+   // views::ResizeArea:
+   void OnGestureEvent(ui::GestureEvent* event) override;
++  bool OnMousePressed(const ui::MouseEvent& event) override;
++  bool OnMouseDragged(const ui::MouseEvent& event) override;
+   void OnMouseReleased(const ui::MouseEvent& event) override;
++  void OnMouseCaptureLost() override;
+   bool OnKeyPressed(const ui::KeyEvent& event) override;
+   void OnMouseMoved(const ui::MouseEvent& event) override;
+   void OnMouseExited(const ui::MouseEvent& event) override;
+   void SetVisible(bool visible) override;
++  void OnThemeChanged() override;
+ 
+  private:
+   // Sets the layout manager orientation and preferred size according to the
+   // split view layout.
+   void OnLayoutUpdated();
++  void UpdateYeeResizeHandleAnchor(const gfx::Point& anchor,
++                                   bool emphasized,
++                                   bool animate);
++  void ResetYeeResizeHandleAnchor(bool animate);
++  void RestoreYeeControlsAfterResize(bool was_resizing);
+ 
+   ui::KeyboardCode DecreaseContentsSizeKeyCode();
+   ui::KeyboardCode IncreaseContentsSizeKeyCode();
+@@ -79,6 +94,11 @@ class MultiContentsResizeArea : public views::ResizeArea {
+ 
+   raw_ptr<MultiContentsView> multi_contents_view_;
+   raw_ptr<MultiContentsResizeHandle> resize_handle_;
++  views::ViewTracker yee_controls_view_tracker_;
++  bool suppress_controls_while_resizing_ = false;
++  bool yee_controls_anchored_ = false;
++  bool yee_handle_at_anchor_ = false;
++  std::optional<gfx::Point> yee_handle_anchor_;
+ 
+   raw_ptr<views::FlexLayout> flex_layout_manager_;
+ };
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index 54069adbee..544b3096ca 100644
+index 54069adbee..6d25fb0b9f 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
-@@ -32,6 +32,7 @@
+@@ -8,6 +8,7 @@
+ #include <cstdlib>
+ 
+ #include "base/check_deref.h"
++#include "base/functional/bind.h"
+ #include "base/notreached.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
+ #include "chrome/browser/browser_process.h"
+@@ -32,6 +33,8 @@
  #include "chrome/browser/ui/views/frame/themed_background.h"
  #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
++#include "chrome/browser/ui/views/yee/split_pane_controls.h"
 +#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/common/pref_names.h"
  #include "chrome/common/webui_url_constants.h"
  #include "components/prefs/pref_service.h"
-@@ -65,10 +66,13 @@ MultiContentsView::MultiContentsView(
+@@ -65,10 +68,13 @@ MultiContentsView::MultiContentsView(
      std::unique_ptr<MultiContentsViewDelegate> delegate)
      : browser_view_(browser_view),
        delegate_(std::move(delegate)),
@@ -2462,21 +2793,121 @@ index 54069adbee..544b3096ca 100644
    SetLayoutManager(std::make_unique<views::DelegatingLayoutManager>(this));
    SetProperty(views::kElementIdentifierKey, kMultiContentsViewElementId);
  
-@@ -503,8 +507,12 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -132,6 +138,26 @@ MultiContentsView::MultiContentsView(
+   lens_overlay_view->SetLayoutManager(std::make_unique<views::FillLayout>());
+   lens_overlay_view_ = AddChildView(std::move(lens_overlay_view));
+ 
++  if (yee::IsShellEnabled()) {
++    views::View* const controls = AddChildView(yee::CreateSplitPaneControlsView(
++        yee::SplitPaneControlCallbacks{
++            base::BindRepeating(&MultiContentsView::OnToggleSplitLayout,
++                                base::Unretained(this)),
++            base::BindRepeating(&MultiContentsView::OnSwap,
++                                base::Unretained(this)),
++            base::BindRepeating(&MultiContentsView::OnExitSplit,
++                                base::Unretained(this)),
++            base::BindRepeating(
++                &MultiContentsResizeArea::SetYeeControlsAnchored,
++                base::Unretained(resize_area_))},
++        resize_area_));
++    yee_split_controls_tracker_.SetView(controls);
++    resize_area_->SetYeeControlsView(controls);
++    yee::UpdateSplitPaneControls(*controls,
++                                 /*side_by_side=*/true,
++                                 /*active_at_start=*/true);
++  }
++
+   for (auto& contents_container_view : contents_container_views_) {
+     auto& view_map = container_focusable_map_[contents_container_view];
+ 
+@@ -325,6 +351,11 @@ void MultiContentsView::SwapContentsInSplitView() {
+   std::swap(contents_container_views_[0], contents_container_views_[1]);
+ 
+   active_index_ = active_index_ == 0 ? 1 : 0;
++  if (views::View* controls = yee_split_controls_tracker_.view()) {
++    yee::UpdateSplitPaneControls(
++        *controls, GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide,
++        active_index_ == 0);
++  }
+ }
+ 
+ void MultiContentsView::SetActiveIndex(int index) {
+@@ -337,6 +368,11 @@ void MultiContentsView::SetActiveIndex(int index) {
+   GetActiveContentsView()->set_is_primary_web_contents_for_window(true);
+   GetInactiveContentsView()->set_is_primary_web_contents_for_window(false);
+   UpdateContentsBorderAndOverlay();
++  if (views::View* controls = yee_split_controls_tracker_.view()) {
++    yee::UpdateSplitPaneControls(
++        *controls, GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide,
++        active_index_ == 0);
++  }
+ }
+ 
+ void MultiContentsView::UpdateSplitVisualData(
+@@ -347,6 +383,12 @@ void MultiContentsView::UpdateSplitVisualData(
+ 
+   visual_data_ = visual_data;
+   resize_area_->SetLayout(visual_data.split_layout());
++  if (views::View* controls = yee_split_controls_tracker_.view()) {
++    yee::UpdateSplitPaneControls(
++        *controls,
++        visual_data.split_layout() == split_tabs::SplitTabLayout::kSideBySide,
++        active_index_ == 0);
++  }
+   InvalidateLayout();
+ }
+ 
+@@ -371,6 +413,21 @@ void MultiContentsView::OnSwap() {
+   delegate_->ReverseWebContents();
+ }
+ 
++void MultiContentsView::OnEqualizeSplit() {
++  CHECK(IsInSplitView());
++  delegate_->ResizeWebContents(0.5, /*done_resizing=*/true);
++}
++
++void MultiContentsView::OnToggleSplitLayout() {
++  CHECK(IsInSplitView());
++  delegate_->ToggleSplitLayout();
++}
++
++void MultiContentsView::OnExitSplit() {
++  CHECK(IsInSplitView());
++  delegate_->ExitSplit();
++}
++
+ void MultiContentsView::SetTargetContentBounds(
+     std::optional<TargetContentBounds> target_content_bounds) {
+   if (target_content_bounds_ == target_content_bounds) {
+@@ -503,8 +560,12 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
  
    gfx::Rect available_space = gfx::Rect(width, height);
  
-+  // In Yee split mode this view is the opaque neutral canvas behind both
-+  // rounded WebContents cards. Keeping it visible is what prevents the shell
-+  // or desktop from leaking through their clipped corners and center gap.
++  // Yee aligns split cards directly to the Browser Surface backing, so it does
++  // not add Chromium's nested canvas behind them. Non-Yee layouts retain the
++  // native split and drop-target background behavior.
    const bool show_background =
 -      drop_target_view_->GetVisible() || IsInSplitView();
-+      IsInSplitView() ||
-+      (!yee::IsShellEnabled() && drop_target_view_->GetVisible());
++      !yee::IsShellEnabled() &&
++      (IsInSplitView() || drop_target_view_->GetVisible());
    layouts.child_layouts.emplace_back(background_view_.get(), show_background,
                                       available_space);
  
-@@ -577,8 +585,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -549,6 +610,13 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+   layouts.child_layouts.emplace_back(lens_overlay_view_.get(),
+                                      lens_overlay_view_->GetVisible(),
+                                      gfx::Rect(width, height));
++  if (views::View* controls = yee_split_controls_tracker_.view()) {
++    const gfx::Rect controls_rect =
++        yee::GetSplitPaneControlsBounds(*controls, gfx::Rect(width, height));
++    layouts.child_layouts.emplace_back(
++        controls, resize_area_->GetVisible() && controls->GetVisible(),
++        controls_rect);
++  }
+ 
+   layouts.host_size = gfx::Size(width, height);
+   return layouts;
+@@ -577,8 +645,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
    {
      // Need to temporarily override the split view insets.
      const auto split_view_insets =
@@ -2490,7 +2921,7 @@ index 54069adbee..544b3096ca 100644
      base::AutoReset inset_override(&split_view_insets_, split_view_insets);
      target_layout = CalculateProposedLayout(
          views::SizeBounds(target_content_bounds_->actual_size));
-@@ -795,10 +806,14 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+@@ -795,10 +866,14 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
    for (auto& contents_container_view : contents_container_views_) {
      const bool is_active =
          contents_container_view->contents_view() == GetActiveContentsView();
@@ -2509,7 +2940,7 @@ index 54069adbee..544b3096ca 100644
      contents_container_view->UpdateBorderAndOverlay(
          is_in_split, is_active, is_active && active_contents_view_highlighted_);
    }
-@@ -849,10 +864,13 @@ void MultiContentsView::SetShouldShowTopSeparator(bool should_show) {
+@@ -849,10 +924,13 @@ void MultiContentsView::SetShouldShowTopSeparator(bool should_show) {
  }
  
  void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
@@ -2525,6 +2956,201 @@ index 54069adbee..544b3096ca 100644
    // This can be called during BrowserView layout, so protect against creating a
    // layout loop.
    InvalidateLayout(/*avoid_propagate_during_layout=*/true);
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
+index 6ecb49a239..9f2ee2b1f4 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view.h
+@@ -23,6 +23,7 @@
+ #include "ui/views/controls/resize_area_delegate.h"
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view.h"
++#include "ui/views/view_tracker.h"
+ 
+ class BrowserView;
+ class ContentsWebView;
+@@ -138,6 +139,10 @@ class MultiContentsView
+ 
+   // If in a split view, swaps the positions of the two active tabs.
+   void OnSwap();
++  // Restores both panes to an equal share of the split view.
++  void OnEqualizeSplit();
++  void OnToggleSplitLayout();
++  void OnExitSplit();
+ 
+   // If non-null, specifies an increase in target size so that web contents
+   // maintain their maximum extents during browser animations to prevent
+@@ -308,6 +313,7 @@ class MultiContentsView
+   // The handle responsible for resizing the two contents views as relative to
+   // each other.
+   raw_ptr<MultiContentsResizeArea> resize_area_ = nullptr;
++  mutable views::ViewTracker yee_split_controls_tracker_;
+ 
+   // The views that are shown for entering split view. E.g., this is shown when
+   // the user drags a link to the edge of the contents view.
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
+index add087635e..5066d91cd2 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
+@@ -56,6 +56,32 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
+   tab_strip_model_->ReverseTabsInSplit(split_tab_id.value());
+ }
+ 
++void MultiContentsViewDelegateImpl::ToggleSplitLayout() {
++  const std::optional<split_tabs::SplitTabId> split_tab_id =
++      tab_strip_model_->GetActiveTab()->GetSplit();
++  CHECK(split_tab_id.has_value());
++
++  const split_tabs::SplitTabLayout current_layout =
++      tab_strip_model_->GetSplitData(*split_tab_id)
++          ->visual_data()
++          ->split_layout();
++  const split_tabs::SplitTabLayout new_layout =
++      current_layout == split_tabs::SplitTabLayout::kSideBySide
++          ? split_tabs::SplitTabLayout::kStacked
++          : split_tabs::SplitTabLayout::kSideBySide;
++  tab_strip_model_->UpdateSplitLayout(
++      *split_tab_id, new_layout,
++      split_tabs::SplitTabOrientationChangeSource::kToolbarButton);
++  tab_strip_model_->UpdateSplitRatio(*split_tab_id, 0.5);
++}
++
++void MultiContentsViewDelegateImpl::ExitSplit() {
++  const std::optional<split_tabs::SplitTabId> split_tab_id =
++      tab_strip_model_->GetActiveTab()->GetSplit();
++  CHECK(split_tab_id.has_value());
++  tab_strip_model_->RemoveSplit(*split_tab_id);
++}
++
+ void MultiContentsViewDelegateImpl::ResizeWebContents(double start_ratio,
+                                                       bool done_resizing) {
+   const std::optional<split_tabs::SplitTabId> split_tab_id =
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.h b/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
+index 91de47263b..8d07454e32 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
+@@ -22,6 +22,8 @@ class MultiContentsViewDelegate
+   virtual void WebContentsFocused(content::WebContents* contents) = 0;
+   virtual void ResizeWebContents(double ratio, bool done_resizing) = 0;
+   virtual void ReverseWebContents() = 0;
++  virtual void ToggleSplitLayout() = 0;
++  virtual void ExitSplit() = 0;
+ };
+ 
+ // Executes browser and tabstrip dependent behaviors on behalf of a
+@@ -46,6 +48,14 @@ class MultiContentsViewDelegateImpl : public MultiContentsViewDelegate {
+   // Must already be in a split.
+   void ReverseWebContents() override;
+ 
++  // Switches between side-by-side and stacked split layouts.
++  // Must already be in a split.
++  void ToggleSplitLayout() override;
++
++  // Separates both tabs back into ordinary tabs in the same browser window.
++  // Must already be in a split.
++  void ExitSplit() override;
++
+   // Creates a new tab for the first valid URL in `urls` and creates a split
+   // with it and the active tab. If all URLs are blocked, then it will open
+   // that.
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
+index 959386b621..14eb1e2401 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
+@@ -567,16 +567,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+ }
+ 
+ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
+-  RunTestSequence(
+-      CreateTabsAndEnterSplitView(), ResizeWindow(1000),
+-      // Artificially lower min size so that testing on smaller devices does
+-      // not affect results.
+-      SetMinSize(60),
+-      CheckResize(
+-          10000, base::BindRepeating([](double start_size, double end_size) {
+-            // On large window, uses flat min size.
+-            return end_size == 60;
+-          })));
++  RunTestSequence(CreateTabsAndEnterSplitView(), ResizeWindow(1000),
++                  // Artificially lower min size so that testing on smaller
++                  // devices does not affect results.
++                  SetMinSize(60),
++                  CheckResize(10000, base::BindRepeating([](double start_size,
++                                                            double end_size) {
++                                // On large window, uses flat min size.
++                                return end_size == 60;
++                              })));
+ }
+ 
+ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
+@@ -772,11 +771,11 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+ }
+ 
+ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+-                       ResizeGestureDoubleTapSwapsSplitViews) {
+-  using MultiContentsViewSwapObserver =
++                       ResizeGestureDoubleTapEqualizesSplitViews) {
++  using MultiContentsViewRatioObserver =
+       views::test::PollingViewObserver<bool, MultiContentsView>;
+-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewSwapObserver,
+-                                      kMultiContentsViewSwapObserver);
++  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewRatioObserver,
++                                      kMultiContentsViewRatioObserver);
+   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
+   RunTestSequence(
+       // Create a split view with and verify web contents are as expected and
+@@ -796,8 +795,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+                    ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
+       }),
+       CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
+-      // Simulate a double press gesture event on the resize area to trigger the
+-      // split tabs to swap.
++      Do([&]() { multi_contents_view()->OnResize(100, true); }),
++      Check([&]() { return multi_contents_view()->GetSplitRatio() != 0.5; }),
++      // Simulate a double press gesture on the resize area to restore an even
++      // split without changing pane order.
+       Do([&]() {
+         auto* resize_area = multi_contents_view()->resize_area_for_testing();
+         gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
+@@ -807,23 +808,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+                                        ui::EventTimeForNow(), details);
+         resize_area->OnGestureEvent(&gesture_event);
+       }),
+-      // Verify the web contents in the split have swapped and the active index
+-      // is correct.
+-      PollView(kMultiContentsViewSwapObserver, kMultiContentsViewElementId,
++      PollView(kMultiContentsViewRatioObserver, kMultiContentsViewElementId,
+                [&](const MultiContentsView* multi_contents_view) -> bool {
+-                 bool first_web_contents_set =
+-                     multi_contents_view->start_contents_view_for_testing()
+-                         ->GetWebContents()
+-                         ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
+-                 bool second_web_contents_set =
+-                     multi_contents_view->end_contents_view_for_testing()
+-                         ->GetWebContents()
+-                         ->GetVisibleURL() ==
+-                     GURL(chrome::kChromeUISettingsURL);
+-                 return first_web_contents_set && second_web_contents_set;
++                 return multi_contents_view->GetSplitRatio() == 0.5;
+                }),
+-      WaitForState(kMultiContentsViewSwapObserver, true),
+-      WaitForActiveTabChange(1), CheckActiveContentsHasFocus());
++      WaitForState(kMultiContentsViewRatioObserver, true), Check([&]() {
++        return multi_contents_view()
++                   ->start_contents_view_for_testing()
++                   ->GetWebContents()
++                   ->GetVisibleURL() == GURL(chrome::kChromeUISettingsURL);
++      }),
++      Check([&]() {
++        return multi_contents_view()
++                   ->end_contents_view_for_testing()
++                   ->GetWebContents()
++                   ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
++      }),
++      CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
++      CheckActiveContentsHasFocus());
+ }
+ 
+ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 index d5f3d22b6e..f91c35fa8e 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
@@ -8557,3 +9183,55 @@ index 5d8a77b3bc..9ca5413a1a 100644
        color_provider = browser_window->GetColorProvider();
      }
  
+diff --git a/ui/views/mouse_watcher.cc b/ui/views/mouse_watcher.cc
+index 9aec1c1a81..274b597b89 100644
+--- a/ui/views/mouse_watcher.cc
++++ b/ui/views/mouse_watcher.cc
+@@ -75,7 +75,7 @@ class MouseWatcher::Observer : public ui::EventObserver {
+             base::BindOnce(&Observer::NotifyListener,
+                            notify_listener_factory_.GetWeakPtr()),
+             event_type == EventType::kMove
+-                ? kNotifyListenerTime
++                ? mouse_watcher_->notify_on_move_time_
+                 : mouse_watcher_->notify_on_exit_time_);
+       }
+     } else {
+@@ -106,7 +106,8 @@ MouseWatcher::MouseWatcher(std::unique_ptr<MouseWatcherHost> host,
+                            MouseWatcherListener* listener)
+     : host_(std::move(host)),
+       listener_(listener),
+-      notify_on_exit_time_(kNotifyListenerTime) {}
++      notify_on_exit_time_(kNotifyListenerTime),
++      notify_on_move_time_(kNotifyListenerTime) {}
+ 
+ MouseWatcher::~MouseWatcher() = default;
+ 
+diff --git a/ui/views/mouse_watcher.h b/ui/views/mouse_watcher.h
+index 3d98085d74..5fc176b9cf 100644
+--- a/ui/views/mouse_watcher.h
++++ b/ui/views/mouse_watcher.h
+@@ -62,6 +62,14 @@ class VIEWS_EXPORT MouseWatcher {
+     notify_on_exit_time_ = time;
+   }
+ 
++  // Sets the amount to delay before notifying the listener after an ordinary
++  // mouse move leaves the host. This is separate from window-exit events so
++  // clients can keep their own hover-dismiss timing without changing the
++  // default behavior of other MouseWatcher users.
++  void set_notify_on_move_time(base::TimeDelta time) {
++    notify_on_move_time_ = time;
++  }
++
+   // Starts watching mouse movements. When the mouse moves outside the bounds of
+   // the host the listener is notified. |Start| may be invoked any number of
+   // times. If the mouse moves outside the bounds of the host the listener is
+@@ -93,6 +101,9 @@ class VIEWS_EXPORT MouseWatcher {
+ 
+   // See description above setter.
+   base::TimeDelta notify_on_exit_time_;
++
++  // See description above setter.
++  base::TimeDelta notify_on_move_time_;
+ };
+ 
+ }  // namespace views

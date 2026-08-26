@@ -96,8 +96,9 @@ Title Bar 바로 아래에서 시작하며 두 영역 사이에 별도 gap이나
 않는다. 현재 theme의 content separator 색으로 1 DIP 내부 선만 그린다.
 
 분할 상태는 공용 Browser Surface Header를 예약하지 않고 Content Gutter 바로 아래에
-두 카드를 배치한다. 각 카드 안에는 Pane Header가 있으며 Chromium의 native Omnibox
-하나를 active 카드에 재배치한다. inactive 카드는 동일 geometry의 읽기 전용
+별도 Split Canvas inset 없이 두 카드를 배치한다. Split Canvas는 중첩 background를
+만들지 않는 투명 레이아웃 영역이며 뒤의 Chrome Surface를 그대로 드러낸다. 각 카드 안에는 Pane Header가 있으며
+Chromium의 native Omnibox 하나를 active 카드에 재배치한다. inactive 카드는 동일 geometry의 읽기 전용
 `origin | title` 표면을 사용한다. 이는 두 번째 Omnibox model이 아니라 inactive
 WebContents의 페이지 정보를 보여주는 Yee presentation이다. Pane Header 표면은
 카드의 1 DIP outline 안에서 11 DIP 상단 곡률로 잘리고, Header와 WebContents는
@@ -312,6 +313,49 @@ Back·Forward·Reload를 호버와 무관하게 표시한다. inactive Pane Head
 복제하지 않고 같은 native LocationBar를 새 host 또는 원래 `ToolbarView`로 되돌린다.
 각 Header의 page-aware 색은 Omnibox pill만이 아니라 42 DIP Pane Header 전체를
 채우며, 상단 두 모서리는 카드 외곽 곡률로 hard clip한다.
+
+두 Pane 사이의 resize hit area는 유지한다. 중앙의 회색 handle mark는 rest에서도
+시스템 surface와 대비되는 낮은 opacity로 고정되어 위치를 알린다. hover·focus에서는
+이 marker를 이동시키지 않고 fade out하며, 포인터 축 위치의 별도 active marker를
+동시에 fade in한다.
+hover하면 70ms 지연 뒤 커서 위에 가로 중앙 정렬된 둥근 floating control surface를
+열고, 상단 공간이 부족할 때만 커서 아래로 전환한다. `배치 변경`, `순서 변경`,
+`멀티탭 해제` 아이콘을
+이 순서로 배치한다. divider와 surface 사이의 이동 구간은 하나의 hover 영역으로
+묶는다. surface의 바깥쪽에는 2 DIP 안정 여백만 두고, divider와 surface 사이에만
+이동 bridge를 유지한다. 전체 영역을 이탈하면 최대 32ms의 pointer-exit 안정화 뒤
+80ms opacity/scale 닫기 모션을 시작한다.
+divider의 단순 click은
+surface를 유지하고, 실제 resize drag가 시작될 때만 surface를 즉시 닫아 native resize를
+우선한다. drag가 끝난 뒤 포인터가 divider 위에 남아 있으면 기존 reveal delay를 거쳐
+surface를 다시 연다. divider를 더블 클릭하거나 더블 탭하면 Pane 순서를 바꾸지 않고
+split ratio를 50:50으로 복원한다. 순서 변경은 floating surface의 전용 control만
+담당한다. 이
+surface는 split layout을 밀지 않는 overlay이며 기존 Chromium의 resize,
+orientation, reverse, remove-split 명령을 호출한다.
+
+resize handle의 짧은 중앙 mark는 rest에서 dimmed 상태로 고정한다. 포인터가 divider에
+들어오면 별도의 active mark가 최초 축 좌표만 정하고, floating surface가 열릴 때
+150ms opacity timing으로 fade in한다. 중앙 dimmed mark는 같은 timing으로 fade
+out한다. 이후 포인터를 추종하지 않으며 surface로 이동한 동안에는 위치를 유지한다.
+surface가 닫힐 때 active marker를 150ms `FAST_OUT_LINEAR_IN`으로 완전히 fade out한
+다음, 중앙 marker를 220ms `SMOOTH_IN_OUT`으로 fade in한다. 두 marker의 복귀
+opacity는 겹치지 않는다.
+실제 resize hit area는 움직이지 않는다. 키보드 focus에서는 중앙 mark를
+표시하고, 세로 divider에서는 surface와 handle 끝 사이에 6 DIP 간격을 둔다.
+
+세 control icon은 기능별로 구분되는 실루엣을 사용하고 선 두께, 곡률과 motion curve를
+공유한다. 이동 거리가 긴 layout과 reverse는 500ms, remove-split은 320ms로 재생해
+체감 속도를 맞춘다. layout은 frame을 유지한 채 목표 divider를 짧게 fade out하고,
+중앙에서 양끝으로 다시 펼친다. reverse는 완성된 두 화살표를 짧게 fade out한 뒤 위치를
+바꾸지 않고 각 꼬리부터 화살촉 방향으로 약간의 시차를 두고 다시 그린다. geometry를
+반대 방향으로 되감지 않는다. remove-split은 끊어진 divider와 원 없는 minus mark로
+표현한다.
+hover·focus에서 icon 전체를 사라지게 하지 않고 semantic preview를 한 번 재생하며
+action phase는 천천히 출발하는 `ACCEL_40_DECEL_100_3` 곡선을 사용한다.
+hover out에서는 역재생하지 않는다. remove-split preview는 온전한 divider가
+가운데부터 사라져 하나의 frame만 남는다. remove-split에 최대화 glyph를 사용하지
+않으며 reduced-motion에서는 모션 없이 목표 상태를 즉시 표시한다.
 
 Rest의 origin은 scheme과 선행 `www.`를 생략하되 의미 있는 subdomain은 유지한다.
 Origin과 Page title 사이는 글자 `|`가 아니라 1 DIP 세로 divider로 나누며, Page
