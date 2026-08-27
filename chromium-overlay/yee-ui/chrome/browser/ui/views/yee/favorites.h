@@ -70,11 +70,13 @@ bool FavoritesDockUsesSeparator();
 
 void ApplyFavoritesDockStyle(views::View& dock);
 
-// Idle / hover / active tile fill. Used by TabView and the drag preview.
+// Theme-aware tile state. Used by TabView, SplitTabView, and drag preview.
 void PaintFavoritesCellBackground(gfx::Canvas* canvas,
                                   const gfx::Rect& bounds,
-                                  bool active,
-                                  bool hovered);
+                                  SidebarItemVisualState state,
+                                  double hover_progress,
+                                  bool frame_active,
+                                  const ui::ColorProvider& color_provider);
 
 // Empty Favorites pad: dashed well plus “drag here” copy, full sidebar width.
 // Chromium glue only lays it out while a tab drag is active.

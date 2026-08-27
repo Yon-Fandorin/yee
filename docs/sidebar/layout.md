@@ -30,7 +30,12 @@ Favorites와 Tab 목록 사이에 1px 구분선을 두지 않는다. 독 칸의 
 영역을 나눈다.
 
 Title Bar의 New Tab과 Agent Control은 Sidebar Header에 남기되 Sidebar 본문 안에
-다시 두지 않는다. Sidebar Toggle은 Browser Surface Header의 첫 컨트롤로 옮긴다.
+다시 두지 않는다. 펼친 Sidebar에서는 두 컨트롤을 하나의 묶음으로 취급해 플랫폼
+창 버튼 다음에 불필요한 왼쪽 여백 없이 정렬한다. Sidebar Toggle은 Browser
+Surface Header의 첫 컨트롤로 옮긴다. 이 묶음은 `ToolbarView`가 아니라 Sidebar
+Header가 한 번만 소유한다. 따라서 분할 상태에서 공용 Toolbar가 사라지고 native
+Omnibox가 active Pane Header로 이동해도 New Tab과 Agent는 펼친 Sidebar에 그대로
+남고 각 pane에 복제되지 않는다.
 
 ## 세 상태
 
@@ -79,4 +84,7 @@ constant에 다시 적지 않는다.
 - Expanded Sidebar의 Tab ScrollView는 마지막 행에서 끝나지 않고 남은 세로
   공간 전체를 채운다. 마지막 Tab 아래의 빈 공간도 목록 끝 드롭 타깃이다.
 - Tab 행 32, 행 간격 2, 아이콘 16, Group 헤더 높이도 32
-- Favorites 칸 최소 32, 상하 padding 8, 칸 간격 8, 독 inset 6
+- Favorites 칸 최소 32, 상하 padding 8, 칸 간격 8, 독 좌우 inset 8 / 상단
+  inset 0. Favorite 독은 Sidebar Header 바로 아래에서 시작하고 Favorite이 없는
+  평상시 Tab 목록만 상단 8 DIP 여백을 유지한다. Favorite과 Tab 행의 좌우
+  정렬선은 같다.

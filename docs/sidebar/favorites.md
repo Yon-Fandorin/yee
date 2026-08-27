@@ -16,7 +16,11 @@ Favorites에 가깝고, Arc Pinned Tabs가 아니다. Chromium pin이 백킹이�
   묶지 않는다.
 - 한 행에 최대 4열, 전체 최대 12개.
 - 모서리 8 DIP. 기본 채움 알파 110, hover 150, 활성 220. 스트로크 72 / 활성 140.
-- 독 inset 6 DIP, 칸 간격 8 DIP.
+  RGB는 고정 흰색이 아니라 현재 theme의 elevated surface와 neutral outline에서
+  계산하고, 비활성 창에서는 같은 상태의 대비를 낮춘다.
+- 독은 Tab 행과 같은 좌우 8 DIP 정렬선을 한 번만 적용하고 Sidebar Header 바로
+  아래에서 시작한다. 별도 상단 inset은 두지 않으며 칸 간격은 8 DIP다. 바깥
+  ScrollView가 좌측 또는 상단 inset을 다시 더하지 않는다.
 
 고정 32px 열은 쓰지 않는다. 1px 흰 구분선만 있는 칸도 쓰지 않는다.
 

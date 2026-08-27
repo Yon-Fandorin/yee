@@ -27,11 +27,12 @@ Tab Sidebar에서 이미 고른 UX 결정은
 | 항목 | 기준 | 구현 메모 |
 | --- | ---: | --- |
 | Expanded sidebar | 244 DIP | prototype과 native shell이 같은 기본 폭 token을 사용한다. |
-| Sidebar header | Expanded sidebar와 동일 | New Tab·Agent Control과 Tab Sidebar가 하나의 Sidebar Column 경계를 공유한다. |
+| Sidebar header | Expanded sidebar와 동일 | New Tab·Agent Control과 Tab Sidebar가 하나의 Sidebar Column 경계를 공유하며, 플랫폼 Window Controls Safe Area 다음에 불필요한 leading gap을 두지 않는다. |
 | Browser surface gutter | 6 DIP | 결합된 Browser Surface의 상·우·하 및 Sidebar 쪽 외부 간격이다. |
 | Browser Surface Header | 42 DIP | 48 DIP Title Bar에서 상단 6 DIP gutter를 제외한 실제 표면 높이다. |
 | Browser Toolbar | 40 DIP | Browser Surface Header 안에서 수직 중앙 정렬한다. |
 | Omnibox | 34 DIP | Browser Surface Header 안에서 위·아래 4 DIP 여백을 갖는다. |
+| Header outer control inset | 8 DIP | 단일 Header의 Sidebar Toggle·Extensions와 분할 Pane Header의 바깥 control이 같은 edge inset을 사용한다. |
 | Split Pane Header | 42 DIP | 분할 카드 내부 상단. 34 DIP 주소 표면과 사방 4 DIP inset을 포함한다. |
 | Sidebar 내부 좌우 padding | 8 DIP | section 자체는 추가로 좌우 4 DIP inset을 사용할 수 있다. |
 | Sidebar section gap | 10 DIP | Favorites, Bookmarks, Group, Agent 영역 사이의 기본 리듬이다. |
@@ -64,6 +65,16 @@ New Tab과 Agent Control은 Sidebar Header에 남긴다. Sidebar Toggle은 Conte
 Column의 Browser Surface Header 첫 컨트롤이며, 그 뒤에 Back, Forward, Reload와
 Omnibox가 이어진다. 창 크기나 OS Window Controls 때문에 공간이 부족하면 컨트롤
 간격을 줄이되 Browser Surface의 시작 경계를 깨지 않는다.
+
+Sidebar Header의 New Tab·Agent는 창마다 한 세트만 존재하는 window-global
+control이다. `ToolbarView`나 개별 Split Pane Header의 자식으로 두지 않으며,
+공용 Toolbar가 분할 카드 안으로 이동하거나 숨겨져도 펼친 Sidebar와 함께 계속
+보인다. 플랫폼 Window Controls Safe Area는 Sidebar Header 자체가 받아 두
+컨트롤의 시작 위치를 결정한다.
+
+Favorite 독이 보일 때는 Sidebar Header 바로 아래에서 별도 상단 inset 없이
+시작한다. Favorite 표면이 없는 유휴 상태의 일반 Tab 목록은 8 DIP 상단 여백을
+유지한다.
 
 Sidebar가 닫히면 고정 기준선은 해제하고 Omnibox와 Browser Content가 남은 폭을
 사용한다. Hover flyout은 페이지 폭을 변경하지 않는다.
@@ -123,7 +134,9 @@ WebContents 합성 결과까지 검증한 뒤 별도 결정으로 추가해야 �
 각 OS는 하나의 `chrome_bg`를 가진다. Browser frame, pinned Sidebar와 Browser
 Surface 바깥 gutter는 동일한 값을 사용한다. 결합된 Browser Surface는 Toolbar
 theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline과 낮은
-두 단계 shadow로 구성한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고 더 옅은
+두 단계 shadow로 구성한다. 외곽 outline은 page-aware Header 색이 아니라 opaque
+shell contrast surface에서 계산해 단일 Surface와 Split Pane Card가 같은 경계색과
+stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고 더 옅은
 0/2/7 DIP ambient shadow가 Gutter로 자연스럽게 풀린다. 분할 상태의 중립 canvas도
 같은 외곽 outline과 shadow를 공유하되 내부 각 Pane의 active shadow와 역할을
 겹치지 않는다.
@@ -170,7 +183,9 @@ theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline�
 - macOS 26 미만, Windows, Linux와 macOS의 ‘투명도 줄이기’ 환경에서는 현재 theme
   frame 색을 불투명하게 그린다. 지원되는 macOS의 활성 창만 native material을
   사용하며 비활성 창은 같은 색의 불투명 표면으로 전환한다.
-- Active tab: 약 88% white, 얕은 1px/3px shadow
+- Active tab과 Favorite: 고정 흰색이 아니라 현재 theme의 elevated surface에서
+  계산한다. Hover는 system hover overlay, outline은 neutral outline, focus는 system
+  focus ring을 사용하며 비활성 창에서는 상태 대비를 낮춘다.
 - Windows restored window: visible outline 없이 DWM의 둥근 시스템 shadow를
   유지한다. 1px transparent top-frame extension은 shadow를 위한 합성 힌트일
   뿐이며 client surface 안에 검은 선이나 별도 inset을 만들지 않는다.
@@ -191,10 +206,19 @@ theme 색의 header, 불투명 WebContents, 외곽 theme-derived 1 DIP outline�
 
 ### macOS
 
-- Title bar: 52 DIP
+- Native caption titlebar: 54 DIP. AppKit의 Traffic Lights 중심을 Yee의
+  실제 Browser Surface Header 중심 `y=27`에 맞추기 위한 값이며, Yee content
+  layout의 Title Bar 예약 높이는 계속 48 DIP다.
 - Traffic lights: 왼쪽, Close → Minimize → Zoom
 - Traffic lights는 Sidebar Header의 Window Controls Safe Area에 두고 Shell
   Controls와 겹치지 않는다.
+- Sidebar를 접은 Split에서도 첫 Pane Header의 탐색 컨트롤은 같은 native
+  Window Controls Safe Area 뒤에서 시작한다. Pane Card 배경과 곡률은 창
+  왼쪽 gutter까지 유지하고 컨트롤만 safe edge 안쪽으로 정렬한다.
+- 단일 Browser Toolbar와 Split Pane Header의 컨트롤 행은 상단 6 DIP gutter 아래
+  42 DIP Browser Surface Header의 공통 중심 `y=27`을 사용한다. Traffic Lights도
+  AppKit native titlebar를 통해 같은 축에 맞춘다. 주소 표면의 inset을 유지하며,
+  정렬을 위해 카드의 상단 gutter나 outline 위치를 바꾸지 않는다.
 - Leading actions는 필요하면 26 DIP까지 압축할 수 있다.
 - Glass/blur는 지원되는 macOS의 browser chrome에만 적용하고 `WebContents`는
   불투명하게 유지한다. 시스템의 ‘투명도 줄이기’ 설정에서는 즉시 불투명 셸로
@@ -545,7 +569,8 @@ page action을 두 번 실행하지 않는다.
 | Caption controls | 플랫폼 native frame/container |
 | Pinned Sidebar geometry | `BrowserView` proposed layout의 단일 owner |
 | Favorites / Bookmarks / Groups | Favorites는 실제 pinned tabs, Bookmarks는 실제 manager entry, Groups는 `TabStripModel`의 tab group |
-| Agent activity | Toolbar status View + Sidebar task model contract |
+| Sidebar Header actions | Yee-owned window-global View. New Tab·Agent를 한 세트만 소유하고 native command callback을 호출한다. |
+| Agent activity | Sidebar Header status control + Sidebar task model contract |
 | Tenant / Workspace | Sidebar footer View; Title bar에 중복 금지 |
 
 레이아웃 계산은 한 곳에서만 소유한다. Title bar가 nominal sidebar width를 다시
@@ -573,13 +598,18 @@ native 구현은 Chromium의 model, accelerator, theme, focus manager와 accessi
 
 - [ ] Windows, macOS, Linux에서 Sidebar 폭과 내부 행 위치가 같다.
 - [ ] Expanded 상태에서 Browser Surface Header와 Browser Content의 왼쪽 경계가 1 DIP 이내로 맞는다.
-- [ ] Sidebar Toggle이 Browser Surface Header의 첫 컨트롤이고 New Tab·Agent는 Sidebar Header에 남는다.
+- [ ] Sidebar Toggle이 Browser Surface Header의 첫 컨트롤이고 New Tab·Agent는
+      Sidebar Header에 남는다. 분할 진입으로 공용 Toolbar가 숨겨져도 펼친
+      Sidebar의 두 control은 사라지거나 pane마다 중복되지 않는다.
 - [ ] Toolbar와 Browser Content 사이에는 gap 없이 theme-derived 1 DIP separator만 보인다.
 - [ ] Browser Surface의 상·우·하 및 Sidebar 쪽 외부 gutter가 6 DIP다.
 - [ ] Browser Surface 외곽 네 모서리가 12 DIP이고 WebContents 하단 clip과 일치한다.
 - [ ] 일반 한 탭의 overlay scrollbar와 page overlay가 WebContents 하단 곡률 또는
       Content Gutter를 뚫고 나오지 않는다.
-- [ ] 외곽 outline은 theme-derived 1 DIP이고 shadow는 얕은 1px/3px다.
+- [ ] 단일 Browser Surface와 Split Pane Card의 외곽 outline은 opaque shell
+      contrast surface에서 같은 renderer로 계산한 theme-derived 1 DIP이며, 실제
+      바깥 곡률도 12 DIP로 같다. 같은 elevation·색 계산의 얕은 shadow를 사용하고
+      active pane은 outline alpha만 강화하며 shadow 깊이는 바꾸지 않는다.
 - [ ] Caption controls가 content나 extension dock 위로 겹치지 않는다.
 - [ ] 창 resize, maximize/restore, DPI 100/125/150/200%에서 정렬이 유지된다.
 - [ ] Sidebar collapse/expand 중 page viewport가 panel과 함께 연속 resize된다.

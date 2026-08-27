@@ -50,8 +50,8 @@
 namespace yee {
 namespace {
 
-int DockInset() {
-  return kSidebarMetrics.favorites_dock_insets;
+int DockHorizontalInset() {
+  return kSidebarMetrics.tab_strip_horizontal_padding;
 }
 
 int DockMinCell() {
@@ -100,7 +100,7 @@ struct DockGrid {
 
 DockGrid ComputeDockGrid(int item_count, int available_width) {
   DockGrid grid;
-  const int inset = DockInset();
+  const int inset = DockHorizontalInset();
   const int gap = DockGap();
   const int min_cell = DockMinCell();
   const int inner =
@@ -126,10 +126,12 @@ DockGrid ComputeDockGrid(int item_count, int available_width) {
 
 gfx::Size EmptyDockSize(int available_width) {
   const DockGrid grid = ComputeDockGrid(1, available_width);
-  const int inset = DockInset();
+  const int horizontal_inset = DockHorizontalInset();
   const int width =
-      available_width > 0 ? available_width : grid.cell_width + 2 * inset;
-  return gfx::Size(width, grid.cell_height + inset);
+      available_width > 0
+          ? available_width
+          : grid.cell_width + 2 * horizontal_inset;
+  return gfx::Size(width, grid.cell_height);
 }
 
 gfx::Size LiveFavoriteCellSize(const views::View& tab_strip) {
@@ -149,9 +151,9 @@ gfx::Size LiveFavoriteCellSize(const views::View& tab_strip) {
 }  // namespace
 
 gfx::Size FavoritesDockMinimumSize(int /*item_count*/) {
-  const int inset = DockInset();
+  const int horizontal_inset = DockHorizontalInset();
   const int cell = DockMinCell();
-  return gfx::Size(cell + 2 * inset, cell + inset);
+  return gfx::Size(cell + 2 * horizontal_inset, cell);
 }
 
 views::ProposedLayout CalculateFavoritesDockLayout(
@@ -160,7 +162,7 @@ views::ProposedLayout CalculateFavoritesDockLayout(
     bool contains_split,
     std::optional<int> incoming_slot) {
   views::ProposedLayout layouts;
-  const int inset = DockInset();
+  const int horizontal_inset = DockHorizontalInset();
   const int gap = DockGap();
   const int available_width = size_bounds.width().value_or(0);
   const int laid_out = CountLaidOutItems(items);
@@ -175,11 +177,11 @@ views::ProposedLayout CalculateFavoritesDockLayout(
   const int child_width = grid.cell_width * (contains_split ? 2 : 1);
   const int child_height = grid.cell_height;
 
-  int x = inset;
-  int y = inset;
+  int x = horizontal_inset;
+  int y = 0;
   int column = 0;
-  int content_right = inset;
-  int content_bottom = inset;
+  int content_right = horizontal_inset;
+  int content_bottom = 0;
   int next_slot = 0;
 
   auto occupy_slot = [&]() {
@@ -189,7 +191,7 @@ views::ProposedLayout CalculateFavoritesDockLayout(
     ++column;
     if (column >= grid.columns) {
       column = 0;
-      x = inset;
+      x = horizontal_inset;
       y = slot.bottom() + gap;
     } else {
       x = slot.right() + gap;
@@ -243,7 +245,9 @@ views::ProposedLayout CalculateFavoritesDockLayout(
   consume_incoming();
 
   layouts.host_size =
-      gfx::Size(available_width > 0 ? available_width : content_right + inset,
+      gfx::Size(available_width > 0
+                    ? available_width
+                    : content_right + horizontal_inset,
                 content_bottom);
   return layouts;
 }
@@ -286,20 +290,21 @@ std::optional<int> FavoritesInsertIndexForTile(const views::View& dock,
   }
 
   const DockGrid grid = ComputeDockGrid(item_count, dock_w);
-  const int inset = DockInset();
+  const int horizontal_inset = DockHorizontalInset();
   const int gap = DockGap();
   const int stride_x = grid.cell_width + gap;
   const int stride_y = grid.cell_height + gap;
   const int last_index = item_count - 1;
   const int last_row = last_index / grid.columns;
   const int last_col = last_index % grid.columns;
-  const int last_bottom = inset + (last_row + 1) * stride_y - gap;
+  const int last_bottom = (last_row + 1) * stride_y - gap;
   if (center.y() >= last_bottom) {
     return item_count;
   }
 
-  int col = stride_x > 0 ? (center.x() - inset) / stride_x : 0;
-  int row = stride_y > 0 ? (center.y() - inset) / stride_y : 0;
+  int col =
+      stride_x > 0 ? (center.x() - horizontal_inset) / stride_x : 0;
+  int row = stride_y > 0 ? center.y() / stride_y : 0;
   col = std::clamp(col, 0, grid.columns - 1);
   row = std::max(0, row);
   if (row > last_row || (row == last_row && col > last_col)) {
@@ -320,8 +325,10 @@ void ApplyFavoritesDockStyle(views::View& dock) {
 
 void PaintFavoritesCellBackground(gfx::Canvas* canvas,
                                   const gfx::Rect& bounds,
-                                  bool active,
-                                  bool hovered) {
+                                  SidebarItemVisualState state,
+                                  double hover_progress,
+                                  bool frame_active,
+                                  const ui::ColorProvider& color_provider) {
   if (!canvas || bounds.IsEmpty()) {
     return;
   }
@@ -331,26 +338,20 @@ void PaintFavoritesCellBackground(gfx::Canvas* canvas,
   const float radius =
       static_cast<float>(kSidebarMetrics.favorites_dock_corner_radius);
 
-  int alpha = kSidebarMetrics.favorites_cell_fill_alpha;
-  if (active) {
-    alpha = kSidebarMetrics.favorites_cell_active_fill_alpha;
-  } else if (hovered) {
-    alpha = kSidebarMetrics.favorites_cell_hover_fill_alpha;
-  }
+  const SidebarItemColors colors = ResolveSidebarItemColors(
+      color_provider, state, hover_progress, frame_active,
+      /*persistent_surface=*/true);
 
   cc::PaintFlags fill;
   fill.setAntiAlias(true);
-  fill.setColor(SkColorSetARGB(alpha, 255, 255, 255));
+  fill.setColor(colors.fill);
   canvas->DrawRoundRect(card, radius, fill);
 
   cc::PaintFlags stroke;
   stroke.setAntiAlias(true);
   stroke.setStyle(cc::PaintFlags::kStroke_Style);
   stroke.setStrokeWidth(1.0f);
-  stroke.setColor(
-      SkColorSetARGB(active ? kSidebarMetrics.favorites_cell_active_stroke_alpha
-                            : kSidebarMetrics.favorites_cell_stroke_alpha,
-                     255, 255, 255));
+  stroke.setColor(colors.stroke);
   canvas->DrawRoundRect(card, radius, stroke);
 }
 
@@ -825,7 +826,12 @@ class FavoritesDragPreview : public views::View {
   void OnPaint(gfx::Canvas* canvas) override {
     if (over_favorites_) {
       PaintFavoritesCellBackground(canvas, GetLocalBounds(),
-                                   /*active=*/true, /*hovered=*/false);
+                                   SidebarItemVisualState::kDragging,
+                                   /*hover_progress=*/1.0,
+                                   GetWidget()
+                                       ? GetWidget()->ShouldPaintAsActive()
+                                       : true,
+                                   *GetColorProvider());
     } else {
       cc::PaintFlags fill;
       fill.setAntiAlias(true);
@@ -845,18 +851,17 @@ class FavoritesDragPreview : public views::View {
  private:
   void UpdateColors() {
     const ui::ColorProvider* const provider = GetColorProvider();
-    const SkColor foreground =
-        provider ? provider->GetColor(ui::kColorLabelForeground)
-                 : SK_ColorBLACK;
+    const bool frame_active =
+        !GetWidget() || GetWidget()->ShouldPaintAsActive();
+    const SidebarItemColors colors =
+        provider ? ResolveSidebarItemColors(
+                       *provider, SidebarItemVisualState::kDragging,
+                       /*hover_progress=*/1.0, frame_active,
+                       /*persistent_surface=*/true)
+                 : SidebarItemColors();
+    const SkColor foreground = colors.foreground;
     title_->SetColors(foreground, foreground);
-
-    // Light text sits on a dark card; dark text sits on a lifted white card so
-    // the preview matches the glass sidebar instead of inverting it.
-    if (color_utils::IsDark(foreground)) {
-      fill_color_ = SkColorSetARGB(over_favorites_ ? 230 : 210, 255, 255, 255);
-    } else {
-      fill_color_ = SkColorSetARGB(over_favorites_ ? 210 : 180, 32, 36, 34);
-    }
+    fill_color_ = colors.fill;
   }
 
   bool over_favorites_ = false;

@@ -12,6 +12,7 @@
 #include "base/functional/callback_forward.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/color/color_provider_key.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/views/controls/button/button.h"
@@ -39,28 +40,36 @@ struct SidebarMetrics {
   int collapsed_width = 8;
   int content_gutter = 6;
   int content_corner_radius = 12;
+  int browser_surface_outline_width = 1;
   int titlebar_height = 48;
   int toolbar_height = 40;
   int toolbar_leading_inset = 10;
   int toolbar_trailing_gap = 8;
   int toolbar_interior_inset = 4;
+  int browser_surface_header_control_edge_inset = 8;
+  int toolbar_extension_container_margin = 2;
   int location_bar_margin = 5;
   int location_bar_focus_stroke_inset = 2;
   int split_card_inset = 0;
   int split_card_corner_radius = 12;
   int split_pane_header_height = 42;
   int split_pane_address_bar_inset = 4;
-  int split_pane_address_bar_height = 34;
+  int browser_surface_location_bar_height = 34;
   int split_pane_address_bar_gap = 4;
   int split_pane_content_stroke_inset = 1;
   int split_pane_inner_corner_radius = 11;
   int split_pane_address_bar_horizontal_padding = 8;
   int split_pane_address_bar_active_padding = 2;
   int split_pane_address_bar_item_spacing = 6;
-  int sidebar_header_control_count = 2;
   int shell_control_size = 30;
   int shell_control_corner_radius = 8;
   int shell_control_horizontal_margin = 1;
+  int sidebar_header_controls_leading_adjustment = 12;
+
+  constexpr int sidebar_header_controls_leading_inset() const {
+    return toolbar_leading_inset + toolbar_interior_inset -
+           sidebar_header_controls_leading_adjustment;
+  }
 
   // The combined Browser Surface starts below the shell gutter, so its
   // Header is shorter than the window titlebar. Center the native Toolbar in
@@ -68,21 +77,24 @@ struct SidebarMetrics {
   constexpr int browser_surface_header_height() const {
     return titlebar_height - content_gutter;
   }
-  constexpr int titlebar_toolbar_top_inset() const {
-    return (titlebar_height - toolbar_height) / 2;
+  constexpr int browser_surface_header_center_y() const {
+    return content_gutter + browser_surface_header_height() / 2;
   }
   constexpr int browser_surface_toolbar_top_inset() const {
-    return content_gutter +
-           (browser_surface_header_height() - toolbar_height) / 2;
+    return browser_surface_header_center_y() - toolbar_height / 2;
   }
-  constexpr int browser_surface_toolbar_offset() const {
-    return browser_surface_toolbar_top_inset() - titlebar_toolbar_top_inset();
+  // AppKit centers native caption controls inside its private titlebar height.
+  // Yee's visible Header starts below the outer gutter, so use a symmetric
+  // native titlebar whose center lands on the same visual axis.
+  constexpr int native_caption_titlebar_height() const {
+    return 2 * browser_surface_header_center_y();
   }
   int tab_icon_design_width = 16;
   int tab_row_height = 32;
   int tab_content_vertical_padding = 3;
   int tab_content_horizontal_padding = 8;
   int tab_strip_horizontal_padding = 8;
+  int tab_list_top_inset = 8;
   int tab_to_content_gap = 8;
   int tab_row_margin = 2;
   int tab_hover_card_offset = 4;
@@ -109,14 +121,12 @@ struct SidebarMetrics {
   int group_mark_slot_size = 16;
   int group_mark_trailing_margin = 4;
   int group_unread_dot_size = 5;
-  int group_header_hover_alpha = 51;
 
   int favorites_cell_size = 32;
   int favorites_cell_vertical_padding = 8;
   int favorites_cell_gap = 8;
   int favorites_max_columns = 4;
   int favorites_max_count = 12;
-  int favorites_dock_insets = 6;
   int favorites_dock_corner_radius = 8;
   int favorites_dock_fill_alpha = 36;
   int favorites_cell_fill_alpha = 110;
@@ -135,9 +145,47 @@ struct SidebarMetrics {
 };
 
 inline constexpr SidebarMetrics kSidebarMetrics;
+
+// One theme-aware state contract for rows, Favorite tiles, and drag previews.
+// Geometry remains component-specific, while state colors stay identical
+// across light/dark themes and active/inactive windows.
+enum class SidebarItemVisualState {
+  kResting,
+  kHovered,
+  kActive,
+  kDragging,
+};
+
+struct SidebarItemColors {
+  SkColor fill = SK_ColorTRANSPARENT;
+  SkColor stroke = SK_ColorTRANSPARENT;
+  SkColor foreground = SK_ColorBLACK;
+};
+
+SidebarItemColors ResolveSidebarItemColors(
+    const ui::ColorProvider& color_provider,
+    SidebarItemVisualState state,
+    double hover_progress,
+    bool frame_active,
+    bool persistent_surface);
 static_assert(kSidebarMetrics.split_pane_inner_corner_radius ==
               kSidebarMetrics.split_card_corner_radius -
                   kSidebarMetrics.split_pane_content_stroke_inset);
+static_assert(kSidebarMetrics.content_corner_radius ==
+              kSidebarMetrics.split_card_corner_radius);
+static_assert(kSidebarMetrics.browser_surface_header_height() ==
+              kSidebarMetrics.split_pane_header_height);
+static_assert(kSidebarMetrics.browser_surface_location_bar_height +
+                      2 * kSidebarMetrics.split_pane_address_bar_inset ==
+                  kSidebarMetrics.browser_surface_header_height());
+static_assert(kSidebarMetrics.browser_surface_header_control_edge_inset ==
+              kSidebarMetrics.toolbar_trailing_gap -
+                      kSidebarMetrics.content_gutter +
+                  kSidebarMetrics.toolbar_interior_inset +
+                  kSidebarMetrics.toolbar_extension_container_margin);
+static_assert(kSidebarMetrics.browser_surface_outline_width ==
+              kSidebarMetrics.split_pane_content_stroke_inset);
+static_assert(kSidebarMetrics.sidebar_header_controls_leading_inset() >= 0);
 inline constexpr int kSidebarFavoritesLabelViewId = 92001;
 inline constexpr int kSidebarBookmarksButtonViewId = 92002;
 inline constexpr int kSidebarFavoritesDropZoneViewId = 92007;
@@ -278,6 +326,20 @@ std::unique_ptr<ToolbarButton> CreateShellAddButton(
     ShellCreateCallback callback);
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
     views::Button::PressedCallback callback);
+
+// Window-global Sidebar Header actions. This view owns one Create control and
+// one Agent status control regardless of whether the Browser Surface is single
+// or split. Chromium supplies command callbacks and the platform caption-button
+// exclusion; Yee owns their presentation and geometry.
+std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
+    ShellCreateCallback create_callback,
+    views::Button::PressedCallback agent_callback);
+void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
+                                             int leading_exclusion);
+void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible);
+bool IsSidebarHeaderActionsPositionInWindowCaption(
+    const views::View& view,
+    const gfx::Point& point);
 
 }  // namespace yee
 

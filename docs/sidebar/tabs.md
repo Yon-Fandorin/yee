@@ -14,8 +14,12 @@ Tabs는 URL과 `WebContents`에 연결된 실제 브라우저 탭이다. Favorit
 - 행 간격 2 DIP
 - 한 줄 제목만 그린다. 긴 제목은 끝에서 페이드한다. hostname/URL은 행이
   아니라 hover card에 둔다.
-- 목록 행의 활성/hover는 native 세로 탭 페인트다. Favorites 칸의 dimmed
-  카드와 섞지 않는다. 스펙의 3×20 mint indicator를 넣을지는 묻는다.
+- 목록 행은 native 세로 탭 페인트와 hit target을 유지한다. 색만 Favorites,
+  Group hover, 드래그 프리뷰와 같은 theme-aware Sidebar state 팔레트를 쓴다.
+  유휴 Tab 행은 투명하고 Favorite만 dimmed 기본 표면을 유지한다. active는
+  elevated surface, hover는 system hover overlay, focus는 system focus ring을
+  사용하며 비활성 창에서는 같은 상태의 대비를 낮춘다. 스펙의 3×20 mint
+  indicator를 넣을지는 묻는다.
 
 `Tabs` 섹션 제목은 두지 않는다.
 
@@ -71,11 +75,10 @@ Tab은 보였던 빈자리로 이동하고 다른 한쪽은 기존 분할 위치
 ### 분할뷰 표면 회귀 체크리스트
 
 Yee shell은 Browser Surface 바깥 여백과 둥근 모서리를 이미 소유한다. 분할
-상태는 일반 한 탭 상태와 구분되는 별도 presentation이다. 주소 표시줄 아래에
-불투명한 중립 그레이 canvas를 놓고, 두 `ContentsContainerView`를 각각 네
-모서리가 둥근 카드로 배치한다. canvas는 theme에서 계산하되 page 표면 색이나
-바탕 화면을 비치지 않는다. 이 불투명 배경이 카드의 잘린 모서리, 바깥 inset,
-두 pane 사이 resize 영역을 모두 채운다.
+상태는 일반 한 탭 상태와 구분되는 별도 presentation이다. Split Canvas는
+배경·외곽선·그림자 없이 배치만 담당하고, 두 `ContentsContainerView`를 각각 네
+모서리가 둥근 Pane Card로 배치한다. 카드 밖에는 Yee Chrome Surface가 그대로
+보이고, 각 Pane Card가 자신의 page surface와 clip을 소유한다.
 
 분할 중에는 공용 Browser Toolbar 행과 그 예약 높이를 제거하고 두 카드를 상단 6 DIP
 Content Gutter까지 올린다. 두 카드는 각각 42 DIP 높이의 Pane Header를 내부 상단에
@@ -89,14 +92,16 @@ Omnibox로 한 번에 focus를 넘긴다. native Omnibox나 주소 편집 model�
 
 각 42 DIP Pane Header 전체는 해당 WebContents의 page-aware 색을 독립적으로
 따른다. Omnibox나 origin label의 안쪽 pill만 색칠하지 않는다. 따라서
-서로 다른 두 페이지의 Header 색은 달라질 수 있다. active pane은
-카드 전체의 얕은 그림자와 한 단계 진한 1 DIP 외곽선으로 구분하고, 주소 표면의
+서로 다른 두 페이지의 Header 색은 달라질 수 있다. 외곽 경계는 페이지가 아니라
+Yee chrome에 속하므로 단일 Browser Surface와 Pane Card 모두 opaque shell contrast
+surface에서 같은 renderer·색·1 DIP stroke·12 DIP 바깥 곡률을 계산한다. active pane은
+같은 색 계산에서 alpha만 한 단계 높인다. 주소 표면의
 focus stroke는 실제 편집 중일 때만 표시한다. Split Canvas는 page 색과 관계없는
 투명 레이아웃 영역이며 자체 fill·outline·shadow를 그리지 않는다. 뒤의 Chrome Surface가
 그대로 보이고 시각적 표면 경계는 두 Pane Card가 담당한다. 단일 Tab으로 돌아오면
 기존 Browser Surface backing, 1 DIP outline, 낮은 two-stage shadow와 Header 아래의
-하단 두 모서리 clip을 복원한다. 분할 상태의 active Pane shadow는 선택된 카드만
-구분한다.
+하단 두 모서리 clip을 복원한다. 선택 상태는 그림자를 과하게 키우지 않고 outline
+차이로 전달한다.
 
 각 카드는 별도 split inset 없이 Browser Surface의 네 변에 직접 정렬하고 12 DIP
 곡률로 네 모서리를 모두 클리핑한다. 두 카드 사이에는 Chromium의 resize hit target과
@@ -198,14 +203,26 @@ host한다. 따라서 WebContents 우하단에 별도 rail이나 notch를 만들
 scrollbar와 닫기 affordance도 겹치지 않는다.
 permission/security semantic highlight 중에는 native 동작대로 숨긴다.
 
-- [ ] 분할 진입 시 두 카드 상단에 같은 42 DIP Pane Header와 34 DIP 주소 표면이
-      나타나고 WebContents는 그 아래에서 시작한다.
+- [ ] 단일 Browser Surface Header와 분할 진입 시 두 카드의 42 DIP Pane Header가
+      모두 같은 34 DIP 주소 표면을 사용하며, 분할 WebContents는 그 아래에서 시작한다.
 - [ ] 공용 Browser Toolbar의 빈 상단 행이 분할에서 남지 않고 카드가 6 DIP 상단
       gutter에 맞닿는다. 일반 단일 Tab으로 돌아오면 기존 Toolbar 행과 inset이
       정확히 복원된다.
+- [ ] 펼친 Sidebar의 New Tab·Agent는 공용 Browser Toolbar의 가시성과 무관하게
+      그대로 보이며, 두 Pane Header 안에 중복 생성되지 않는다. Sidebar를 접으면
+      두 control도 Sidebar Header와 함께 사라진다.
 - [ ] active Header의 Sidebar Toggle·Back·Forward·Reload와 inactive Header의
       Back·Forward·Reload가 pointer hover 전에도 보이며 활성·비활성 상태가 해당
       WebContents의 탐색 기록을 따른다.
+- [ ] Sidebar를 접어 첫 Pane Card가 창 왼쪽 gutter에 닿아도 Pane Header의 첫
+      컨트롤은 native caption exclusion 뒤에서 시작하고 traffic lights와 겹치지
+      않는다. 카드 배경 자체를 밀어 이중 gutter를 만들지는 않는다.
+- [ ] Split Pane Header의 컨트롤 행은 좌우 pane 모두 단일 Browser Surface Header와
+      같은 `y=27` 중심축을 사용한다. Sidebar·탐색·주소 표면처럼 높이가 다른 요소도
+      이 축을 공유하고 주소 표면의 inset을 유지하며, 정렬을 위해 카드 배경·outline·
+      separator를 위로 당기지 않는다. macOS Traffic Lights도 같은 축에 놓인다.
+- [ ] 단일 Header의 Sidebar Toggle과 Extensions control, 분할 Pane Header의 가장
+      바깥 control은 각 surface edge에서 최소 8 DIP inset을 공유한다.
 - [ ] active pane에는 실제 native Omnibox, inactive pane에는 favicon과
       `origin | title` 읽기 전용 표면이 보이며 inactive 표면 click은 pane 활성화와
       주소 편집을 한 번에 수행한다.
@@ -218,13 +235,16 @@ permission/security semantic highlight 중에는 native 동작대로 숨긴다.
       밝고 어두운 page 색 모두에서 외곽선을 덮거나 모서리로 튀어나오지 않는다.
 - [ ] Pane Header와 WebContents 사이에는 resolved Header surface에서 도출한 조용한
       1 DIP separator만 보이며 중복 gap이나 별도 pill 외곽선이 생기지 않는다.
-- [ ] active pane의 카드 전체에만 강화된 1 DIP outline과 얕은 shadow가 보이며,
+- [ ] 두 Pane Card와 단일 Browser Surface의 기본 outline은 page-aware Header 색과
+      분리된 같은 shell contrast surface에서 하나의 renderer로 계산되며, stroke
+      geometry·12 DIP 바깥 곡률·색이 같다. shadow renderer·elevation·색 계산도
+      같고, active pane에만 강화된 1 DIP outline이 보이며,
       주소 focus stroke는 실제 편집 중일 때만 추가된다.
 - [ ] 라이트·다크 테마와 활성·비활성 창에서 Split Canvas가 완전히 투명하고 자체
       색 띠·외곽선·그림자를 만들지 않으며 뒤의 Chrome Surface가 자연스럽게 보인다.
 - [ ] 분할 상태에서 각 Pane Card의 12 DIP clip이 외곽 모서리를 담당하고, 단일 Tab
       복귀 시 중복 곡률이나 빈 틈 없이 기존 Browser Surface 경계로 돌아간다.
-- [ ] 분할 상태에서는 Pane Card 외곽선과 active shadow만 보이며, 제거된 Split Canvas
+- [ ] 분할 상태에서는 Pane Card 외곽선과 낮은 카드 shadow만 보이며, 제거된 Split Canvas
       경계와 겹쳐 두꺼운 테두리나 상·하단 중복선이 생기지 않는다.
 - [ ] 각 카드가 별도 inset 없이 Browser Surface 네 변에 직접 정렬되고, pane 사이에는
       native resize 영역만 남는다.
