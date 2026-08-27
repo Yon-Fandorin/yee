@@ -490,83 +490,6 @@ index b46ad7ecdf..173e08dc18 100644
  
  // Per-window state for the vertical tab strip.
  struct VerticalTabStripState {
-diff --git a/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.cc b/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.cc
-index a2ed5990f4..04bbdc49f3 100644
---- a/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.cc
-+++ b/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.cc
-@@ -9,9 +9,11 @@
- #include "base/check_deref.h"
- #include "base/functional/bind.h"
- #include "base/i18n/case_conversion.h"
-+#include "base/location.h"
- #include "base/metrics/user_metrics.h"
- #include "base/metrics/user_metrics_action.h"
- #include "base/notreached.h"
-+#include "base/task/sequenced_task_runner.h"
- #include "chrome/browser/extensions/extension_action_runner.h"
- #include "chrome/browser/extensions/extension_tab_util.h"
- #include "chrome/browser/extensions/extension_ui_util.h"
-@@ -433,8 +435,27 @@ void ExtensionsMenuDelegateDesktop::OpenSitePermissionsPage(
- }
- 
- void ExtensionsMenuDelegateDesktop::CloseBubble() {
--  bubble_contents_->GetWidget()->CloseWithReason(
--      views::Widget::ClosedReason::kCloseButtonClicked);
-+  views::Widget* const widget = bubble_contents_->GetWidget();
-+  if (!widget) {
-+    // OpenMainPage() runs while the BubbleDialogDelegate is still being
-+    // assembled. An empty extensions list can request a close before Views has
-+    // created its Widget, so finish construction before honoring that close.
-+    if (!close_bubble_task_pending_) {
-+      close_bubble_task_pending_ = true;
-+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-+          FROM_HERE,
-+          base::BindOnce(
-+              &ExtensionsMenuDelegateDesktop::CloseBubbleWhenWidgetIsReady,
-+              weak_ptr_factory_.GetWeakPtr()));
-+    }
-+    return;
-+  }
-+  widget->CloseWithReason(views::Widget::ClosedReason::kCloseButtonClicked);
-+}
-+
-+void ExtensionsMenuDelegateDesktop::CloseBubbleWhenWidgetIsReady() {
-+  close_bubble_task_pending_ = false;
-+  CloseBubble();
- }
- 
- void ExtensionsMenuDelegateDesktop::OnSiteAccessSelected(
-diff --git a/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.h b/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.h
-index 1aece851a7..482d6961c3 100644
---- a/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.h
-+++ b/chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.h
-@@ -7,6 +7,7 @@
- 
- #include "base/memory/raw_ptr.h"
- #include "base/memory/raw_ref.h"
-+#include "base/memory/weak_ptr.h"
- #include "chrome/browser/ui/extensions/extensions_menu_handler.h"
- #include "chrome/browser/ui/extensions/extensions_menu_view_model.h"
- #include "content/public/browser/web_contents.h"
-@@ -101,6 +102,8 @@ class ExtensionsMenuDelegateDesktop : public ExtensionsMenuViewModel::Delegate,
-   ExtensionsMenuSitePermissionsPageView* GetSitePermissionsPageForTesting();
- 
-  private:
-+  void CloseBubbleWhenWidgetIsReady();
-+
-   // Switches the current page to `page`.
-   void SwitchToPage(std::unique_ptr<views::View> page);
- 
-@@ -134,6 +137,9 @@ class ExtensionsMenuDelegateDesktop : public ExtensionsMenuViewModel::Delegate,
- 
-   // The current page visible in `bubble_contents_`.
-   views::ViewTracker current_page_;
-+
-+  bool close_bubble_task_pending_ = false;
-+  base::WeakPtrFactory<ExtensionsMenuDelegateDesktop> weak_ptr_factory_{this};
- };
- 
- #endif  // CHROME_BROWSER_UI_VIEWS_EXTENSIONS_EXTENSIONS_MENU_DELEGATE_DESKTOP_H_
 diff --git a/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc
 index 09cc9ce38d..21a534073a 100644
 --- a/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc
@@ -9029,7 +8952,7 @@ index 0fcdbfa57b..2c25d60149 100644
    std::optional<Button::ScopedAnchorHighlight> menu_anchor_higlight_;
  
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 09b381e46e..2a51b544ae 100644
+index 09b381e46e..a9389dbfba 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -19,9 +19,11 @@
@@ -9101,7 +9024,7 @@ index 09b381e46e..2a51b544ae 100644
  
  // Returns whether `point` should be treated as part of the caption area in
  // `view`. Recursively traverses into icon containers to correctly handle
-@@ -305,6 +336,265 @@ ToolbarView::~ToolbarView() {
+@@ -305,6 +336,273 @@ ToolbarView::~ToolbarView() {
    }
  }
  
@@ -9310,7 +9233,15 @@ index 09b381e46e..2a51b544ae 100644
 +  forward_->SetVisible(!in_split);
 +  reload_->SetVisible(!in_split);
 +  if (extensions_container_) {
-+    extensions_container_->SetVisible(!in_split);
++    if (in_split) {
++      // The split pane headers own their navigation controls, so suppress the
++      // top-level extension dock while the Omnibox is hosted in a pane.
++      extensions_container_->SetVisible(false);
++    } else {
++      // Chromium owns extension availability. In particular, an empty
++      // extension model must keep the dock hidden when leaving split view.
++      extensions_container_->UpdateContainerVisibility();
++    }
 +  }
 +  location_bar_view_->SetVisible(true);
 +  InvalidateLayout();
@@ -9367,7 +9298,7 @@ index 09b381e46e..2a51b544ae 100644
  void ToolbarView::Init() {
  #if defined(USE_AURA)
    // Avoid generating too many occlusion tracking calculation events before this
-@@ -1269,6 +1559,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
+@@ -1269,6 +1567,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
  
  bool ToolbarView::IsPositionInWindowCaption(
      const gfx::Point& test_point) const {
@@ -9378,7 +9309,7 @@ index 09b381e46e..2a51b544ae 100644
    return IsPositionInWindowCaptionForView(this, test_point);
  }
  
-@@ -1439,10 +1733,11 @@ void ToolbarView::Layout(PassKey) {
+@@ -1439,10 +1741,11 @@ void ToolbarView::Layout(PassKey) {
    }
  
    if (display_mode_ == DisplayMode::kNormal) {
@@ -9391,7 +9322,7 @@ index 09b381e46e..2a51b544ae 100644
      // Need to determine whether the overflow button should be visible, and only
      // update it if the visibility changes.
      const bool was_overflow_button_visible =
-@@ -1519,21 +1814,15 @@ void ToolbarView::InitLayout() {
+@@ -1519,21 +1822,15 @@ void ToolbarView::InitLayout() {
    // Shift previously flex-able elements' order by `kOrderOffset`.
    // This will cause them to be the first ones to drop out or shrink to minimum.
    // Order 1 - kOrderOffset will be assigned to new flex-able elements.
@@ -9417,7 +9348,7 @@ index 09b381e46e..2a51b544ae 100644
  
    layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
  
-@@ -1633,7 +1922,7 @@ void ToolbarView::InitLayout() {
+@@ -1633,7 +1930,7 @@ void ToolbarView::InitLayout() {
            views::kFlexBehaviorKey,
            toolbar_webview_->GetFlexSpecification(
                toolbar_controller_->webui_toolbar_button_flex_order(),
@@ -9426,7 +9357,7 @@ index 09b381e46e..2a51b544ae 100644
      } else {
        // If `toolbar_controller_` is nullptr, then the WebUI toolbar is managing
        // all controls, so don't need to worry about integrating with
-@@ -1704,6 +1993,10 @@ void ToolbarView::LayoutCommon() {
+@@ -1704,6 +2001,10 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
@@ -9437,7 +9368,7 @@ index 09b381e46e..2a51b544ae 100644
    layout_manager_->SetInteriorMargin(interior_margin);
  
    // Extend buttons to the window edge if we're either in a maximized or
-@@ -1751,7 +2044,9 @@ void ToolbarView::LayoutCommon() {
+@@ -1751,7 +2052,9 @@ void ToolbarView::LayoutCommon() {
  
    if (toolbar_divider_ && extensions_container_) {
      views::ManualLayoutUtil(layout_manager_)
@@ -9448,7 +9379,7 @@ index 09b381e46e..2a51b544ae 100644
    }
    // Cast button visibility is controlled externally.
  }
-@@ -1931,7 +2226,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
+@@ -1931,7 +2234,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
    return reload_;
  }
  
@@ -9456,7 +9387,7 @@ index 09b381e46e..2a51b544ae 100644
  ToolbarButton* ToolbarView::GetDownloadButton() {
    return pinned_toolbar_actions_container_
               ? pinned_toolbar_actions_container_->GetButtonFor(
-@@ -1988,7 +2282,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
+@@ -1988,7 +2290,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
  
  void ToolbarView::OnShowHomeButtonChanged() {
    if (home_) {
@@ -9465,7 +9396,7 @@ index 09b381e46e..2a51b544ae 100644
    }
  }
  
-@@ -2004,8 +2298,12 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2004,8 +2306,12 @@ void ToolbarView::OnTouchUiChanged() {
      layout_manager_->SetDefault(views::kMarginsKey,
                                  gfx::Insets::VH(0, default_margin));
      if (location_bar_view_) {
@@ -9480,7 +9411,7 @@ index 09b381e46e..2a51b544ae 100644
      }
  
      LoadImages();
-@@ -2014,6 +2312,9 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2014,6 +2320,9 @@ void ToolbarView::OnTouchUiChanged() {
  }
  
  void ToolbarView::SetForwardButtonVisibility(bool visible) {
