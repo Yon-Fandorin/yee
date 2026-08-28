@@ -33,6 +33,17 @@ class View;
 
 namespace yee {
 
+enum class FavoritesDragIntent { kNone, kPin, kUnpin, kRejected };
+
+// One policy decision shared by pointer hit-testing and native container-entry
+// callbacks. Keeping these paths identical prevents a nested Group from
+// overwriting a deferred unpin, and keeps a full dock rejection distinct from
+// a normal same-region drag.
+FavoritesDragIntent ResolveFavoritesDragIntent(bool dragging_pinned_tabs,
+                                               bool over_favorites,
+                                               int pinned_count,
+                                               int adding);
+
 // One cell in the Favorites icon dock. Drag fields match Chromium's
 // `DraggedViewVisualData` so the pinned container can hand layout off.
 struct FavoritesDockItem {
@@ -52,6 +63,11 @@ views::ProposedLayout CalculateFavoritesDockLayout(
 
 gfx::Size FavoritesTileSize(const views::View& dock);
 
+// Size of a cell after the dock reaches `item_count`. This is the geometry to
+// use for an incoming Tab because adding it can change the number of columns.
+gfx::Size FavoritesTileSizeForItemCount(const views::View& dock,
+                                        int item_count);
+
 // Screen rect of the moving favorite. `grab_offset` is the pointer
 // relative to the tile origin in pixels, captured from the real cell
 // so the overlay does not jump at drag start.
@@ -59,11 +75,34 @@ gfx::Rect FavoritesDraggedTileInScreen(const gfx::Point& pointer_in_screen,
                                        const gfx::Vector2d& grab_offset,
                                        const gfx::Size& tile_size);
 
-// Slot the moving tile is sitting on (0..item_count). Overlapping a
-// cell returns that cell's index; past the last cell returns item_count.
-std::optional<int> FavoritesInsertIndexForTile(const views::View& dock,
-                                               const gfx::Rect& tile_in_screen,
-                                               int item_count);
+// Target bounds of the drag preview while it is over the Tab list, in
+// `tab_strip` coordinates. Both painting and insertion hit-testing must use
+// this geometry so the Favorite tile's original grab point cannot change the
+// destination slot.
+gfx::Rect TabDragPreviewBoundsInTabStrip(
+    views::View& tab_strip,
+    const gfx::Point& pointer_in_screen,
+    int tab_leading_inset,
+    const gfx::Vector2d& source_grab_offset,
+    const gfx::Size& source_tile_size);
+
+// Moving tile converted to the dock's eventual cell geometry without moving
+// the pointer's relative grab position.
+gfx::Rect FavoritesDraggedTileForDockInScreen(
+    const views::View& dock,
+    const gfx::Point& pointer_in_screen,
+    const gfx::Vector2d& source_grab_offset,
+    const gfx::Size& source_tile_size,
+    int target_item_count);
+
+// Slot the moving tile is sitting on (0..item_count). `reserve_incoming_slot`
+// uses the resulting grid with one extra cell, which is required when a Tab
+// crosses into Favorites. Same-dock reordering keeps the current grid.
+std::optional<int> FavoritesInsertIndexForTile(
+    const views::View& dock,
+    const gfx::Rect& tile_in_screen,
+    int item_count,
+    bool reserve_incoming_slot = false);
 
 // The dock uses a dimmed well instead of a 1px separator.
 bool FavoritesDockUsesSeparator();
@@ -98,6 +137,8 @@ bool PointHitsFavoritesDropTarget(const views::View& tab_strip,
 void ShowFavoritesDragPreview(views::View& tab_strip,
                               const gfx::Point& point_in_screen,
                               bool over_favorites,
+                              int tab_leading_inset,
+                              int favorites_target_item_count,
                               const ui::ImageModel& favicon,
                               const std::u16string& title,
                               const gfx::Vector2d& grab_offset,

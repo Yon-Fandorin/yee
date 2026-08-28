@@ -21,6 +21,42 @@
 | [favorites-drag.md](./favorites-drag.md) | 드래그로 옮기기, 재배치, 영역 전환, 새 창 분리 |
 | [groups.md](./groups.md) | Group 헤더, color mark, Agent와의 구분 |
 | [tabs.md](./tabs.md) | Tab 행 표현, 세로 목록 드래그 |
+| [test-coverage.md](./test-coverage.md) | 자동 회귀 범위와 실제 화면 검수의 경계 |
+
+## 검증 배치
+
+문서의 동작 규칙을 한 종류의 테스트에 몰아넣지 않는다. 구현과 같은 변경에서
+아래 가장 낮은 계층에 회귀 근거를 둔다.
+
+| 규칙 | 검증 위치 |
+| --- | --- |
+| 용량, pin/unpin 의도, 레이아웃·삽입·hit geometry, RTL | `favorites_unittest.cc` 같은 Yee 유닛 테스트 |
+| 실제 View 배치·`TabStripModel` 순서·Group 소속·취소 복원 | Chromium `interactive_ui_tests` |
+| 색 대비, 클리핑, hover·drag motion의 시각적 연속성 | 각 문서의 Native 회귀 체크리스트를 실제 Yee 앱에서 검수 |
+
+새 규칙이 순수 입력과 출력으로 표현되면 유닛 테스트를 함께 추가한다. 실제
+Chromium View 생명주기나 모델 커밋이 핵심이면 억지로 mock 유닛 테스트를 만들지
+않고 interactive browser test를 둔다. 체감 모션처럼 픽셀과 시간의 조합이 핵심인
+항목은 자동화 가능한 불변 조건만 테스트하고 최종 시각 검수 항목을 유지한다.
+
+저장소 루트에서 아래 배치로 같은 범위를 반복 실행한다.
+
+```sh
+# 브라우저 창을 열지 않는 정책·geometry·View 유닛 테스트
+# (native View 테스트이므로 macOS GUI 세션 접근은 필요)
+./chromium-dev/test-sidebar.sh unit
+
+# 실제 Yee 창의 Sidebar 배치·drag·Group·scroll과 split/header 통합 테스트
+./chromium-dev/test-sidebar.sh interactive
+
+# 빌드와 두 배치를 순서대로 실행
+./chromium-dev/test-sidebar.sh all
+```
+
+`interactive`와 `all`은 기존 Yee 프로세스에 정상 종료를 요청한 뒤 새 테스트 창을
+열기 때문에 실행 중 포커스를 가져갈 수 있다. 이미 해당 target을 빌드했다면 마지막에
+`--no-build`를 붙인다. native 체크리스트는 자동화가 놓치는 페이드의 리듬, 색의 체감
+대비, 클리핑 가장자리처럼 실제 화면으로 판단해야 하는 항목만 남긴다.
 
 ## 아직 묻기
 

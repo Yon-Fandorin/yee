@@ -743,11 +743,15 @@ class YeeSidebarHeaderActionsView : public views::View {
   YeeSidebarHeaderActionsView(
       yee::ShellCreateCallback create_callback,
       views::Button::PressedCallback agent_callback) {
+    SetID(yee::kSidebarHeaderActionsViewId);
     auto add_button = yee::CreateShellAddButton(std::move(create_callback));
     add_button->SetVectorIcon(kAddIcon);
+    add_button->SetID(yee::kSidebarHeaderCreateViewId);
     add_button_ = AddChildView(std::move(add_button));
-    agent_button_ = AddChildView(
-        yee::CreateAgentToolbarButton(std::move(agent_callback)));
+    auto agent_button =
+        yee::CreateAgentToolbarButton(std::move(agent_callback));
+    agent_button->SetID(yee::kSidebarHeaderAgentViewId);
+    agent_button_ = AddChildView(std::move(agent_button));
   }
   YeeSidebarHeaderActionsView(const YeeSidebarHeaderActionsView&) = delete;
   YeeSidebarHeaderActionsView& operator=(

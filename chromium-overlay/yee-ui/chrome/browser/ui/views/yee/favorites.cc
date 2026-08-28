@@ -134,21 +134,23 @@ gfx::Size EmptyDockSize(int available_width) {
   return gfx::Size(width, grid.cell_height);
 }
 
-gfx::Size LiveFavoriteCellSize(const views::View& tab_strip) {
-  const auto* scroll =
-      views::AsViewClass<views::ScrollView>(const_cast<views::View*>(
-          tab_strip.GetViewByID(kSidebarFavoritesDockViewId)));
-  if (scroll && scroll->contents()) {
-    for (views::View* child : scroll->contents()->children()) {
-      if (child->GetVisible() && !child->size().IsEmpty()) {
-        return child->size();
-      }
-    }
-  }
-  return gfx::Size(DockMinCell(), DockCellHeight());
-}
-
 }  // namespace
+
+FavoritesDragIntent ResolveFavoritesDragIntent(bool dragging_pinned_tabs,
+                                               bool over_favorites,
+                                               int pinned_count,
+                                               int adding) {
+  if (dragging_pinned_tabs) {
+    return over_favorites ? FavoritesDragIntent::kNone
+                          : FavoritesDragIntent::kUnpin;
+  }
+  if (!over_favorites) {
+    return FavoritesDragIntent::kNone;
+  }
+  return CanFavoriteDrop(pinned_count, adding)
+             ? FavoritesDragIntent::kPin
+             : FavoritesDragIntent::kRejected;
+}
 
 gfx::Size FavoritesDockMinimumSize(int /*item_count*/) {
   const int horizontal_inset = DockHorizontalInset();
@@ -262,15 +264,85 @@ gfx::Size FavoritesTileSize(const views::View& dock) {
   return gfx::Size(grid.cell_width, grid.cell_height);
 }
 
+gfx::Size FavoritesTileSizeForItemCount(const views::View& dock,
+                                        int item_count) {
+  const DockGrid grid = ComputeDockGrid(item_count, dock.width());
+  return gfx::Size(grid.cell_width, grid.cell_height);
+}
+
 gfx::Rect FavoritesDraggedTileInScreen(const gfx::Point& pointer_in_screen,
                                        const gfx::Vector2d& grab_offset,
                                        const gfx::Size& tile_size) {
   return gfx::Rect(pointer_in_screen - grab_offset, tile_size);
 }
 
+gfx::Rect TabDragPreviewBoundsInTabStrip(
+    views::View& tab_strip,
+    const gfx::Point& pointer_in_screen,
+    int tab_leading_inset,
+    const gfx::Vector2d& source_grab_offset,
+    const gfx::Size& source_tile_size) {
+  const int pad = kSidebarMetrics.tab_strip_horizontal_padding;
+  const gfx::Size row_size(
+      std::max(DockMinCell(),
+               tab_strip.width() - 2 * pad - tab_leading_inset),
+      kSidebarMetrics.tab_row_height);
+  gfx::Vector2d grab_offset = source_grab_offset;
+  if (!source_tile_size.IsEmpty() && source_tile_size != row_size) {
+    grab_offset = gfx::Vector2d(
+        source_tile_size.width()
+            ? grab_offset.x() * row_size.width() / source_tile_size.width()
+            : grab_offset.x(),
+        source_tile_size.height()
+            ? grab_offset.y() * row_size.height() / source_tile_size.height()
+            : grab_offset.y());
+  }
+
+  gfx::Rect bounds = views::View::ConvertRectFromScreen(
+      &tab_strip,
+      FavoritesDraggedTileInScreen(pointer_in_screen, grab_offset, row_size));
+  // `SetBoundsRect()` consumes physical coordinates, so mirror the logical
+  // leading inset explicitly instead of relying on a LayoutManager to do it.
+  bounds.set_x(base::i18n::IsRTL()
+                   ? tab_strip.width() - pad - tab_leading_inset -
+                         row_size.width()
+                   : pad + tab_leading_inset);
+  bounds.set_width(row_size.width());
+  bounds.set_height(row_size.height());
+  bounds.AdjustToFit(tab_strip.GetLocalBounds());
+  return bounds;
+}
+
+gfx::Rect FavoritesDraggedTileForDockInScreen(
+    const views::View& dock,
+    const gfx::Point& pointer_in_screen,
+    const gfx::Vector2d& source_grab_offset,
+    const gfx::Size& source_tile_size,
+    int target_item_count) {
+  const gfx::Size target_size =
+      FavoritesTileSizeForItemCount(dock, target_item_count);
+  gfx::Size tile_size = source_tile_size;
+  gfx::Vector2d grab_offset = source_grab_offset;
+  if (tile_size.IsEmpty()) {
+    tile_size = target_size;
+  } else if (!target_size.IsEmpty() && tile_size != target_size) {
+    grab_offset = gfx::Vector2d(
+        tile_size.width()
+            ? grab_offset.x() * target_size.width() / tile_size.width()
+            : grab_offset.x(),
+        tile_size.height()
+            ? grab_offset.y() * target_size.height() / tile_size.height()
+            : grab_offset.y());
+    tile_size = target_size;
+  }
+  return FavoritesDraggedTileInScreen(pointer_in_screen, grab_offset,
+                                      tile_size);
+}
+
 std::optional<int> FavoritesInsertIndexForTile(const views::View& dock,
                                                const gfx::Rect& tile_in_screen,
-                                               int item_count) {
+                                               int item_count,
+                                               bool reserve_incoming_slot) {
   if (item_count <= 0) {
     return 0;
   }
@@ -289,7 +361,8 @@ std::optional<int> FavoritesInsertIndexForTile(const views::View& dock,
     return 0;
   }
 
-  const DockGrid grid = ComputeDockGrid(item_count, dock_w);
+  const DockGrid grid =
+      ComputeDockGrid(item_count + (reserve_incoming_slot ? 1 : 0), dock_w);
   const int horizontal_inset = DockHorizontalInset();
   const int gap = DockGap();
   const int stride_x = grid.cell_width + gap;
@@ -714,7 +787,7 @@ bool PointHitsFavoritesDropTarget(const views::View& tab_strip,
   return magnet.Contains(point_in_screen);
 }
 
-class FavoritesDragPreview : public views::View {
+class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(FavoritesDragPreview, views::View)
 
  public:
@@ -725,6 +798,12 @@ class FavoritesDragPreview : public views::View {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     layer()->SetOpacity(0.94f);
+    group_indent_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+    group_indent_animation_.SetSlideDuration(
+        base::Milliseconds(kSidebarMetrics.tab_drag_geometry_duration_ms));
+    region_transition_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+    region_transition_animation_.SetSlideDuration(
+        base::Milliseconds(kSidebarMetrics.tab_drag_geometry_duration_ms));
 
     icon_ = AddChildView(std::make_unique<views::ImageView>());
     const int icon_size = kSidebarMetrics.tab_icon_design_width;
@@ -736,14 +815,23 @@ class FavoritesDragPreview : public views::View {
   }
   FavoritesDragPreview(const FavoritesDragPreview&) = delete;
   FavoritesDragPreview& operator=(const FavoritesDragPreview&) = delete;
-  ~FavoritesDragPreview() override = default;
+  ~FavoritesDragPreview() override {
+    suppress_animation_callback_ = true;
+    group_indent_animation_.Stop();
+    region_transition_animation_.Stop();
+  }
 
   void Update(const gfx::Point& point_in_screen,
               bool over_favorites,
+              int tab_leading_inset,
+              int favorites_target_item_count,
               const ui::ImageModel& favicon,
               const std::u16string& title,
               const gfx::Vector2d& grab_offset,
               const gfx::Size& source_tile_size) {
+    const bool was_over_favorites = over_favorites_;
+    const bool had_preview_bounds = has_preview_bounds_;
+    const gfx::Rect previous_bounds = bounds();
     over_favorites_ = over_favorites;
     icon_->SetImage(favicon);
     title_->SetTitle(title);
@@ -755,54 +843,95 @@ class FavoritesDragPreview : public views::View {
       return;
     }
 
-    const int pad = kSidebarMetrics.tab_strip_horizontal_padding;
-    gfx::Size size = source_tile_size;
-    gfx::Vector2d offset = grab_offset;
     if (over_favorites_) {
-      const gfx::Size cell = LiveFavoriteCellSize(*strip);
-      if (size.IsEmpty()) {
-        size = cell;
-      } else if (!cell.IsEmpty() && size.width() > cell.width() + 8) {
-        offset = gfx::Vector2d(
-            size.width() ? offset.x() * cell.width() / size.width()
-                         : offset.x(),
-            size.height() ? offset.y() * cell.height() / size.height()
-                          : offset.y());
-        size = cell;
+      SnapGroupIndentTo(0);
+      const auto* scroll = views::AsViewClass<views::ScrollView>(
+          strip->GetViewByID(kSidebarFavoritesDockViewId));
+      if (scroll && scroll->contents()) {
+        const gfx::Rect tile = FavoritesDraggedTileForDockInScreen(
+            *scroll->contents(), point_in_screen, grab_offset, source_tile_size,
+            favorites_target_item_count);
+        const gfx::Rect target_bounds =
+            views::View::ConvertRectFromScreen(strip, tile);
+        if (!was_over_favorites && had_preview_bounds) {
+          StartRegionTransition(previous_bounds, target_bounds);
+        } else {
+          region_target_bounds_ = target_bounds;
+          ApplyAnimatedRegionTransition();
+        }
+        has_preview_bounds_ = true;
+        SetVisible(true);
+        strip->ReorderChildView(this, strip->children().size() - 1);
+        return;
       }
     } else {
-      const gfx::Size row_size(
-          std::max(DockMinCell(), strip->width() - 2 * pad),
-          kSidebarMetrics.tab_row_height);
-      if (!size.IsEmpty() && size != row_size) {
-        offset = gfx::Vector2d(
-            size.width() ? offset.x() * row_size.width() / size.width()
-                         : offset.x(),
-            size.height() ? offset.y() * row_size.height() / size.height()
-                          : offset.y());
+      if (was_over_favorites || region_transition_animation_.is_animating()) {
+        SnapGroupIndentTo(tab_leading_inset);
+      } else {
+        RetargetGroupIndent(tab_leading_inset);
       }
-      size = row_size;
     }
 
-    gfx::Rect bounds = views::View::ConvertRectFromScreen(
-        strip, FavoritesDraggedTileInScreen(point_in_screen, offset, size));
+    gfx::Rect bounds =
+        over_favorites_
+            ? views::View::ConvertRectFromScreen(
+                  strip, FavoritesDraggedTileInScreen(
+                             point_in_screen, grab_offset, source_tile_size))
+            : TabDragPreviewBoundsInTabStrip(*strip, point_in_screen,
+                                             tab_leading_inset, grab_offset,
+                                             source_tile_size);
     if (!over_favorites_) {
-      int x = pad;
-      if (base::i18n::IsRTL()) {
-        x = strip->width() - pad - size.width();
+      tab_target_bounds_ = bounds;
+    }
+    if (over_favorites_) {
+      SetBoundsRect(bounds);
+    } else {
+      if (was_over_favorites && had_preview_bounds) {
+        StartRegionTransition(previous_bounds, bounds);
+      } else if (region_transition_animation_.is_animating()) {
+        region_target_bounds_ = bounds;
+        ApplyAnimatedRegionTransition();
+      } else {
+        ApplyAnimatedGroupIndent();
       }
-      bounds.set_x(x);
-      bounds.set_width(size.width());
-      bounds.set_height(size.height());
     }
-    // Do not AdjustToFit over Favorites: clamping shifts the tile relative
-    // to the cursor at drag start.
-    if (!over_favorites_) {
-      bounds.AdjustToFit(strip->GetLocalBounds());
-    }
-    SetBoundsRect(bounds);
+    has_preview_bounds_ = true;
     SetVisible(true);
     strip->ReorderChildView(this, strip->children().size() - 1);
+  }
+
+  void HidePreview() {
+    StopWithoutApplying(group_indent_animation_);
+    StopWithoutApplying(region_transition_animation_);
+    group_indent_animation_.Reset(1.0);
+    region_transition_animation_.Reset(1.0);
+    group_indent_start_ = 0.0;
+    group_indent_target_ = 0;
+    has_tab_geometry_ = false;
+    has_preview_bounds_ = false;
+    tab_target_bounds_.reset();
+    region_target_bounds_.reset();
+    over_favorites_ = false;
+    SetVisible(false);
+  }
+
+  void AnimationProgressed(const gfx::Animation* animation) override {
+    if (suppress_animation_callback_) {
+      return;
+    }
+    if (animation == &group_indent_animation_) {
+      ApplyAnimatedGroupIndent();
+    } else if (animation == &region_transition_animation_) {
+      ApplyAnimatedRegionTransition();
+    }
+  }
+
+  void AnimationEnded(const gfx::Animation* animation) override {
+    AnimationProgressed(animation);
+  }
+
+  void AnimationCanceled(const gfx::Animation* animation) override {
+    AnimationProgressed(animation);
   }
 
   void Layout(PassKey) override {
@@ -816,11 +945,19 @@ class FavoritesDragPreview : public views::View {
 
     const int pad = kSidebarMetrics.tab_content_horizontal_padding;
     const int gap = kSidebarMetrics.bookmarks_image_label_spacing;
-    icon_->SetBoundsRect(
-        gfx::Rect(pad, (height() - icon_size) / 2, icon_size, icon_size));
+    gfx::Rect icon_bounds(pad, (height() - icon_size) / 2, icon_size,
+                          icon_size);
+    if (base::i18n::IsRTL()) {
+      icon_bounds.set_x(GetMirroredXForRect(icon_bounds));
+    }
+    icon_->SetBoundsRect(icon_bounds);
     const int title_x = pad + icon_size + gap;
-    title_->SetBoundsRect(
-        gfx::Rect(title_x, 0, std::max(0, width() - title_x - pad), height()));
+    gfx::Rect title_bounds(
+        title_x, 0, std::max(0, width() - title_x - pad), height());
+    if (base::i18n::IsRTL()) {
+      title_bounds.set_x(GetMirroredXForRect(title_bounds));
+    }
+    title_->SetBoundsRect(title_bounds);
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
@@ -849,6 +986,113 @@ class FavoritesDragPreview : public views::View {
   }
 
  private:
+  double CurrentGroupIndent() const {
+    if (!group_indent_animation_.is_animating()) {
+      return group_indent_target_;
+    }
+    return gfx::Tween::DoubleValueBetween(
+        group_indent_animation_.GetCurrentValue(), group_indent_start_,
+        group_indent_target_);
+  }
+
+  void RetargetGroupIndent(int target) {
+    target = std::max(0, target);
+    if (!has_tab_geometry_) {
+      SnapGroupIndentTo(target);
+      return;
+    }
+    if (target == group_indent_target_) {
+      return;
+    }
+
+    const double current = CurrentGroupIndent();
+    StopWithoutApplying(group_indent_animation_);
+    group_indent_start_ = current;
+    group_indent_target_ = target;
+
+    const bool rich_animation = gfx::Animation::ShouldRenderRichAnimation() &&
+                                !gfx::Animation::PrefersReducedMotion();
+    if (!rich_animation || std::abs(group_indent_target_ - current) < 0.5) {
+      group_indent_animation_.Reset(1.0);
+      ApplyAnimatedGroupIndent();
+      return;
+    }
+    group_indent_animation_.Reset(0.0);
+    group_indent_animation_.Show();
+  }
+
+  void SnapGroupIndentTo(int target) {
+    StopWithoutApplying(group_indent_animation_);
+    group_indent_animation_.Reset(1.0);
+    group_indent_start_ = std::max(0, target);
+    group_indent_target_ = std::max(0, target);
+    has_tab_geometry_ = true;
+  }
+
+  void ApplyAnimatedGroupIndent() {
+    if (!tab_target_bounds_) {
+      return;
+    }
+    gfx::Rect bounds = *tab_target_bounds_;
+    const int current = base::ClampRound(CurrentGroupIndent());
+    const int remaining = group_indent_target_ - current;
+    // Animate in logical coordinates. The preview is positioned directly, not
+    // by a mirroring LayoutManager: LTR moves the left edge while RTL keeps the
+    // left edge fixed and moves the right edge.
+    if (!base::i18n::IsRTL()) {
+      bounds.Offset(-remaining, 0);
+    }
+    bounds.set_width(std::max(0, bounds.width() + remaining));
+    SetBoundsRect(bounds);
+  }
+
+  void StartRegionTransition(const gfx::Rect& start_bounds,
+                             const gfx::Rect& target_bounds) {
+    StopWithoutApplying(region_transition_animation_);
+    region_transition_start_x_offset_ = start_bounds.x() - target_bounds.x();
+    region_transition_start_width_ = start_bounds.width();
+    region_target_bounds_ = target_bounds;
+
+    const bool rich_animation = gfx::Animation::ShouldRenderRichAnimation() &&
+                                !gfx::Animation::PrefersReducedMotion();
+    const bool changes_horizontal_geometry =
+        start_bounds.x() != target_bounds.x() ||
+        start_bounds.width() != target_bounds.width();
+    if (!rich_animation || !changes_horizontal_geometry) {
+      region_transition_animation_.Reset(1.0);
+      ApplyAnimatedRegionTransition();
+      return;
+    }
+    region_transition_animation_.Reset(0.0);
+    region_transition_animation_.Show();
+    ApplyAnimatedRegionTransition();
+  }
+
+  void ApplyAnimatedRegionTransition() {
+    if (!region_target_bounds_) {
+      return;
+    }
+    gfx::Rect bounds = *region_target_bounds_;
+    if (region_transition_animation_.is_animating()) {
+      const double value = region_transition_animation_.GetCurrentValue();
+      // Apply pointer-driven target movement immediately. Only the region
+      // transition's initial offset decays, so the preview never trails a
+      // quickly moving cursor while its width is morphing.
+      const int x_offset = gfx::Tween::IntValueBetween(
+          value, region_transition_start_x_offset_, 0);
+      bounds.Offset(x_offset, 0);
+      bounds.set_width(gfx::Tween::IntValueBetween(
+          value, region_transition_start_width_, bounds.width()));
+    }
+    SetBoundsRect(bounds);
+  }
+
+  void StopWithoutApplying(gfx::SlideAnimation& animation) {
+    suppress_animation_callback_ = true;
+    animation.Stop();
+    suppress_animation_callback_ = false;
+  }
+
   void UpdateColors() {
     const ui::ColorProvider* const provider = GetColorProvider();
     const bool frame_active =
@@ -865,6 +1109,17 @@ class FavoritesDragPreview : public views::View {
   }
 
   bool over_favorites_ = false;
+  bool has_tab_geometry_ = false;
+  bool has_preview_bounds_ = false;
+  bool suppress_animation_callback_ = false;
+  double group_indent_start_ = 0.0;
+  int group_indent_target_ = 0;
+  std::optional<gfx::Rect> tab_target_bounds_;
+  gfx::SlideAnimation group_indent_animation_{this};
+  int region_transition_start_x_offset_ = 0;
+  int region_transition_start_width_ = 0;
+  std::optional<gfx::Rect> region_target_bounds_;
+  gfx::SlideAnimation region_transition_animation_{this};
   SkColor fill_color_ = SkColorSetARGB(210, 255, 255, 255);
   raw_ptr<views::ImageView> icon_ = nullptr;
   raw_ptr<VerticalTabTextView> title_ = nullptr;
@@ -876,6 +1131,8 @@ END_METADATA
 void ShowFavoritesDragPreview(views::View& tab_strip,
                               const gfx::Point& point_in_screen,
                               bool over_favorites,
+                              int tab_leading_inset,
+                              int favorites_target_item_count,
                               const ui::ImageModel& favicon,
                               const std::u16string& title,
                               const gfx::Vector2d& grab_offset,
@@ -885,14 +1142,15 @@ void ShowFavoritesDragPreview(views::View& tab_strip,
   if (!preview) {
     preview = tab_strip.AddChildView(std::make_unique<FavoritesDragPreview>());
   }
-  preview->Update(point_in_screen, over_favorites, favicon, title, grab_offset,
+  preview->Update(point_in_screen, over_favorites, tab_leading_inset,
+                  favorites_target_item_count, favicon, title, grab_offset,
                   source_tile_size);
 }
 
 void HideFavoritesDragPreview(views::View& tab_strip) {
-  if (views::View* const preview =
-          tab_strip.GetViewByID(kSidebarFavoritesDragPreviewViewId)) {
-    preview->SetVisible(false);
+  if (auto* const preview = static_cast<FavoritesDragPreview*>(
+          tab_strip.GetViewByID(kSidebarFavoritesDragPreviewViewId))) {
+    preview->HidePreview();
   }
 }
 

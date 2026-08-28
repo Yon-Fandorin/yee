@@ -140,6 +140,7 @@ struct SidebarMetrics {
   int favorites_drop_zone_close_duration_ms = 120;
   int favorites_drop_zone_commit_fade_duration_ms = 90;
   int favorites_shift_duration_ms = 420;
+  int tab_drag_geometry_duration_ms = 120;
   int cross_region_arrival_offset = 10;
   int cross_region_arrival_duration_ms = 240;
 };
@@ -192,6 +193,9 @@ inline constexpr int kSidebarFavoritesDropZoneViewId = 92007;
 inline constexpr int kSidebarFavoritesDockViewId = 92008;
 inline constexpr int kSidebarFavoritesDragPreviewViewId = 92009;
 inline constexpr int kSplitPaneEmphasisViewId = 92010;
+inline constexpr int kSidebarHeaderActionsViewId = 92012;
+inline constexpr int kSidebarHeaderCreateViewId = 92013;
+inline constexpr int kSidebarHeaderAgentViewId = 92014;
 
 enum class ShellCreateAction {
   kNewTab,
