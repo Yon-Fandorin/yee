@@ -60,6 +60,24 @@ TEST(YeeSurfaceGeometryTest, SplitAndSingleSurfacesShareCornerContract) {
                 kSidebarMetrics.split_pane_content_stroke_inset);
 }
 
+TEST(YeeSurfaceGeometryTest, SplitAndSingleHeadersShareMetricsContract) {
+  EXPECT_EQ(42, kSidebarMetrics.browser_surface_header_height());
+  EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
+            kSidebarMetrics.split_pane_header_height);
+  EXPECT_EQ(34, kSidebarMetrics.browser_surface_location_bar_height);
+  EXPECT_EQ(40, kSidebarMetrics.toolbar_height);
+  EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
+            kSidebarMetrics.browser_surface_toolbar_top_inset() +
+                kSidebarMetrics.toolbar_height / 2);
+  EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
+            kSidebarMetrics.browser_surface_location_bar_height +
+                2 * kSidebarMetrics.split_pane_address_bar_inset);
+  EXPECT_EQ(8, kSidebarMetrics.browser_surface_header_control_edge_inset);
+  EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
+            kSidebarMetrics.content_gutter +
+                kSidebarMetrics.split_pane_header_height / 2);
+}
+
 TEST(YeeSurfaceGeometryTest, HoverCardAnchorOnlyAddsContentSideClearance) {
   const gfx::Rect original(10, 20, 100, 32);
   const gfx::Rect adjusted = AdjustVerticalTabHoverCardAnchor(original);
@@ -84,21 +102,18 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
     ui::ColorProvider provider;
     const SkColor elevated = dark ? SkColorSetRGB(0x2B, 0x2D, 0x31)
                                   : SkColorSetRGB(0xF7, 0xF8, 0xFA);
-    const SkColor inactive_surface =
-        dark ? SkColorSetRGB(0x22, 0x23, 0x27)
-             : SkColorSetRGB(0xF0, 0xF1, 0xF3);
+    const SkColor inactive_surface = dark ? SkColorSetRGB(0x22, 0x23, 0x27)
+                                          : SkColorSetRGB(0xF0, 0xF1, 0xF3);
     const SkColor outline = dark ? SkColorSetRGB(0xA8, 0xAA, 0xB0)
                                  : SkColorSetRGB(0x5E, 0x60, 0x66);
     const SkColor foreground = dark ? SK_ColorWHITE : SK_ColorBLACK;
-    const SkColor inactive_foreground =
-        dark ? SkColorSetRGB(0xC4, 0xC6, 0xCC)
-             : SkColorSetRGB(0x55, 0x57, 0x5D);
-    const SkColor hover = SkColorSetARGB(
-        0x28, SkColorGetR(foreground), SkColorGetG(foreground),
-        SkColorGetB(foreground));
+    const SkColor inactive_foreground = dark ? SkColorSetRGB(0xC4, 0xC6, 0xCC)
+                                             : SkColorSetRGB(0x55, 0x57, 0x5D);
+    const SkColor hover =
+        SkColorSetARGB(0x28, SkColorGetR(foreground), SkColorGetG(foreground),
+                       SkColorGetB(foreground));
     provider.SetColorForTesting(ui::kColorSysBaseContainerElevated, elevated);
-    provider.SetColorForTesting(ui::kColorSysBaseContainer,
-                                inactive_surface);
+    provider.SetColorForTesting(ui::kColorSysBaseContainer, inactive_surface);
     provider.SetColorForTesting(ui::kColorSysNeutralOutline, outline);
     provider.SetColorForTesting(ui::kColorSysOnSurface, foreground);
     provider.SetColorForTesting(ui::kColorSysOnSurfaceSecondary,

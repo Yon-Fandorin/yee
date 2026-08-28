@@ -53,6 +53,53 @@ require_chromium_src() {
   fi
 }
 
+configure_regression_build_cache() {
+  export XDG_CACHE_HOME="$LOCAL_BUILD_ROOT/cache"
+  export CLANG_MODULE_CACHE_PATH="$LOCAL_BUILD_ROOT/cache/clang/ModuleCache"
+  export GOCACHE="$LOCAL_BUILD_ROOT/cache/go-build"
+  export GOMODCACHE="$LOCAL_BUILD_ROOT/cache/go-mod"
+  export CARGO_HOME="$LOCAL_BUILD_ROOT/cache/cargo"
+  export npm_config_cache="$LOCAL_BUILD_ROOT/cache/npm"
+  export PIP_CACHE_DIR="$LOCAL_BUILD_ROOT/cache/pip"
+  mkdir -p \
+    "$CLANG_MODULE_CACHE_PATH" \
+    "$GOCACHE" \
+    "$GOMODCACHE" \
+    "$CARGO_HOME" \
+    "$npm_config_cache" \
+    "$PIP_CACHE_DIR"
+}
+
+build_regression_targets() {
+  local suite_name="$1"
+  shift
+  configure_regression_build_cache
+  print "Building ${suite_name} regression targets."
+  (
+    cd "$CHROMIUM_SRC"
+    caffeinate -dimsu nice -n 10 \
+      autoninja -C "out/$YEE_OUT_NAME" -j "$YEE_BUILD_JOBS" "$@"
+  )
+}
+
+gracefully_quit_yee() {
+  if ! pgrep -f -- "$YEE_BROWSER_BIN" >/dev/null 2>&1; then
+    return
+  fi
+
+  print "Requesting a graceful shutdown of the running Yee app."
+  osascript -e 'tell application "Yee" to quit'
+  for attempt in {1..100}; do
+    if ! pgrep -f -- "$YEE_BROWSER_BIN" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.1
+  done
+
+  print -u2 "Yee did not exit after the graceful shutdown request."
+  exit 15
+}
+
 print_paths() {
   print "yee root:       $YEE_ROOT"
   print "depot_tools:    $DEPOT_TOOLS_DIR"

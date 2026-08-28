@@ -148,13 +148,21 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 | Linux | 현재 theme frame 색, 기본 `#f1f0ef` | `#d8d6d4` | Adwaita 계열, 불투명 |
 
 - Browser Surface Header backing: navigation·load·tab 전환·페이지 색 변경 뒤 실제
-  WebContents 최상단의 얇은 띠를 저해상도로 샘플링한다. navigation 중에는 직전에
-  확정한 Header 색을 지우지 않고 새 결과를 candidate로만 유지한다. load가 끝난 뒤
-  같은 평면색이 최소 150ms 동안 세 sample 연속 안정적일 때 새 색을 한 번 확정한다.
+  WebContents 최상단의 얇은 띠를 저해상도로 샘플링한다. 첫 유효 화면이 그려지거나
+  load가 끝나면 약 16ms 뒤 첫 sample을 시작한다. 평면색이 페이지 CSS background
+  또는 `theme-color`와 일치하면 첫 sample에서 채택하고, 일치하지 않으면 약 48ms
+  간격의 두 sample이 안정적일 때 채택한다. 첫 채택은 늦추지 않되 약 80ms와 100ms
+  간격의 bounded settling sample 두 번을 이어서 실행한다. hydration이나 reveal
+  animation 뒤 실제 최상단 색이 달라지면 안정성 gate를 거쳐 현재 화면색에서
+  retarget하고, 변화가 없으면 sampling을 끝낸다. navigation 중 첫 유효 화면 전에는
+  직전에 확정한 같은 Tab의 Header 색을 지우지 않고 새 결과를 candidate로만 유지한다.
   각 WebContents는 마지막으로 확정한 색을 자신의 수명 동안 보관한다. 이미 샘플링한
-  Tab으로 돌아오면 다른 Tab의 색을 유지하지 않고 해당 색을 즉시 복원한 뒤 새 sample로
-  검증한다.
-  이전 확정 색이 없는 창은 이 구간에 현재 theme의 `kColorToolbar`를 사용한다. 사용자
+  Tab으로 돌아오면 다른 Tab의 색을 목표로 유지하지 않고 해당 Tab의 캐시 색을 즉시
+  새 목표로 선택한 뒤 약 120ms 동안 현재 화면색에서 보간하고 새 sample로 검증한다.
+  이전 확정 색이 없는 Tab은 현재 theme의 `kColorToolbar`를 즉시 새 목표로 선택한다.
+  이후 페이지색이 확정되면 약 160ms 동안 이어서 보간한다. 앞선 전환 중 새 목표가
+  생기면 대기 중인 애니메이션을 순서대로 재생하지 않고 현재 화면색에서 바로
+  retarget한다. 사용자
   스크롤이 시작되면 매 frame을 캡처하지 않고 약 140ms 간격의 제한된 sample burst를
   실행한다. 연속한 두 결과가 안정적일 때만 현재 viewport 최상단 색으로 전환하고,
   확정된 색 사이는 약 200ms 동안 연속 보간한다. 전환 중 새 결과가 확정되면 현재
@@ -572,6 +580,14 @@ page action을 두 번 실행하지 않는다.
 | Sidebar Header actions | Yee-owned window-global View. New Tab·Agent를 한 세트만 소유하고 native command callback을 호출한다. |
 | Agent activity | Sidebar Header status control + Sidebar task model contract |
 | Tenant / Workspace | Sidebar footer View; Title bar에 중복 금지 |
+
+Browser Surface Header와 각 Pane Header는 같은 page-aware 색상 안정화 정책을
+사용하되 `WebContents`별 controller instance를 소유한다. 색상 animation frame은
+Header paint state만 갱신한다. native LocationBar의 Toolbar/Pane Header 재호스팅과
+split outline 전환은 분할 진입·pane 활성화·해제 같은 구조 변화에서만 수행해 색상
+보간 중 layout 또는 View hierarchy를 반복해서 건드리지 않는다.
+자동 회귀 범위와 실제 화면 검수의 경계는
+[`header/test-coverage.md`](./header/test-coverage.md)에 둔다.
 
 레이아웃 계산은 한 곳에서만 소유한다. Title bar가 nominal sidebar width를 다시
 계산하거나, content가 layout 후 수동 이동되는 구현은 금지한다. 최종 proposed

@@ -28,26 +28,35 @@ namespace {
 
 constexpr int kTopStripHeight = 32;
 constexpr gfx::Size kSampleSize(96, 8);
-constexpr base::TimeDelta kInitialSampleDelay = base::Milliseconds(160);
-constexpr base::TimeDelta kVerificationDelay = base::Milliseconds(75);
+constexpr base::TimeDelta kInitialSampleDelay = base::Milliseconds(32);
+constexpr base::TimeDelta kFirstPaintSampleDelay = base::Milliseconds(16);
+constexpr base::TimeDelta kVerificationDelay = base::Milliseconds(48);
+constexpr base::TimeDelta kFirstSettlingSampleDelay = base::Milliseconds(80);
+constexpr base::TimeDelta kSecondSettlingSampleDelay = base::Milliseconds(100);
 constexpr base::TimeDelta kCaptureTimeout = base::Milliseconds(500);
 constexpr base::TimeDelta kScrollSampleInterval = base::Milliseconds(140);
 constexpr base::TimeDelta kScrollSamplingDuration = base::Milliseconds(1680);
 constexpr base::TimeDelta kScrollColorTransitionDuration =
     base::Milliseconds(200);
+constexpr base::TimeDelta kTabSwitchColorTransitionDuration =
+    base::Milliseconds(120);
+constexpr base::TimeDelta kPageColorTransitionDuration =
+    base::Milliseconds(160);
 constexpr base::TimeDelta kColorTransitionFrameInterval =
     base::Milliseconds(16);
 constexpr int kMaximumSampleAttempts = 5;
-constexpr int kRequiredStablePageSamples = 3;
+constexpr int kRequiredStablePageSamples = 2;
 constexpr int kRequiredStableScrollSamples = 2;
+constexpr int kPageSettlingSampleCount = 2;
 constexpr int kMinimumOpaqueAlpha = 230;
 constexpr double kMinimumDominantShare = 0.55;
 constexpr int kMaximumStableChannelDelta = 12;
 
 // Stores the last color that completed Yee's stability gate on this tab. The
 // cache is owned by WebContents so closing a background tab cannot leave a
-// dangling lookup entry, and returning to an already sampled tab can restore
-// its Header without showing another tab's color during the sampling delay.
+// dangling lookup entry. Returning to an already sampled tab can therefore
+// select its own Header target immediately and transition continuously from the
+// color currently on screen.
 class BrowserSurfaceColorCache
     : public content::WebContentsUserData<BrowserSurfaceColorCache> {
  public:
@@ -133,7 +142,7 @@ SkColor AverageColors(SkColor first, SkColor second) {
 
 SkColor InterpolateColors(SkColor start, SkColor target, double progress) {
   const auto interpolate_channel = [progress](uint8_t start_channel,
-                                               uint8_t target_channel) {
+                                              uint8_t target_channel) {
     return static_cast<uint8_t>(std::lround(
         start_channel + (target_channel - start_channel) * progress));
   };
@@ -170,6 +179,17 @@ BrowserSurfaceColorController::BrowserSurfaceColorController(
 
 BrowserSurfaceColorController::~BrowserSurfaceColorController() = default;
 
+void BrowserSurfaceColorController::SetThemeFallbackColor(SkColor color) {
+  color = SkColorSetA(color, SK_AlphaOPAQUE);
+  if (theme_fallback_color_ == color) {
+    return;
+  }
+  theme_fallback_color_ = color;
+  if (web_contents() && !committed_color_.has_value()) {
+    StartColorTransition(color, kTabSwitchColorTransitionDuration);
+  }
+}
+
 void BrowserSurfaceColorController::SetWebContents(
     content::WebContents* web_contents) {
   if (web_contents == this->web_contents()) {
@@ -178,21 +198,32 @@ void BrowserSurfaceColorController::SetWebContents(
   StopColorTransition();
   Observe(web_contents);
   waiting_for_load_completion_ = web_contents && web_contents->IsLoading();
-  RestartPageSampling();
+  first_visually_non_empty_paint_seen_ = false;
+  pending_page_settling_samples_ = 0;
+  RestartPageSampling(kInitialSampleDelay);
 
-  std::optional<SkColor> next_color = committed_color_;
-  if (!web_contents) {
-    next_color.reset();
-  } else if (const BrowserSurfaceColorCache* cache =
-                 BrowserSurfaceColorCache::FromWebContents(web_contents);
-             cache && cache->color().has_value()) {
-    next_color = cache->color();
+  // A newly selected WebContents must never inherit another tab's resolved
+  // page color. Leaving this empty makes the Header use the current theme's
+  // toolbar color until this tab produces its own stable sample. Returning to
+  // an already sampled tab selects that tab's cached color as the next target.
+  std::optional<SkColor> next_color;
+  if (web_contents) {
+    if (const BrowserSurfaceColorCache* cache =
+            BrowserSurfaceColorCache::FromWebContents(web_contents);
+        cache && cache->color().has_value()) {
+      next_color = cache->color();
+    }
   }
-  const bool presentation_changed = presented_color_ != next_color;
   committed_color_ = next_color;
-  presented_color_ = next_color;
-  if (presentation_changed) {
-    color_changed_.Run();
+  if (!web_contents) {
+    ClearPresentedColor();
+  } else if (next_color.has_value()) {
+    StartColorTransition(*next_color, kTabSwitchColorTransitionDuration);
+  } else if (theme_fallback_color_.has_value()) {
+    StartColorTransition(*theme_fallback_color_,
+                         kTabSwitchColorTransitionDuration);
+  } else {
+    ClearPresentedColor();
   }
 }
 
@@ -205,25 +236,34 @@ void BrowserSurfaceColorController::DidFinishNavigation(
   if (navigation_handle->IsInPrimaryMainFrame() &&
       navigation_handle->HasCommitted()) {
     waiting_for_load_completion_ = !navigation_handle->IsSameDocument();
-    RestartPageSampling();
+    if (!navigation_handle->IsSameDocument()) {
+      first_visually_non_empty_paint_seen_ = false;
+      pending_page_settling_samples_ = 0;
+    }
+    RestartPageSampling(kInitialSampleDelay);
   }
 }
 
 void BrowserSurfaceColorController::DidStopLoading() {
   waiting_for_load_completion_ = false;
-  RestartPageSampling();
+  BeginPageSettling();
 }
 
 void BrowserSurfaceColorController::RenderViewReady() {
-  RestartPageSampling();
+  RestartPageSampling(kInitialSampleDelay);
+}
+
+void BrowserSurfaceColorController::DidFirstVisuallyNonEmptyPaint() {
+  first_visually_non_empty_paint_seen_ = true;
+  BeginPageSettling();
 }
 
 void BrowserSurfaceColorController::DidChangeThemeColor() {
-  RestartPageSampling();
+  RestartPageSampling(kFirstPaintSampleDelay);
 }
 
 void BrowserSurfaceColorController::OnBackgroundColorChanged() {
-  RestartPageSampling();
+  RestartPageSampling(kFirstPaintSampleDelay);
 }
 
 void BrowserSurfaceColorController::DidGetUserInteraction(
@@ -238,7 +278,8 @@ void BrowserSurfaceColorController::DidChangeVerticalScrollDirection(
   StartScrollSampling();
 }
 
-void BrowserSurfaceColorController::RestartPageSampling() {
+void BrowserSurfaceColorController::RestartPageSampling(
+    base::TimeDelta initial_delay) {
   sample_timer_.Stop();
   scroll_sample_timer_.Stop();
   scroll_sampling_timeout_timer_.Stop();
@@ -249,8 +290,27 @@ void BrowserSurfaceColorController::RestartPageSampling() {
   capture_in_flight_ = false;
   is_scroll_sampling_ = false;
   if (web_contents()) {
-    ScheduleSample(kInitialSampleDelay);
+    ScheduleSample(initial_delay);
   }
+}
+
+void BrowserSurfaceColorController::BeginPageSettling() {
+  pending_page_settling_samples_ = kPageSettlingSampleCount;
+  RestartPageSampling(kFirstPaintSampleDelay);
+}
+
+bool BrowserSurfaceColorController::ScheduleNextPageSettlingSample() {
+  if (is_scroll_sampling_ || pending_page_settling_samples_ <= 0) {
+    return false;
+  }
+
+  const base::TimeDelta delay =
+      pending_page_settling_samples_ == kPageSettlingSampleCount
+          ? kFirstSettlingSampleDelay
+          : kSecondSettlingSampleDelay;
+  --pending_page_settling_samples_;
+  ScheduleSample(delay);
+  return true;
 }
 
 void BrowserSurfaceColorController::ResetCandidateSequence() {
@@ -267,6 +327,7 @@ void BrowserSurfaceColorController::StartScrollSampling() {
   if (!web_contents()) {
     return;
   }
+  pending_page_settling_samples_ = 0;
   ResetCandidateSequence();
   is_scroll_sampling_ = true;
   CaptureTopStrip();
@@ -292,7 +353,7 @@ void BrowserSurfaceColorController::CaptureTopStrip() {
     if (++sample_attempt_ < kMaximumSampleAttempts) {
       ScheduleSample(kVerificationDelay);
     } else {
-      CommitFallbackIfReady();
+      CommitPageMetadataColorIfReady();
     }
     return;
   }
@@ -302,7 +363,7 @@ void BrowserSurfaceColorController::CaptureTopStrip() {
     if (++sample_attempt_ < kMaximumSampleAttempts) {
       ScheduleSample(kVerificationDelay);
     } else {
-      CommitFallbackIfReady();
+      CommitPageMetadataColorIfReady();
     }
     return;
   }
@@ -340,13 +401,20 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
       stable_candidate_count_ = 1;
     }
 
-    const int required_stable_samples = is_scroll_sampling_
-                                            ? kRequiredStableScrollSamples
-                                            : kRequiredStablePageSamples;
-    if (stable_candidate_count_ >= required_stable_samples) {
-      if (!waiting_for_load_completion_) {
-        CommitColor(*candidate_color_);
-      }
+    const std::optional<SkColor> page_metadata_color = GetPageMetadataColor();
+    const bool matches_page_metadata =
+        page_metadata_color.has_value() &&
+        ColorsAreStable(*page_metadata_color, *candidate_color_);
+    const int required_stable_samples =
+        is_scroll_sampling_
+            ? kRequiredStableScrollSamples
+            : (matches_page_metadata ? 1 : kRequiredStablePageSamples);
+    const bool has_meaningful_page_frame =
+        !waiting_for_load_completion_ || first_visually_non_empty_paint_seen_;
+    if (stable_candidate_count_ >= required_stable_samples &&
+        has_meaningful_page_frame) {
+      CommitColor(*candidate_color_);
+      ScheduleNextPageSettlingSample();
       return;
     }
   }
@@ -354,7 +422,7 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
   if (sample_attempt_ < kMaximumSampleAttempts) {
     ScheduleSample(kVerificationDelay);
   } else {
-    CommitFallbackIfReady();
+    CommitPageMetadataColorIfReady();
   }
 }
 
@@ -368,15 +436,19 @@ void BrowserSurfaceColorController::CommitColor(SkColor color) {
   }
   committed_color_ = color;
 
-  if (is_scroll_sampling_ && presented_color_.has_value()) {
-    StartColorTransition(color);
+  if (presented_color_.has_value()) {
+    StartColorTransition(color, is_scroll_sampling_
+                                    ? kScrollColorTransitionDuration
+                                    : kPageColorTransitionDuration);
   } else {
     StopColorTransition();
     SetPresentedColor(color);
   }
 }
 
-void BrowserSurfaceColorController::StartColorTransition(SkColor target_color) {
+void BrowserSurfaceColorController::StartColorTransition(
+    SkColor target_color,
+    base::TimeDelta duration) {
   if (!presented_color_.has_value() || *presented_color_ == target_color) {
     StopColorTransition();
     SetPresentedColor(target_color);
@@ -386,6 +458,7 @@ void BrowserSurfaceColorController::StartColorTransition(SkColor target_color) {
   transition_start_color_ = presented_color_;
   transition_target_color_ = target_color;
   transition_start_time_ = base::TimeTicks::Now();
+  transition_duration_ = duration;
   if (!color_transition_timer_.IsRunning()) {
     color_transition_timer_.Start(
         FROM_HERE, kColorTransitionFrameInterval, this,
@@ -402,7 +475,7 @@ void BrowserSurfaceColorController::AdvanceColorTransition() {
 
   const double progress = std::clamp(
       (base::TimeTicks::Now() - transition_start_time_).InMillisecondsF() /
-          kScrollColorTransitionDuration.InMillisecondsF(),
+          transition_duration_.InMillisecondsF(),
       0.0, 1.0);
   if (progress >= 1.0) {
     const SkColor target_color = *transition_target_color_;
@@ -411,10 +484,10 @@ void BrowserSurfaceColorController::AdvanceColorTransition() {
     return;
   }
 
-  // Smoothstep avoids a visible jump at either end. If a later scroll sample
-  // selects a new target, StartColorTransition() begins from the color that is
-  // currently on screen, so the motion remains continuous instead of adding
-  // another discrete midpoint.
+  // Smoothstep avoids a visible jump at either end. If a later sample selects
+  // a new target, StartColorTransition() begins from the color currently on
+  // screen, so the motion remains continuous instead of adding another
+  // discrete midpoint.
   const double eased_progress = progress * progress * (3.0 - 2.0 * progress);
   SetPresentedColor(InterpolateColors(
       *transition_start_color_, *transition_target_color_, eased_progress));
@@ -425,6 +498,14 @@ void BrowserSurfaceColorController::StopColorTransition() {
   transition_start_color_.reset();
   transition_target_color_.reset();
   transition_start_time_ = base::TimeTicks();
+  transition_duration_ = base::TimeDelta();
+}
+
+void BrowserSurfaceColorController::ClearPresentedColor() {
+  if (presented_color_.has_value()) {
+    presented_color_.reset();
+    color_changed_.Run();
+  }
 }
 
 void BrowserSurfaceColorController::SetPresentedColor(SkColor color) {
@@ -435,16 +516,18 @@ void BrowserSurfaceColorController::SetPresentedColor(SkColor color) {
   }
 }
 
-void BrowserSurfaceColorController::CommitFallbackIfReady() {
+void BrowserSurfaceColorController::CommitPageMetadataColorIfReady() {
   if (waiting_for_load_completion_ || is_scroll_sampling_) {
     return;
   }
-  if (const std::optional<SkColor> fallback = GetFallbackColor()) {
-    CommitColor(*fallback);
+  if (const std::optional<SkColor> page_metadata_color =
+          GetPageMetadataColor()) {
+    CommitColor(*page_metadata_color);
   }
 }
 
-std::optional<SkColor> BrowserSurfaceColorController::GetFallbackColor() const {
+std::optional<SkColor> BrowserSurfaceColorController::GetPageMetadataColor()
+    const {
   if (!web_contents()) {
     return std::nullopt;
   }

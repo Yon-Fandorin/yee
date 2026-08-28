@@ -46,7 +46,7 @@ Chromium View 생명주기나 모델 커밋이 핵심이면 억지로 mock 유�
 # (native View 테스트이므로 macOS GUI 세션 접근은 필요)
 ./chromium-dev/test-sidebar.sh unit
 
-# 실제 Yee 창의 Sidebar 배치·drag·Group·scroll과 split/header 통합 테스트
+# 실제 Yee 창의 Sidebar 배치·drag·Group·scroll 통합 테스트
 ./chromium-dev/test-sidebar.sh interactive
 
 # 빌드와 두 배치를 순서대로 실행

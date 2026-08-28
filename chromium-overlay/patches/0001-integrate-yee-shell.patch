@@ -830,7 +830,7 @@ index 6a1b79d4b2..69522195b0 100644
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index bfae037bfe..30a626e289 100644
+index bfae037bfe..aa1b7b503e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -17,7 +17,6 @@
@@ -858,7 +858,7 @@ index bfae037bfe..30a626e289 100644
  #include "chrome/browser/ui/waap/initial_web_ui_manager.h"
  #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
-@@ -1013,6 +1015,28 @@ BrowserView::BrowserView(Browser* browser)
+@@ -1013,6 +1015,27 @@ BrowserView::BrowserView(Browser* browser)
                                  base::Unretained(this)));
    }
  
@@ -866,15 +866,14 @@ index bfae037bfe..30a626e289 100644
 +    vertical_tab_strip_region_view_->SetHideCollapsedRail(true);
 +    vertical_tab_strip_state_controller->SetExpandOnHoverEnabled(true);
 +
-+    yee_browser_surface_color_controller_ =
++    yee_header_color_controller_ =
 +        std::make_unique<yee::BrowserSurfaceColorController>(
-+            base::BindRepeating(
-+                &BrowserView::UpdateYeeBrowserSurfacePresentation,
-+                weak_ptr_factory_.GetWeakPtr()));
-+    yee_browser_surface_color_controller_->SetWebContents(
++            base::BindRepeating(&BrowserView::UpdateYeeHeaderPresentation,
++                                weak_ptr_factory_.GetWeakPtr()));
++    yee_header_color_controller_->SetWebContents(
 +        browser_->tab_strip_model()->GetActiveWebContents());
 +    yee::PageSurfaceColorCallback page_surface_color_callback =
-+        base::BindRepeating(&BrowserView::GetYeeBrowserSurfacePresentationColor,
++        base::BindRepeating(&BrowserView::GetYeeHeaderPresentationColor,
 +                            base::Unretained(this));
 +    SetBackground(yee::CreateShellBackground());
 +
@@ -887,7 +886,7 @@ index bfae037bfe..30a626e289 100644
    // Create do-nothing view for the sake of controlling the z-order of the find
    // bar widget.
    find_bar_host_view_ = AddChildView(std::make_unique<View>());
-@@ -1084,6 +1108,12 @@ BrowserView::BrowserView(Browser* browser)
+@@ -1084,6 +1107,12 @@ BrowserView::BrowserView(Browser* browser)
  }
  
  BrowserView::~BrowserView() {
@@ -900,7 +899,7 @@ index bfae037bfe..30a626e289 100644
    // Remove the layout manager to avoid dangling. This needs to be earlier than
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
-@@ -1231,6 +1261,14 @@ ClientFrameElementInfo BrowserView::GetFrameElementInfo() const {
+@@ -1231,6 +1260,14 @@ ClientFrameElementInfo BrowserView::GetFrameElementInfo() const {
            : 0;
    if (toolbar_ && ShouldDrawVerticalTabStrip()) {
      info.toolbar_minimum_height = toolbar_->GetMinimumSize().height();
@@ -915,7 +914,7 @@ index bfae037bfe..30a626e289 100644
    } else if (web_app_frame_toolbar_ && ShouldDrawWebAppFrameToolbar()) {
      info.toolbar_minimum_height =
          web_app_frame_toolbar_->GetMinimumSize().height();
-@@ -1936,7 +1974,6 @@ bool BrowserView::IsLoadingAnimationRunning() const {
+@@ -1936,7 +1973,6 @@ bool BrowserView::IsLoadingAnimationRunning() const {
    return !loading_animation_start_.is_null();
  }
  
@@ -923,35 +922,35 @@ index bfae037bfe..30a626e289 100644
  void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       content::WebContents* new_contents,
                                       int index,
-@@ -1955,6 +1992,10 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -1955,6 +1991,10 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
    }
  
    WebContentsObserver::Observe(new_contents);
-+  if (yee_browser_surface_color_controller_) {
-+    yee_browser_surface_color_controller_->SetWebContents(new_contents);
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetWebContents(new_contents);
 +  }
 +  UpdateYeeBrowserSurfacePresentation();
  
    // If |contents_web_view| already has the correct WebContents, we can save
    // some work.  This also prevents extra events from being reported by the
-@@ -2942,6 +2983,7 @@ void BrowserView::OnWidgetWindowModalVisibilityChanged(views::Widget* widget,
+@@ -2942,6 +2982,7 @@ void BrowserView::OnWidgetWindowModalVisibilityChanged(views::Widget* widget,
  
  void BrowserView::TitleWasSet(content::NavigationEntry* entry) {
    UpdateAccessibleNameForRootView();
-+  UpdateYeeBrowserSurfacePresentation();
++  UpdateYeeHeaderPresentation();
  }
  
  void BrowserView::DidFinishNavigation(
-@@ -2951,6 +2993,8 @@ void BrowserView::DidFinishNavigation(
+@@ -2951,6 +2992,8 @@ void BrowserView::DidFinishNavigation(
      return;
    }
  
-+  UpdateYeeBrowserSurfacePresentation();
++  UpdateYeeHeaderPresentation();
 +
    if (AppUsesUnframedMode() && !window_management_subscription_id_) {
      SetWindowManagementPermissionSubscriptionForUnframedMode(
          navigation_handle->GetWebContents());
-@@ -4281,6 +4325,7 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
+@@ -4281,6 +4324,7 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
    multi_contents_view_->SetActiveIndex(relative_active_position);
  
    multi_contents_view_->UpdateSplitVisualData(*split_data->visual_data());
@@ -959,7 +958,7 @@ index bfae037bfe..30a626e289 100644
  
    // Set focus to the active contents avoid reentrency when setting the web
    // contents within MultiContentsView. See crbug.com/458189541 and
-@@ -4298,6 +4343,7 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
+@@ -4298,6 +4342,7 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
  
  void BrowserView::HideSplitView() {
    multi_contents_view_->CloseSplitView();
@@ -967,7 +966,7 @@ index bfae037bfe..30a626e289 100644
  }
  
  void BrowserView::UpdateActiveTabInSplitView() {
-@@ -4316,6 +4362,7 @@ void BrowserView::UpdateActiveTabInSplitView() {
+@@ -4316,6 +4361,7 @@ void BrowserView::UpdateActiveTabInSplitView() {
        browser_->tab_strip_model()->GetIndexOfTab(first_tab);
    const int relative_active_position = active_index - first_split_tab_index;
    multi_contents_view_->SetActiveIndex(relative_active_position);
@@ -975,7 +974,7 @@ index bfae037bfe..30a626e289 100644
  
    // When active tab changes inside a split, it's generally due to focus change.
    // However, there are cases where inactive tab can be activated without a
-@@ -4814,6 +4861,25 @@ void BrowserView::Layout(PassKey) {
+@@ -4814,6 +4860,24 @@ void BrowserView::Layout(PassKey) {
  
    LayoutSuperclass<views::View>(this);
  
@@ -985,8 +984,7 @@ index bfae037bfe..30a626e289 100644
 +        multi_contents_view_ && multi_contents_view_->IsInSplitView();
 +    const bool show_outline =
 +        multi_contents_view_ && multi_contents_view_->GetVisible();
-+    yee::UpdateCombinedSurfaceOutlineView(*surface_outline,
-+                                          split_presentation);
++    yee::UpdateCombinedSurfaceOutlineView(*surface_outline, split_presentation);
 +    surface_outline->SetVisible(show_outline);
 +    if (show_outline) {
 +      gfx::Rect surface_bounds = multi_contents_view_->bounds();
@@ -1001,18 +999,22 @@ index bfae037bfe..30a626e289 100644
    // TODO(jamescook): Why was this in the middle of layout code?
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
    GetFrameView()->UpdateMinimumSize();
-@@ -4956,6 +5022,10 @@ void BrowserView::AddedToWidget() {
+@@ -4956,6 +5020,14 @@ void BrowserView::AddedToWidget() {
  
    toolbar_->Init();
  
 +  if (yee::IsShellEnabled()) {
++    if (yee_header_color_controller_) {
++      yee_header_color_controller_->SetThemeFallbackColor(
++          GetColorProvider()->GetColor(kColorToolbar));
++    }
 +    toolbar_->ConfigureForCompactShell();
 +  }
 +
    if (omnibox::IsWebUIOmniboxInBrowserViewEnabled()) {
      // When the WebUI Omnibox is embedded directly in the `BrowserView` (instead
      // of being a separate popup widget), the popup view needs a reference to
-@@ -5039,10 +5109,49 @@ void BrowserView::AddedToWidget() {
+@@ -5039,10 +5111,49 @@ void BrowserView::AddedToWidget() {
    layout_views.vertical_tab_strip_top_corner = vertical_tab_strip_top_corner_;
    layout_views.organizer_panel_container = organizer_panel_container_;
    layout_views.toolbar = toolbar_;
@@ -1052,8 +1054,8 @@ index bfae037bfe..30a626e289 100644
 +        /*show_vertical_tab_strip_corners=*/false,
 +        /*show_bookmark_bar=*/false,
 +        /*split_view_top_inset=*/yee::kSidebarMetrics.content_gutter,
-+        /*split_view_corner_radii=*/gfx::RoundedCornersF(
-+            yee::kSidebarMetrics.content_corner_radius)};
++        /*split_view_corner_radii=*/
++        gfx::RoundedCornersF(yee::kSidebarMetrics.content_corner_radius)};
 +    layout_views.vertical_tab_strip_layout_config =
 +        BrowserVerticalTabStripLayoutConfig{
 +            gfx::Insets::TLBR(0, 0, yee::kSidebarMetrics.content_gutter, 0),
@@ -1062,7 +1064,7 @@ index bfae037bfe..30a626e289 100644
    // LINT.ThenChange(//chrome/browser/ui/views/frame/layout/browser_view_layout.h:BrowserViewLayoutViews)
  
    SetLayoutManager(BrowserViewLayout::CreateLayout(
-@@ -5103,9 +5212,23 @@ void BrowserView::AddedToWidget() {
+@@ -5103,9 +5214,23 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -1086,25 +1088,26 @@ index bfae037bfe..30a626e289 100644
    CHECK(GetFocusManager());
  #if BUILDFLAG(IS_WIN)
    pip_exclusion_observer_.reset();
-@@ -5138,6 +5261,57 @@ void BrowserView::OnThemeChanged() {
+@@ -5138,6 +5263,79 @@ void BrowserView::OnThemeChanged() {
    }
  
    FrameColorsChanged();
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetThemeFallbackColor(
++        GetColorProvider()->GetColor(kColorToolbar));
++  }
 +  UpdateYeeBrowserSurfacePresentation();
 +}
 +
-+std::optional<SkColor> BrowserView::GetYeeBrowserSurfacePresentationColor()
-+    const {
-+  return yee_browser_surface_color_controller_
-+             ? yee_browser_surface_color_controller_->GetColor()
-+             : std::nullopt;
++std::optional<SkColor> BrowserView::GetYeeHeaderPresentationColor() const {
++  return yee_header_color_controller_ ? yee_header_color_controller_->GetColor()
++                                      : std::nullopt;
 +}
 +
 +int BrowserView::GetYeeLeadingWindowControlsSafeEdge() const {
 +  const BrowserLayoutParams params = GetFrameView()->GetBrowserLayoutParams();
 +  return params.visual_client_area.x() +
-+         base::ClampCeil(
-+             params.leading_exclusion.ContentWithPadding().width());
++         base::ClampCeil(params.leading_exclusion.ContentWithPadding().width());
 +}
 +
 +void BrowserView::EnableYeeSplitLocationBarHosting() {
@@ -1112,39 +1115,60 @@ index bfae037bfe..30a626e289 100644
 +    return;
 +  }
 +  yee_split_location_bar_hosting_enabled_ = true;
-+  UpdateYeeBrowserSurfacePresentation();
++  UpdateYeeSplitPresentation();
 +}
 +
-+void BrowserView::UpdateYeeBrowserSurfacePresentation() {
++void BrowserView::UpdateYeeHeaderPresentation() {
 +  if (!initialized_ || !yee::IsShellEnabled()) {
 +    return;
 +  }
 +
++  // This is the color-controller callback and can run once per animation
++  // frame. Keep it limited to Header paint state; native LocationBar
++  // reparenting and split outline state are updated only on structural events.
 +  if (toolbar_ && toolbar_->location_bar_view()) {
-+    if (yee_split_location_bar_hosting_enabled_) {
-+      toolbar_->SetCompactShellLocationBarHost(
-+          multi_contents_view_ && multi_contents_view_->IsInSplitView()
-+              ? multi_contents_view_->GetActiveContentsContainerView()
-+              : nullptr);
-+    }
-+    toolbar_->SetCompactShellSurfaceColor(
-+        GetYeeBrowserSurfacePresentationColor());
++    toolbar_->SetCompactShellSurfaceColor(GetYeeHeaderPresentationColor());
 +  }
 +  SchedulePaint();
 +  if (views::View* const surface_outline =
 +          GetViewByID(yee::kCombinedSurfaceOutlineViewId)) {
++    surface_outline->SchedulePaint();
++  }
++}
++
++void BrowserView::UpdateYeeSplitPresentation() {
++  if (!initialized_ || !yee::IsShellEnabled()) {
++    return;
++  }
++
++  // Chromium continues to own the one native LocationBar. Yee only selects
++  // whether its presentation host is the shared Browser Toolbar or the active
++  // Pane Header when split structure changes.
++  if (toolbar_ && toolbar_->location_bar_view() &&
++      yee_split_location_bar_hosting_enabled_) {
++    toolbar_->SetCompactShellLocationBarHost(
++        multi_contents_view_ && multi_contents_view_->IsInSplitView()
++            ? multi_contents_view_->GetActiveContentsContainerView()
++            : nullptr);
++  }
++  if (views::View* const surface_outline =
++          GetViewByID(yee::kCombinedSurfaceOutlineViewId)) {
 +    const bool split_presentation =
 +        multi_contents_view_ && multi_contents_view_->IsInSplitView();
-+    yee::UpdateCombinedSurfaceOutlineView(*surface_outline,
-+                                          split_presentation);
++    yee::UpdateCombinedSurfaceOutlineView(*surface_outline, split_presentation);
 +    surface_outline->SetVisible(multi_contents_view_ &&
 +                                multi_contents_view_->GetVisible());
 +    surface_outline->SchedulePaint();
 +  }
++}
++
++void BrowserView::UpdateYeeBrowserSurfacePresentation() {
++  UpdateYeeSplitPresentation();
++  UpdateYeeHeaderPresentation();
  }
  
  bool BrowserView::GetDropFormats(
-@@ -5352,6 +5526,7 @@ bool BrowserView::MaybeUpdateSplitView(content::WebContents* contents) {
+@@ -5352,6 +5550,7 @@ bool BrowserView::MaybeUpdateSplitView(content::WebContents* contents) {
      return false;
    }
  
@@ -1153,7 +1177,7 @@ index bfae037bfe..30a626e289 100644
  }
  
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 3c9907fe4a..2b5f9c6a95 100644
+index 3c9907fe4a..a57e47cb3c 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -118,6 +118,10 @@ namespace views {
@@ -1178,22 +1202,24 @@ index 3c9907fe4a..2b5f9c6a95 100644
    // Convenience method for fetching the element context for the window.
    ui::ElementContext GetElementContext();
  
-@@ -1042,6 +1050,9 @@ class BrowserView : public BrowserWindow,
+@@ -1042,6 +1050,11 @@ class BrowserView : public BrowserWindow,
  
    void PaintAsActiveChanged();
    void FrameColorsChanged();
 +  void EnableYeeSplitLocationBarHosting();
-+  std::optional<SkColor> GetYeeBrowserSurfacePresentationColor() const;
++  std::optional<SkColor> GetYeeHeaderPresentationColor() const;
++  void UpdateYeeHeaderPresentation();
++  void UpdateYeeSplitPresentation();
 +  void UpdateYeeBrowserSurfacePresentation();
  
    // Called by BrowserWindowThemeObserver when the theme changes.
    void UserChangedTheme(BrowserThemeChangeType theme_change_type);
-@@ -1078,6 +1089,10 @@ class BrowserView : public BrowserWindow,
+@@ -1078,6 +1091,10 @@ class BrowserView : public BrowserWindow,
    // The owning Browser object. `browser_` will outlive this.
    const raw_ptr<Browser> browser_;
  
 +  std::unique_ptr<yee::BrowserSurfaceColorController>
-+      yee_browser_surface_color_controller_;
++      yee_header_color_controller_;
 +  bool yee_split_location_bar_hosting_enabled_ = false;
 +
    base::CallbackListSubscription chip_visibility_subscription_;
@@ -3148,10 +3174,26 @@ index 91de47263b..8d07454e32 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index 959386b621..3d3bc58c7a 100644
+index 959386b621..f9fcc16bc9 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-@@ -18,6 +18,7 @@
+@@ -7,17 +7,23 @@
+ #include "base/functional/bind.h"
+ #include "base/numerics/clamped_math.h"
+ #include "base/numerics/ranges.h"
++#include "base/run_loop.h"
+ #include "base/test/scoped_feature_list.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
+ #include "chrome/browser/bookmarks/bookmark_model_factory.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_tabstrip.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
++#include "chrome/browser/ui/omnibox/omnibox_controller.h"
++#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
++#include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
+ #include "chrome/browser/ui/side_panel/side_panel_action_callback.h"
  #include "chrome/browser/ui/side_panel/side_panel_enums.h"
  #include "chrome/browser/ui/tabs/features.h"
  #include "chrome/browser/ui/tabs/split_tab_highlight_controller.h"
@@ -3159,12 +3201,15 @@ index 959386b621..3d3bc58c7a 100644
  #include "chrome/browser/ui/toolbar/app_menu_model.h"
  #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -32,10 +33,14 @@
+@@ -32,16 +38,24 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
 +#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 +#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h"
++#include "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h"
  #include "chrome/browser/ui/views/page_info/page_info_main_view.h"
  #include "chrome/browser/ui/views/side_panel/side_panel.h"
  #include "chrome/browser/ui/views/test/split_view_interactive_test_mixin.h"
@@ -3174,20 +3219,126 @@ index 959386b621..3d3bc58c7a 100644
  #include "chrome/common/pref_names.h"
  #include "chrome/common/webui_url_constants.h"
  #include "chrome/test/base/interactive_test_utils.h"
-@@ -422,6 +427,172 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+ #include "chrome/test/interaction/interactive_browser_test.h"
+ #include "components/bookmarks/browser/bookmark_model.h"
+ #include "components/bookmarks/common/bookmark_pref_names.h"
++#include "components/omnibox/browser/autocomplete_input.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "components/tabs/public/split_tab_collection.h"
+@@ -299,6 +313,76 @@ class MultiContentsViewUiTest
+                           }),
+                  WaitForState(kSidePanelViewObserver, true));
+   }
++
++  LocationBarView* location_bar() {
++    return BrowserView::GetBrowserViewForBrowser(browser())
++        ->toolbar()
++        ->location_bar_view();
++  }
++
++  views::Widget* OpenYeeOmniboxPopup() {
++    LocationBarView* const location_bar_view = location_bar();
++    location_bar_view->FocusLocation(/*is_user_initiated=*/false,
++                                     /*clear_focus_if_failed=*/false);
++    OmniboxController* const controller =
++        location_bar_view->GetOmniboxController();
++    controller->edit_model()->SetUserText(u"yee header regression");
++    AutocompleteInput input(
++        u"yee header regression", metrics::OmniboxEventProto::BLANK,
++        ChromeAutocompleteSchemeClassifier(browser()->GetProfile()));
++    input.set_omit_asynchronous_matches(true);
++    controller->StartAutocomplete(input);
++    base::RunLoop().RunUntilIdle();
++
++    OmniboxPopupView* const popup_view =
++        location_bar_view->GetOmniboxPopupView();
++    if (!popup_view || !controller->IsPopupOpen()) {
++      return nullptr;
++    }
++    if (OmniboxPopupPresenterBase* const presenter = popup_view->presenter()) {
++      return presenter->get_widget_for_testing();
++    }
++    auto* const views_popup = static_cast<OmniboxPopupViewViews*>(popup_view);
++    views_popup->UpdatePopupAppearance();
++    return views_popup->GetWidget();
++  }
++
++  void CloseYeeOmniboxPopup() {
++    LocationBarView* const location_bar_view = location_bar();
++    location_bar_view->GetOmniboxController()->StopAutocomplete(
++        /*clear_result=*/true);
++    if (OmniboxPopupView* const popup_view =
++            location_bar_view->GetOmniboxPopupView()) {
++      popup_view->UpdatePopupAppearance();
++      if (OmniboxPopupPresenterBase* const presenter =
++              popup_view->presenter()) {
++        presenter->Hide();
++      }
++    }
++  }
++
++  bool YeeOmniboxPopupMatchesLocationBar() {
++    LocationBarView* const location_bar_view = location_bar();
++    if (!location_bar_view->IsCompactShellMode() ||
++        !location_bar_view->GetCompactShellPopupSurfaceColor().has_value()) {
++      return false;
++    }
++
++    views::Widget* const popup_widget = OpenYeeOmniboxPopup();
++    if (!popup_widget) {
++      return false;
++    }
++    gfx::Rect expected_bounds = location_bar_view->GetBoundsInScreen();
++    expected_bounds.Inset(
++        -RoundedOmniboxResultsFrame::GetLocationBarAlignmentInsets(
++            /*compact_shell_alignment=*/true));
++    expected_bounds.Inset(-RoundedOmniboxResultsFrame::GetShadowInsets(
++        /*compact_shell_alignment=*/true));
++    const gfx::Rect popup_bounds = popup_widget->GetWindowBoundsInScreen();
++    return popup_bounds.x() == expected_bounds.x() &&
++           popup_bounds.y() == expected_bounds.y() &&
++           popup_bounds.right() == expected_bounds.right();
++  }
+ };
+
+ INSTANTIATE_TEST_SUITE_P(
+@@ -422,6 +506,229 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-+                       YeeNativeLocationBarFollowsActivePaneAndRestores) {
++                       YeeSingleAndSplitHeadersShareLocationBarGeometry) {
 +  ASSERT_TRUE(yee::IsShellEnabled());
++  int single_location_bar_center_y = 0;
 +  RunTestSequence(
++      Check([&]() {
++        BrowserView* browser_view =
++            BrowserView::GetBrowserViewForBrowser(browser());
++        LocationBarView* location_bar =
++            browser_view->toolbar()->location_bar_view();
++        single_location_bar_center_y =
++            location_bar->GetBoundsInScreen().CenterPoint().y();
++        return location_bar->parent() == browser_view->toolbar() &&
++               browser_view->toolbar()->height() ==
++                   yee::kSidebarMetrics.toolbar_height &&
++               location_bar->height() ==
++                   yee::kSidebarMetrics.browser_surface_location_bar_height;
++      }),
 +      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0), Check([&]() {
 +        BrowserView* browser_view =
 +            BrowserView::GetBrowserViewForBrowser(browser());
 +        LocationBarView* location_bar =
 +            browser_view->toolbar()->location_bar_view();
-+        return location_bar->parent() ==
++        const int split_location_bar_center_y =
++            location_bar->GetBoundsInScreen().CenterPoint().y();
++        return split_location_bar_center_y >=
++                   single_location_bar_center_y - 1 &&
++               split_location_bar_center_y <=
++                   single_location_bar_center_y + 1 &&
++               location_bar->height() ==
++                   yee::kSidebarMetrics.browser_surface_location_bar_height &&
++               location_bar->parent() ==
 +                   multi_contents_view()->mini_toolbar_for_testing(0) &&
 +               multi_contents_view()->mini_toolbar_for_testing(0)->height() ==
 +                   yee::kSidebarMetrics.split_pane_header_height -
@@ -3206,8 +3357,14 @@ index 959386b621..3d3bc58c7a 100644
 +      ExitSplitView(1), WaitForActiveTabChange(1), Check([&]() {
 +        BrowserView* browser_view =
 +            BrowserView::GetBrowserViewForBrowser(browser());
-+        return browser_view->toolbar()->location_bar_view()->parent() ==
-+               browser_view->toolbar();
++        LocationBarView* location_bar =
++            browser_view->toolbar()->location_bar_view();
++        const int restored_location_bar_center_y =
++            location_bar->GetBoundsInScreen().CenterPoint().y();
++        return location_bar->parent() == browser_view->toolbar() &&
++               location_bar->height() ==
++                   yee::kSidebarMetrics.browser_surface_location_bar_height &&
++               restored_location_bar_center_y == single_location_bar_center_y;
 +      }));
 +}
 +
@@ -3234,6 +3391,37 @@ index 959386b621..3d3bc58c7a 100644
 +}
 +
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
++                       YeeOmniboxPopupFollowsSingleAndSplitHeader) {
++  ASSERT_TRUE(yee::IsShellEnabled());
++  RunTestSequence(
++      Check([this]() { return YeeOmniboxPopupMatchesLocationBar(); }),
++      Do([this]() { CloseYeeOmniboxPopup(); }), CreateTabsAndEnterSplitView(),
++      WaitForActiveTabChange(0), Check([this]() {
++        return location_bar()->IsCompactShellSplitMode() &&
++               location_bar()->parent() ==
++                   multi_contents_view()->mini_toolbar_for_testing(0) &&
++               YeeOmniboxPopupMatchesLocationBar();
++      }),
++      Do([this]() { CloseYeeOmniboxPopup(); }),
++      Do([this]() { tab_strip_model()->ActivateTabAt(1); }),
++      WaitForActiveTabChange(1), Check([this]() {
++        return location_bar()->IsCompactShellSplitMode() &&
++               location_bar()->parent() ==
++                   multi_contents_view()->mini_toolbar_for_testing(1) &&
++               YeeOmniboxPopupMatchesLocationBar();
++      }),
++      Do([this]() { CloseYeeOmniboxPopup(); }), ExitSplitView(1),
++      WaitForActiveTabChange(1), Check([this]() {
++        return !location_bar()->IsCompactShellSplitMode() &&
++               location_bar()->parent() ==
++                   BrowserView::GetBrowserViewForBrowser(browser())
++                       ->toolbar() &&
++               YeeOmniboxPopupMatchesLocationBar();
++      }),
++      Do([this]() { CloseYeeOmniboxPopup(); }));
++}
++
++IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 +                       YeeSidebarHeaderControlsPersistAcrossSplitAndCollapse) {
 +  ASSERT_TRUE(yee::IsShellEnabled());
 +  views::View* original_actions = nullptr;
@@ -3253,10 +3441,8 @@ index 959386b621..3d3bc58c7a 100644
 +    for (views::View* child : region->children()) {
 +      actions_count += child->GetID() == yee::kSidebarHeaderActionsViewId;
 +    }
-+    views::View* create =
-+        actions->GetViewByID(yee::kSidebarHeaderCreateViewId);
-+    views::View* agent =
-+        actions->GetViewByID(yee::kSidebarHeaderAgentViewId);
++    views::View* create = actions->GetViewByID(yee::kSidebarHeaderCreateViewId);
++    views::View* agent = actions->GetViewByID(yee::kSidebarHeaderAgentViewId);
 +    if (actions_count != 1 || !create || !agent || create == agent ||
 +        create->parent() != actions || agent->parent() != actions ||
 +        actions->children()[0] != create || actions->children()[1] != agent) {
@@ -3347,7 +3533,7 @@ index 959386b621..3d3bc58c7a 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -567,16 +738,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -567,16 +874,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -3373,7 +3559,7 @@ index 959386b621..3d3bc58c7a 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -671,9 +841,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -671,9 +977,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -3387,7 +3573,7 @@ index 959386b621..3d3bc58c7a 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -688,8 +859,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -688,8 +995,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -3402,7 +3588,7 @@ index 959386b621..3d3bc58c7a 100644
        }));
  }
  
-@@ -711,15 +886,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -711,15 +1022,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -3422,7 +3608,7 @@ index 959386b621..3d3bc58c7a 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -735,8 +908,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -735,8 +1044,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -3435,7 +3621,7 @@ index 959386b621..3d3bc58c7a 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -752,31 +927,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -752,31 +1063,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -3488,7 +3674,7 @@ index 959386b621..3d3bc58c7a 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -796,8 +972,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -796,8 +1108,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -3501,7 +3687,7 @@ index 959386b621..3d3bc58c7a 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -807,23 +985,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -807,23 +1121,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -3541,7 +3727,7 @@ index 959386b621..3d3bc58c7a 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -867,12 +1046,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -867,12 +1182,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -3561,7 +3747,7 @@ index 959386b621..3d3bc58c7a 100644
                  }));
  }
  #endif
-@@ -880,11 +1062,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -880,11 +1198,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -3580,7 +3766,7 @@ index 959386b621..3d3bc58c7a 100644
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index d5f3d22b6e..4c7228989d 100644
+index d5f3d22b6e..f3528ce888 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,26 +7,36 @@
@@ -3722,24 +3908,34 @@ index d5f3d22b6e..4c7228989d 100644
    alert_state_indicator_ = AddChildView(std::make_unique<views::ImageView>());
    alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
                                        icon_flex_spec.WithOrder(2));
-@@ -132,13 +211,63 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -132,13 +211,73 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
            base::BindRepeating(&MultiContentsViewMiniToolbar::ClearWebContents,
                                base::Unretained(this)));
  
 +  if (yee::IsShellEnabled()) {
-+    yee_color_controller_ =
++    yee_header_color_controller_ =
 +        std::make_unique<yee::BrowserSurfaceColorController>(
-+            base::BindRepeating(&MultiContentsViewMiniToolbar::UpdateYeeSurface,
-+                                weak_ptr_factory_.GetWeakPtr()));
-+    yee_color_controller_->SetWebContents(web_contents_);
++            base::BindRepeating(
++                &MultiContentsViewMiniToolbar::UpdateYeeHeaderPresentation,
++                weak_ptr_factory_.GetWeakPtr()));
++    yee_header_color_controller_->SetWebContents(web_contents_);
 +  }
 +
    RegisterTabSubscriptions();
-+  UpdateYeeSurface();
++  UpdateYeeHeaderPresentation();
  }
  
  MultiContentsViewMiniToolbar::~MultiContentsViewMiniToolbar() = default;
  
++void MultiContentsViewMiniToolbar::AddedToWidget() {
++  views::View::AddedToWidget();
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetThemeFallbackColor(
++        GetColorProvider()->GetColor(kColorToolbar));
++  }
++  UpdateYeeHeaderPresentation();
++}
++
 +void MultiContentsViewMiniToolbar::AttachYeeSplitLocationBar(
 +    std::unique_ptr<views::View> location_bar) {
 +  CHECK(yee::IsShellEnabled());
@@ -3779,14 +3975,14 @@ index d5f3d22b6e..4c7228989d 100644
 +    yee_forward_button_->SetVisible(true);
 +    yee_reload_button_->SetVisible(true);
 +    SetFocusBehavior(is_active ? FocusBehavior::NEVER : FocusBehavior::ALWAYS);
-+    UpdateYeeSurface();
++    UpdateYeeHeaderPresentation();
 +    return;
 +  }
 +
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -166,6 +295,60 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -166,6 +305,60 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -3820,7 +4016,8 @@ index d5f3d22b6e..4c7228989d 100644
 +      yee::kSidebarMetrics.split_pane_address_bar_inset +
 +          (is_active_
 +               ? yee::kSidebarMetrics.split_pane_address_bar_active_padding
-+               : yee::kSidebarMetrics.split_pane_address_bar_horizontal_padding));
++               : yee::kSidebarMetrics
++                     .split_pane_address_bar_horizontal_padding));
 +  int leading_padding = horizontal_padding;
 +
 +  // A split Pane Header replaces the shared Toolbar, so it must independently
@@ -3837,71 +4034,80 @@ index d5f3d22b6e..4c7228989d 100644
 +  }
 +
 +  static_cast<views::FlexLayout*>(GetLayoutManager())
-+      ->SetInteriorMargin(base::i18n::IsRTL()
-+                              ? gfx::Insets::TLBR(0, horizontal_padding, 0,
-+                                                  leading_padding)
-+                              : gfx::Insets::TLBR(0, leading_padding, 0,
-+                                                  horizontal_padding));
++      ->SetInteriorMargin(
++          base::i18n::IsRTL()
++              ? gfx::Insets::TLBR(0, horizontal_padding, 0, leading_padding)
++              : gfx::Insets::TLBR(0, leading_padding, 0, horizontal_padding));
 +}
 +
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -208,6 +391,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -208,6 +401,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
-+  UpdateYeeSurface();
++  UpdateYeeHeaderPresentation();
 +
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -215,6 +400,9 @@ void MultiContentsViewMiniToolbar::UpdateWebContents(views::WebView* web_view) {
+@@ -215,6 +410,9 @@ void MultiContentsViewMiniToolbar::UpdateWebContents(views::WebView* web_view) {
    tab_alert_status_subscription_.reset();
    tab_ui_updated_subscription_.reset();
    web_contents_ = web_view->web_contents();
-+  if (yee_color_controller_) {
-+    yee_color_controller_->SetWebContents(web_contents_);
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetWebContents(web_contents_);
 +  }
    RegisterTabSubscriptions();
  }
  
-@@ -222,9 +410,30 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -222,15 +420,40 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    tab_alert_status_subscription_.reset();
    OnAlertStatusIndicatorChanged(std::nullopt);
    web_contents_ = nullptr;
-+  if (yee_color_controller_) {
-+    yee_color_controller_->SetWebContents(nullptr);
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetWebContents(nullptr);
 +  }
  }
  
  void MultiContentsViewMiniToolbar::OnPaint(gfx::Canvas* canvas) {
 +  if (yee::IsShellEnabled()) {
 +    // `View::OnPaint()` paints the page-aware Background installed by
-+    // UpdateYeeSurface(). Returning without it leaves the Pane Header on the
-+    // default toolbar color even though its text uses page-derived colors.
++    // UpdateYeeHeaderPresentation(). Returning without it leaves the Pane
++    // Header on the default toolbar color even though its text uses
++    // page-derived colors.
 +    views::View::OnPaint(canvas);
 +    if (GetColorProvider()) {
 +      const SkColor surface = yee::ResolveBrowserSurfaceHeaderColor(
-+          *GetColorProvider(), yee_color_controller_
-+                                   ? yee_color_controller_->GetColor()
++          *GetColorProvider(), yee_header_color_controller_
++                                   ? yee_header_color_controller_->GetColor()
 +                                   : std::nullopt);
 +      const float separator_y = height() - 1.0f;
-+      canvas->DrawLine(
-+          gfx::PointF(0.0f, separator_y),
-+          gfx::PointF(static_cast<float>(width()), separator_y),
-+          yee::ResolveBrowserSurfaceSeparatorColor(surface));
++      canvas->DrawLine(gfx::PointF(0.0f, separator_y),
++                       gfx::PointF(static_cast<float>(width()), separator_y),
++                       yee::ResolveBrowserSurfaceSeparatorColor(surface));
 +    }
 +    return;
 +  }
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -242,6 +451,148 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+
+ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+   views::View::OnThemeChanged();
++  if (yee_header_color_controller_) {
++    yee_header_color_controller_->SetThemeFallbackColor(
++        GetColorProvider()->GetColor(kColorToolbar));
++  }
+   if (auto* interface = GetTabInterface(web_contents_)) {
+     auto* tab_alert_controller = tabs::TabAlertController::From(interface);
+     if (tab_alert_controller) {
+@@ -242,6 +465,149 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
-+  UpdateYeeSurface();
++  UpdateYeeHeaderPresentation();
 +}
 +
 +bool MultiContentsViewMiniToolbar::OnMousePressed(const ui::MouseEvent& event) {
@@ -3941,12 +4147,12 @@ index d5f3d22b6e..4c7228989d 100644
 +
 +void MultiContentsViewMiniToolbar::OnFocus() {
 +  views::View::OnFocus();
-+  UpdateYeeSurface();
++  UpdateYeeHeaderPresentation();
 +}
 +
 +void MultiContentsViewMiniToolbar::OnBlur() {
 +  views::View::OnBlur();
-+  UpdateYeeSurface();
++  UpdateYeeHeaderPresentation();
 +}
 +
 +void MultiContentsViewMiniToolbar::ActivateAddressBar() {
@@ -3988,14 +4194,15 @@ index d5f3d22b6e..4c7228989d 100644
 +  yee_sidebar_button_->GetViewAccessibility().SetName(label);
 +}
 +
-+void MultiContentsViewMiniToolbar::UpdateYeeSurface() {
++void MultiContentsViewMiniToolbar::UpdateYeeHeaderPresentation() {
 +  if (!yee::IsShellEnabled() || !GetColorProvider()) {
 +    return;
 +  }
 +
 +  const SkColor surface = yee::ResolveBrowserSurfaceHeaderColor(
-+      *GetColorProvider(),
-+      yee_color_controller_ ? yee_color_controller_->GetColor() : std::nullopt);
++      *GetColorProvider(), yee_header_color_controller_
++                               ? yee_header_color_controller_->GetColor()
++                               : std::nullopt);
 +  // The Pane Header is the card's full top surface, not another Omnibox pill.
 +  // Its layer supplies only the two outer top clips; the native LocationBar
 +  // keeps its own inset focus treatment while editing.
@@ -4047,7 +4254,7 @@ index d5f3d22b6e..4c7228989d 100644
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
-index de2fb5ff5f..7bdaf7cd13 100644
+index de2fb5ff5f..b6aeef5404 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
 @@ -5,9 +5,11 @@
@@ -4114,10 +4321,11 @@ index de2fb5ff5f..7bdaf7cd13 100644
    // Trigger an update of the tab data used to populate the mini toolbar.
    void UpdateContents();
  
-@@ -51,8 +71,15 @@ class MultiContentsViewMiniToolbar : public views::View {
+@@ -51,8 +71,16 @@ class MultiContentsViewMiniToolbar : public views::View {
  
   private:
    // View:
++  void AddedToWidget() override;
 +  void Layout(PassKey) override;
    void OnPaint(gfx::Canvas* canvas) override;
    void OnThemeChanged() override;
@@ -4130,7 +4338,7 @@ index de2fb5ff5f..7bdaf7cd13 100644
  
    void UpdateWebContents(views::WebView* web_view);
    void ClearWebContents(views::WebView*);
-@@ -63,9 +90,21 @@ class MultiContentsViewMiniToolbar : public views::View {
+@@ -63,9 +91,21 @@ class MultiContentsViewMiniToolbar : public views::View {
    void UpdateFavicon(TabUIHelper* tab_ui_helper);
  
    void CloseCurrentView();
@@ -4139,7 +4347,7 @@ index de2fb5ff5f..7bdaf7cd13 100644
 +  void ActivateAndExecuteCommand(int command_id);
 +  void ExecuteGlobalCommand(int command_id);
 +  void UpdateYeeSidebarButton(tabs::VerticalTabStripCollapseState state);
-+  void UpdateYeeSurface();
++  void UpdateYeeHeaderPresentation();
 +  void UpdateYeeInteriorMargin();
 +
 +  raw_ptr<ToolbarButton> yee_sidebar_button_ = nullptr;
@@ -4153,14 +4361,15 @@ index de2fb5ff5f..7bdaf7cd13 100644
    raw_ptr<views::ImageView> alert_state_indicator_;
    raw_ptr<views::ImageButton> close_button_;
  
-@@ -73,8 +112,13 @@ class MultiContentsViewMiniToolbar : public views::View {
+@@ -73,8 +113,14 @@ class MultiContentsViewMiniToolbar : public views::View {
    raw_ptr<content::WebContents> web_contents_;
    base::CallbackListSubscription web_contents_attached_subscription_;
    base::CallbackListSubscription web_contents_detached_subscription_;
 +  base::CallbackListSubscription yee_sidebar_subscription_;
    std::optional<base::CallbackListSubscription> tab_alert_status_subscription_;
    std::optional<base::CallbackListSubscription> tab_ui_updated_subscription_;
-+  std::unique_ptr<yee::BrowserSurfaceColorController> yee_color_controller_;
++  std::unique_ptr<yee::BrowserSurfaceColorController>
++      yee_header_color_controller_;
 +  bool is_active_ = false;
 +  bool address_press_started_ = false;
 +  base::WeakPtrFactory<MultiContentsViewMiniToolbar> weak_ptr_factory_{this};
@@ -6240,7 +6449,7 @@ index 75f1d43326..583b42a8f1 100644
  
  bool BrowserTabStripController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 3c52548396..884efb82ee 100644
+index 3c52548396..c7ea5b52c2 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
 @@ -103,6 +103,7 @@ source_set("impl") {
@@ -6251,10 +6460,11 @@ index 3c52548396..884efb82ee 100644
      "//chrome/browser/ui/window_metadata",
      "//components/contextual_tasks/public:feature_list",
      "//components/performance_manager",
-@@ -181,6 +182,10 @@ source_set("browser_tests") {
+@@ -181,6 +182,11 @@ source_set("browser_tests") {
  source_set("unit_tests") {
    testonly = true
    sources = [
++    "../../yee/browser_surface_color_controller_unittest.cc",
 +    "../../yee/favorites_unittest.cc",
 +    "../../yee/group_mark_signals_unittest.cc",
 +    "../../yee/split_pane_controls_unittest.cc",
