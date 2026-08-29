@@ -15,7 +15,10 @@
 | 4열 독, 상단 inset 없음, 한 Favorite의 좌·우 삽입 슬롯 | `FavoritesDockLayoutTest.*` |
 | 독/목록 hit magnet, 첫 Tab 경계, RTL, grab offset | `FavoritesDragGeometryTest.*` |
 | 76 DIP 빈 드롭존과 reduced-motion의 원자적 전환 | `FavoritesDragGeometryTest.*DropZone*` |
+| Light scheme은 frame 색을 보존하고 Dark scheme은 같은 hue의 차분한 shell로 정규화 | `YeeShellColorTest.*` |
 | 일반 행·Favorite·drag preview의 라이트/다크 및 활성/비활성 상태 팔레트 | `YeeSidebarItemColorTest.*` |
+| Resting→Hover→Active→Dragging의 fill·stroke 강도와 실제 합성 표면의 전경 대비 | `YeeSidebarItemColorTest.EveryStateSharesOneThemeAwarePalette` |
+| 세로 Group Header의 resting·hover 표면과 전경이 함께 바뀌고 창 활성 상태를 다시 반영 | `TabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether` |
 | Group mark가 브라우저 신호만 사용하고 Agent 상태를 섞지 않음 | `GroupMarkSignalsTest.*` |
 
 ## 2. 펼친 Sidebar의 실제 View 구조

@@ -12,6 +12,16 @@
 namespace yee {
 namespace {
 
+void SetSidebarPaletteForTesting(ui::ColorProvider& provider, bool dark) {
+  provider.SetColorForTesting(
+      ui::kColorSysBase,
+      dark ? SkColorSetRGB(0x12, 0x13, 0x12) : SkColorSetRGB(0xFA, 0xFA, 0xF8));
+  provider.SetColorForTesting(ui::kColorFrameActive,
+                              SkColorSetRGB(0xD3, 0xE8, 0xCF));
+  provider.SetColorForTesting(ui::kColorFrameInactive,
+                              SkColorSetRGB(0xCB, 0xD5, 0xC8));
+}
+
 TEST(YeeSurfaceColorTest, HeaderRolesRemainReadableOnLightAndDarkPages) {
   for (SkColor surface :
        {SkColorSetRGB(0xFA, 0xF4, 0xE5), SkColorSetRGB(0x18, 0x1A, 0x1F)}) {
@@ -97,35 +107,56 @@ TEST(YeeSurfaceColorTest, DarkGlassUsesStrongerNativeTint) {
   EXPECT_GT(dark, light);
 }
 
+TEST(YeeShellColorTest, LightSchemePreservesOpaqueFrameColors) {
+  ui::ColorProvider provider;
+  SetSidebarPaletteForTesting(provider, /*dark=*/false);
+
+  EXPECT_EQ(SkColorSetRGB(0xD3, 0xE8, 0xCF),
+            ResolveShellBackgroundColor(provider, /*frame_active=*/true));
+  EXPECT_EQ(SkColorSetRGB(0xCB, 0xD5, 0xC8),
+            ResolveShellBackgroundColor(provider, /*frame_active=*/false));
+}
+
+TEST(YeeShellColorTest, DarkSchemeTonesBrightFrameWithoutLosingHue) {
+  ui::ColorProvider provider;
+  SetSidebarPaletteForTesting(provider, /*dark=*/true);
+
+  const SkColor active =
+      ResolveShellBackgroundColor(provider, /*frame_active=*/true);
+  const SkColor inactive =
+      ResolveShellBackgroundColor(provider, /*frame_active=*/false);
+  color_utils::HSL seed_hsl;
+  color_utils::HSL active_hsl;
+  color_utils::HSL inactive_hsl;
+  color_utils::SkColorToHSL(SkColorSetRGB(0xD3, 0xE8, 0xCF), &seed_hsl);
+  color_utils::SkColorToHSL(active, &active_hsl);
+  color_utils::SkColorToHSL(inactive, &inactive_hsl);
+
+  EXPECT_TRUE(color_utils::IsDark(active));
+  EXPECT_NEAR(seed_hsl.h, active_hsl.h, 0.01);
+  EXPECT_GE(active_hsl.l, 0.16);
+  // HSL round-trips through eight-bit RGB, so allow one quantization step.
+  EXPECT_LE(active_hsl.l, 0.262);
+  EXPECT_LE(active_hsl.s, 0.44);
+  EXPECT_LT(inactive_hsl.l, active_hsl.l);
+  EXPECT_LT(inactive_hsl.s, active_hsl.s);
+}
+
 TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
   for (const bool dark : {false, true}) {
     ui::ColorProvider provider;
-    const SkColor elevated = dark ? SkColorSetRGB(0x2B, 0x2D, 0x31)
-                                  : SkColorSetRGB(0xF7, 0xF8, 0xFA);
-    const SkColor inactive_surface = dark ? SkColorSetRGB(0x22, 0x23, 0x27)
-                                          : SkColorSetRGB(0xF0, 0xF1, 0xF3);
-    const SkColor outline = dark ? SkColorSetRGB(0xA8, 0xAA, 0xB0)
-                                 : SkColorSetRGB(0x5E, 0x60, 0x66);
-    const SkColor foreground = dark ? SK_ColorWHITE : SK_ColorBLACK;
-    const SkColor inactive_foreground = dark ? SkColorSetRGB(0xC4, 0xC6, 0xCC)
-                                             : SkColorSetRGB(0x55, 0x57, 0x5D);
-    const SkColor hover =
-        SkColorSetARGB(0x28, SkColorGetR(foreground), SkColorGetG(foreground),
-                       SkColorGetB(foreground));
-    provider.SetColorForTesting(ui::kColorSysBaseContainerElevated, elevated);
-    provider.SetColorForTesting(ui::kColorSysBaseContainer, inactive_surface);
-    provider.SetColorForTesting(ui::kColorSysNeutralOutline, outline);
-    provider.SetColorForTesting(ui::kColorSysOnSurface, foreground);
-    provider.SetColorForTesting(ui::kColorSysOnSurfaceSecondary,
-                                inactive_foreground);
-    provider.SetColorForTesting(ui::kColorSysStateHoverOnSubtle, hover);
+    SetSidebarPaletteForTesting(provider, dark);
+    const SkColor shell =
+        ResolveShellBackgroundColor(provider, /*frame_active=*/true);
+    const SkColor endpoint = color_utils::GetColorWithMaxContrast(shell);
 
     const SidebarItemColors resting_row = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kResting, /*hover_progress=*/0.0,
         /*frame_active=*/true, /*persistent_surface=*/false);
     EXPECT_EQ(0, static_cast<int>(SkColorGetA(resting_row.fill)));
     EXPECT_EQ(0, static_cast<int>(SkColorGetA(resting_row.stroke)));
-    EXPECT_EQ(foreground, resting_row.foreground);
+    EXPECT_GE(color_utils::GetContrastRatio(resting_row.foreground, shell),
+              color_utils::kMinimumReadableContrastRatio);
 
     const SidebarItemColors resting_favorite = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kResting, /*hover_progress=*/0.0,
@@ -134,13 +165,18 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
               static_cast<int>(SkColorGetA(resting_favorite.fill)));
     EXPECT_EQ(kSidebarMetrics.favorites_cell_stroke_alpha,
               static_cast<int>(SkColorGetA(resting_favorite.stroke)));
+    EXPECT_EQ(SkColorSetA(endpoint, SK_AlphaOPAQUE),
+              SkColorSetA(resting_favorite.fill, SK_AlphaOPAQUE));
+    EXPECT_EQ(resting_row.foreground, resting_favorite.foreground);
 
     const SidebarItemColors hovered_row = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kHovered, /*hover_progress=*/1.0,
         /*frame_active=*/true, /*persistent_surface=*/false);
-    EXPECT_EQ(static_cast<int>(SkColorGetA(hover)),
+    EXPECT_EQ(kSidebarMetrics.favorites_cell_fill_alpha,
               static_cast<int>(SkColorGetA(hovered_row.fill)));
     EXPECT_EQ(0, static_cast<int>(SkColorGetA(hovered_row.stroke)));
+    EXPECT_GT(color_utils::GetContrastRatio(hovered_row.foreground, shell),
+              color_utils::GetContrastRatio(resting_row.foreground, shell));
 
     const SidebarItemColors hovered_favorite = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kHovered, /*hover_progress=*/1.0,
@@ -164,6 +200,12 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
               static_cast<int>(SkColorGetA(active.fill)));
     EXPECT_GT(static_cast<int>(SkColorGetA(dragging.stroke)),
               static_cast<int>(SkColorGetA(active.stroke)));
+    EXPECT_EQ(active.foreground, dragging.foreground);
+    const SkColor composited_active_fill =
+        color_utils::GetResultingPaintColor(active.fill, shell);
+    EXPECT_GE(color_utils::GetContrastRatio(active.foreground,
+                                            composited_active_fill),
+              color_utils::kMinimumReadableContrastRatio);
 
     const SidebarItemColors inactive = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kActive, /*hover_progress=*/0.0,
@@ -172,20 +214,20 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
               static_cast<int>(SkColorGetA(active.fill)));
     EXPECT_LT(static_cast<int>(SkColorGetA(inactive.stroke)),
               static_cast<int>(SkColorGetA(active.stroke)));
-    EXPECT_EQ(inactive_foreground, inactive.foreground);
+    const SkColor inactive_shell =
+        ResolveShellBackgroundColor(provider, /*frame_active=*/false);
+    EXPECT_GE(
+        color_utils::GetContrastRatio(inactive.foreground, inactive_shell),
+        color_utils::kMinimumReadableContrastRatio);
+    EXPECT_LT(
+        color_utils::GetContrastRatio(inactive.foreground, inactive_shell),
+        color_utils::GetContrastRatio(active.foreground, shell));
   }
 }
 
 TEST(YeeSidebarItemColorTest, HoverProgressClampsAtBothEnds) {
   ui::ColorProvider provider;
-  provider.SetColorForTesting(ui::kColorSysBaseContainerElevated,
-                              SK_ColorWHITE);
-  provider.SetColorForTesting(ui::kColorSysBaseContainer, SK_ColorWHITE);
-  provider.SetColorForTesting(ui::kColorSysNeutralOutline, SK_ColorBLACK);
-  provider.SetColorForTesting(ui::kColorSysOnSurface, SK_ColorBLACK);
-  provider.SetColorForTesting(ui::kColorSysOnSurfaceSecondary, SK_ColorGRAY);
-  provider.SetColorForTesting(ui::kColorSysStateHoverOnSubtle,
-                              SkColorSetARGB(0x30, 0, 0, 0));
+  SetSidebarPaletteForTesting(provider, /*dark=*/true);
 
   const SidebarItemColors below_zero = ResolveSidebarItemColors(
       provider, SidebarItemVisualState::kHovered, /*hover_progress=*/-1.0,

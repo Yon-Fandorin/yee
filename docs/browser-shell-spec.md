@@ -147,6 +147,11 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 | macOS | 현재 theme frame 색의 native glass tint | theme-derived separator | Light 약 43% / Dark 약 74% 유효 불투명도 |
 | Linux | 현재 theme frame 색, 기본 `#f1f0ef` | `#d8d6d4` | Adwaita 계열, 불투명 |
 
+- `chrome_bg`는 theme frame의 색상 계열을 보존하되 현재 시스템 color scheme을
+  우선한다. 특히 Dark scheme에서 밝은 frame seed를 그대로 유리 tint로 사용하지
+  않고, hue는 유지하면서 명도와 채도를 차분한 dark shell 범위로 정규화한다.
+  native glass tint, opaque fallback, Sidebar background는 이 한 번 resolved된 색을
+  공유하며 비활성 창은 같은 계열에서 한 단계 낮은 명도와 채도를 사용한다.
 - Browser Surface Header backing: navigation·load·tab 전환·페이지 색 변경 뒤 실제
   WebContents 최상단의 얇은 띠를 저해상도로 샘플링한다. 첫 유효 화면이 그려지거나
   load가 끝나면 약 16ms 뒤 첫 sample을 시작한다. 평면색이 페이지 CSS background
@@ -191,9 +196,12 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 - macOS 26 미만, Windows, Linux와 macOS의 ‘투명도 줄이기’ 환경에서는 현재 theme
   frame 색을 불투명하게 그린다. 지원되는 macOS의 활성 창만 native material을
   사용하며 비활성 창은 같은 색의 불투명 표면으로 전환한다.
-- Active tab과 Favorite: 고정 흰색이 아니라 현재 theme의 elevated surface에서
-  계산한다. Hover는 system hover overlay, outline은 neutral outline, focus는 system
-  focus ring을 사용하며 비활성 창에서는 상태 대비를 낮춘다.
+- Tab, Group Header와 Favorite은 `chrome_bg`의 최대 대비 endpoint에서 공통 역할색을
+  계산한다. Resting은 secondary foreground, Hover는 낮은 contrast layer, Active와
+  drag는 같은 계열의 primary foreground와 순차적으로 강해지는 fill·outline을
+  사용한다. Favorite의 상시 surface도 낮은 alpha로만 영역을 알리며 별도 불투명
+  카드처럼 보이지 않는다. focus는 system focus ring을 유지하고 비활성 창에서는
+  상태 대비를 낮춘다.
 - Windows restored window: visible outline 없이 DWM의 둥근 시스템 shadow를
   유지한다. 1px transparent top-frame extension은 shadow를 위한 합성 힌트일
   뿐이며 client surface 안에 검은 선이나 별도 inset을 만들지 않는다.

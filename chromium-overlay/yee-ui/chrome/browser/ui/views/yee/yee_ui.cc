@@ -85,6 +85,13 @@ constexpr int kBrowserSurfaceShadowKeyAlphaLight = 0x14;
 constexpr int kBrowserSurfaceShadowAmbientAlphaLight = 0x09;
 constexpr int kBrowserSurfaceShadowKeyAlphaDark = 0x20;
 constexpr int kBrowserSurfaceShadowAmbientAlphaDark = 0x10;
+constexpr double kDarkShellMinimumLightness = 0.16;
+constexpr double kDarkShellMaximumLightness = 0.26;
+constexpr double kDarkShellMaximumSaturation = 0.44;
+constexpr double kInactiveShellSaturationScale = 0.82;
+constexpr double kInactiveShellLightnessScale = 0.90;
+constexpr double kSidebarPrimaryForegroundOpacity = 0.88;
+constexpr double kSidebarSecondaryForegroundOpacity = 0.64;
 
 struct BrowserSurfaceShadowColors {
   SkColor key;
@@ -93,14 +100,13 @@ struct BrowserSurfaceShadowColors {
 
 BrowserSurfaceShadowColors ResolveBrowserSurfaceShadowColors(
     const ui::ColorProvider& color_provider) {
-  const bool dark = color_utils::IsDark(
-      yee::ResolveShellContrastBackground(color_provider));
+  const bool dark =
+      color_utils::IsDark(yee::ResolveShellContrastBackground(color_provider));
   return {
       SkColorSetA(SK_ColorBLACK, dark ? kBrowserSurfaceShadowKeyAlphaDark
-                                     : kBrowserSurfaceShadowKeyAlphaLight),
-      SkColorSetA(SK_ColorBLACK,
-                  dark ? kBrowserSurfaceShadowAmbientAlphaDark
-                       : kBrowserSurfaceShadowAmbientAlphaLight),
+                                      : kBrowserSurfaceShadowKeyAlphaLight),
+      SkColorSetA(SK_ColorBLACK, dark ? kBrowserSurfaceShadowAmbientAlphaDark
+                                      : kBrowserSurfaceShadowAmbientAlphaLight),
   };
 }
 
@@ -122,7 +128,7 @@ SkColor ResolveBrowserSurfaceOutlineColor(
   return color_utils::BlendTowardMaxContrast(
       yee::ResolveShellContrastBackground(color_provider),
       emphasized ? kBrowserSurfaceActiveOutlineAlpha
-                  : kBrowserSurfaceOutlineAlpha);
+                 : kBrowserSurfaceOutlineAlpha);
 }
 
 void PaintBrowserSurfaceOutline(gfx::Canvas* canvas,
@@ -130,8 +136,7 @@ void PaintBrowserSurfaceOutline(gfx::Canvas* canvas,
                                 float outer_radius,
                                 const ui::ColorProvider& color_provider,
                                 bool emphasized) {
-  const float stroke_width =
-      yee::kSidebarMetrics.browser_surface_outline_width;
+  const float stroke_width = yee::kSidebarMetrics.browser_surface_outline_width;
   gfx::RectF stroke_bounds(local_bounds);
   stroke_bounds.Inset(stroke_width / 2.0f);
   if (stroke_bounds.IsEmpty()) {
@@ -144,9 +149,9 @@ void PaintBrowserSurfaceOutline(gfx::Canvas* canvas,
   stroke.setStrokeWidth(stroke_width);
   stroke.setColor(
       ResolveBrowserSurfaceOutlineColor(color_provider, emphasized));
-  canvas->DrawRoundRect(
-      stroke_bounds, std::max(0.0f, outer_radius - stroke_width / 2.0f),
-      stroke);
+  canvas->DrawRoundRect(stroke_bounds,
+                        std::max(0.0f, outer_radius - stroke_width / 2.0f),
+                        stroke);
 }
 
 SkColor ResolveSurfaceSeparatorColor(SkColor surface_color) {
@@ -238,8 +243,8 @@ class YeeShellBackground : public views::Background {
     CHECK(color_provider);
     const views::Widget* const widget = view->GetWidget();
     const bool is_active = !widget || widget->IsActive();
-    SkColor shell_color = color_provider->GetColor(
-        is_active ? ui::kColorFrameActive : ui::kColorFrameInactive);
+    SkColor shell_color =
+        yee::ResolveShellBackgroundColor(*color_provider, is_active);
 
     const ui::NativeTheme* const native_theme = view->GetNativeTheme();
     const bool use_glass = is_active && features::IsGlassFrameEnabled() &&
@@ -376,9 +381,9 @@ class YeeCombinedSurfaceOutlineView : public views::View {
     }
     const SkColor surface_color = ResolveSurfaceColor(*GetColorProvider());
     const SkColor separator_color = ResolveSurfaceSeparatorColor(surface_color);
-    PaintBrowserSurfaceOutline(
-        canvas, surface_bounds, yee::kSidebarMetrics.content_corner_radius,
-        *GetColorProvider(), /*emphasized=*/false);
+    PaintBrowserSurfaceOutline(canvas, surface_bounds,
+                               yee::kSidebarMetrics.content_corner_radius,
+                               *GetColorProvider(), /*emphasized=*/false);
 
     const float separator_y = yee::kSidebarMetrics.titlebar_height -
                               yee::kSidebarMetrics.content_gutter;
@@ -386,11 +391,10 @@ class YeeCombinedSurfaceOutlineView : public views::View {
         separator_y < surface_bounds.bottom()) {
       const float horizontal_inset =
           yee::kSidebarMetrics.browser_surface_outline_width / 2.0f;
-      canvas->DrawLine(gfx::PointF(surface_bounds.x() + horizontal_inset,
-                                   separator_y),
-                       gfx::PointF(surface_bounds.right() - horizontal_inset,
-                                   separator_y),
-                       separator_color);
+      canvas->DrawLine(
+          gfx::PointF(surface_bounds.x() + horizontal_inset, separator_y),
+          gfx::PointF(surface_bounds.right() - horizontal_inset, separator_y),
+          separator_color);
     }
   }
 
@@ -453,10 +457,9 @@ class YeeSplitPaneEmphasisView : public views::View {
     if (!color_provider) {
       return;
     }
-    PaintBrowserSurfaceOutline(
-        canvas, GetLocalBounds(),
-        yee::kSidebarMetrics.split_card_corner_radius, *color_provider,
-        emphasized_);
+    PaintBrowserSurfaceOutline(canvas, GetLocalBounds(),
+                               yee::kSidebarMetrics.split_card_corner_radius,
+                               *color_provider, emphasized_);
   }
 
  private:
@@ -740,9 +743,8 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
 
 class YeeSidebarHeaderActionsView : public views::View {
  public:
-  YeeSidebarHeaderActionsView(
-      yee::ShellCreateCallback create_callback,
-      views::Button::PressedCallback agent_callback) {
+  YeeSidebarHeaderActionsView(yee::ShellCreateCallback create_callback,
+                              views::Button::PressedCallback agent_callback) {
     SetID(yee::kSidebarHeaderActionsViewId);
     auto add_button = yee::CreateShellAddButton(std::move(create_callback));
     add_button->SetVectorIcon(kAddIcon);
@@ -754,8 +756,8 @@ class YeeSidebarHeaderActionsView : public views::View {
     agent_button_ = AddChildView(std::move(agent_button));
   }
   YeeSidebarHeaderActionsView(const YeeSidebarHeaderActionsView&) = delete;
-  YeeSidebarHeaderActionsView& operator=(
-      const YeeSidebarHeaderActionsView&) = delete;
+  YeeSidebarHeaderActionsView& operator=(const YeeSidebarHeaderActionsView&) =
+      delete;
   ~YeeSidebarHeaderActionsView() override = default;
 
   void SetLeadingExclusion(int leading_exclusion) {
@@ -785,9 +787,9 @@ class YeeSidebarHeaderActionsView : public views::View {
     const int control_size = yee::kSidebarMetrics.shell_control_size;
     const int control_margin =
         yee::kSidebarMetrics.shell_control_horizontal_margin;
-    int x = std::max(
-        leading_exclusion_,
-        yee::kSidebarMetrics.sidebar_header_controls_leading_inset());
+    int x =
+        std::max(leading_exclusion_,
+                 yee::kSidebarMetrics.sidebar_header_controls_leading_inset());
     const int y = std::max(0, (height() - control_size) / 2);
 
     for (ToolbarButton* button : {add_button_, agent_button_}) {
@@ -798,8 +800,7 @@ class YeeSidebarHeaderActionsView : public views::View {
     }
   }
 
-  gfx::Size CalculatePreferredSize(
-      const views::SizeBounds&) const override {
+  gfx::Size CalculatePreferredSize(const views::SizeBounds&) const override {
     const int controls_width =
         2 * (yee::kSidebarMetrics.shell_control_size +
              2 * yee::kSidebarMetrics.shell_control_horizontal_margin);
@@ -827,13 +828,10 @@ SidebarItemColors ResolveSidebarItemColors(
     bool persistent_surface) {
   hover_progress = std::clamp(hover_progress, 0.0, 1.0);
 
-  int fill_alpha = persistent_surface
-                       ? kSidebarMetrics.favorites_cell_fill_alpha
-                       : 0;
-  int stroke_alpha = persistent_surface
-                         ? kSidebarMetrics.favorites_cell_stroke_alpha
-                         : 0;
-  bool use_hover_overlay = false;
+  int fill_alpha =
+      persistent_surface ? kSidebarMetrics.favorites_cell_fill_alpha : 0;
+  int stroke_alpha =
+      persistent_surface ? kSidebarMetrics.favorites_cell_stroke_alpha : 0;
   switch (state) {
     case SidebarItemVisualState::kResting:
       break;
@@ -850,7 +848,8 @@ SidebarItemColors ResolveSidebarItemColors(
                 kSidebarMetrics.favorites_cell_active_stroke_alpha),
             hover_progress * 0.42)));
       } else {
-        use_hover_overlay = true;
+        fill_alpha = static_cast<int>(std::lround(
+            kSidebarMetrics.favorites_cell_fill_alpha * hover_progress));
       }
       break;
     case SidebarItemVisualState::kActive:
@@ -858,10 +857,8 @@ SidebarItemColors ResolveSidebarItemColors(
       stroke_alpha = kSidebarMetrics.favorites_cell_active_stroke_alpha;
       break;
     case SidebarItemVisualState::kDragging:
-      fill_alpha = std::min(
-          255, kSidebarMetrics.favorites_cell_active_fill_alpha + 16);
-      stroke_alpha = std::min(
-          255, kSidebarMetrics.favorites_cell_active_stroke_alpha + 24);
+      fill_alpha = kSidebarMetrics.favorites_cell_drag_fill_alpha;
+      stroke_alpha = kSidebarMetrics.favorites_cell_drag_stroke_alpha;
       break;
   }
 
@@ -870,26 +867,58 @@ SidebarItemColors ResolveSidebarItemColors(
     stroke_alpha = static_cast<int>(std::lround(stroke_alpha * 0.78));
   }
 
-  const SkColor surface = color_provider.GetColor(
-      frame_active ? ui::kColorSysBaseContainerElevated
-                   : ui::kColorSysBaseContainer);
-  const SkColor outline =
-      color_provider.GetColor(ui::kColorSysNeutralOutline);
-  SkColor fill = SkColorSetA(surface, fill_alpha);
-  if (use_hover_overlay) {
-    fill = color_provider.GetColor(ui::kColorSysStateHoverOnSubtle);
-    const double frame_opacity = frame_active ? 1.0 : 0.78;
-    fill = SkColorSetA(
-        fill, static_cast<SkAlpha>(
-                  std::lround(SkColorGetA(fill) * hover_progress *
-                              frame_opacity)));
+  const SkColor shell =
+      ResolveShellBackgroundColor(color_provider, frame_active);
+  const SkColor endpoint = color_utils::GetColorWithMaxContrast(shell);
+  const SkColor fill = SkColorSetA(endpoint, fill_alpha);
+  int strongest_fill_alpha = kSidebarMetrics.favorites_cell_drag_fill_alpha;
+  int resting_fill_alpha = kSidebarMetrics.favorites_cell_fill_alpha;
+  if (!frame_active) {
+    strongest_fill_alpha =
+        static_cast<int>(std::lround(strongest_fill_alpha * 0.78));
+    resting_fill_alpha =
+        static_cast<int>(std::lround(resting_fill_alpha * 0.78));
   }
+  // Resolve each role against its strongest applicable state layer. Components
+  // keep identical RGB roles without making the resting role as bright as the
+  // active and dragging roles.
+  const SkColor strongest_painted_fill = color_utils::GetResultingPaintColor(
+      SkColorSetA(endpoint, strongest_fill_alpha), shell);
+  const SkColor resting_painted_fill = color_utils::GetResultingPaintColor(
+      SkColorSetA(endpoint, resting_fill_alpha), shell);
+  const auto foreground_for_opacity = [endpoint](SkColor painted_fill,
+                                                 double opacity) {
+    const SkColor preferred = color_utils::AlphaBlend(
+        endpoint, painted_fill, static_cast<float>(opacity));
+    return color_utils::BlendForMinContrast(
+               preferred, painted_fill, endpoint,
+               color_utils::kMinimumReadableContrastRatio)
+        .color;
+  };
+  const SkColor primary = foreground_for_opacity(
+      strongest_painted_fill, kSidebarPrimaryForegroundOpacity);
+  const SkColor secondary = foreground_for_opacity(
+      resting_painted_fill, kSidebarSecondaryForegroundOpacity);
+  SkColor foreground = secondary;
+  if (frame_active) {
+    switch (state) {
+      case SidebarItemVisualState::kResting:
+        break;
+      case SidebarItemVisualState::kHovered:
+        foreground = color_utils::AlphaBlend(
+            primary, secondary, static_cast<float>(hover_progress));
+        break;
+      case SidebarItemVisualState::kActive:
+      case SidebarItemVisualState::kDragging:
+        foreground = primary;
+        break;
+    }
+  }
+
   return {
       .fill = fill,
-      .stroke = SkColorSetA(outline, stroke_alpha),
-      .foreground = color_provider.GetColor(
-          frame_active ? ui::kColorSysOnSurface
-                       : ui::kColorSysOnSurfaceSecondary),
+      .stroke = SkColorSetA(endpoint, stroke_alpha),
+      .foreground = foreground,
   };
 }
 
@@ -981,12 +1010,34 @@ std::unique_ptr<views::Background> CreateShellBackground() {
   return std::make_unique<YeeShellBackground>();
 }
 
+SkColor ResolveShellBackgroundColor(const ui::ColorProvider& color_provider,
+                                    bool frame_active) {
+  const SkColor frame_color = color_provider.GetColor(
+      frame_active ? ui::kColorFrameActive : ui::kColorFrameInactive);
+  const bool dark_mode =
+      color_utils::IsDark(color_provider.GetColor(ui::kColorSysBase));
+  if (!dark_mode) {
+    return SkColorSetA(frame_color, SK_AlphaOPAQUE);
+  }
+
+  color_utils::HSL hsl;
+  color_utils::SkColorToHSL(frame_color, &hsl);
+  hsl.l =
+      std::clamp(hsl.l, kDarkShellMinimumLightness, kDarkShellMaximumLightness);
+  hsl.s = std::min(hsl.s, kDarkShellMaximumSaturation);
+  if (!frame_active) {
+    hsl.s *= kInactiveShellSaturationScale;
+    hsl.l *= kInactiveShellLightnessScale;
+  }
+  return color_utils::HSLToSkColor(hsl, SK_AlphaOPAQUE);
+}
+
 SkColor ResolveShellContrastBackground(
     const ui::ColorProvider& color_provider) {
   // Both native tint and Yee's overlay use this color, so their composition
   // resolves to the same opaque contrast anchor without sampling desktop
   // pixels. This keeps text contrast stable while a glass window moves.
-  return color_provider.GetColor(ui::kColorFrameActive);
+  return ResolveShellBackgroundColor(color_provider, /*frame_active=*/true);
 }
 
 SkColor ResolveSplitCanvasColor(const ui::ColorProvider& color_provider) {
@@ -1092,9 +1143,8 @@ void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible) {
   actions.SetControlsVisible(visible);
 }
 
-bool IsSidebarHeaderActionsPositionInWindowCaption(
-    const views::View& view,
-    const gfx::Point& point) {
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
+                                                   const gfx::Point& point) {
   return static_cast<const YeeSidebarHeaderActionsView&>(view)
       .IsPositionInWindowCaption(point);
 }

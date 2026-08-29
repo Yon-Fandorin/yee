@@ -780,7 +780,7 @@ index 5883589f63..74a512b293 100644
  
  void BrowserFrameViewWin::LayoutClientView() {
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index 6a1b79d4b2..69522195b0 100644
+index 6a1b79d4b2..40cde2c717 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 @@ -41,6 +41,7 @@
@@ -791,7 +791,15 @@ index 6a1b79d4b2..69522195b0 100644
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #include "chrome/common/pref_names.h"
  #include "chrome/grit/generated_resources.h"
-@@ -102,6 +103,10 @@ bool ShouldHandleKeyboardEvent(const input::NativeWebKeyboardEvent& event) {
+@@ -65,6 +66,7 @@
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/ui_base_features.h"
++#include "ui/gfx/color_utils.h"
+ #include "ui/native_theme/native_theme.h"
+ #import "ui/views/cocoa/native_widget_mac_ns_window_host.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+@@ -102,6 +104,10 @@ bool ShouldHandleKeyboardEvent(const input::NativeWebKeyboardEvent& event) {
  }
  
  double GetGlassFrameTintOpacity(bool is_dark_mode, bool is_vertical_tabs) {
@@ -802,20 +810,18 @@ index 6a1b79d4b2..69522195b0 100644
    double opacity_value = is_dark_mode
                               ? features::kGlassTintOpacityForDarkMode.Get()
                               : features::kGlassTintOpacityForLightMode.Get();
-@@ -254,6 +259,12 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
+@@ -254,6 +260,10 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
    if (browser_view_ && browser_view_->browser_widget() &&
        browser_view_->browser_widget()->GetFrameView()) {
      *override_titlebar_height = true;
-+    if (yee::IsShellEnabled() &&
-+        browser_view_->ShouldDrawVerticalTabStrip()) {
-+      *titlebar_height =
-+          yee::kSidebarMetrics.native_caption_titlebar_height();
++    if (yee::IsShellEnabled() && browser_view_->ShouldDrawVerticalTabStrip()) {
++      *titlebar_height = yee::kSidebarMetrics.native_caption_titlebar_height();
 +      return;
 +    }
      const auto top_element_info = browser_view_->GetFrameElementInfo();
  
      *titlebar_height =
-@@ -293,6 +304,13 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
+@@ -293,6 +303,13 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
  }
  
  std::optional<int> BrowserNativeWidgetMac::GetGlassFrameWidth() const {
@@ -829,6 +835,49 @@ index 6a1b79d4b2..69522195b0 100644
    // If vertical tabs are not being drawn (e.g. horizontal tab strip mode,
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
+@@ -1052,28 +1069,33 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+   const bool is_active = GetWidget()->IsActive();
+   const SkColor theme_color = browser_view_->GetColorProvider()->GetColor(
+       is_active ? ui::kColorFrameActive : ui::kColorFrameInactive);
++  const SkColor tint_color =
++      yee::IsShellEnabled() ? yee::ResolveShellBackgroundColor(
++                                  *browser_view_->GetColorProvider(), is_active)
++                            : theme_color;
+
+   bool is_vertical_tabs = browser_view_->ShouldDrawVerticalTabStrip();
+
+   // Avoid updating the background view if the theme colors and the tab strip
+   // orientation have not changed.
+   if (last_preferred_color_scheme_ == color_scheme &&
+-      last_theme_color_ == theme_color &&
++      last_theme_color_ == tint_color &&
+       last_is_vertical_tabs_ == is_vertical_tabs) {
+     return;
+   }
+
+   last_preferred_color_scheme_ = color_scheme;
+-  last_theme_color_ = theme_color;
++  last_theme_color_ = tint_color;
+   last_is_vertical_tabs_ = is_vertical_tabs;
+
+-  const CGFloat r = SkColorGetR(theme_color) / 255.0;
+-  const CGFloat g = SkColorGetG(theme_color) / 255.0;
+-  const CGFloat b = SkColorGetB(theme_color) / 255.0;
+-  const CGFloat a =
+-      GetGlassFrameTintOpacity(last_preferred_color_scheme_ ==
+-                                   ui::NativeTheme::PreferredColorScheme::kDark,
+-                               is_vertical_tabs);
++  const CGFloat r = SkColorGetR(tint_color) / 255.0;
++  const CGFloat g = SkColorGetG(tint_color) / 255.0;
++  const CGFloat b = SkColorGetB(tint_color) / 255.0;
++  const bool dark_tint = yee::IsShellEnabled()
++                             ? color_utils::IsDark(tint_color)
++                             : last_preferred_color_scheme_ ==
++                                   ui::NativeTheme::PreferredColorScheme::kDark;
++  const CGFloat a = GetGlassFrameTintOpacity(dark_tint, is_vertical_tabs);
+
+   tint_view_.layer.backgroundColor =
+       [NSColor colorWithSRGBRed:r green:g blue:b alpha:a].CGColor;
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
 index bfae037bfe..aa1b7b503e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
@@ -9191,10 +9240,10 @@ index acff73cee8..ed644b7756 100644
        WaitForState(kScrollOffsetPoller, 0),
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f..5dad054211 100644
+index cfaf18f54f..3b445460c0 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-@@ -17,6 +17,9 @@
+@@ -17,12 +17,16 @@
  #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
  #include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_tracker.h"
  #include "chrome/browser/ui/views/tabs/hovercard/tab_hover_card_controller.h"
@@ -9204,14 +9253,13 @@ index cfaf18f54f..5dad054211 100644
  #include "chrome/grit/generated_resources.h"
  #include "components/data_sharing/public/features.h"
  #include "components/strings/grit/components_strings.h"
-@@ -29,6 +32,7 @@
- #include "ui/base/mojom/menu_source_type.mojom-shared.h"
- #include "ui/base/ui_base_features.h"
- #include "ui/color/color_provider.h"
+ #include "components/tab_groups/tab_group_visual_data.h"
+ #include "components/tabs/public/tab_group.h"
+ #include "components/vector_icons/vector_icons.h"
 +#include "third_party/skia/include/core/SkColor.h"
- #include "ui/gfx/color_utils.h"
- #include "ui/views/accessibility/view_accessibility.h"
- #include "ui/views/animation/ink_drop.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/models/image_model.h"
 @@ -47,8 +51,6 @@
  #include "ui/views/widget/widget.h"
  
@@ -9225,10 +9273,10 @@ index cfaf18f54f..5dad054211 100644
      const tab_groups::TabGroupVisualData* tab_group_visual_data)
      : HoverCardAnchorTarget(this),
        tab_group_visual_data_(*tab_group_visual_data),
-+      color_mark_(orientation == TabStripOrientation::kVertical
-+                      ? AddChildView(
-+                            std::make_unique<yee::VerticalGroupColorMark>())
-+                      : nullptr),
++      color_mark_(
++          orientation == TabStripOrientation::kVertical
++              ? AddChildView(std::make_unique<yee::VerticalGroupColorMark>())
++              : nullptr),
        sync_icon_(AddChildView(std::make_unique<views::ImageView>())),
        group_header_label_(
            AddChildView(std::make_unique<TabGroupHeaderLabel>())),
@@ -9315,36 +9363,85 @@ index cfaf18f54f..5dad054211 100644
  }
  
  void TabGroupHeaderView::OnFocus() {
-@@ -540,7 +570,8 @@ void TabGroupHeaderView::OnDataChanged(
-                                             : kPeopleGroupOldIcon,
-           foreground_color, kIconSize));
-     }
+@@ -419,9 +449,15 @@ void TabGroupHeaderView::AddedToWidget() {
+   views::FlexLayoutView::AddedToWidget();
+   GetFocusManager()->AddFocusChangeListener(this);
+   editor_bubble_tracker_.SetScrollView(GetScrollView(this));
++  paint_as_active_subscription_ =
++      GetWidget()->RegisterPaintAsActiveChangedCallback(base::BindRepeating(
++          &TabGroupHeaderView::UpdateVerticalColorsForCurrentState,
++          base::Unretained(this)));
++  UpdateVerticalColorsForCurrentState();
+ }
+
+ void TabGroupHeaderView::RemovedFromWidget() {
++  paint_as_active_subscription_ = {};
+   GetFocusManager()->RemoveFocusChangeListener(this);
+   views::FlexLayoutView::RemovedFromWidget();
+ }
+@@ -528,19 +564,11 @@ void TabGroupHeaderView::OnDataChanged(
+                                    GetWidget()->ShouldPaintAsActive()));
+     SkColor foreground_color = GetForegroundColor();
+
+-    // Update label.
+-    group_header_label_->SetEnabledColor(foreground_color);
+-
+-    // Update save tab group related items, the sync icon and attention
+-    // indicator.
+-    sync_icon_->SetVisible(is_shared_);
+-    if (is_shared_) {
+-      sync_icon_->SetImage(ui::ImageModel::FromVectorIcon(
+-          features::IsRoundedIconsEnabled() ? kGroupCustomIcon
+-                                            : kPeopleGroupOldIcon,
+-          foreground_color, kIconSize));
+-    }
 -    if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
++    UpdateForegroundColor(foreground_color);
++
++    // Update save tab group related items and the attention indicator.
 +    if (orientation_ != TabStripOrientation::kVertical &&
 +        tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
        attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
            kDefaultTouchFaviconMaskCustomIcon, foreground_color,
-@@ -569,9 +600,15 @@ void TabGroupHeaderView::OnDataChanged(
-           foreground_color, kIconSize));
+@@ -549,29 +577,15 @@ void TabGroupHeaderView::OnDataChanged(
+       attention_indicator_->SetVisible(false);
      }
  
--    // Update background.
--    SetBackground(views::CreateRoundedRectBackground(background_color,
--                                                     kGroupHeaderCornerRadius));
+-    // Update editor bubble button.
+-    if (editor_bubble_button_) {
+-      UpdateEditorButtonColors(editor_bubble_button_, foreground_color);
+-      UpdateEditorBubbleButtonVisibility();
 +    if (color_mark_) {
 +      color_mark_->SetMarkColor(background_color);
-+    }
+     }
+-
+-    // Update collapse icon.
+-    if (collapse_icon_) {
+-      collapse_icon_->SetVisible(!delegate_->IsGroupFocused());
+-      collapse_icon_->SetImage(ui::ImageModel::FromVectorIcon(
+-          tab_group_visual_data_.is_collapsed()
+-              ? features::IsRoundedIconsEnabled()
+-                    ? kKeyboardArrowDownIcon
+-                    : kKeyboardArrowDownChromeRefreshOldIcon
+-          : features::IsRoundedIconsEnabled()
+-              ? vector_icons::kKeyboardArrowUpIcon
+-              : kKeyboardArrowUpChromeRefreshOldIcon,
+-          foreground_color, kIconSize));
 +    if (orientation_ == TabStripOrientation::kVertical) {
 +      UpdateVerticalHoverBackground(IsMouseHovered());
 +    } else {
 +      SetBackground(views::CreateRoundedRectBackground(
 +          background_color, yee::kSidebarMetrics.group_header_corner_radius));
-+    }
+     }
+-
+-    // Update background.
+-    SetBackground(views::CreateRoundedRectBackground(background_color,
+-                                                     kGroupHeaderCornerRadius));
      UpdateAttentionState(
          data_sharing::features::IsDataSharingFunctionalityEnabled() &&
          tab_group_data.needs_attention);
-@@ -615,7 +652,8 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -615,7 +629,8 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    }
    needs_attention_ = needs_attention;
  
@@ -9354,37 +9451,75 @@ index cfaf18f54f..5dad054211 100644
      attention_indicator_->SetVisible(true);
      attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
          kDefaultTouchFaviconMaskCustomIcon, GetForegroundColor(),
-@@ -673,6 +711,12 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -673,6 +688,15 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
 +    if (orientation_ == TabStripOrientation::kVertical) {
-+      return GetColorProvider()->GetColor(
-+          GetWidget()->ShouldPaintAsActive()
-+              ? kColorTabForegroundInactiveFrameActive
-+              : kColorTabForegroundInactiveFrameInactive);
++      const views::Widget* const widget = GetWidget();
++      return yee::ResolveSidebarItemColors(
++                 *GetColorProvider(), yee::SidebarItemVisualState::kResting,
++                 /*hover_progress=*/0.0,
++                 !widget || widget->ShouldPaintAsActive(),
++                 /*persistent_surface=*/false)
++          .foreground;
 +    }
      SkColor background_color = GetColorProvider()->GetColor(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
-@@ -681,6 +725,34 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
+@@ -681,6 +705,69 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
    return SK_ColorBLACK;
  }
  
++void TabGroupHeaderView::UpdateForegroundColor(SkColor foreground_color) {
++  group_header_label_->SetEnabledColor(foreground_color);
++
++  sync_icon_->SetVisible(is_shared_);
++  if (is_shared_) {
++    sync_icon_->SetImage(ui::ImageModel::FromVectorIcon(
++        features::IsRoundedIconsEnabled() ? kGroupCustomIcon
++                                          : kPeopleGroupOldIcon,
++        foreground_color, kIconSize));
++  }
++
++  if (editor_bubble_button_) {
++    UpdateEditorButtonColors(editor_bubble_button_, foreground_color);
++    UpdateEditorBubbleButtonVisibility();
++  }
++
++  if (collapse_icon_) {
++    collapse_icon_->SetVisible(!delegate_->IsGroupFocused());
++    collapse_icon_->SetImage(ui::ImageModel::FromVectorIcon(
++        tab_group_visual_data_.is_collapsed()
++            ? features::IsRoundedIconsEnabled()
++                  ? kKeyboardArrowDownIcon
++                  : kKeyboardArrowDownChromeRefreshOldIcon
++        : features::IsRoundedIconsEnabled()
++            ? vector_icons::kKeyboardArrowUpIcon
++            : kKeyboardArrowUpChromeRefreshOldIcon,
++        foreground_color, kIconSize));
++  }
++}
++
++void TabGroupHeaderView::UpdateVerticalColorsForCurrentState() {
++  UpdateVerticalHoverBackground(IsMouseHovered());
++}
++
 +void TabGroupHeaderView::UpdateVerticalHoverBackground(bool hovered) {
 +  if (orientation_ != TabStripOrientation::kVertical) {
 +    return;
 +  }
++  const views::Widget* const widget = GetWidget();
++  const yee::SidebarItemColors colors = yee::ResolveSidebarItemColors(
++      *GetColorProvider(),
++      hovered ? yee::SidebarItemVisualState::kHovered
++              : yee::SidebarItemVisualState::kResting,
++      hovered ? 1.0 : 0.0, !widget || widget->ShouldPaintAsActive(),
++      /*persistent_surface=*/false);
++  UpdateForegroundColor(colors.foreground);
 +  if (hovered) {
-+    const views::Widget* const widget = GetWidget();
-+    const yee::SidebarItemColors colors = yee::ResolveSidebarItemColors(
-+        *GetColorProvider(), yee::SidebarItemVisualState::kHovered,
-+        /*hover_progress=*/1.0,
-+        !widget || widget->ShouldPaintAsActive(),
-+        /*persistent_surface=*/false);
 +    SetBackground(views::CreateRoundedRectBackground(
-+        colors.fill,
-+        yee::kSidebarMetrics.group_header_corner_radius));
++        colors.fill, yee::kSidebarMetrics.group_header_corner_radius));
 +  } else {
 +    SetBackground(nullptr);
 +  }
@@ -9403,7 +9538,7 @@ index cfaf18f54f..5dad054211 100644
    // The editor bubble button only exists in the vertical orientation.
    if (!editor_bubble_button_) {
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
-index 982370f7cd..caae135dd3 100644
+index 982370f7cd..900ffe37c3 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
 @@ -27,6 +27,11 @@ struct TabGroupData;
@@ -9426,15 +9561,17 @@ index 982370f7cd..caae135dd3 100644
  
    tab_groups::TabGroupId group() const;
  
-@@ -124,6 +130,7 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+@@ -124,6 +130,9 @@ class TabGroupHeaderView : public views::FlexLayoutView,
  
   private:
    void UpdateEditorBubbleButtonVisibility();
++  void UpdateForegroundColor(SkColor foreground_color);
++  void UpdateVerticalColorsForCurrentState();
 +  void UpdateVerticalHoverBackground(bool hovered);
    void OnBubbleOpened();
    void OnBubbleClosed();
    // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
-@@ -141,6 +148,8 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+@@ -141,6 +150,8 @@ class TabGroupHeaderView : public views::FlexLayoutView,
    bool needs_attention_ = false;
    bool is_shared_ = false;
  
@@ -9443,6 +9580,66 @@ index 982370f7cd..caae135dd3 100644
    // The sync icon that is displayed in the tab group header of saved groups in
    // the tabstrip.
    const raw_ptr<views::ImageView> sync_icon_ = nullptr;
+@@ -162,6 +173,7 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+   base::CallbackListSubscription editor_bubble_opened_subscription_;
+   base::CallbackListSubscription editor_bubble_closed_subscription_;
+   base::CallbackListSubscription tab_group_data_changed_subscription_;
++  base::CallbackListSubscription paint_as_active_subscription_;
+   base::WeakPtrFactory<TabGroupHeaderView> weak_ptr_factory_{this};
+ };
+
+diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
+index 7614f6f43b..ee82c4dad1 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
+@@ -16,6 +16,7 @@
+ #include "build/buildflag.h"
+ #include "chrome/browser/ui/tabs/tab_group_data.h"
+ #include "chrome/browser/ui/ui_features.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/tab_groups/tab_group_visual_data.h"
+ #include "components/tabs/public/mock_tab_group.h"
+@@ -240,6 +241,39 @@ TEST_P(TabGroupHeaderViewTest, EditorBubbleButtonVisibilityOnHover) {
+   check_editor_bubble_button_visible(false);
+ }
+
++TEST_P(TabGroupHeaderViewTest,
++       YeeVerticalHoverUpdatesSurfaceAndForegroundTogether) {
++  testing::NiceMock<MockDelegate> delegate;
++  tab_groups::TabGroupVisualData visual_data(
++      u"Group Title", tab_groups::TabGroupColorId::kBlue, false);
++
++  std::unique_ptr<views::Widget> widget =
++      CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
++  auto* header = widget->SetContentsView(std::make_unique<TabGroupHeaderView>(
++      delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
++  widget->Show();
++
++  ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
++  const auto expected_color = [&](yee::SidebarItemVisualState state) {
++    return yee::ResolveSidebarItemColors(
++               *header->GetColorProvider(), state,
++               state == yee::SidebarItemVisualState::kHovered ? 1.0 : 0.0,
++               widget->ShouldPaintAsActive(),
++               /*persistent_surface=*/false)
++        .foreground;
++  };
++
++  MoveMouseTo(generator, header, false);
++  EXPECT_EQ(expected_color(yee::SidebarItemVisualState::kResting),
++            header->title_label_for_testing()->GetEnabledColor());
++  MoveMouseTo(generator, header, true);
++  EXPECT_EQ(expected_color(yee::SidebarItemVisualState::kHovered),
++            header->title_label_for_testing()->GetEnabledColor());
++  MoveMouseTo(generator, header, false);
++  EXPECT_EQ(expected_color(yee::SidebarItemVisualState::kResting),
++            header->title_label_for_testing()->GetEnabledColor());
++}
++
+ TEST_P(TabGroupHeaderViewTest, FocusModeVisibility) {
+   MockDelegate delegate;
+   ON_CALL(delegate, IsGroupFocused()).WillByDefault(testing::Return(true));
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_view.cc
 index 008b41bc39..6fd9e282d0 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view.cc
@@ -10651,18 +10848,16 @@ index 8699ee4682..de0e3ee74a 100644
  
  BEGIN_METADATA(TabHoverCardBubbleView, TabCardView)
 diff --git a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-index cbec9de4fa..86273d956b 100644
+index cbec9de4fa..7d9cb6f245 100644
 --- a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
 +++ b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-@@ -10,6 +10,7 @@
- #include "chrome/browser/themes/theme_properties.h"
- #include "chrome/browser/ui/layout_constants.h"
- #include "chrome/browser/ui/views/frame/browser_frame_view.h"
-+#include "chrome/browser/ui/views/yee/yee_ui.h"
- #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
- #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
+@@ -15,13 +15,16 @@
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
-@@ -20,8 +21,10 @@
+ #include "chrome/browser/ui/views/tabs/tab.h"
+ #include "chrome/browser/ui/views/tabs/tab_slot_controller.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/grit/theme_resources.h"
+ #include "third_party/skia/include/core/SkPath.h"
  #include "third_party/skia/include/core/SkRRect.h"
  #include "ui/base/theme_provider.h"
  #include "ui/gfx/canvas.h"
@@ -10673,7 +10868,7 @@ index cbec9de4fa..86273d956b 100644
  #include "ui/views/view_utils.h"
  #include "ui/views/widget/widget.h"
  
-@@ -142,7 +145,42 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+@@ -142,7 +145,41 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
                                      hovered)) {
      cc::PaintFlags flags;
      flags.setAntiAlias(true);
@@ -10687,9 +10882,8 @@ index cbec9de4fa..86273d956b 100644
 +      const yee::SidebarItemVisualState state =
 +          selection_state == TabStyle::TabSelectionState::kActive
 +              ? yee::SidebarItemVisualState::kActive
-+              : (hover_progress > 0.0
-+                     ? yee::SidebarItemVisualState::kHovered
-+                     : yee::SidebarItemVisualState::kResting);
++              : (hover_progress > 0.0 ? yee::SidebarItemVisualState::kHovered
++                                      : yee::SidebarItemVisualState::kResting);
 +      const views::Widget* const widget = delegate_->GetView()->GetWidget();
 +      background_color =
 +          yee::ResolveSidebarItemColors(
@@ -10717,7 +10911,7 @@ index cbec9de4fa..86273d956b 100644
      canvas->DrawRect(gfx::ScaleToEnclosingRect(
                           delegate_->GetView()->GetLocalBounds(), scale),
                       flags);
-@@ -212,9 +250,8 @@ SkScalar VerticalTabStyleViews::GetCornerRadius() const {
+@@ -212,9 +249,8 @@ SkScalar VerticalTabStyleViews::GetCornerRadius() const {
  }
  
  gfx::Insets VerticalTabStyleViews::GetContentsInsets() const {
@@ -10729,6 +10923,39 @@ index cbec9de4fa..86273d956b 100644
  }
  
  int VerticalTabStyleViews::GetStrokeThickness() const {
+@@ -233,10 +269,31 @@ bool VerticalTabStyleViews::IsApparentlyActive() const {
+ }
+
+ TabStyle::TabColors VerticalTabStyleViews::CalculateTargetColors() const {
+-  return tab_style()->CalculateTargetColors(
++  TabStyle::TabColors colors = tab_style()->CalculateTargetColors(
+       GetSelectionState(), IsApparentlyActive(), delegate_->IsHovering(),
+       delegate_->GetView()->GetWidget()
+           ? delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
+           : true,
+       delegate_->GetView()->GetColorProvider());
++  const bool default_contrast =
++      delegate_->GetView()->GetNativeTheme()->preferred_contrast() !=
++      ui::NativeTheme::PreferredContrast::kMore;
++  if (!yee::UsesExpandedSidebarPresentation() || !default_contrast) {
++    return colors;
++  }
++
++  const double hover_progress = delegate_->GetHoverAnimationValue();
++  const yee::SidebarItemVisualState state =
++      GetSelectionState() == TabStyle::TabSelectionState::kActive
++          ? yee::SidebarItemVisualState::kActive
++          : (hover_progress > 0.0 ? yee::SidebarItemVisualState::kHovered
++                                  : yee::SidebarItemVisualState::kResting);
++  const views::Widget* const widget = delegate_->GetView()->GetWidget();
++  colors.foreground_color =
++      yee::ResolveSidebarItemColors(*delegate_->GetView()->GetColorProvider(),
++                                    state, hover_progress,
++                                    !widget || widget->ShouldPaintAsActive(),
++                                    /*persistent_surface=*/false)
++          .foreground;
++  return colors;
+ }
 diff --git a/chrome/browser/ui/views/toolbar/BUILD.gn b/chrome/browser/ui/views/toolbar/BUILD.gn
 index 72399b5bd5..f7f61bae38 100644
 --- a/chrome/browser/ui/views/toolbar/BUILD.gn

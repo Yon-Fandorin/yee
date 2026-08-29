@@ -129,11 +129,13 @@ struct SidebarMetrics {
   int favorites_max_count = 12;
   int favorites_dock_corner_radius = 8;
   int favorites_dock_fill_alpha = 36;
-  int favorites_cell_fill_alpha = 110;
-  int favorites_cell_hover_fill_alpha = 150;
-  int favorites_cell_active_fill_alpha = 220;
-  int favorites_cell_stroke_alpha = 72;
-  int favorites_cell_active_stroke_alpha = 140;
+  int favorites_cell_fill_alpha = 18;
+  int favorites_cell_hover_fill_alpha = 30;
+  int favorites_cell_active_fill_alpha = 42;
+  int favorites_cell_drag_fill_alpha = 58;
+  int favorites_cell_stroke_alpha = 28;
+  int favorites_cell_active_stroke_alpha = 52;
+  int favorites_cell_drag_stroke_alpha = 68;
   int favorites_drop_zone_height = 76;
   int favorites_drop_zone_open_duration_ms = 160;
   int favorites_drop_zone_surface_delay_ms = 30;
@@ -177,11 +179,11 @@ static_assert(kSidebarMetrics.content_corner_radius ==
 static_assert(kSidebarMetrics.browser_surface_header_height() ==
               kSidebarMetrics.split_pane_header_height);
 static_assert(kSidebarMetrics.browser_surface_location_bar_height +
-                      2 * kSidebarMetrics.split_pane_address_bar_inset ==
-                  kSidebarMetrics.browser_surface_header_height());
+                  2 * kSidebarMetrics.split_pane_address_bar_inset ==
+              kSidebarMetrics.browser_surface_header_height());
 static_assert(kSidebarMetrics.browser_surface_header_control_edge_inset ==
               kSidebarMetrics.toolbar_trailing_gap -
-                      kSidebarMetrics.content_gutter +
+                  kSidebarMetrics.content_gutter +
                   kSidebarMetrics.toolbar_interior_inset +
                   kSidebarMetrics.toolbar_extension_container_margin);
 static_assert(kSidebarMetrics.browser_surface_outline_width ==
@@ -248,6 +250,13 @@ ui::ColorProviderKey::InitializerSupplier* GetBrowserSurfaceOmniboxPopupTheme(
     SkColor surface_color);
 
 std::unique_ptr<views::Background> CreateShellBackground();
+
+// Resolves the one opaque frame-derived material used by native glass, the
+// Views shell, Sidebar items, and the split canvas. Dark mode retains the theme
+// hue while bringing overly bright frame colors into a calm dark tonal range;
+// light mode preserves the supplied frame color.
+SkColor ResolveShellBackgroundColor(const ui::ColorProvider& color_provider,
+                                    bool frame_active);
 
 // Returns an opaque, theme-resolved proxy for the shell surface. Translucent
 // Yee surfaces use this to calculate contrast without sampling desktop pixels.
@@ -341,9 +350,8 @@ std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
 void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
                                              int leading_exclusion);
 void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible);
-bool IsSidebarHeaderActionsPositionInWindowCaption(
-    const views::View& view,
-    const gfx::Point& point);
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
+                                                   const gfx::Point& point);
 
 }  // namespace yee
 
