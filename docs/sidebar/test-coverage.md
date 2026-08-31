@@ -36,6 +36,16 @@
 | Group 헤더 drag는 Favorite 드롭존·preview·pin을 만들지 않음 | `YeeSidebarGroupHeaderDragHasNoFavoriteAffordance` |
 | Group 헤더와 행은 32 DIP, Group 행은 10 DIP 들여쓰기, 접기 시 자식 숨김 | `YeeSidebarExpandedGroupUsesSharedRowMetrics` |
 | New Tab·Agent control은 Sidebar Header에 한 번만 남고 split/collapse에서도 소유권 유지 | `YeeSidebarHeaderControlsPersistAcrossSplitAndCollapse` |
+| Context Switcher Footer는 탭 목록 아래에 한 번만 남고 split에서 복제되지 않으며 collapse와 expand를 따름 | `YeeSidebarFooterPersistsAcrossSplitAndCollapse` |
+| Footer trigger는 하나의 메뉴 Widget을 열고 Root를 Context → Browser tools → Yee Memory 순서로 표시하며, 선별되지 않은 Chromium 설정은 복제하지 않고 메뉴 폭·접근성 이름·재클릭 닫기를 유지 | `YeeSidebarFooterOpensCuratedRootMenu` |
+
+Footer의 Root 순서, Browser tools의 제한된 action 목록, 하위 화면의 Back 목적지, 단일 local context fallback은
+`SidebarFooterPolicyTest.*`가 창을 열지 않고 확인한다. `SidebarFooterViewTest.*`는
+bubble이 Footer 폭 변경을 추적하는지, 접근 가능한 창 이름을 제공하는지, trigger
+재클릭으로 같은 bubble을 닫는지, Memory 변경을 callback으로 전달하는지 확인한다.
+또한 `ThemeChangeAfterCloseHasNoDanglingBubble`과
+`ThemeChangeAfterNativeTeardownHasNoDanglingBubble`은 정상 종료와 네이티브 종료
+직후 theme 변경에도 닫힌 bubble의 anchor observer가 남지 않는지 검증한다.
 
 ## 3. 드래그 출발점과 도착점
 
@@ -65,6 +75,8 @@
 - Group 경계를 빠르게 왕복할 때 가로 geometry가 튀거나 깜빡이지 않는지
 - 라이트/다크 및 활성/비활성 창에서 색 대비가 시각적으로 과하거나 약하지 않은지
 - 긴 제목 fade, focus ring, hover 전환이 native Tab과 자연스럽게 이어지는지
+- 긴 Tenant·Workspace·Account 이름의 말줄임, Footer와 위로 열리는 메뉴의 연결감,
+  라이트/다크에서 mark와 보조 텍스트 대비
 - renderer overlay와 scrollbar가 둥근 Browser Content clip 밖으로 새지 않는지
 - 단일 Tab이 같은 Sidebar를 벗어나 창 이동으로 전환되는 경로, 다른 Yee 창으로
   옮겨 Favorite에 놓는 경로와 취소 복원. macOS의 upstream detach 테스트가

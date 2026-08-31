@@ -149,6 +149,11 @@ export function createLauncherController(shell) {
   function toggleSiteInfo() {
     const willOpen = siteInfoPopover.hidden;
     close();
+    if (willOpen) {
+      shell.dispatchEvent(new CustomEvent("yee:surface-open", {
+        detail: { source: "site-info" },
+      }));
+    }
     siteInfoPopover.hidden = !willOpen;
     setBooleanAttribute(siteInfoTrigger, "aria-expanded", willOpen);
   }
@@ -172,6 +177,9 @@ export function createLauncherController(shell) {
   }
 
   function open(mode = "browse") {
+    shell.dispatchEvent(new CustomEvent("yee:surface-open", {
+      detail: { source: "launcher" },
+    }));
     closeSiteInfo();
     currentMode = mode === "hub" ? "hub" : "browse";
     const modeCopy = MODE_COPY[currentMode];
@@ -281,6 +289,11 @@ export function createLauncherController(shell) {
   shell.addEventListener("workspace:tabs-changed", () => {
     if (isOpen()) {
       filterResults();
+    }
+  });
+  shell.addEventListener("yee:surface-open", (event) => {
+    if (event.detail?.source !== "launcher") {
+      close();
     }
   });
 

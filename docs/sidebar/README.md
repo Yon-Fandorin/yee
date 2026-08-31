@@ -21,6 +21,7 @@
 | [favorites-drag.md](./favorites-drag.md) | 드래그로 옮기기, 재배치, 영역 전환, 새 창 분리 |
 | [groups.md](./groups.md) | Group 헤더, color mark, Agent와의 구분 |
 | [tabs.md](./tabs.md) | Tab 행 표현, 세로 목록 드래그 |
+| [footer.md](./footer.md) | Context Switcher, 선별된 Browser tools, Yee Workspace 기능의 통합 Footer 흐름 |
 | [test-coverage.md](./test-coverage.md) | 자동 회귀 범위와 실제 화면 검수의 경계 |
 | [dark-theme-audit.md](./dark-theme-audit.md) | 다크 Sidebar 표면 계층 감사와 검증 근거 |
 

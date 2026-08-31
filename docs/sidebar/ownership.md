@@ -60,3 +60,16 @@ Views와 command glue는 Yee 헬퍼를 호출해도 된다.
 | Agent History | 예약 | Agent Activity와 혼동하지 않는다. 켜기 전에 묻는다. |
 
 Pins를 켜는 것은 Favorites를 없애거나 옮기는 결정이다. 추측하지 않는다.
+
+## Footer는 Yee 표현이다
+
+Footer는 Chromium의 vertical tab bottom container를 재활용하지 않는다. Yee가
+하나의 Context Switcher View와 같은 Widget 안에서 전환되는 메뉴 화면을 소유하고,
+`VerticalTabStripRegionView`는 이를 탭 목록 아래에 한 번만 호스팅한다.
+
+Footer는 Reopen closed tab, Downloads, History, Tabs from other devices, Manage
+extensions처럼 바로 찾기 어려운 Chromium 기능만 Browser tools로 선별한다. 기존
+Chromium command/page를 호출하는 제한된 enum bridge만 두며 임의 URL navigation은
+Yee View에 넣지 않는다. 전체 Settings/Profile과 예약된 Bookmarks 슬롯은 복제하지
+않는다. Account·Tenant·Workspace의 실제 데이터와 전환은 별도 product model의
+책임이며, Footer가 이를 `TabStripModel`이나 임시 URL 목록에 저장하지 않는다.

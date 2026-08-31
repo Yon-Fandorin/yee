@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <title>yee — Browser shell pilot</title>
-    <link rel="stylesheet" href="styles.css?v=33" />
+    <link rel="stylesheet" href="styles.css?v=39" />
   </head>
   <body>
     <div class="browser-shell" data-ui="browser-shell" data-titlebar-density="regular" data-tenant-shape="offset" data-sidebar-state="open">
@@ -183,7 +183,10 @@
           <div class="launcher-popover-footer launcher-footer-command">
             <span><kbd>↑↓</kbd> navigate</span>
             <span><kbd>↵</kbd> run</span>
-            <span>Product workspace</span>
+            <span class="hub-context-trail" aria-label="현재 Yee 컨텍스트">
+              <small>Context</small>
+              <strong data-field="hub-context">Northstar / Product</strong>
+            </span>
           </div>
           <div class="launcher-popover-footer launcher-footer-browse">
             <span><kbd>↵</kbd> open</span>
@@ -328,15 +331,79 @@
             </section>
           </nav>
 
-          <div class="sidebar-footer">
-            <button class="identity-switcher" type="button" aria-haspopup="menu" aria-label="Northstar Labs 테넌트, Product 워크스페이스 전환" title="Northstar Labs / Product workspace" data-role="tenant-context">
+          <div class="sidebar-footer" data-region="sidebar-footer">
+            <div class="sidebar-context-popover unified-footer-menu" id="sidebar-footer-menu" role="dialog" aria-label="워크스페이스 및 계정 메뉴" data-footer-surface="menu" hidden>
+              <div class="footer-menu-view" data-footer-view="root">
+                <button class="footer-menu-link footer-detail-entry current-context-entry" type="button" data-action="open-footer-view" data-view="context">
+                  <span class="context-choice-mark northstar" data-field="tenant-mark">N</span>
+                  <span class="footer-row-copy"><strong data-field="workspace-name">Product</strong><small><span data-field="tenant-name">Northstar Labs</span> · Yongjun Kim</small></span>
+                  <span class="footer-row-value">›</span>
+                </button>
+                <button class="footer-menu-link footer-detail-entry" type="button" data-action="open-footer-view" data-view="browser-tools">
+                  <span class="footer-row-icon browser-tools" aria-hidden="true"><svg viewBox="0 0 18 18"><path d="M3.5 5.5h11M3.5 9h11M3.5 12.5h11M6 3.5v4M12 7v4M8 10.5v4" /></svg></span>
+                  <span class="footer-row-copy"><strong>Browser tools</strong><small>Recent tabs, downloads, and more</small></span>
+                  <span class="footer-row-value">›</span>
+                </button>
+                <button class="footer-menu-link footer-detail-entry" type="button" data-action="open-footer-view" data-view="memory">
+                  <span class="footer-row-icon memory" aria-hidden="true"><svg viewBox="0 0 18 18"><path d="M6.4 13.8h5.2M7.2 15.5h3.6M5.1 9.2a4.2 4.2 0 1 1 7.8 2.1c-.6.8-1 1.2-1.2 2H6.3c-.2-.8-.6-1.2-1.2-2a4.2 4.2 0 0 1 0-2.1Z" /></svg></span>
+                  <span class="footer-row-copy"><strong>Yee &amp; memory</strong><small>Workspace-specific memory</small></span>
+                  <span class="footer-row-value" data-field="memory-status">On · ›</span>
+                </button>
+              </div>
+
+              <div class="footer-menu-view" data-footer-view="context" hidden>
+                <header class="footer-subview-heading context-heading">
+                  <button class="footer-back" type="button" aria-label="워크스페이스 메뉴로 돌아가기" data-action="open-footer-view" data-view="root">‹</button>
+                  <span><small>Account &amp; contexts</small><strong>Switch context</strong></span>
+                </header>
+                <span class="footer-popover-label context-list-label">Available contexts</span>
+                <div class="context-choices" role="radiogroup" aria-label="테넌트 및 워크스페이스 전환">
+                  <button class="is-current" type="button" role="radio" aria-checked="true" data-action="select-context" data-tenant="Northstar Labs" data-tenant-short="Northstar" data-tenant-mark="N" data-workspace="Product" data-memory="on">
+                    <span class="context-choice-mark northstar">N</span><span><strong>Product</strong><small>Northstar Labs · 12 tabs</small></span><span class="context-check">✓</span>
+                  </button>
+                  <button type="button" role="radio" aria-checked="false" data-action="select-context" data-tenant="Northstar Labs" data-tenant-short="Northstar" data-tenant-mark="N" data-workspace="Platform" data-memory="on">
+                    <span class="context-choice-mark northstar">N</span><span><strong>Platform</strong><small>Northstar Labs · 8 tabs</small></span><span class="context-check">✓</span>
+                  </button>
+                  <button type="button" role="radio" aria-checked="false" data-action="select-context" data-tenant="Acme Corporation" data-tenant-short="Acme" data-tenant-mark="A" data-workspace="Research" data-memory="paused">
+                    <span class="context-choice-mark acme">A</span><span><strong>Research</strong><small>Acme Corporation · 5 tabs</small></span><span class="context-check">✓</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="footer-menu-view" data-footer-view="browser-tools" hidden>
+                <header class="footer-subview-heading browser-tools-heading">
+                  <button class="footer-back" type="button" aria-label="워크스페이스 메뉴로 돌아가기" data-action="open-footer-view" data-view="root">‹</button>
+                  <span><small>Browser</small><strong>Browser tools</strong></span>
+                </header>
+                <div class="browser-tools-list">
+                  <button class="footer-menu-link" type="button" data-demo-message="The most recently closed tab would reopen here."><span>Reopen closed tab</span><span>↶</span></button>
+                  <button class="footer-menu-link" type="button" data-demo-message="Chromium Downloads would open here."><span>Downloads</span><span>›</span></button>
+                  <button class="footer-menu-link" type="button" data-demo-message="Chromium History would open here."><span>History</span><span>›</span></button>
+                  <button class="footer-menu-link" type="button" data-demo-message="Synced tabs from other devices would open here."><span>Tabs from other devices</span><span>›</span></button>
+                  <button class="footer-menu-link" type="button" data-demo-message="Chromium extension management would open here."><span>Manage extensions</span><span>›</span></button>
+                </div>
+              </div>
+
+              <div class="footer-menu-view" data-footer-view="memory" hidden>
+                <header class="footer-subview-heading memory-heading">
+                  <button class="footer-back" type="button" aria-label="워크스페이스 메뉴로 돌아가기" data-action="open-footer-view" data-view="root">‹</button>
+                  <span><small>Memory</small><strong data-field="memory-context">Product workspace</strong></span>
+                  <button class="memory-switch" type="button" role="switch" aria-checked="true" aria-label="워크스페이스 메모리 사용" data-action="toggle-memory"><span></span></button>
+                </header>
+                <p class="memory-summary"><strong data-field="memory-count">12 saved memories</strong><span>Updated 8 minutes ago</span></p>
+                <p class="memory-explainer">Memories stay inside this workspace and are never shared across tenants.</p>
+              </div>
+            </div>
+
+            <button class="identity-switcher footer-unified-trigger" type="button" aria-haspopup="dialog" aria-controls="sidebar-footer-menu" aria-expanded="false" aria-label="Northstar Labs 테넌트, Product 워크스페이스 메뉴" title="Northstar Labs / Product workspace" data-action="toggle-footer-menu">
               <span class="context-images" aria-hidden="true">
-                <span class="tenant-image">N</span>
+                <span class="tenant-image" data-field="tenant-mark">N</span>
               </span>
               <span class="identity-copy">
-                <small>Northstar Labs</small>
-                <strong>Product</strong>
+                <strong data-field="workspace-name">Product</strong>
+                <small class="footer-context-meta"><span data-field="tenant-name">Northstar Labs</span><i>·</i><span>Yongjun Kim</span></small>
               </span>
+              <span class="profile-avatar" aria-hidden="true">YK</span>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
             </button>
           </div>
@@ -380,8 +447,8 @@
           </div>
         </main>
       </div>
+      <div class="demo-toast" role="status" aria-live="polite" data-region="demo-toast" hidden></div>
     </div>
-
-    <script type="module" src="app.js?v=19"></script>
+    <script type="module" src="app.js?v=23"></script>
   </body>
 </html>

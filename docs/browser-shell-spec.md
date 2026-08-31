@@ -256,7 +256,12 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 2. **Bookmarks**: 기본은 30 DIP 한 줄로 접고, 펼치면 folder별 항목과 개수를 표시
 3. **User groups**: 사용자 정의 tab collection
 4. **Agent activity**: 실행 중인 task와 연결된 context tabs. 현재 native sidebar 체크포인트에서는 제외한다.
-5. **Tenant / Workspace**: Sidebar footer에 고정
+5. **Context Switcher Footer**: Sidebar footer에 고정. 지속 행은 현재
+   Workspace와 `Tenant · Account`를 표시하고, 한 패널 안에서 Current context,
+   선별된 Browser tools, Yee 전용 Workspace 기능을 전환한다. Browser tools는
+   찾기 어려운 Chromium 기능의 단축 진입점만 제공하고 전체 Settings/Profile
+   구조나 예약된 Bookmarks 슬롯은 중복하지 않는다. 세부 계층과 데이터 경계는
+   [`sidebar/footer.md`](./sidebar/footer.md)를 따른다.
 
 `Tabs` 같은 중복 섹션 제목은 사용하지 않는다. 화면 자체가 tab sidebar이므로
 추가 제목은 정보를 늘리지 않는다.
@@ -587,7 +592,7 @@ page action을 두 번 실행하지 않는다.
 | Favorites / Bookmarks / Groups | Favorites는 실제 pinned tabs, Bookmarks는 실제 manager entry, Groups는 `TabStripModel`의 tab group |
 | Sidebar Header actions | Yee-owned window-global View. New Tab·Agent를 한 세트만 소유하고 native command callback을 호출한다. |
 | Agent activity | Sidebar Header status control + Sidebar task model contract |
-| Tenant / Workspace | Sidebar footer View; Title bar에 중복 금지 |
+| Tenant / Workspace | Yee Context Switcher Footer View; Title bar에 중복 금지. 실제 context data는 별도 product model |
 
 Browser Surface Header와 각 Pane Header는 같은 page-aware 색상 안정화 정책을
 사용하되 `WebContents`별 controller instance를 소유한다. 색상 animation frame은

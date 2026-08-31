@@ -16,11 +16,12 @@ Tab Sidebar는 Sidebar Column 안에서 위에서 아래로 쌓인다. 폭·섹�
 | 3–4 | Groups + Tabs | 보임. **한 목록**. 그룹과 비그룹 탭이 모델 순서로 섞인다 |
 | 5 | Agent activity | 안 보임. 체크포인트에서 제외 |
 | 6 | Chat / Agent History | 안 보임. 예약 |
-| footer | Tenant / Workspace | 안 보임. 예약 |
+| footer | Context Switcher | 보임. Tenant / Workspace / Account, 선별된 Browser tools, Yee Workspace 기능 진입점 |
 
 지금 펼친 Sidebar에 실제로 쌓이는 것은 **Favorite이 있을 때의 Favorites 독,
-그 아래 하나의 unpinned 목록**이다. Groups 블록을 Tabs 위에 따로 모으지
-않는다. Favorite이 0개인 유휴 상태에서는 목록만 쌓인다.
+그 아래 하나의 unpinned 목록, 맨 아래 Context Switcher Footer**다. Groups 블록을
+Tabs 위에 따로 모으지 않는다. Favorite이 0개인 유휴 상태에서는 목록과 Footer만
+쌓인다.
 Bookmarks를 독과 목록 사이에 끼워 넣지 않는다.
 
 `Tabs` 같은 중복 섹션 제목은 쓰지 않는다. 화면 자체가 tab sidebar다.
@@ -88,3 +89,5 @@ constant에 다시 적지 않는다.
   inset 0. Favorite 독은 Sidebar Header 바로 아래에서 시작하고 Favorite이 없는
   평상시 Tab 목록만 상단 8 DIP 여백을 유지한다. Favorite과 Tab 행의 좌우
   정렬선은 같다.
+- Footer 지속 행은 50 DIP이고 Sidebar 좌우 inset 8을 공유한다. Tab ScrollView는
+  Footer 위까지의 남은 공간을 채우며 Footer를 덮지 않는다.

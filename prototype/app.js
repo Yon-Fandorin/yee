@@ -1,5 +1,6 @@
 import { requireElement } from "./js/dom.js";
 import { createLauncherController } from "./js/launcher.js?v=6";
+import { createSidebarFooterController } from "./js/sidebar-footer.js?v=6";
 import { createTabSidebarController } from "./js/workspace.js?v=12";
 
 const shell = requireElement(document, '[data-ui="browser-shell"]');
@@ -8,6 +9,8 @@ const titlebarDensity = urlParams.get("titlebar");
 const tenantShape = urlParams.get("tenant");
 const sidebarState = urlParams.get("sidebar");
 const requestedOs = urlParams.get("os");
+const requestedTheme = urlParams.get("theme");
+const requestedSurface = urlParams.get("surface");
 
 const platform = navigator.userAgentData?.platform || navigator.platform || "";
 const detectedOs = /mac/i.test(platform)
@@ -32,6 +35,10 @@ shell.dataset.os = ["mac", "windows", "linux"].includes(requestedOs)
   ? requestedOs
   : detectedOs;
 
+if (requestedTheme === "light" || requestedTheme === "dark") {
+  shell.dataset.theme = requestedTheme;
+}
+
 shell.querySelectorAll('[data-region="create-menu"] [data-kind="tab"] kbd')
   .forEach((shortcut) => {
     shortcut.textContent = shell.dataset.os === "mac" ? "⌘T" : "Ctrl T";
@@ -54,12 +61,23 @@ if (commandSidebarShortcut) {
 }
 
 const launcher = createLauncherController(shell);
+const sidebarFooter = createSidebarFooterController(shell);
 const tabs = createTabSidebarController(shell);
+
+if (requestedSurface === "hub") {
+  requestAnimationFrame(() => launcher.open("hub"));
+} else if (["root", "context", "browser-tools", "memory"].includes(requestedSurface)) {
+  requestAnimationFrame(() => sidebarFooter.open(requestedSurface));
+}
 
 shell.querySelector('[data-page="blank"] [data-action="toggle-launcher"]')
   ?.addEventListener("click", () => launcher.open());
 
 document.addEventListener("keydown", (event) => {
+  if (sidebarFooter.handleKeydown(event)) {
+    return;
+  }
+
   if (launcher.handleKeydown(event)) {
     return;
   }
