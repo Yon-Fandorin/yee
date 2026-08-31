@@ -19,6 +19,8 @@ if [[ ! -x "$YEE_BROWSER_BIN" ]]; then
   exit 10
 fi
 
+require_integrated_yee_app_current
+
 mkdir -p "$PROFILE_DIR"
 
 browser_args=(

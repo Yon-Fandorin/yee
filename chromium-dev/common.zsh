@@ -13,9 +13,44 @@ YEE_OUT_DIR="$CHROMIUM_SRC/out/$YEE_OUT_NAME"
 YEE_PRODUCT_NAME="Yee"
 YEE_APP_DIR="$YEE_OUT_DIR/$YEE_PRODUCT_NAME.app"
 YEE_BROWSER_BIN="$YEE_APP_DIR/Contents/MacOS/$YEE_PRODUCT_NAME"
+YEE_UNBUNDLED_FRAMEWORK_BIN="$YEE_OUT_DIR/$YEE_PRODUCT_NAME Framework.framework/$YEE_PRODUCT_NAME Framework"
+YEE_BUNDLED_FRAMEWORK_BIN="$YEE_APP_DIR/Contents/Frameworks/$YEE_PRODUCT_NAME Framework.framework/$YEE_PRODUCT_NAME Framework"
 YEE_ARGS_FILE="$YEE_ROOT/chromium-overlay/args.gn"
 METAL_TOOLCHAIN_CACHE="$LOCAL_BUILD_ROOT/metal-toolchain-path"
 YEE_BUILD_JOBS="${YEE_BUILD_JOBS:-2}"
+
+integrated_yee_app_is_current() {
+  local unbundled_framework="${1:-$YEE_UNBUNDLED_FRAMEWORK_BIN}"
+  local bundled_framework="${2:-$YEE_BUNDLED_FRAMEWORK_BIN}"
+
+  if [[ ! -e "$unbundled_framework" ]]; then
+    return 0
+  fi
+  if [[ ! -e "$bundled_framework" ||
+        "$unbundled_framework" -nt "$bundled_framework" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+require_integrated_yee_app_current() {
+  if integrated_yee_app_is_current; then
+    return
+  fi
+
+  print -u2 "Built Yee.app is older than the latest linked Yee Framework."
+  print -u2 "Run ./chromium-dev/build.sh before launching the real app."
+  return 11
+}
+
+sync_yee_ui_sources() {
+  local yee_destination="$CHROMIUM_SRC/chrome/browser/ui/views/yee/BUILD.gn"
+  if [[ -f "$yee_destination" ]]; then
+    "$YEE_ROOT/chromium-overlay/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
+  else
+    "$YEE_ROOT/chromium-overlay/apply.sh" "$CHROMIUM_SRC"
+  fi
+}
 
 available_gib() {
   local available_kib

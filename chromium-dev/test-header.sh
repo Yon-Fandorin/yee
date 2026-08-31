@@ -28,7 +28,7 @@ INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeaderOmitsUnsupportedSidebarContro
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Header regression targets"
-  "$YEE_ROOT/chromium-overlay/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
+  sync_yee_ui_sources
 
   targets=()
   [[ "$MODE" == "unit" || "$MODE" == "all" ]] && targets+=(unit_tests)

@@ -14,11 +14,7 @@ if [[ "$YEE_BUILD_JOBS" != <-> || "$YEE_BUILD_JOBS" -lt 1 ]]; then
   exit 14
 fi
 
-if [[ -f "$CHROMIUM_SRC/chrome/browser/ui/views/yee/BUILD.gn" ]]; then
-  "$YEE_ROOT/chromium-overlay/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
-else
-  "$YEE_ROOT/chromium-overlay/apply.sh" "$CHROMIUM_SRC"
-fi
+sync_yee_ui_sources
 
 if [[ ! -f "$YEE_OUT_DIR/build.ninja" ]]; then
   "$SCRIPT_DIR/configure.sh"

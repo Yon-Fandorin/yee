@@ -15,6 +15,8 @@ if [[ ! -x "$YEE_BROWSER_BIN" ]]; then
   exit 10
 fi
 
+require_integrated_yee_app_current
+
 if ! command -v curl >/dev/null 2>&1; then
   print -u2 "curl is required for the DevTools smoke test."
   exit 12

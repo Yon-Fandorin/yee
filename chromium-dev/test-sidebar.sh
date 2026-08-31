@@ -6,6 +6,8 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
+"$SCRIPT_DIR/test-run-preflight.sh"
+
 MODE="${1:-all}"
 SKIP_BUILD=false
 if [[ "$MODE" == "--no-build" ]]; then
@@ -28,7 +30,7 @@ INTERACTIVE_FILTER='VerticalTabDragTest.*Favorite*:VerticalTabDragTest.LoneTabCa
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Sidebar regression targets"
-  "$YEE_ROOT/chromium-overlay/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
+  sync_yee_ui_sources
 
   targets=()
   [[ "$MODE" == "unit" || "$MODE" == "all" ]] && targets+=(unit_tests)
