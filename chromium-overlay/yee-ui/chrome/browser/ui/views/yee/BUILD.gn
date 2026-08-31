@@ -7,6 +7,8 @@ assert(is_win || is_mac || is_linux || is_chromeos)
 source_set("yee_ui") {
   public = [
     "browser_surface_color_controller.h",
+    "browser_surface_presentation_binding.h",
+    "browser_surface_presentation.h",
     "favorites.h",
     "group_mark_signals.h",
     "sidebar_footer.h",
@@ -18,6 +20,7 @@ source_set("yee_ui") {
   ]
   sources = [
     "browser_surface_color_controller.cc",
+    "browser_surface_presentation_binding.cc",
     "favorites.cc",
     "group_mark_signals.cc",
     "sidebar_footer.cc",

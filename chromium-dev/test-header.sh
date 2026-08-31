@@ -23,15 +23,16 @@ fi
 require_depot_tools
 require_chromium_src
 
-UNIT_FILTER='BrowserSurfaceColorControllerTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.OmniboxPopupThemeIdentityIsStablePerOpaqueColor:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
-INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeaderOmitsUnsupportedSidebarControl:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
+UNIT_FILTER='BrowserSurfaceColorControllerTest.*:BrowserSurfacePresentationResolverTest.*:YeeRestingTextViewTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
+INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeaderOmitsUnsupportedSidebarControl:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/MultiContentsViewUiTest.YeeLocationBarRehostSynchronizesOncePerGeneration/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Header regression targets"
   sync_yee_ui_sources
 
   targets=()
-  [[ "$MODE" == "unit" || "$MODE" == "all" ]] && targets+=(unit_tests)
+  [[ "$MODE" == "unit" || "$MODE" == "all" ]] && \
+    targets+=(chrome/browser/ui/views/tabs/common:yee_header_unittests)
   [[ "$MODE" == "interactive" || "$MODE" == "all" ]] && \
     targets+=(interactive_ui_tests)
   build_regression_targets "Header" "${targets[@]}"
@@ -40,7 +41,7 @@ fi
 if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
   print "Running Header unit regressions without opening a browser window."
   print "Native View tests still require access to the active GUI session."
-  "$YEE_OUT_DIR/unit_tests" \
+  "$YEE_OUT_DIR/yee_header_unittests" \
     --gtest_filter="$UNIT_FILTER" \
     --test-launcher-jobs=1
 fi

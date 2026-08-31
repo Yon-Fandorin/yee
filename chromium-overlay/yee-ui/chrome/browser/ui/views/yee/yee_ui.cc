@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <string>
 #include <utility>
 
@@ -14,7 +13,6 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
-#include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -32,6 +30,7 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_mixer.h"
 #include "ui/color/color_provider.h"
+#include "ui/color/color_provider_manager.h"
 #include "ui/color/color_recipe.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor_extra/shadow.h"
@@ -169,63 +168,6 @@ enum class ShellCreateCommand {
   kChat,
 };
 
-class YeeOmniboxPopupTheme final
-    : public ui::ColorProviderKey::InitializerSupplier {
- public:
-  explicit YeeOmniboxPopupTheme(SkColor surface_color)
-      : surface_color_(SkColorSetA(surface_color, SK_AlphaOPAQUE)) {}
-  ~YeeOmniboxPopupTheme() override = default;
-
-  void AddColorMixers(ui::ColorProvider* provider,
-                      const ui::ColorProviderKey& key) const override {
-    const yee::BrowserSurfaceHeaderColors colors =
-        yee::ResolveBrowserSurfaceHeaderColors(surface_color_);
-    const SkColor endpoint =
-        color_utils::GetColorWithMaxContrast(surface_color_);
-    const SkColor hover = color_utils::AlphaBlend(endpoint, surface_color_,
-                                                  kOmniboxPopupHoverOpacity);
-    const SkColor outline = color_utils::AlphaBlend(
-        endpoint, surface_color_, kOmniboxPopupOutlineOpacity);
-
-    // PopupWidget installs this supplier as the key's app controller. Chromium
-    // invokes app-controller mixers after its own mixers and the user's theme,
-    // so these neutral roles cannot be overwritten later in provider setup.
-    // Warning, security, and product-semantic colors remain untouched.
-    ui::ColorMixer& mixer = provider->AddMixer();
-    mixer[kColorOmniboxResultsBackground] = {surface_color_};
-    mixer[kColorOmniboxResultsBackgroundHovered] = {hover};
-    mixer[kColorOmniboxResultsBackgroundSelected] = {hover};
-    mixer[kColorOmniboxResultsBackgroundIph] = {hover};
-    mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
-        SkColorSetA(endpoint, 0x0F)};
-    mixer[kColorOmniboxBubbleOutline] = {outline};
-    mixer[kColorOmniboxResultsChipBackground] = {hover};
-
-    mixer[kColorOmniboxText] = {colors.primary};
-    mixer[kColorOmniboxTextDimmed] = {colors.secondary};
-    mixer[kColorOmniboxResultsTextSelected] = {colors.primary};
-    mixer[kColorOmniboxResultsTextAnswer] = {colors.primary};
-    mixer[kColorOmniboxResultsTextDimmed] = {colors.secondary};
-    mixer[kColorOmniboxResultsTextDimmedSelected] = {colors.secondary};
-    mixer[kColorOmniboxResultsTextSecondary] = {colors.secondary};
-    mixer[kColorOmniboxResultsTextSecondarySelected] = {colors.secondary};
-    mixer[kColorOmniboxResultsUrl] = {colors.primary};
-    mixer[kColorOmniboxResultsUrlSelected] = {colors.primary};
-    mixer[kColorOmniboxKeywordSelected] = {colors.primary};
-    mixer[kColorOmniboxKeywordSeparator] = {colors.secondary};
-
-    mixer[kColorOmniboxResultsIcon] = {colors.primary};
-    mixer[kColorOmniboxResultsIconSelected] = {colors.primary};
-    mixer[kColorOmniboxResultsButtonIcon] = {colors.primary};
-    mixer[kColorOmniboxResultsButtonIconSelected] = {colors.primary};
-    mixer[kColorOmniboxResultsButtonBorder] = {outline};
-    mixer[kColorOmniboxResultsIconGM3Background] = {hover};
-  }
-
- private:
-  const SkColor surface_color_;
-};
-
 class YeeShellBackground : public views::Background {
  public:
   YeeShellBackground() = default;
@@ -329,8 +271,8 @@ class YeeCombinedSurfaceOutlineView : public views::View {
 
  public:
   explicit YeeCombinedSurfaceOutlineView(
-      yee::PageSurfaceColorCallback page_surface_color_callback)
-      : page_surface_color_callback_(std::move(page_surface_color_callback)) {
+      yee::BrowserSurfacePresentationCallback presentation_callback)
+      : presentation_callback_(std::move(presentation_callback)) {
     SetID(yee::kCombinedSurfaceOutlineViewId);
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
@@ -358,10 +300,19 @@ class YeeCombinedSurfaceOutlineView : public views::View {
   }
 
   SkColor ResolveSurfaceColor(const ui::ColorProvider& color_provider) const {
-    return split_presentation_
-               ? yee::ResolveSplitCanvasColor(color_provider)
-               : yee::ResolveBrowserSurfaceHeaderColor(
-                     color_provider, page_surface_color_callback_.Run());
+    if (split_presentation_) {
+      return yee::ResolveSplitCanvasColor(color_provider);
+    }
+    const std::optional<yee::BrowserSurfacePresentation> presentation =
+        presentation_callback_.Run();
+    const bool native_colors = GetNativeTheme()->preferred_contrast() ==
+                               ui::NativeTheme::PreferredContrast::kMore;
+    return presentation.has_value() && !native_colors &&
+                   presentation->palette_mode ==
+                       yee::BrowserSurfacePresentation::PaletteMode::
+                           kCustomSurface
+               ? presentation->surface
+               : color_provider.GetColor(kColorToolbar);
   }
 
   bool split_presentation() const { return split_presentation_; }
@@ -379,8 +330,18 @@ class YeeCombinedSurfaceOutlineView : public views::View {
     if (surface_bounds.IsEmpty()) {
       return;
     }
-    const SkColor surface_color = ResolveSurfaceColor(*GetColorProvider());
-    const SkColor separator_color = ResolveSurfaceSeparatorColor(surface_color);
+    const std::optional<yee::BrowserSurfacePresentation> presentation =
+        presentation_callback_.Run();
+    const bool custom_colors =
+        presentation.has_value() &&
+        GetNativeTheme()->preferred_contrast() !=
+            ui::NativeTheme::PreferredContrast::kMore &&
+        presentation->palette_mode ==
+            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface;
+    const SkColor separator_color =
+        custom_colors
+            ? presentation->header_separator
+            : GetColorProvider()->GetColor(kColorToolbarContentAreaSeparator);
     PaintBrowserSurfaceOutline(canvas, surface_bounds,
                                yee::kSidebarMetrics.content_corner_radius,
                                *GetColorProvider(), /*emphasized=*/false);
@@ -399,7 +360,7 @@ class YeeCombinedSurfaceOutlineView : public views::View {
   }
 
  private:
-  yee::PageSurfaceColorCallback page_surface_color_callback_;
+  yee::BrowserSurfacePresentationCallback presentation_callback_;
   std::unique_ptr<views::ViewShadow> view_shadow_;
   bool split_presentation_ = false;
 };
@@ -490,6 +451,7 @@ class YeeOmniboxRestingTextView : public views::View {
     origin->SetElideBehavior(gfx::ELIDE_HEAD);
     origin->SetFontList(
         omnibox_font.Derive(0, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM));
+    origin->SetAutoColorReadabilityEnabled(false);
     origin->GetViewAccessibility().SetIsIgnored(true);
     origin_ = AddChildView(std::move(origin));
 
@@ -503,6 +465,7 @@ class YeeOmniboxRestingTextView : public views::View {
     title->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     title->SetElideBehavior(gfx::FADE_TAIL);
     title->SetFontList(omnibox_font);
+    title->SetAutoColorReadabilityEnabled(false);
     title->GetViewAccessibility().SetIsIgnored(true);
     title_ = AddChildView(std::move(title));
     layout->SetFlexForView(title_, 1);
@@ -516,6 +479,9 @@ class YeeOmniboxRestingTextView : public views::View {
   void Update(std::u16string_view title,
               std::u16string_view origin,
               SkColor background_color,
+              SkColor primary,
+              SkColor secondary,
+              SkColor divider,
               bool visible) {
     title_->SetText(std::u16string(title));
     origin_->SetText(std::u16string(origin));
@@ -528,16 +494,13 @@ class YeeOmniboxRestingTextView : public views::View {
     if (background_color_ != background_color) {
       background_color_ = background_color;
       SetBackground(views::CreateSolidBackground(background_color));
+      origin_->SetBackgroundColor(background_color);
+      title_->SetBackgroundColor(background_color);
     }
 
-    const yee::BrowserSurfaceHeaderColors colors =
-        yee::ResolveBrowserSurfaceHeaderColors(background_color);
-    origin_->SetEnabledColor(colors.primary);
-    title_->SetEnabledColor(colors.secondary);
-    separator_->SetBackground(
-        views::CreateSolidBackground(color_utils::AlphaBlend(
-            color_utils::GetColorWithMaxContrast(background_color),
-            background_color, kRestingSeparatorOpacity)));
+    origin_->SetEnabledColor(primary);
+    title_->SetEnabledColor(secondary);
+    separator_->SetBackground(views::CreateSolidBackground(divider));
     SetVisible(visible);
   }
 
@@ -952,18 +915,24 @@ SkColor ResolveBrowserSurfaceHeaderColor(
 BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
     SkColor surface_color) {
   surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  const SkColor endpoint = color_utils::GetColorWithMaxContrast(surface_color);
+  // Chromium's general-purpose dark endpoint is intentionally softer than
+  // black, so it cannot reach 4.5:1 on every mid-luminance page color. Header
+  // text is small and must meet the readable-text contract for every sampled
+  // surface; choose the higher-contrast physical black/white endpoint here.
+  const SkColor endpoint = color_utils::PickContrastingColor(
+      SK_ColorBLACK, SK_ColorWHITE, surface_color);
   const SkColor preferred_primary = color_utils::AlphaBlend(
       endpoint, surface_color, kHeaderPrimaryPreferredOpacity);
   const SkColor preferred_secondary = color_utils::AlphaBlend(
       endpoint, surface_color, kHeaderSecondaryPreferredOpacity);
   return {
-      .primary =
-          color_utils::BlendForMinContrast(preferred_primary, surface_color)
-              .color,
+      .primary = color_utils::BlendForMinContrast(
+                     preferred_primary, surface_color, endpoint,
+                     color_utils::kMinimumReadableContrastRatio)
+                     .color,
       .secondary = color_utils::BlendForMinContrast(
-                       preferred_secondary, surface_color, std::nullopt,
-                       color_utils::kMinimumVisibleContrastRatio)
+                       preferred_secondary, surface_color, endpoint,
+                       color_utils::kMinimumReadableContrastRatio)
                        .color,
       .disabled = color_utils::AlphaBlend(endpoint, surface_color,
                                           kHeaderDisabledOpacity),
@@ -993,17 +962,105 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
                                                 focus_stroke_color);
 }
 
-ui::ColorProviderKey::InitializerSupplier* GetBrowserSurfaceOmniboxPopupTheme(
-    SkColor surface_color) {
-  using PopupThemes = std::map<SkColor, std::unique_ptr<YeeOmniboxPopupTheme>>;
-  static base::NoDestructor<PopupThemes> popup_themes;
+BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
+    SkColor surface,
+    uint64_t source_id,
+    uint64_t revision,
+    uint64_t popup_revision) {
+  surface = SkColorSetA(surface, SK_AlphaOPAQUE);
+  const BrowserSurfaceHeaderColors colors =
+      ResolveBrowserSurfaceHeaderColors(surface);
+  const SkColor endpoint = color_utils::GetColorWithMaxContrast(surface);
+  return {
+      .palette_mode = BrowserSurfacePresentation::PaletteMode::kCustomSurface,
+      .source_id = source_id,
+      .revision = revision,
+      .popup_revision = popup_revision,
+      .surface = surface,
+      .primary = colors.primary,
+      .secondary = colors.secondary,
+      .disabled = colors.disabled,
+      .location_hover = color_utils::AlphaBlend(endpoint, surface, 0.02f),
+      .focus_stroke = ResolveBrowserSurfaceFocusStrokeColor(surface),
+      .header_separator = ResolveSurfaceSeparatorColor(surface),
+      .resting_divider =
+          color_utils::AlphaBlend(endpoint, surface, kRestingSeparatorOpacity),
+      .popup_hover =
+          color_utils::AlphaBlend(endpoint, surface, kOmniboxPopupHoverOpacity),
+      .popup_outline = color_utils::AlphaBlend(endpoint, surface,
+                                               kOmniboxPopupOutlineOpacity),
+  };
+}
 
-  surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  auto [it, inserted] = popup_themes->try_emplace(surface_color);
-  if (inserted) {
-    it->second = std::make_unique<YeeOmniboxPopupTheme>(surface_color);
+BrowserSurfacePresentation UseNativeBrowserSurfaceColors(
+    const BrowserSurfacePresentation& presentation) {
+  BrowserSurfacePresentation native = presentation;
+  native.palette_mode = BrowserSurfacePresentation::PaletteMode::kNativeColors;
+  return native;
+}
+
+void AddBrowserSurfaceOmniboxPopupColorMixer(
+    ui::ColorProvider& provider,
+    const BrowserSurfacePresentation& presentation) {
+  CHECK_EQ(presentation.palette_mode,
+           BrowserSurfacePresentation::PaletteMode::kCustomSurface);
+  const SkColor endpoint =
+      color_utils::GetColorWithMaxContrast(presentation.surface);
+  ui::ColorMixer& mixer = provider.AddMixer();
+  mixer[kColorOmniboxResultsBackground] = {presentation.surface};
+  mixer[kColorOmniboxResultsBackgroundHovered] = {presentation.popup_hover};
+  mixer[kColorOmniboxResultsBackgroundSelected] = {presentation.popup_hover};
+  mixer[kColorOmniboxResultsBackgroundIph] = {presentation.popup_hover};
+  mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
+      SkColorSetA(endpoint, 0x0F)};
+  mixer[kColorOmniboxBubbleOutline] = {presentation.popup_outline};
+  mixer[kColorOmniboxResultsChipBackground] = {presentation.popup_hover};
+
+  mixer[kColorOmniboxText] = {presentation.primary};
+  mixer[kColorOmniboxTextDimmed] = {presentation.secondary};
+  mixer[kColorOmniboxResultsTextSelected] = {presentation.primary};
+  mixer[kColorOmniboxResultsTextAnswer] = {presentation.primary};
+  mixer[kColorOmniboxResultsTextDimmed] = {presentation.secondary};
+  mixer[kColorOmniboxResultsTextDimmedSelected] = {presentation.secondary};
+  mixer[kColorOmniboxResultsTextSecondary] = {presentation.secondary};
+  mixer[kColorOmniboxResultsTextSecondarySelected] = {presentation.secondary};
+  mixer[kColorOmniboxResultsUrl] = {presentation.primary};
+  mixer[kColorOmniboxResultsUrlSelected] = {presentation.primary};
+  mixer[kColorOmniboxKeywordSelected] = {presentation.primary};
+  mixer[kColorOmniboxKeywordSeparator] = {presentation.secondary};
+
+  mixer[kColorOmniboxResultsIcon] = {presentation.primary};
+  mixer[kColorOmniboxResultsIconSelected] = {presentation.primary};
+  mixer[kColorOmniboxResultsButtonIcon] = {presentation.primary};
+  mixer[kColorOmniboxResultsButtonIconSelected] = {presentation.primary};
+  mixer[kColorOmniboxResultsButtonBorder] = {presentation.popup_outline};
+  mixer[kColorOmniboxResultsIconGM3Background] = {presentation.popup_hover};
+}
+
+std::unique_ptr<ui::ColorProvider>
+CreateBrowserSurfaceOmniboxPopupColorProvider(
+    ui::ColorProviderKey key,
+    std::optional<BrowserSurfacePresentation> presentation) {
+  const bool use_native_colors =
+      key.contrast_mode == ui::ColorProviderKey::ContrastMode::kHigh ||
+      key.forced_colors != ui::ColorProviderKey::ForcedColors::kNone;
+  const bool use_custom_presentation =
+      presentation.has_value() &&
+      presentation->palette_mode ==
+          BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
+      !use_native_colors;
+  if (use_custom_presentation) {
+    key.color_mode = color_utils::IsDark(presentation->surface)
+                         ? ui::ColorProviderKey::ColorMode::kDark
+                         : ui::ColorProviderKey::ColorMode::kLight;
   }
-  return it->second.get();
+
+  std::unique_ptr<ui::ColorProvider> provider =
+      ui::ColorProviderManager::Get().CreateUncachedColorProvider(key);
+  if (use_custom_presentation) {
+    AddBrowserSurfaceOmniboxPopupColorMixer(*provider, *presentation);
+  }
+  return provider;
 }
 
 std::unique_ptr<views::Background> CreateShellBackground() {
@@ -1054,9 +1111,9 @@ double GetNativeGlassTintOpacity(bool is_dark_mode) {
 }
 
 std::unique_ptr<views::View> CreateCombinedSurfaceOutlineView(
-    PageSurfaceColorCallback page_surface_color_callback) {
+    BrowserSurfacePresentationCallback presentation_callback) {
   return std::make_unique<YeeCombinedSurfaceOutlineView>(
-      std::move(page_surface_color_callback));
+      std::move(presentation_callback));
 }
 
 void UpdateCombinedSurfaceOutlineView(views::View& view,
@@ -1090,8 +1147,20 @@ void UpdateOmniboxRestingTextView(views::View& view,
                                   std::u16string_view origin,
                                   SkColor background_color,
                                   bool visible) {
+  const BrowserSurfacePresentation presentation =
+      ResolveBrowserSurfacePresentation(background_color, 0, 0, 0);
+  UpdateOmniboxRestingTextView(view, title, origin, presentation, visible);
+}
+
+void UpdateOmniboxRestingTextView(
+    views::View& view,
+    std::u16string_view title,
+    std::u16string_view origin,
+    const BrowserSurfacePresentation& presentation,
+    bool visible) {
   static_cast<YeeOmniboxRestingTextView&>(view).Update(
-      title, origin, background_color, visible);
+      title, origin, presentation.surface, presentation.primary,
+      presentation.secondary, presentation.resting_divider, visible);
 }
 
 gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect& bounds) {

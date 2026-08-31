@@ -10,13 +10,14 @@
 #include <cstdint>
 #include <utility>
 
+#include "base/atomic_sequence_num.h"
 #include "base/functional/bind.h"
 #include "base/task/bind_post_task.h"
 #include "base/time/time.h"
+#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_user_data.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -52,30 +53,7 @@ constexpr int kMinimumOpaqueAlpha = 230;
 constexpr double kMinimumDominantShare = 0.55;
 constexpr int kMaximumStableChannelDelta = 12;
 
-// Stores the last color that completed Yee's stability gate on this tab. The
-// cache is owned by WebContents so closing a background tab cannot leave a
-// dangling lookup entry. Returning to an already sampled tab can therefore
-// select its own Header target immediately and transition continuously from the
-// color currently on screen.
-class BrowserSurfaceColorCache
-    : public content::WebContentsUserData<BrowserSurfaceColorCache> {
- public:
-  ~BrowserSurfaceColorCache() override = default;
-
-  std::optional<SkColor> color() const { return color_; }
-  void set_color(SkColor color) { color_ = color; }
-
- private:
-  explicit BrowserSurfaceColorCache(content::WebContents* web_contents)
-      : content::WebContentsUserData<BrowserSurfaceColorCache>(*web_contents) {}
-
-  friend class content::WebContentsUserData<BrowserSurfaceColorCache>;
-  WEB_CONTENTS_USER_DATA_KEY_DECL();
-
-  std::optional<SkColor> color_;
-};
-
-WEB_CONTENTS_USER_DATA_KEY_IMPL(BrowserSurfaceColorCache);
+base::AtomicSequenceNumber g_browser_surface_source_ids;
 
 struct ColorBucket {
   int count = 0;
@@ -173,11 +151,26 @@ bool IsScrollInteraction(const blink::WebInputEvent& event) {
 
 namespace yee {
 
+WEB_CONTENTS_USER_DATA_KEY_IMPL(BrowserSurfaceColorController);
+
 BrowserSurfaceColorController::BrowserSurfaceColorController(
-    base::RepeatingClosure color_changed)
-    : color_changed_(std::move(color_changed)) {}
+    content::WebContents* web_contents)
+    : content::WebContentsObserver(web_contents),
+      content::WebContentsUserData<BrowserSurfaceColorController>(
+          *web_contents),
+      waiting_for_load_completion_(web_contents->IsLoading()),
+      source_id_(static_cast<uint64_t>(g_browser_surface_source_ids.GetNext()) +
+                 1) {
+  RestartPageSampling(kInitialSampleDelay);
+}
 
 BrowserSurfaceColorController::~BrowserSurfaceColorController() = default;
+
+base::CallbackListSubscription
+BrowserSurfaceColorController::AddPresentationChangedCallback(
+    base::RepeatingClosure callback) {
+  return presentation_changed_callbacks_.Add(std::move(callback));
+}
 
 void BrowserSurfaceColorController::SetThemeFallbackColor(SkColor color) {
   color = SkColorSetA(color, SK_AlphaOPAQUE);
@@ -185,50 +178,53 @@ void BrowserSurfaceColorController::SetThemeFallbackColor(SkColor color) {
     return;
   }
   theme_fallback_color_ = color;
-  if (web_contents() && !committed_color_.has_value()) {
+  if (!committed_color_.has_value()) {
     StartColorTransition(color, kTabSwitchColorTransitionDuration);
   }
 }
 
-void BrowserSurfaceColorController::SetWebContents(
-    content::WebContents* web_contents) {
-  if (web_contents == this->web_contents()) {
+void BrowserSurfaceColorController::ActivateFrom(
+    std::optional<SkColor> current_surface) {
+  const std::optional<SkColor> target =
+      committed_color_.has_value() ? committed_color_ : theme_fallback_color_;
+  if (!target.has_value()) {
     return;
   }
-  StopColorTransition();
-  Observe(web_contents);
-  waiting_for_load_completion_ = web_contents && web_contents->IsLoading();
-  first_visually_non_empty_paint_seen_ = false;
-  pending_page_settling_samples_ = 0;
-  RestartPageSampling(kInitialSampleDelay);
+  if (current_surface.has_value()) {
+    StopColorTransition();
+    SetPresentedColor(*current_surface, /*popup_policy_changed=*/false);
+  }
+  StartColorTransition(*target, kTabSwitchColorTransitionDuration);
+}
 
-  // A newly selected WebContents must never inherit another tab's resolved
-  // page color. Leaving this empty makes the Header use the current theme's
-  // toolbar color until this tab produces its own stable sample. Returning to
-  // an already sampled tab selects that tab's cached color as the next target.
-  std::optional<SkColor> next_color;
-  if (web_contents) {
-    if (const BrowserSurfaceColorCache* cache =
-            BrowserSurfaceColorCache::FromWebContents(web_contents);
-        cache && cache->color().has_value()) {
-      next_color = cache->color();
-    }
-  }
-  committed_color_ = next_color;
-  if (!web_contents) {
-    ClearPresentedColor();
-  } else if (next_color.has_value()) {
-    StartColorTransition(*next_color, kTabSwitchColorTransitionDuration);
-  } else if (theme_fallback_color_.has_value()) {
-    StartColorTransition(*theme_fallback_color_,
-                         kTabSwitchColorTransitionDuration);
-  } else {
-    ClearPresentedColor();
-  }
+const std::optional<BrowserSurfacePresentation>&
+BrowserSurfaceColorController::GetPresentation() const {
+  return presentation_;
 }
 
 std::optional<SkColor> BrowserSurfaceColorController::GetColor() const {
   return presented_color_;
+}
+
+void BrowserSurfaceColorController::SetPageSurfaceColorForTesting(
+    SkColor color) {
+  sample_timer_.Stop();
+  scroll_sample_timer_.Stop();
+  scroll_sampling_timeout_timer_.Stop();
+  weak_ptr_factory_.InvalidateWeakPtrs();
+  ++sampling_epoch_;
+  capture_in_flight_ = false;
+  is_scroll_sampling_ = false;
+  ResetCandidateSequence();
+  color = SkColorSetA(color, SK_AlphaOPAQUE);
+  committed_color_ = color;
+  StopColorTransition();
+  SetPresentedColor(color, /*popup_policy_changed=*/true);
+}
+
+void BrowserSurfaceColorController::TransitionToPageSurfaceColorForTesting(
+    SkColor color) {
+  CommitColor(color);
 }
 
 void BrowserSurfaceColorController::DidFinishNavigation(
@@ -294,7 +290,7 @@ void BrowserSurfaceColorController::RestartPageSampling(
   scroll_sample_timer_.Stop();
   scroll_sampling_timeout_timer_.Stop();
   weak_ptr_factory_.InvalidateWeakPtrs();
-  ++generation_;
+  ++sampling_epoch_;
   ResetCandidateSequence();
   sample_attempt_ = 0;
   capture_in_flight_ = false;
@@ -341,6 +337,27 @@ void BrowserSurfaceColorController::StartScrollSampling() {
   if (!web_contents()) {
     return;
   }
+  if (is_scroll_sampling_) {
+    // Wheel and trackpad gestures deliver a stream of interaction events. Keep
+    // the active epoch, in-flight capture, and stability candidate intact;
+    // repeated signals only extend the observation window from the latest
+    // input. Resetting here would prevent two stable samples from ever
+    // accumulating during a continuous scroll.
+    scroll_sampling_timeout_timer_.Start(
+        FROM_HERE, kScrollSamplingDuration, this,
+        &BrowserSurfaceColorController::StopScrollSampling);
+    return;
+  }
+  // A page-settling capture must never be interpreted under scroll policy.
+  // Open a fresh sampling epoch and invalidate the old async callback before
+  // changing modes.
+  sample_timer_.Stop();
+  scroll_sample_timer_.Stop();
+  scroll_sampling_timeout_timer_.Stop();
+  weak_ptr_factory_.InvalidateWeakPtrs();
+  ++sampling_epoch_;
+  capture_in_flight_ = false;
+  sample_attempt_ = 0;
   pending_page_settling_samples_ = 0;
   ResetCandidateSequence();
   is_scroll_sampling_ = true;
@@ -354,6 +371,14 @@ void BrowserSurfaceColorController::StartScrollSampling() {
 
 void BrowserSurfaceColorController::StopScrollSampling() {
   scroll_sample_timer_.Stop();
+  scroll_sampling_timeout_timer_.Stop();
+  // Likewise, a final scroll capture cannot become a page-settling result.
+  weak_ptr_factory_.InvalidateWeakPtrs();
+  ++sampling_epoch_;
+  capture_in_flight_ = false;
+  sample_attempt_ = 0;
+  ResetCandidateSequence();
+  is_scroll_sampling_ = false;
   CaptureTopStrip();
 }
 
@@ -389,16 +414,16 @@ void BrowserSurfaceColorController::CaptureTopStrip() {
   view->CopyFromSurface(top_strip, kSampleSize, kCaptureTimeout,
                         base::BindPostTaskToCurrentDefault(base::BindOnce(
                             &BrowserSurfaceColorController::OnTopStripCaptured,
-                            weak_ptr_factory_.GetWeakPtr(), generation_)));
+                            weak_ptr_factory_.GetWeakPtr(), sampling_epoch_)));
 }
 
 void BrowserSurfaceColorController::OnTopStripCaptured(
-    int generation,
+    uint64_t sampling_epoch,
     const content::CopyFromSurfaceResult& result) {
-  capture_in_flight_ = false;
-  if (generation != generation_ || !web_contents()) {
+  if (sampling_epoch != sampling_epoch_ || !web_contents()) {
     return;
   }
+  capture_in_flight_ = false;
 
   std::optional<SkColor> candidate;
   if (result.has_value()) {
@@ -442,9 +467,6 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
 
 void BrowserSurfaceColorController::CommitColor(SkColor color) {
   color = SkColorSetA(color, SK_AlphaOPAQUE);
-  BrowserSurfaceColorCache::GetOrCreateForWebContents(web_contents())
-      ->set_color(color);
-
   if (committed_color_.has_value() && *committed_color_ == color) {
     return;
   }
@@ -456,7 +478,7 @@ void BrowserSurfaceColorController::CommitColor(SkColor color) {
                                     : kPageColorTransitionDuration);
   } else {
     StopColorTransition();
-    SetPresentedColor(color);
+    SetPresentedColor(color, /*popup_policy_changed=*/true);
   }
 }
 
@@ -465,7 +487,7 @@ void BrowserSurfaceColorController::StartColorTransition(
     base::TimeDelta duration) {
   if (!presented_color_.has_value() || *presented_color_ == target_color) {
     StopColorTransition();
-    SetPresentedColor(target_color);
+    SetPresentedColor(target_color, /*popup_policy_changed=*/true);
     return;
   }
 
@@ -494,7 +516,7 @@ void BrowserSurfaceColorController::AdvanceColorTransition() {
   if (progress >= 1.0) {
     const SkColor target_color = *transition_target_color_;
     StopColorTransition();
-    SetPresentedColor(target_color);
+    SetPresentedColor(target_color, /*popup_policy_changed=*/true);
     return;
   }
 
@@ -503,8 +525,10 @@ void BrowserSurfaceColorController::AdvanceColorTransition() {
   // screen, so the motion remains continuous instead of adding another
   // discrete midpoint.
   const double eased_progress = progress * progress * (3.0 - 2.0 * progress);
-  SetPresentedColor(InterpolateColors(
-      *transition_start_color_, *transition_target_color_, eased_progress));
+  SetPresentedColor(
+      InterpolateColors(*transition_start_color_, *transition_target_color_,
+                        eased_progress),
+      /*popup_policy_changed=*/false);
 }
 
 void BrowserSurfaceColorController::StopColorTransition() {
@@ -515,19 +539,31 @@ void BrowserSurfaceColorController::StopColorTransition() {
   transition_duration_ = base::TimeDelta();
 }
 
-void BrowserSurfaceColorController::ClearPresentedColor() {
-  if (presented_color_.has_value()) {
-    presented_color_.reset();
-    color_changed_.Run();
-  }
-}
-
-void BrowserSurfaceColorController::SetPresentedColor(SkColor color) {
+void BrowserSurfaceColorController::SetPresentedColor(
+    SkColor color,
+    bool popup_policy_changed) {
   color = SkColorSetA(color, SK_AlphaOPAQUE);
   if (!presented_color_.has_value() || *presented_color_ != color) {
     presented_color_ = color;
-    color_changed_.Run();
+    PublishPresentation(popup_policy_changed);
+  } else if (popup_policy_changed) {
+    // The final animation frame can already equal the target after channel
+    // rounding. Publish the discrete popup policy revision exactly once even
+    // when the visible RGB no longer changes.
+    PublishPresentation(/*popup_policy_changed=*/true);
   }
+}
+
+void BrowserSurfaceColorController::PublishPresentation(
+    bool popup_policy_changed) {
+  CHECK(presented_color_.has_value());
+  ++revision_;
+  if (popup_policy_changed) {
+    ++popup_revision_;
+  }
+  presentation_ = ResolveBrowserSurfacePresentation(
+      *presented_color_, source_id_, revision_, popup_revision_);
+  presentation_changed_callbacks_.Notify();
 }
 
 void BrowserSurfaceColorController::CommitPageMetadataColorIfReady() {
