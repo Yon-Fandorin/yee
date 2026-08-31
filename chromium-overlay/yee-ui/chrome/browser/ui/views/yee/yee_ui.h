@@ -21,12 +21,12 @@ class ToolbarButton;
 
 namespace ui {
 class ColorProvider;
-}  // namespace ui
+} // namespace ui
 
 namespace views {
 class Background;
 class View;
-}  // namespace views
+} // namespace views
 
 namespace yee {
 
@@ -65,6 +65,20 @@ struct SidebarMetrics {
   int shell_control_corner_radius = 8;
   int shell_control_horizontal_margin = 1;
   int sidebar_header_controls_leading_adjustment = 12;
+  int sidebar_footer_row_height = 50;
+  int sidebar_footer_top_spacing = 6;
+  int sidebar_footer_corner_radius = 10;
+  int sidebar_footer_icon_size = 28;
+  int sidebar_footer_avatar_size = 20;
+  int sidebar_footer_disclosure_size = 14;
+  int sidebar_footer_icon_label_spacing = 8;
+  int sidebar_footer_trailing_gap = 5;
+  int sidebar_row_hover_animation_duration_ms = 50;
+  int sidebar_footer_menu_gap = 4;
+  int sidebar_footer_root_row_height = 46;
+  int sidebar_footer_menu_row_height = 38;
+  int sidebar_footer_screen_fade_out_duration_ms = 45;
+  int sidebar_footer_screen_fade_in_duration_ms = 70;
 
   constexpr int sidebar_header_controls_leading_inset() const {
     return toolbar_leading_inset + toolbar_interior_inset -
@@ -165,12 +179,10 @@ struct SidebarItemColors {
   SkColor foreground = SK_ColorBLACK;
 };
 
-SidebarItemColors ResolveSidebarItemColors(
-    const ui::ColorProvider& color_provider,
-    SidebarItemVisualState state,
-    double hover_progress,
-    bool frame_active,
-    bool persistent_surface);
+SidebarItemColors
+ResolveSidebarItemColors(const ui::ColorProvider &color_provider,
+                         SidebarItemVisualState state, double hover_progress,
+                         bool frame_active, bool persistent_surface);
 static_assert(kSidebarMetrics.split_pane_inner_corner_radius ==
               kSidebarMetrics.split_card_corner_radius -
                   kSidebarMetrics.split_pane_content_stroke_inset);
@@ -189,6 +201,10 @@ static_assert(kSidebarMetrics.browser_surface_header_control_edge_inset ==
 static_assert(kSidebarMetrics.browser_surface_outline_width ==
               kSidebarMetrics.split_pane_content_stroke_inset);
 static_assert(kSidebarMetrics.sidebar_header_controls_leading_inset() >= 0);
+static_assert(kSidebarMetrics.sidebar_footer_avatar_size <
+              kSidebarMetrics.sidebar_footer_icon_size);
+static_assert(kSidebarMetrics.sidebar_footer_disclosure_size <
+              kSidebarMetrics.sidebar_footer_avatar_size);
 inline constexpr int kSidebarFavoritesLabelViewId = 92001;
 inline constexpr int kSidebarBookmarksButtonViewId = 92002;
 inline constexpr int kSidebarFavoritesDropZoneViewId = 92007;
@@ -219,15 +235,15 @@ struct BrowserSurfaceHeaderColors {
 
 // Uses the page's rendered surface color as the Browser Surface Header, falling
 // back to the current Toolbar color when the page does not provide one.
-SkColor ResolveBrowserSurfaceHeaderColor(
-    const ui::ColorProvider& color_provider,
-    std::optional<SkColor> page_surface_color);
+SkColor
+ResolveBrowserSurfaceHeaderColor(const ui::ColorProvider &color_provider,
+                                 std::optional<SkColor> page_surface_color);
 
 // Derives readable text and control colors from the exact page-aware Header
 // surface. Primary and secondary roles keep minimum contrast guarantees while
 // disabled controls intentionally remain quieter.
-BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
-    SkColor surface_color);
+BrowserSurfaceHeaderColors
+ResolveBrowserSurfaceHeaderColors(SkColor surface_color);
 
 // Returns a quiet one-DIP focus stroke derived from the page-aware Header.
 // Light surfaces prefer a darker stroke; surfaces too dark to distinguish a
@@ -237,17 +253,17 @@ SkColor ResolveBrowserSurfaceFocusStrokeColor(SkColor surface_color);
 // Paints the compact Omnibox's full-height surface while keeping its optional
 // one-DIP focus stroke inset from the control edge. This makes focus read as an
 // internal state without changing native bounds or hit testing.
-std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
-    SkColor background_color,
-    SkColor focus_stroke_color);
+std::unique_ptr<views::Background>
+CreateBrowserSurfaceOmniboxBackground(SkColor background_color,
+                                      SkColor focus_stroke_color);
 
 // Returns a process-stable supplier for page-aware neutral Omnibox result
 // colors. ColorProviderManager uses this address as part of its process-wide
 // cache key, so equal surfaces deliberately reuse the same supplier identity.
 // The popup remains Chromium-owned; only its neutral palette follows Yee's
 // Header.
-ui::ColorProviderKey::InitializerSupplier* GetBrowserSurfaceOmniboxPopupTheme(
-    SkColor surface_color);
+ui::ColorProviderKey::InitializerSupplier *
+GetBrowserSurfaceOmniboxPopupTheme(SkColor surface_color);
 
 std::unique_ptr<views::Background> CreateShellBackground();
 
@@ -255,17 +271,17 @@ std::unique_ptr<views::Background> CreateShellBackground();
 // Views shell, Sidebar items, and the split canvas. Dark mode retains the theme
 // hue while bringing overly bright frame colors into a calm dark tonal range;
 // light mode preserves the supplied frame color.
-SkColor ResolveShellBackgroundColor(const ui::ColorProvider& color_provider,
+SkColor ResolveShellBackgroundColor(const ui::ColorProvider &color_provider,
                                     bool frame_active);
 
 // Returns an opaque, theme-resolved proxy for the shell surface. Translucent
 // Yee surfaces use this to calculate contrast without sampling desktop pixels.
-SkColor ResolveShellContrastBackground(const ui::ColorProvider& color_provider);
+SkColor ResolveShellContrastBackground(const ui::ColorProvider &color_provider);
 
 // Returns the opaque Chrome Surface color inherited by Yee's split backing,
 // pane outlines, and split controls. Split presentation deliberately does not
 // follow either page's sampled color.
-SkColor ResolveSplitCanvasColor(const ui::ColorProvider& color_provider);
+SkColor ResolveSplitCanvasColor(const ui::ColorProvider &color_provider);
 
 // Returns the subtle one-DIP separator shared by the combined Browser Surface
 // and split Pane Headers. Deriving it from the resolved surface keeps the
@@ -284,27 +300,24 @@ std::unique_ptr<views::View> CreateCombinedSurfaceOutlineView(
 // presentation. Split presentation suppresses that fill, outline, and shadow;
 // the transparent Split Canvas only lays out Pane Cards, which own their visual
 // boundaries.
-void UpdateCombinedSurfaceOutlineView(views::View& view,
+void UpdateCombinedSurfaceOutlineView(views::View &view,
                                       bool split_presentation);
 
 // Split panes are independent cards aligned directly to Yee's Browser Surface.
 // Chromium continues to own split layout, resizing, and semantic highlights.
 gfx::RoundedCornersF ResolveSplitPaneRoundedCorners();
 std::unique_ptr<views::View> CreateSplitPaneEmphasisView();
-void UpdateSplitPaneEmphasisView(views::View& view,
-                                 bool visible,
+void UpdateSplitPaneEmphasisView(views::View &view, bool visible,
                                  bool emphasized);
 
 // Non-interactive resting presentation layered over Chromium's real Omnibox.
 // The native editor remains mounted underneath and is revealed on focus.
 std::unique_ptr<views::View> CreateOmniboxRestingTextView();
-void UpdateOmniboxRestingTextView(views::View& view,
-                                  std::u16string_view title,
+void UpdateOmniboxRestingTextView(views::View &view, std::u16string_view title,
                                   std::u16string_view origin,
-                                  SkColor background_color,
-                                  bool visible);
+                                  SkColor background_color, bool visible);
 
-void ApplyShellControlStyle(ToolbarButton& button);
+void ApplyShellControlStyle(ToolbarButton &button);
 
 bool IsShellEnabled();
 
@@ -317,8 +330,7 @@ bool UsesExpandedSidebarPresentation();
 // list get first refusal. Leaving the sidebar still hands the drag back to
 // Chromium's normal window move path. Group-header drags keep Chromium's
 // all-tabs behavior.
-bool ShouldPrioritizeSidebarTabDrag(int dragged_tab_count,
-                                    int source_tab_count,
+bool ShouldPrioritizeSidebarTabDrag(int dragged_tab_count, int source_tab_count,
                                     bool is_group_drag,
                                     bool uses_vertical_tab_strip);
 
@@ -331,28 +343,28 @@ inline bool CanAddFavorite(int pinned_count, int adding = 1) {
 // Nudges a vertical-tab hover card away from the sidebar. Chromium's slide
 // animator reads View::GetAnchorBoundsInScreen(), so TabView applies this
 // there instead of inside the bubble.
-gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect& bounds);
+gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect &bounds);
 
-std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
-    views::Button::PressedCallback callback);
-std::unique_ptr<ToolbarButton> CreateShellAddButton(
-    ShellCreateCallback callback);
-std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
-    views::Button::PressedCallback callback);
+std::unique_ptr<ToolbarButton>
+CreateShellToolbarButton(views::Button::PressedCallback callback);
+std::unique_ptr<ToolbarButton>
+CreateShellAddButton(ShellCreateCallback callback);
+std::unique_ptr<ToolbarButton>
+CreateAgentToolbarButton(views::Button::PressedCallback callback);
 
 // Window-global Sidebar Header actions. This view owns one Create control and
 // one Agent status control regardless of whether the Browser Surface is single
 // or split. Chromium supplies command callbacks and the platform caption-button
 // exclusion; Yee owns their presentation and geometry.
-std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
-    ShellCreateCallback create_callback,
-    views::Button::PressedCallback agent_callback);
-void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
+std::unique_ptr<views::View>
+CreateSidebarHeaderActionsView(ShellCreateCallback create_callback,
+                               views::Button::PressedCallback agent_callback);
+void SetSidebarHeaderActionsLeadingExclusion(views::View &view,
                                              int leading_exclusion);
-void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible);
-bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
-                                                   const gfx::Point& point);
+void SetSidebarHeaderActionsControlsVisible(views::View &view, bool visible);
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View &view,
+                                                   const gfx::Point &point);
 
-}  // namespace yee
+} // namespace yee
 
-#endif  // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_
+#endif // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_

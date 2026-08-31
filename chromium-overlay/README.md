@@ -67,7 +67,8 @@ Generated Chromium assets stay in the local checkout rather than this repo.
 
 The Windows shell follows the latest pilot's 48px titlebar and 6px browser
 surface gutter. Tenant/workspace identity is no longer duplicated in the
-titlebar; it belongs to the future sidebar pass. Chromium's real `ToolbarView`
+titlebar; one Yee-owned Context Switcher Footer presents it below the tab list.
+Chromium's real `ToolbarView`
 keeps New Tab and compact agent activity in the Sidebar Header, then starts the
 Browser Surface Header with sidebar toggle, back, forward, reload, native
 Omnibox, and extension dock. It does not paint a second imitation toolbar over
