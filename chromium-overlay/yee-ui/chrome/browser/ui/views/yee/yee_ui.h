@@ -69,10 +69,11 @@ struct SidebarMetrics {
   int sidebar_footer_top_spacing = 6;
   int sidebar_footer_corner_radius = 10;
   int sidebar_footer_icon_size = 28;
-  int sidebar_footer_avatar_size = 20;
   int sidebar_footer_disclosure_size = 14;
   int sidebar_footer_icon_label_spacing = 8;
-  int sidebar_footer_trailing_gap = 5;
+  int sidebar_footer_surface_outline_width = 1;
+  int sidebar_footer_surface_padding_vertical = 4;
+  int sidebar_footer_surface_padding_horizontal = 5;
   int sidebar_row_hover_animation_duration_ms = 50;
   int sidebar_footer_menu_gap = 4;
   int sidebar_footer_root_row_height = 46;
@@ -83,6 +84,15 @@ struct SidebarMetrics {
   constexpr int sidebar_header_controls_leading_inset() const {
     return toolbar_leading_inset + toolbar_interior_inset -
            sidebar_header_controls_leading_adjustment;
+  }
+
+  constexpr int sidebar_footer_surface_vertical_inset() const {
+    return sidebar_footer_surface_outline_width +
+           sidebar_footer_surface_padding_vertical;
+  }
+  constexpr int sidebar_footer_surface_horizontal_inset() const {
+    return sidebar_footer_surface_outline_width +
+           sidebar_footer_surface_padding_horizontal;
   }
 
   // The combined Browser Surface starts below the shell gutter, so its
@@ -201,10 +211,9 @@ static_assert(kSidebarMetrics.browser_surface_header_control_edge_inset ==
 static_assert(kSidebarMetrics.browser_surface_outline_width ==
               kSidebarMetrics.split_pane_content_stroke_inset);
 static_assert(kSidebarMetrics.sidebar_header_controls_leading_inset() >= 0);
-static_assert(kSidebarMetrics.sidebar_footer_avatar_size <
-              kSidebarMetrics.sidebar_footer_icon_size);
+static_assert(kSidebarMetrics.sidebar_footer_surface_outline_width > 0);
 static_assert(kSidebarMetrics.sidebar_footer_disclosure_size <
-              kSidebarMetrics.sidebar_footer_avatar_size);
+              kSidebarMetrics.sidebar_footer_icon_size);
 inline constexpr int kSidebarFavoritesLabelViewId = 92001;
 inline constexpr int kSidebarBookmarksButtonViewId = 92002;
 inline constexpr int kSidebarFavoritesDropZoneViewId = 92007;

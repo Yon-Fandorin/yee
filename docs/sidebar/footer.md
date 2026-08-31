@@ -15,9 +15,9 @@ Settings/Profile 구조를 복제하지 않는다.
 - 주 정보: 현재 Workspace
 - 보조 정보: `Tenant · Account`
 - 선행 mark: 현재 Workspace의 짧은 표식
-- 후행 정보: Account avatar와 펼침 표시
+- 후행 정보: 펼침 표시
 
-행 전체가 하나의 버튼이다. 내부 avatar나 펼침 표시는 별도 hit target이 아니다.
+행 전체가 하나의 버튼이다. 내부 펼침 표시는 별도 hit target이 아니다.
 Sidebar가 접히면 행과 메뉴를 함께 숨기고, hover flyout에서 펼친 표현을 사용하는
 동안에는 다시 보인다.
 
@@ -55,8 +55,8 @@ Footer row
 
 - 열릴 때 Root의 첫 actionable row로 focus를 옮긴다.
 - 하위 화면의 Back과 `Escape`는 바로 위 화면으로 돌아간다.
-- Root에서 `Escape`, trigger 재클릭, 외부 클릭은 메뉴를 닫고 trigger로 focus를
-  복원한다.
+- Root에서 `Escape`는 메뉴를 닫고 trigger로 keyboard traversal focus를 복원한다.
+  trigger 재클릭과 외부 클릭은 메뉴를 닫되 포인터가 선택한 새 focus를 유지한다.
 - Context를 선택하면 Footer 표시를 먼저 갱신하고 메뉴를 닫는다.
 - Browser tools는 임의 URL이나 새 WebContents를 만들지 않고 기존 Chromium
   page/command를 제한된 action callback으로 호출한다. 공개 action enum에는 위의
@@ -84,15 +84,16 @@ component는 처음부터 여러 context를 받는 model 경계를 유지한다.
 것처럼 저장하지 않는다. Memory를 변경할 수 있는 provider가 연결되면 View 내부
 상태에 머물지 않고 별도 callback으로 변경 결과를 product model에 전달한다.
 Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` placeholder를 쓰는
-경우에는 `LP` 같은 가짜 이니셜을 만들지 않고 generic account icon을 표시한다.
+경우에도 푸터 보조 문구만 사용하고 `LP` 같은 가짜 이니셜이나 별도 profile mark를
+만들지 않는다.
 
 ## 시각 계약
 
 - 지속 행 높이는 50 DIP이고 Sidebar 좌우 inset을 따른다.
 - 행과 메뉴 색은 고정 RGB가 아니라 현재 Chromium theme와 Yee shell 대비색에서
   파생한다.
-- 지속 행은 Favorite tile과 같은 persistent surface 팔레트를 사용해 기본·hover·
-  active 상태의 외곽선 색과 강도 변화를 일관되게 유지한다.
+- 지속 행의 기본 상태는 배경과 외곽선 없이 Sidebar 위에 놓인다. Hover에는 옅은
+  배경만, open·keyboard focus에는 active 배경과 외곽선을 사용한다.
 - 지속 행의 background와 hover·focus·press highlight는 같은 10 DIP 곡률을
   공유해 상태가 바뀌어도 사각 모서리가 드러나지 않는다.
 - hover와 open 상태는 한 겹의 Yee surface로 표현하고 keyboard focus는 같은
@@ -102,13 +103,12 @@ Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` pla
   즉시 최종 상태로 전환한다. 포인터 hover·click으로 생긴 직접 focus에는 ring을
   그리지 않고, 키보드 focus traversal에서만 표시한다.
 - Root의 세 행은 별도 section card로 분리하지 않는다.
-- 현재 Workspace mark만 accent tonal surface를 사용한다. Account avatar는 더 작은
-  neutral surface, 일반 action은 배경 없는 neutral glyph slot으로 낮춰 identity와
-  navigation의 위계를 분리한다. 선택·hover는 기존 Sidebar 상태 팔레트보다
-  강해지지 않는다.
+- 현재 Workspace mark만 accent tonal surface를 사용한다. 일반 action은 배경 없는
+  neutral glyph slot으로 낮춰 identity와 navigation의 위계를 분리한다. 선택·hover는
+  기존 Sidebar 상태 팔레트보다 강해지지 않는다.
 - 지속 행의 Workspace title은 primary hierarchy, `Tenant · Account`는 system
-  secondary foreground를 사용한다. 후행 avatar와 disclosure는 선행 Workspace
-  mark보다 작아야 한다.
+  secondary foreground를 사용한다. 후행 disclosure는 선행 Workspace mark보다
+  작아야 한다.
 - 현재 Context는 neutral selected surface와 check를 함께 쓰고 접근성 트리에도
   selected 상태로 노출한다.
 - 이동과 선택은 문자 기호가 아니라 native vector icon으로 표시하고, `System`,
@@ -130,4 +130,8 @@ Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` pla
 split에서 복제되지 않는지, collapse와 expand에 맞춰 표시되는지를 검증한다.
 메뉴를 정상 종료하거나 네이티브 종료한 직후 browser theme가 바뀌어도 dangling
 anchor observer가 남지 않는지 함께 검증한다.
+외부 클릭 종료는 배경과 외곽선이 없는 resting 상태로 돌아가고 포커스를 강제로
+trigger에 되돌리지 않으며, Escape 종료만 keyboard traversal focus를 복원한다.
+지속 행의 후행 요소는 disclosure 하나로 유지해 Account/Profile mark가 다시
+중복되지 않게 한다.
 테마 대비, bubble의 연결감, 긴 이름 말줄임은 실제 Yee 앱에서 확인한다.

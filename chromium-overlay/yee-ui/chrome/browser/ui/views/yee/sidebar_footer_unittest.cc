@@ -43,6 +43,12 @@
 namespace yee {
 namespace {
 
+gfx::Insets FooterSurfaceInsetsForTesting() {
+  return gfx::Insets::VH(
+      kSidebarMetrics.sidebar_footer_surface_vertical_inset(),
+      kSidebarMetrics.sidebar_footer_surface_horizontal_inset());
+}
+
 TEST(SidebarFooterPolicyTest, RootContainsOnlyApprovedDestinations) {
   EXPECT_EQ(kSidebarFooterRootScreens[0], SidebarFooterScreen::kContext);
   EXPECT_EQ(kSidebarFooterRootScreens[1], SidebarFooterScreen::kBrowserTools);
@@ -146,6 +152,25 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
 
   views::Widget* widget() { return widget_.get(); }
 
+  void ExpectFooterSurface(bool paint_background, bool paint_outline) {
+    EXPECT_EQ(paint_background, footer_->background() != nullptr);
+    if (paint_background) {
+      EXPECT_NE(0u, SkColorGetA(footer_->background()->color().ResolveToSkColor(
+                        footer_->GetColorProvider())));
+      EXPECT_EQ(
+          footer_->background()->GetRoundedCornerRadii(),
+          gfx::RoundedCornersF(kSidebarMetrics.sidebar_footer_corner_radius));
+    }
+
+    ASSERT_TRUE(footer_->GetBorder());
+    EXPECT_EQ(FooterSurfaceInsetsForTesting(), footer_->GetInsets());
+    EXPECT_EQ(paint_outline, !footer_->GetBorder()->GetMinimumSize().IsEmpty());
+    if (paint_outline) {
+      EXPECT_NE(0u, SkColorGetA(footer_->GetBorder()->color().ResolveToSkColor(
+                        footer_->GetColorProvider())));
+    }
+  }
+
   raw_ptr<views::View> footer_ = nullptr;
 
  private:
@@ -197,55 +222,24 @@ TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
   auto* const button = static_cast<views::Button*>(footer_.get());
   ASSERT_TRUE(footer_->GetColorProvider());
 
-  const auto surface_color = [this] {
-    CHECK(footer_->background());
-    return footer_->background()->color().ResolveToSkColor(
-        footer_->GetColorProvider());
-  };
-  const auto surface_stroke = [this] {
-    CHECK(footer_->GetBorder());
-    return footer_->GetBorder()->color().ResolveToSkColor(
-        footer_->GetColorProvider());
-  };
-  const auto expect_shared_radius = [this] {
-    ASSERT_TRUE(footer_->background());
-    EXPECT_EQ(
-        footer_->background()->GetRoundedCornerRadii(),
-        gfx::RoundedCornersF(kSidebarMetrics.sidebar_footer_corner_radius));
-  };
-
   button->SetState(views::Button::STATE_NORMAL);
-  const SkColor resting = surface_color();
-  const SkColor resting_stroke = surface_stroke();
-  const SidebarItemColors favorite_resting = ResolveSidebarItemColors(
-      *footer_->GetColorProvider(), SidebarItemVisualState::kResting,
-      /*hover_progress=*/0.0,
-      /*frame_active=*/widget()->ShouldPaintAsActive(),
-      /*persistent_surface=*/true);
-  EXPECT_EQ(favorite_resting.fill, resting);
-  EXPECT_EQ(favorite_resting.stroke, resting_stroke);
-  EXPECT_NE(SK_ColorTRANSPARENT, resting_stroke);
-  expect_shared_radius();
+  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
 
   button->SetState(views::Button::STATE_HOVERED);
-  const SkColor hovered = surface_color();
-  const SkColor hovered_stroke = surface_stroke();
-  expect_shared_radius();
-  EXPECT_NE(resting, hovered);
-  EXPECT_NE(resting_stroke, hovered_stroke);
+  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/false);
   views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
   ASSERT_TRUE(focus_ring);
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
 
   button->SetState(views::Button::STATE_NORMAL);
+  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
   footer_->RequestFocus();
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
+  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
   footer_->GetFocusManager()->SetFocusedView(nullptr);
   footer_->RequestFocusWithReason(
       views::FocusManager::FocusChangeReason::kFocusTraversal);
-  const SkColor focused = surface_color();
-  expect_shared_radius();
-  EXPECT_NE(resting, focused);
+  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
   EXPECT_EQ(focus_ring->GetColorId(), ui::kColorSysStateFocusRing);
   EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
 
@@ -307,29 +301,15 @@ TEST_F(SidebarFooterViewTest, AccessibilityReportsPopupAndCurrentContext) {
       context_data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
 }
 
-TEST_F(SidebarFooterViewTest, LocalPlaceholderUsesGenericAccountIcon) {
-  views::View* avatar = footer_->GetViewByID(kSidebarFooterAvatarViewId);
-  ASSERT_TRUE(avatar);
-  EXPECT_FALSE(
-      avatar->GetViewByID(kSidebarFooterAvatarIconViewId)->GetVisible());
-  EXPECT_TRUE(
-      avatar->GetViewByID(kSidebarFooterAvatarLabelViewId)->GetVisible());
-
-  footer_ = nullptr;
-  footer_ = widget()->SetContentsView(CreateSidebarFooterView(
-      CreateLocalSidebarFooterModel({}), SidebarContextSelectedCallback(),
-      SidebarFooterBrowserActionCallback(), SidebarMemoryChangedCallback()));
-  footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
-
-  avatar = footer_->GetViewByID(kSidebarFooterAvatarViewId);
-  ASSERT_TRUE(avatar);
-  EXPECT_TRUE(
-      avatar->GetViewByID(kSidebarFooterAvatarIconViewId)->GetVisible());
-  EXPECT_FALSE(
-      avatar->GetViewByID(kSidebarFooterAvatarLabelViewId)->GetVisible());
+TEST_F(SidebarFooterViewTest, TriggerUsesOnlyWorkspaceMarkAndDisclosure) {
+  EXPECT_TRUE(footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
+  views::View* const chevron =
+      footer_->GetViewByID(kSidebarFooterChevronViewId);
+  ASSERT_TRUE(chevron);
+  EXPECT_EQ(footer_, chevron->parent());
 }
 
-TEST_F(SidebarFooterViewTest, IdentityMarksPreserveSupplementaryCodePoints) {
+TEST_F(SidebarFooterViewTest, WorkspaceMarkPreservesSupplementaryCodePoints) {
   footer_ = nullptr;
   SidebarFooterModel model;
   model.contexts.push_back({.tenant_name = u"Local",
@@ -342,12 +322,8 @@ TEST_F(SidebarFooterViewTest, IdentityMarksPreserveSupplementaryCodePoints) {
 
   const auto* const workspace_mark = static_cast<const views::Label*>(
       footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
-  const auto* const account_mark = static_cast<const views::Label*>(
-      footer_->GetViewByID(kSidebarFooterAvatarLabelViewId));
   ASSERT_TRUE(workspace_mark);
-  ASSERT_TRUE(account_mark);
   EXPECT_EQ(workspace_mark->GetText(), u"\U0001F680");
-  EXPECT_EQ(account_mark->GetText(), u"\U0001F600U");
 }
 
 TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
@@ -355,6 +331,60 @@ TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
   Click(footer_);
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+}
+
+TEST_F(SidebarFooterViewTest,
+       PointerDismissDoesNotRestoreFocusOrOutlinedSurface) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  CloseBubble();
+  footer_ = nullptr;
+  auto root = std::make_unique<views::View>();
+  footer_ = root->AddChildView(CreateSidebarFooterView(
+      CreateLocalSidebarFooterModel(u"Yongjun Kim"),
+      SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
+      SidebarMemoryChangedCallback()));
+  views::View* const focus_target =
+      root->AddChildView(std::make_unique<views::View>());
+  focus_target->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+  widget()->SetBounds(gfx::Rect(0, 0, 240, 70));
+  widget()->SetContentsView(std::move(root));
+  footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
+  focus_target->SetBoundsRect(gfx::Rect(0, 50, 240, 20));
+
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  ASSERT_TRUE(menu->GetWidget());
+  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
+  footer_->GetFocusManager()->SetFocusedViewWithReason(
+      focus_target, views::FocusManager::FocusChangeReason::kDirectFocusChange);
+  menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_FALSE(footer_->HasFocus());
+  EXPECT_TRUE(focus_target->HasFocus());
+  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
+}
+
+TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  ASSERT_TRUE(menu->GetWidget());
+  footer_->GetFocusManager()->SetFocusedView(nullptr);
+  menu->GetWidget()->CloseWithReason(
+      views::Widget::ClosedReason::kEscKeyPressed);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_TRUE(footer_->HasFocus());
+  ASSERT_TRUE(footer_->GetFocusManager());
+  EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
+            footer_->GetFocusManager()->focus_change_reason());
+  views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
+  ASSERT_TRUE(focus_ring);
+  EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
+  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
 }
 
 TEST_F(SidebarFooterViewTest, ThemeChangeAfterCloseHasNoDanglingBubble) {

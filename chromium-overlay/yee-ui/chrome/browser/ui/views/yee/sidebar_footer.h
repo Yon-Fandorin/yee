@@ -25,11 +25,9 @@ inline constexpr int kSidebarFooterRootContextViewId = 92101;
 inline constexpr int kSidebarFooterRootBrowserToolsViewId = 92102;
 inline constexpr int kSidebarFooterRootMemoryViewId = 92103;
 inline constexpr int kSidebarFooterMenuViewId = 92104;
-inline constexpr int kSidebarFooterAvatarViewId = 92105;
-inline constexpr int kSidebarFooterAvatarIconViewId = 92106;
-inline constexpr int kSidebarFooterAvatarLabelViewId = 92107;
 inline constexpr int kSidebarFooterWorkspaceMarkViewId = 92108;
 inline constexpr int kSidebarFooterMenuActionIconViewId = 92109;
+inline constexpr int kSidebarFooterChevronViewId = 92111;
 
 enum class SidebarFooterScreen {
   kRoot,

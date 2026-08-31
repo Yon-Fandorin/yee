@@ -23,8 +23,6 @@
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/accessibility/ax_enums.mojom.h"
-#include "ui/base/metadata/metadata_header_macros.h"
-#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/color/color_id.h"
@@ -45,7 +43,6 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
-#include "ui/views/layout/fill_layout.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_tracker.h"
@@ -60,6 +57,34 @@ constexpr int kMenuIconGlyphSize = 16;
 constexpr int kMenuCornerRadius = 8;
 constexpr int kMenuRowHorizontalInset = 6;
 constexpr int kMenuRowVerticalInset = 3;
+
+gfx::Insets FooterSurfaceInsets() {
+  return gfx::Insets::VH(
+      kSidebarMetrics.sidebar_footer_surface_vertical_inset(),
+      kSidebarMetrics.sidebar_footer_surface_horizontal_inset());
+}
+
+std::unique_ptr<views::Border> CreateFooterSurfaceBorder(bool paint_outline,
+                                                         SkColor outline) {
+  if (!paint_outline) {
+    return views::CreateEmptyBorder(FooterSurfaceInsets());
+  }
+  return views::CreatePaddedBorder(
+      views::CreateRoundedRectBorder(
+          kSidebarMetrics.sidebar_footer_surface_outline_width,
+          kSidebarMetrics.sidebar_footer_corner_radius, outline),
+      gfx::Insets::VH(
+          kSidebarMetrics.sidebar_footer_surface_padding_vertical,
+          kSidebarMetrics.sidebar_footer_surface_padding_horizontal));
+}
+
+bool HasKeyboardTraversalFocus(const views::View& view) {
+  const views::FocusManager* const focus_manager = view.GetFocusManager();
+  return view.HasFocus() && focus_manager &&
+         focus_manager->focus_change_reason() ==
+             views::FocusManager::FocusChangeReason::kFocusTraversal;
+}
+
 enum class MenuIconTone {
   kNeutral,
   kAccent,
@@ -91,22 +116,6 @@ std::u16string FirstCodePointMark(std::u16string_view value) {
   return result;
 }
 
-std::u16string FirstMark(std::u16string_view value) {
-  return FirstCodePointMark(value);
-}
-
-std::u16string AccountMark(std::u16string_view value) {
-  std::u16string result = FirstCodePointMark(value);
-  const size_t separator = value.find(u' ');
-  if (separator != std::u16string_view::npos) {
-    const size_t second_mark = value.find_first_not_of(u' ', separator + 1);
-    if (second_mark != std::u16string_view::npos) {
-      result.append(FirstCodePointMark(value.substr(second_mark)));
-    }
-  }
-  return result;
-}
-
 std::u16string ContextSubtitle(const SidebarContextItem& context) {
   return context.tenant_name + u" · " + context.account_name;
 }
@@ -124,60 +133,6 @@ std::unique_ptr<views::Label> CreateMarkLabel(std::u16string text, int size) {
   label->SetCanProcessEventsWithinSubtree(false);
   return label;
 }
-
-class SidebarFooterAvatarView : public views::View {
-  METADATA_HEADER(SidebarFooterAvatarView, views::View)
-
- public:
-  explicit SidebarFooterAvatarView(const SidebarContextItem& context) {
-    const int size = kSidebarMetrics.sidebar_footer_avatar_size;
-    SetID(kSidebarFooterAvatarViewId);
-    SetPreferredSize(gfx::Size(size, size));
-    SetBackground(views::CreateRoundedRectBackground(
-        ui::kColorSysNeutralContainer, size / 2));
-    SetLayoutManager(std::make_unique<views::FillLayout>());
-    SetCanProcessEventsWithinSubtree(false);
-
-    auto icon = std::make_unique<views::ImageView>();
-    icon->SetID(kSidebarFooterAvatarIconViewId);
-    icon->SetCanProcessEventsWithinSubtree(false);
-    icon_ = AddChildView(std::move(icon));
-
-    auto label = std::make_unique<views::Label>();
-    label->SetID(kSidebarFooterAvatarLabelViewId);
-    label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-    label->SetTextStyle(views::style::STYLE_BODY_5_BOLD);
-    label->SetEnabledColor(ui::kColorLabelForegroundSecondary);
-    label->SetSkipSubpixelRenderingOpacityCheck(true);
-    label->SetCanProcessEventsWithinSubtree(false);
-    label_ = AddChildView(std::move(label));
-
-    SetContext(context);
-  }
-
-  SidebarFooterAvatarView(const SidebarFooterAvatarView&) = delete;
-  SidebarFooterAvatarView& operator=(const SidebarFooterAvatarView&) = delete;
-  ~SidebarFooterAvatarView() override = default;
-
-  void SetContext(const SidebarContextItem& context) {
-    const bool show_generic_icon = context.account_name_is_placeholder;
-    icon_->SetVisible(show_generic_icon);
-    label_->SetVisible(!show_generic_icon);
-    if (show_generic_icon) {
-      icon_->SetImage(ui::ImageModel::FromVectorIcon(
-          vector_icons::kAccountCircleIcon, ui::kColorIconSecondary, 14));
-    } else {
-      label_->SetText(AccountMark(context.account_name));
-    }
-  }
-
- private:
-  raw_ptr<views::ImageView> icon_ = nullptr;
-  raw_ptr<views::Label> label_ = nullptr;
-};
-
-BEGIN_METADATA(SidebarFooterAvatarView)
-END_METADATA
 
 std::unique_ptr<views::ImageView> CreateMenuIcon(
     const gfx::VectorIcon& icon,
@@ -255,7 +210,7 @@ std::unique_ptr<views::ImageView> CreateFooterChevron() {
   chevron->SetPreferredSize(gfx::Size(size, size));
   chevron->SetImage(ui::ImageModel::FromVectorIcon(
       vector_icons::kKeyboardArrowUpIcon, ui::kColorIconSecondary, size));
-  chevron->SetID(kSidebarFooterViewId + 11);
+  chevron->SetID(kSidebarFooterChevronViewId);
   chevron->SetCanProcessEventsWithinSubtree(false);
   return chevron;
 }
@@ -367,22 +322,13 @@ class FooterBubble final : public views::WidgetObserver {
 HoverButton::Params CreateFooterTriggerParams(const SidebarFooterModel& model) {
   const SidebarContextItem& context = SelectedContext(model);
   HoverButton::Params params;
-  params.icon_view = CreateMarkLabel(FirstMark(context.workspace_name),
+  params.icon_view = CreateMarkLabel(FirstCodePointMark(context.workspace_name),
                                      kSidebarMetrics.sidebar_footer_icon_size);
   params.title = context.workspace_name;
   params.subtitle = ContextSubtitle(context);
   params.add_vertical_label_spacing = false;
   params.icon_label_spacing = kSidebarMetrics.sidebar_footer_icon_label_spacing;
-
-  auto trailing = std::make_unique<views::View>();
-  auto* layout = trailing->SetLayoutManager(std::make_unique<views::BoxLayout>(
-      views::BoxLayout::Orientation::kHorizontal, gfx::Insets(),
-      kSidebarMetrics.sidebar_footer_trailing_gap));
-  layout->set_cross_axis_alignment(
-      views::BoxLayout::CrossAxisAlignment::kCenter);
-  trailing->AddChildView(std::make_unique<SidebarFooterAvatarView>(context));
-  trailing->AddChildView(CreateFooterChevron());
-  params.secondary_view = std::move(trailing);
+  params.secondary_view = CreateFooterChevron();
   return params;
 }
 
@@ -542,7 +488,7 @@ class YeeSidebarFooterMenuView : public views::View,
   void AddRoot() {
     const SidebarContextItem& context = SelectedContext(model_);
     AddRow(context.workspace_name, ContextSubtitle(context),
-           CreateMarkLabel(FirstMark(context.workspace_name),
+           CreateMarkLabel(FirstCodePointMark(context.workspace_name),
                            kSidebarMetrics.sidebar_footer_icon_size),
            CreateDisclosure(),
            base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
@@ -585,7 +531,7 @@ class YeeSidebarFooterMenuView : public views::View,
       const SidebarContextItem& choice = model_.contexts[index];
       AddRow(choice.workspace_name,
              choice.tenant_name + u" · " + choice.account_name,
-             CreateMarkLabel(FirstMark(choice.workspace_name),
+             CreateMarkLabel(FirstCodePointMark(choice.workspace_name),
                              kSidebarMetrics.sidebar_footer_icon_size),
              index == model_.selected_context_index
                  ? CreateTrailingIcon(vector_icons::kCheckCircleFilledIcon,
@@ -790,11 +736,7 @@ class YeeSidebarFooterView : public HoverButton {
     focus_ring->SetColorId(ui::kColorSysStateFocusRing);
     focus_ring->SetHasFocusPredicate(
         base::BindRepeating([](const views::View* view) {
-          const views::FocusManager* const focus_manager =
-              view->GetFocusManager();
-          return view->HasFocus() && focus_manager &&
-                 focus_manager->focus_change_reason() ==
-                     views::FocusManager::FocusChangeReason::kFocusTraversal;
+          return HasKeyboardTraversalFocus(*view);
         }));
     // Yee owns the row's state ladder. Retain the native click ripple without
     // layering HoverButton's automatic focus highlight over the same surface.
@@ -806,12 +748,9 @@ class YeeSidebarFooterView : public HoverButton {
                                   kSidebarMetrics.section_horizontal_inset, 0,
                                   kSidebarMetrics.section_horizontal_inset));
     mark_ = static_cast<views::Label*>(icon_view());
-    avatar_ = static_cast<SidebarFooterAvatarView*>(
-        secondary_view()->GetViewByID(kSidebarFooterAvatarViewId));
     chevron_ = static_cast<views::ImageView*>(
-        secondary_view()->GetViewByID(kSidebarFooterViewId + 11));
+        secondary_view()->GetViewByID(kSidebarFooterChevronViewId));
     CHECK(mark_);
-    CHECK(avatar_);
     CHECK(chevron_);
     title()->SetTextStyle(views::style::STYLE_BODY_4_EMPHASIS);
     subtitle()->SetTextStyle(views::style::STYLE_BODY_5);
@@ -923,12 +862,10 @@ class YeeSidebarFooterView : public HoverButton {
     if (bubble_reopen_suppressor_.ShouldSuppressBubbleShow(
             is_pointer_interaction)) {
       CloseBubble();
-      RequestFocus();
       return;
     }
     if (bubble_tracker_.view()) {
       CloseBubble();
-      RequestFocus();
       return;
     }
     auto bubble_delegate = std::make_unique<FooterBubbleDelegate>(this);
@@ -964,11 +901,15 @@ class YeeSidebarFooterView : public HoverButton {
     }
   }
 
-  void OnBubbleClosed(views::Widget::ClosedReason) {
+  void OnBubbleClosed(views::Widget::ClosedReason reason) {
     if (!bubble_) {
       return;
     }
-    ReleaseBubble(/*restore_focus=*/true);
+    // Pointer dismissal and window deactivation must leave focus at the newly
+    // selected destination. Escape is the keyboard cancellation path, so only
+    // that close reason returns traversal focus to the trigger.
+    ReleaseBubble(/*restore_keyboard_focus=*/
+                  reason == views::Widget::ClosedReason::kEscKeyPressed);
   }
 
   void OnBubbleNativeDestroying() {
@@ -986,11 +927,11 @@ class YeeSidebarFooterView : public HoverButton {
 
   void ReleaseNativeClosedBubble() {
     if (bubble_) {
-      ReleaseBubble(/*restore_focus=*/false);
+      ReleaseBubble(/*restore_keyboard_focus=*/false);
     }
   }
 
-  void ReleaseBubble(bool restore_focus) {
+  void ReleaseBubble(bool restore_keyboard_focus) {
     bubble_tracker_.SetView(nullptr);
     // A menu action can close the bubble from inside a Button callback. Defer
     // destruction until that event stack unwinds while retaining the Widget ->
@@ -998,8 +939,9 @@ class YeeSidebarFooterView : public HoverButton {
     base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
         FROM_HERE, std::move(bubble_));
     UpdateSurface();
-    if (restore_focus && GetVisible()) {
-      RequestFocus();
+    if (restore_keyboard_focus && GetVisible()) {
+      RequestFocusWithReason(
+          views::FocusManager::FocusChangeReason::kFocusTraversal);
     }
   }
 
@@ -1016,8 +958,7 @@ class YeeSidebarFooterView : public HoverButton {
     const SidebarContextItem& context = SelectedContext(model_);
     title()->SetText(context.workspace_name);
     subtitle()->SetText(ContextSubtitle(context));
-    mark_->SetText(FirstMark(context.workspace_name));
-    avatar_->SetContext(context);
+    mark_->SetText(FirstCodePointMark(context.workspace_name));
     GetViewAccessibility().SetName(context.workspace_name + u", " +
                                    context.tenant_name + u", " +
                                    context.account_name + u", context menu");
@@ -1039,23 +980,29 @@ class YeeSidebarFooterView : public HoverButton {
       visual_state = SidebarItemVisualState::kActive;
     } else if (GetState() == STATE_HOVERED || hover_progress > 0.0) {
       visual_state = SidebarItemVisualState::kHovered;
-    } else if (HasFocus()) {
-      // HoverButton focuses itself on pointer hover, but that path still has a
-      // hovered state. A normal-state focus is therefore keyboard focus and
-      // receives the stronger, outlined treatment.
+    } else if (HasKeyboardTraversalFocus(*this)) {
+      // Pointer focus is intentionally neutral. Only keyboard traversal uses
+      // the stronger outlined treatment shared with the visible focus ring.
       visual_state = SidebarItemVisualState::kActive;
     }
     const views::Widget* const widget = GetWidget();
     const SidebarItemColors colors =
         ResolveSidebarItemColors(*color_provider, visual_state, hover_progress,
                                  !widget || widget->ShouldPaintAsActive(),
-                                 /*persistent_surface=*/true);
-    SetBackground(views::CreateRoundedRectBackground(
-        colors.fill, kSidebarMetrics.sidebar_footer_corner_radius));
-    SetBorder(views::CreatePaddedBorder(
-        views::CreateRoundedRectBorder(
-            1, kSidebarMetrics.sidebar_footer_corner_radius, colors.stroke),
-        gfx::Insets::VH(4, 5)));
+                                 /*persistent_surface=*/false);
+    const bool paint_background =
+        visual_state != SidebarItemVisualState::kResting;
+    const bool paint_outline = visual_state == SidebarItemVisualState::kActive;
+    // A transparent painter is still a surface in the View hierarchy. Remove
+    // the resting background and use a non-painting border for rest and hover.
+    // Both border variants reserve the same metrics-owned insets, so text does
+    // not move when the active outline appears.
+    SetBackground(
+        paint_background
+            ? views::CreateRoundedRectBackground(
+                  colors.fill, kSidebarMetrics.sidebar_footer_corner_radius)
+            : nullptr);
+    SetBorder(CreateFooterSurfaceBorder(paint_outline, colors.stroke));
     // Identity hierarchy remains stable across interaction states: the
     // workspace name is always primary, while the tenant/account line stays
     // secondary. Hover, focus, and open state are expressed by the shared
@@ -1074,7 +1021,6 @@ class YeeSidebarFooterView : public HoverButton {
   SidebarFooterBrowserActionCallback browser_action_callback_;
   SidebarMemoryChangedCallback memory_changed_callback_;
   raw_ptr<views::Label> mark_ = nullptr;
-  raw_ptr<SidebarFooterAvatarView> avatar_ = nullptr;
   raw_ptr<views::ImageView> chevron_ = nullptr;
   views::ViewTracker bubble_tracker_;
   WebUIBubbleReopenSuppressor bubble_reopen_suppressor_;

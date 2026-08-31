@@ -43,6 +43,14 @@ Footer의 Root 순서, Browser tools의 제한된 action 목록, 하위 화면�
 `SidebarFooterPolicyTest.*`가 창을 열지 않고 확인한다. `SidebarFooterViewTest.*`는
 bubble이 Footer 폭 변경을 추적하는지, 접근 가능한 창 이름을 제공하는지, trigger
 재클릭으로 같은 bubble을 닫는지, Memory 변경을 callback으로 전달하는지 확인한다.
+`TriggerUsesOnlyWorkspaceMarkAndDisclosure`는 지속 행의 후행 profile mark가 다시
+추가되지 않도록 한다. `InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
+rest와 direct focus → keyboard traversal focus 순서에서 배경·외곽선 painter와
+고정 inset 계약을 확인한다. `PointerDismissDoesNotRestoreFocusOrOutlinedSurface`는
+별도 focus target으로 직접 focus가 이동한 뒤 lost-focus 종료를 수행해 새 focus를
+보존하고 배경과 active 외곽선을 제거하는지 확인한다.
+`EscapeDismissRestoresKeyboardTraversalFocus`는 그 과정에서도 Escape의 keyboard
+focus 복원 계약이 유지되는지 확인한다.
 또한 `ThemeChangeAfterCloseHasNoDanglingBubble`과
 `ThemeChangeAfterNativeTeardownHasNoDanglingBubble`은 정상 종료와 네이티브 종료
 직후 theme 변경에도 닫힌 bubble의 anchor observer가 남지 않는지 검증한다.

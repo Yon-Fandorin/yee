@@ -3677,7 +3677,6 @@ kbd {
 
 .footer-unified-trigger .identity-copy { gap: 3px; }
 .footer-unified-trigger .identity-copy strong { font-size: 10.5px; }
-.footer-unified-trigger .profile-avatar { flex: 0 0 23px; }
 
 .footer-context-meta {
   display: flex !important;
