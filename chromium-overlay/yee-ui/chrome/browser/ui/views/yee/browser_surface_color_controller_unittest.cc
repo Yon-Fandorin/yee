@@ -39,6 +39,10 @@ protected:
     return controller.sample_timer_.GetCurrentDelay();
   }
 
+  bool IsPageSampleScheduled(BrowserSurfaceColorController &controller) {
+    return controller.sample_timer_.IsRunning();
+  }
+
   void
   NotifyFirstVisuallyNonEmptyPaint(BrowserSurfaceColorController &controller) {
     controller.DidFirstVisuallyNonEmptyPaint();
@@ -145,6 +149,20 @@ TEST_F(BrowserSurfaceColorControllerTest,
   EXPECT_TRUE(ScheduleNextSettlingSample(controller));
   EXPECT_EQ(base::Milliseconds(100), CurrentSampleDelay(controller));
   EXPECT_FALSE(ScheduleNextSettlingSample(controller));
+  StopSamplingForTesting(controller);
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       HiddenTabSamplesWhenItBecomesVisibleAsASplitPane) {
+  web_contents()->WasHidden();
+  BrowserSurfaceColorController controller(base::BindRepeating([] {}));
+  controller.SetThemeFallbackColor(SK_ColorWHITE);
+  controller.SetWebContents(web_contents());
+  EXPECT_FALSE(IsPageSampleScheduled(controller));
+
+  web_contents()->WasShown();
+  EXPECT_TRUE(IsPageSampleScheduled(controller));
+  EXPECT_EQ(base::Milliseconds(16), CurrentSampleDelay(controller));
   StopSamplingForTesting(controller);
 }
 

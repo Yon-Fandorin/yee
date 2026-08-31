@@ -266,6 +266,16 @@ void BrowserSurfaceColorController::OnBackgroundColorChanged() {
   RestartPageSampling(kFirstPaintSampleDelay);
 }
 
+void BrowserSurfaceColorController::OnVisibilityChanged(
+    content::Visibility visibility) {
+  if (visibility == content::Visibility::VISIBLE) {
+    // A background tab can enter split view after its first paint callbacks
+    // have already fired. Sample when Chromium makes that WebContents visible
+    // instead of waiting for the first subsequent scroll interaction.
+    BeginPageSettling();
+  }
+}
+
 void BrowserSurfaceColorController::DidGetUserInteraction(
     const blink::WebInputEvent& event) {
   if (IsScrollInteraction(event)) {
@@ -289,7 +299,11 @@ void BrowserSurfaceColorController::RestartPageSampling(
   sample_attempt_ = 0;
   capture_in_flight_ = false;
   is_scroll_sampling_ = false;
-  if (web_contents()) {
+  // Hidden tabs do not have a dependable compositor surface to copy. Preserve
+  // their cached/fallback presentation and let OnVisibilityChanged() begin a
+  // fresh bounded sequence when Chromium exposes them as a split pane.
+  if (web_contents() &&
+      web_contents()->GetVisibility() == content::Visibility::VISIBLE) {
     ScheduleSample(initial_delay);
   }
 }
