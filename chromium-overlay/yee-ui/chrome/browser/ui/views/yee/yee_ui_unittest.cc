@@ -302,17 +302,16 @@ TEST(YeeSurfaceGeometryTest, BrowserClassRoutingIsPerWindow) {
 TEST(YeeSurfaceGeometryTest,
      SurfaceFrameKeepsNativePanelAllocationAndYeeGutters) {
   BrowserSurfaceFrameInput input;
-  input.visual_client_area = gfx::Rect(0, 0, 1200, 800);
-  input.surface_insets = gfx::Insets::TLBR(6, 250, 6, 6);
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/false,
+      /*header_participates=*/true, /*header_height=*/42});
   input.native_notice_flow_allocation = gfx::Rect(0, 48, 900, 746);
   input.native_body_allocation = gfx::Rect(0, 48, 900, 746);
-  input.header_participates = true;
-  input.header_height = 42;
 
   const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
   EXPECT_EQ(gfx::Rect(250, 6, 944, 788), frame.surface_seed_bounds);
   EXPECT_EQ(gfx::Rect(250, 6, 650, 788), frame.main_surface_bounds);
-  EXPECT_EQ(gfx::Rect(250, 6, 650, 42), frame.header_bounds);
+  EXPECT_EQ(gfx::Rect(250, 6, 944, 42), frame.header_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.notice_flow_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.multi_contents_bounds);
 }
@@ -320,12 +319,11 @@ TEST(YeeSurfaceGeometryTest,
 TEST(YeeSurfaceGeometryTest,
      NativeUnderlapCanWidenBodyWithoutWideningInfoBarFlow) {
   BrowserSurfaceFrameInput input;
-  input.visual_client_area = gfx::Rect(0, 0, 720, 600);
-  input.surface_insets = gfx::Insets::TLBR(6, 250, 6, 6);
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 476, 600), gfx::Insets(6), /*split=*/false,
+      /*header_participates=*/true, /*header_height=*/42});
   input.native_notice_flow_allocation = gfx::Rect(0, 48, 400, 546);
   input.native_body_allocation = gfx::Rect(0, 48, 500, 546);
-  input.header_participates = true;
-  input.header_height = 42;
 
   const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
   EXPECT_EQ(gfx::Rect(250, 48, 150, 546), frame.notice_flow_bounds);
@@ -333,17 +331,27 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_EQ(400, frame.main_surface_bounds.right());
 }
 
+TEST(YeeSurfaceGeometryTest, SplitInsetsResolveBeforeMultiContentsApplication) {
+  const gfx::Insets native_insets = gfx::Insets::TLBR(0, 8, 8, 8);
+  EXPECT_EQ(
+      gfx::Insets(kSidebarMetrics.split_card_inset),
+      ResolveBrowserSurfaceSplitViewInsets(/*split=*/true, native_insets));
+  EXPECT_EQ(native_insets, ResolveBrowserSurfaceSplitViewInsets(
+                               /*split=*/false, native_insets));
+}
+
 TEST(YeeSurfaceGeometryTest,
      HeaderBoundsTrackEveryPinnedSidebarTransitionFrame) {
   BrowserSurfaceFrameInput input;
-  input.visual_client_area = gfx::Rect(0, 0, 1200, 800);
   input.native_notice_flow_allocation = gfx::Rect(0, 48, 1200, 746);
   input.native_body_allocation = gfx::Rect(0, 48, 1200, 746);
-  input.header_participates = true;
-  input.header_height = 42;
 
   for (const int current_leading_inset : {250, 180, 96, 6}) {
-    input.surface_insets = gfx::Insets::TLBR(6, current_leading_inset, 6, 6);
+    input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+        gfx::Rect(current_leading_inset - 6, 0, 1206 - current_leading_inset,
+                  800),
+        gfx::Insets(6), /*split=*/false,
+        /*header_participates=*/true, /*header_height=*/42});
     const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
 
     EXPECT_EQ(current_leading_inset, frame.header_bounds.x());

@@ -60,6 +60,22 @@ Ask before guessing, especially for:
 
 ## Verify
 
+- Use the tiered Browser Surface layout gate instead of rebuilding every large
+  Chromium test binary for each edit:
+  - `./chromium-dev/test-browser-surface-layout.sh` (default `fast`) builds the
+    small pure native/Yee geometry target and runs its focused tests.
+  - `./chromium-dev/test-browser-surface-layout.sh interactive` is the normal
+    checkpoint gate when applied BrowserView, Side Panel, animation, or
+    immersive layout changed.
+  - `./chromium-dev/test-browser-surface-layout.sh browser` is a heavy explicit
+    gate only when browser-level Side Panel coordinator behavior changed.
+  - `all` is a milestone/final-integration gate, not an inner-loop command.
+- Keep related findings that mutate the same layout pipeline in one structural
+  checkpoint so a large integration binary is linked once. A reviewer may
+  still audit each finding's acceptance criteria inside that checkpoint.
+- A cold large-target build may be allowed to finish to warm the ignored
+  `.local-build` cache, but its existence does not make that target mandatory
+  for unrelated later checkpoints.
 - Build before calling UI work done (`build-ui.sh` if only `yee_ui`
   changed, otherwise `build.sh`).
 - Confirm in the real Yee app with real tabs. A design mockup page is

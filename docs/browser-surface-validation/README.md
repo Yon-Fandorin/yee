@@ -8,6 +8,11 @@ keyboard so the WebContents click-pipe defect could not hide the result.
 Sidebar transition evidence was captured as a window-only macOS recording and
 decoded at its original variable-rate frame timestamps rather than through the
 post-action Computer Use screenshot delay.
+The F13/F14 Side Panel pass used a fresh temporary profile and a real New Tab
+Page. Computer Use could not match the local Chromium bundle even though
+WindowServer reported an on-screen CGWindow, so the New Tab Page's real
+customize action was invoked through its local DevTools endpoint and the native
+window was captured directly by WindowServer ID.
 
 ## Results
 
@@ -27,6 +32,7 @@ post-action Computer Use screenshot delay.
 | 1171×768 split, dark + RTL + forced scale 1.25, Sidebar expanded | `dark-rtl-scale125-split-expanded.jpeg` | pass for final structural bounds at the normal captured width; this OS capture is not exact device-pixel clip proof |
 | 800×600 split, dark + RTL + forced scale 1.25, Sidebar expanded/collapsed | `minwidth-800x600-dark-rtl-scale125-split-expanded.jpeg`, `minwidth-800x600-dark-rtl-scale125-split-collapsed.jpeg` | pass for final structural bounds; this capture does not prove exact device-pixel clip equality |
 | Native compositor hard-clip readback, single/animation-target/split | `BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeHardClipOwnersMatchAtDeviceScale` | pass at forced DSF 1.0/1.25/1.5/2.0 with launcher retries disabled — Views and NativeViewHost clip/radius inputs are exact matches; compositor sentinel pixels outside the owning body, including Sidebar/gutter/divider/inactive-pane space, are exactly zero |
+| 1000×700 native Customize Chrome Side Panel, hidden/open, LTR/RTL | `f13-f14-side-panel-hidden-ltr.png`, `f13-f14-side-panel-open-ltr.png`, `f13-f14-side-panel-hidden-rtl.png`, `f13-f14-side-panel-open-rtl.png` | pass for stable real-app pixels — the panel remains inside the Surface and outer edge, starts exactly below the shared Header row, and mirrors from physical right to physical left without entering the Yee Sidebar |
 
 The initial fullscreen transition captures are retained as timing evidence, not
 as pass artifacts. A later final frame and an exit/re-enter round trip were
@@ -50,7 +56,22 @@ required before judging the stable fullscreen result.
 
 ## Automated regression
 
-- `YeeSurfaceGeometryTest.*`: 9/9 passed.
+- `YeeSurfaceGeometryTest.*`: 10/10 passed.
+- `BrowserViewTabbedLayoutNativeGeometryTest.*` plus
+  `YeeSurfaceGeometryTest.*`: 19/19 passed in the small
+  `yee_layout_unittests` target. This covers strict row thresholds, both panel
+  types, horizontal/vertical/no-tab inputs, exclusions, width allocation,
+  separator facts, one finalized-Header top-child calculation, reveal and
+  transition rounding, local clip, split inset, and literal underlap behavior.
+- The focused F13/F14 applied-layout filter passed 8/8 in default LTR and 8/8
+  in forced RTL + DSF 1.25 with retry limit zero. It compares the planner's
+  current result to applied top-container, panel, animation-content,
+  background, shadow, MCV, split-inset, and clip geometry. It also injects a
+  deliberately distinct BrowserView-owned split inset and proves the target
+  animation layout preserves the resulting content bounds. The fresh-plan
+  animation-switch case also passed three consecutive runs.
+- `SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView`: 1/1 passed
+  in the explicit browser-level gate.
 - `VerticalTabsSinglePaneCollapse`, `VerticalTabsSinglePaneExpand`,
   `VerticalTabsSplitViewCollapse`, and `VerticalTabsSplitViewExpand`: 4/4
   interactive UI tests passed.
@@ -110,6 +131,13 @@ required before judging the stable fullscreen result.
   pixel gap. Equivalent InfoBar and fullscreen recordings remain open because
   the earlier Computer Use pass repeatedly lost the restarted Yee window with
   `cgWindowNotFound`; no pass was inferred from that tooling failure.
+- Native Side Panel transition/split pixels: stable hidden/open LTR and RTL
+  states now have real-app captures. Computer Use still cannot target this
+  local bundle, and local DevTools can invoke the WebUI entry action but cannot
+  freeze native chrome at a controlled animation tick or create the native
+  split-tab state. Therefore true native mid-animation and split+panel pixel
+  cells remain open; the exact applied-layout tests are recorded separately
+  and are not promoted to visual evidence.
 - Cross-platform fractional-scale pixels: F22 now has exact macOS compositor
   readback at DSF 1.0/1.25/1.5/2.0. The old OS screenshot remains normalized
   and is not used as proof; Windows 125/150/200% and Linux 200% real-app runs
@@ -122,9 +150,9 @@ required before judging the stable fullscreen result.
   both split orientations and direction/scale configurations, but the real AI
   WebUI controls and a rendered native tab-modal dialog have not received a
   post-fix pixel/keyboard pass. Those visual-interaction cells remain open.
-- Native Side Panel and reserved Yee Sidebar slots: enabling Pins, Bookmarks,
-  Chat, or Agent is a product-scope decision under `AGENTS.md`; it was not
-  guessed during validation.
+- Reserved Yee Sidebar slots: enabling Pins, Bookmarks, Chat, or Agent is a
+  product-scope decision under `AGENTS.md`; it was not guessed during
+  validation.
 - Specialized page overlays and platform matrix: Glic/Lens/DevTools crash and
   Windows/Linux compositor cells require their real feature/platform states.
 - Fresh independent functional and commit-readiness reviewers passed the final

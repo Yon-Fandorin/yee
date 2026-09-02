@@ -17,7 +17,7 @@ YEE_UNBUNDLED_FRAMEWORK_BIN="$YEE_OUT_DIR/$YEE_PRODUCT_NAME Framework.framework/
 YEE_BUNDLED_FRAMEWORK_BIN="$YEE_APP_DIR/Contents/Frameworks/$YEE_PRODUCT_NAME Framework.framework/$YEE_PRODUCT_NAME Framework"
 YEE_ARGS_FILE="$YEE_ROOT/chromium-overlay/args.gn"
 METAL_TOOLCHAIN_CACHE="$LOCAL_BUILD_ROOT/metal-toolchain-path"
-YEE_BUILD_JOBS="${YEE_BUILD_JOBS:-2}"
+YEE_BUILD_JOBS="${YEE_BUILD_JOBS:-3}"
 
 integrated_yee_app_is_current() {
   local unbundled_framework="${1:-$YEE_UNBUNDLED_FRAMEWORK_BIN}"

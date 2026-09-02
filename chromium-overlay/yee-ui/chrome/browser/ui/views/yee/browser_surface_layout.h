@@ -17,9 +17,31 @@ namespace yee {
 bool UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type browser_type,
                                    bool has_vertical_tab_strip);
 
-struct BrowserSurfaceFrameInput {
-  gfx::Rect visual_client_area;
+struct BrowserSurfaceSeedInput {
+  gfx::Rect content_column_bounds;
   gfx::Insets surface_insets;
+
+  bool split = false;
+  bool header_participates = false;
+  int header_height = 0;
+};
+
+struct ResolvedBrowserSurfaceSeed {
+  gfx::Rect content_column_bounds;
+  gfx::Rect surface_seed_bounds;
+  gfx::Rect header_bounds;
+  bool split = false;
+
+  bool operator==(const ResolvedBrowserSurfaceSeed&) const = default;
+};
+
+// Resolves shell-owned content-column, Surface, and participating Header
+// geometry before native top-container and Side Panel allocation.
+ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
+    const BrowserSurfaceSeedInput& input);
+
+struct BrowserSurfaceFrameInput {
+  ResolvedBrowserSurfaceSeed seed;
 
   // Native allocation after the top container, Side Panel, and shadow box,
   // before InfoBar flow or minimum-width content underlap.
@@ -28,10 +50,6 @@ struct BrowserSurfaceFrameInput {
   // Native allocation for MCV after its minimum-width underlap rule. This may
   // be wider than the notice slot underneath an occluding Side Panel.
   gfx::Rect native_body_allocation;
-
-  bool split = false;
-  bool header_participates = false;
-  int header_height = 0;
 };
 
 struct ResolvedBrowserSurfaceFrame {
@@ -49,6 +67,13 @@ struct ResolvedBrowserSurfaceFrame {
 // inset contract.
 ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
     const BrowserSurfaceFrameInput& input);
+
+// Resolves the final split-card inset before it is handed to
+// MultiContentsView. Chromium's native inset remains the fallback contract,
+// while Yee owns the one Surface card inset.
+gfx::Insets ResolveBrowserSurfaceSplitViewInsets(
+    bool split,
+    const gfx::Insets& native_insets);
 
 enum class PaneSplitAxis {
   kHorizontal,

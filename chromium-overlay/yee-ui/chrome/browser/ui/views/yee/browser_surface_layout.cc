@@ -18,12 +18,29 @@ bool UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type browser_type,
          has_vertical_tab_strip;
 }
 
+ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
+    const BrowserSurfaceSeedInput& input) {
+  ResolvedBrowserSurfaceSeed result;
+  result.split = input.split;
+  result.content_column_bounds = input.content_column_bounds;
+  result.surface_seed_bounds = input.content_column_bounds;
+  result.surface_seed_bounds.Inset(input.surface_insets);
+  if (!input.split && input.header_participates &&
+      !result.surface_seed_bounds.IsEmpty()) {
+    result.header_bounds = gfx::Rect(
+        result.surface_seed_bounds.x(), result.surface_seed_bounds.y(),
+        result.surface_seed_bounds.width(),
+        std::min(input.header_height, result.surface_seed_bounds.height()));
+  }
+  return result;
+}
+
 ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
     const BrowserSurfaceFrameInput& input) {
   ResolvedBrowserSurfaceFrame result;
-  result.split = input.split;
-  result.surface_seed_bounds = input.visual_client_area;
-  result.surface_seed_bounds.Inset(input.surface_insets);
+  result.split = input.seed.split;
+  result.surface_seed_bounds = input.seed.surface_seed_bounds;
+  result.header_bounds = input.seed.header_bounds;
 
   result.notice_flow_bounds = input.native_notice_flow_allocation;
   result.notice_flow_bounds.Intersect(result.surface_seed_bounds);
@@ -40,18 +57,13 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
         std::max(0, bottom - result.surface_seed_bounds.y()));
   }
 
-  if (!input.split && input.header_participates &&
-      !result.main_surface_bounds.IsEmpty()) {
-    const int height =
-        std::min({input.header_height, result.main_surface_bounds.height(),
-                  std::max(0, result.multi_contents_bounds.y() -
-                                  result.main_surface_bounds.y())});
-    result.header_bounds = gfx::Rect(
-        result.main_surface_bounds.x(), result.main_surface_bounds.y(),
-        result.main_surface_bounds.width(), height);
-  }
-
   return result;
+}
+
+gfx::Insets ResolveBrowserSurfaceSplitViewInsets(
+    bool split,
+    const gfx::Insets& native_insets) {
+  return split ? gfx::Insets(kSidebarMetrics.split_card_inset) : native_insets;
 }
 
 CurrentPaneGeometry ComputeCurrentPaneGeometry(
