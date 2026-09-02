@@ -36,4 +36,8 @@ if [[ "$LAUNCH_IN_BACKGROUND" == true ]]; then
   exit 0
 fi
 
-exec "$YEE_BROWSER_BIN" "${browser_args[@]}"
+# Launch through Launch Services so the app is registered and activated as a
+# foreground macOS application. Running the Mach-O directly can leave a valid
+# browser process without a CGWindow, which makes both users and UI automation
+# unable to observe the window. -W preserves run.sh's blocking lifecycle.
+exec /usr/bin/open -W -n "$YEE_APP_DIR" --args "${browser_args[@]}"

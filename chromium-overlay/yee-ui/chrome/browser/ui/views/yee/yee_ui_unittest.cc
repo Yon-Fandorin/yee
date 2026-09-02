@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
@@ -269,6 +270,131 @@ TEST(YeeSurfaceGeometryTest, SplitAndSingleHeadersShareMetricsContract) {
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
             kSidebarMetrics.content_gutter +
                 kSidebarMetrics.split_pane_header_height / 2);
+}
+
+TEST(YeeSurfaceGeometryTest, BrowserClassRoutingIsPerWindow) {
+  const bool expected_normal = IsShellEnabled();
+  EXPECT_EQ(expected_normal, UsesYeeBrowserSurfaceGeometry(
+                                 BrowserWindowInterface::Type::TYPE_NORMAL,
+                                 /*has_vertical_tab_strip=*/true));
+  EXPECT_FALSE(
+      UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type::TYPE_NORMAL,
+                                    /*has_vertical_tab_strip=*/false));
+  EXPECT_FALSE(
+      UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type::TYPE_POPUP,
+                                    /*has_vertical_tab_strip=*/true));
+  EXPECT_FALSE(
+      UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type::TYPE_APP,
+                                    /*has_vertical_tab_strip=*/true));
+  EXPECT_FALSE(UsesYeeBrowserSurfaceGeometry(
+      BrowserWindowInterface::Type::TYPE_APP_POPUP,
+      /*has_vertical_tab_strip=*/true));
+#if !BUILDFLAG(IS_ANDROID)
+  EXPECT_FALSE(
+      UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type::TYPE_DEVTOOLS,
+                                    /*has_vertical_tab_strip=*/true));
+  EXPECT_FALSE(UsesYeeBrowserSurfaceGeometry(
+      BrowserWindowInterface::Type::TYPE_PICTURE_IN_PICTURE,
+      /*has_vertical_tab_strip=*/true));
+#endif
+}
+
+TEST(YeeSurfaceGeometryTest,
+     SurfaceFrameKeepsNativePanelAllocationAndYeeGutters) {
+  BrowserSurfaceFrameInput input;
+  input.visual_client_area = gfx::Rect(0, 0, 1200, 800);
+  input.surface_insets = gfx::Insets::TLBR(6, 250, 6, 6);
+  input.native_notice_flow_allocation = gfx::Rect(0, 48, 900, 746);
+  input.native_body_allocation = gfx::Rect(0, 48, 900, 746);
+  input.header_participates = true;
+  input.header_height = 42;
+
+  const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_EQ(gfx::Rect(250, 6, 944, 788), frame.surface_seed_bounds);
+  EXPECT_EQ(gfx::Rect(250, 6, 650, 788), frame.main_surface_bounds);
+  EXPECT_EQ(gfx::Rect(250, 6, 650, 42), frame.header_bounds);
+  EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.notice_flow_bounds);
+  EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.multi_contents_bounds);
+}
+
+TEST(YeeSurfaceGeometryTest,
+     NativeUnderlapCanWidenBodyWithoutWideningInfoBarFlow) {
+  BrowserSurfaceFrameInput input;
+  input.visual_client_area = gfx::Rect(0, 0, 720, 600);
+  input.surface_insets = gfx::Insets::TLBR(6, 250, 6, 6);
+  input.native_notice_flow_allocation = gfx::Rect(0, 48, 400, 546);
+  input.native_body_allocation = gfx::Rect(0, 48, 500, 546);
+  input.header_participates = true;
+  input.header_height = 42;
+
+  const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_EQ(gfx::Rect(250, 48, 150, 546), frame.notice_flow_bounds);
+  EXPECT_EQ(gfx::Rect(250, 48, 250, 546), frame.multi_contents_bounds);
+  EXPECT_EQ(400, frame.main_surface_bounds.right());
+}
+
+TEST(YeeSurfaceGeometryTest,
+     HeaderBoundsTrackEveryPinnedSidebarTransitionFrame) {
+  BrowserSurfaceFrameInput input;
+  input.visual_client_area = gfx::Rect(0, 0, 1200, 800);
+  input.native_notice_flow_allocation = gfx::Rect(0, 48, 1200, 746);
+  input.native_body_allocation = gfx::Rect(0, 48, 1200, 746);
+  input.header_participates = true;
+  input.header_height = 42;
+
+  for (const int current_leading_inset : {250, 180, 96, 6}) {
+    input.surface_insets = gfx::Insets::TLBR(6, current_leading_inset, 6, 6);
+    const ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
+
+    EXPECT_EQ(current_leading_inset, frame.header_bounds.x());
+    EXPECT_EQ(1194 - current_leading_inset, frame.header_bounds.width());
+    EXPECT_EQ(
+        gfx::Rect(current_leading_inset, 6, 1194 - current_leading_inset, 42),
+        frame.header_bounds);
+  }
+}
+
+TEST(YeeSurfaceGeometryTest, CurrentPaneGeometryIsPureAndDirectional) {
+  CurrentPaneGeometryInput input;
+  input.available_space = gfx::Rect(0, 0, 900, 600);
+  input.split = true;
+  input.axis = PaneSplitAxis::kHorizontal;
+  input.start_ratio = 0.4;
+  input.divider_size = 8;
+  input.minimum_pane_size = 200;
+
+  const CurrentPaneGeometry horizontal = ComputeCurrentPaneGeometry(input);
+  EXPECT_EQ(gfx::Rect(0, 0, 357, 600), horizontal.start);
+  EXPECT_EQ(gfx::Rect(357, 0, 8, 600), horizontal.divider);
+  EXPECT_EQ(gfx::Rect(365, 0, 535, 600), horizontal.end);
+
+  input.axis = PaneSplitAxis::kVertical;
+  input.available_space = gfx::Rect(0, 0, 900, 500);
+  input.start_ratio = 0.95;
+  const CurrentPaneGeometry vertical = ComputeCurrentPaneGeometry(input);
+  EXPECT_EQ(292, vertical.start.height());
+  EXPECT_EQ(8, vertical.divider.height());
+  EXPECT_EQ(200, vertical.end.height());
+  EXPECT_EQ(input.available_space.x(), vertical.start.x());
+  EXPECT_EQ(input.available_space.y(), vertical.start.y());
+  EXPECT_EQ(input.available_space.width(), vertical.end.width());
+  EXPECT_EQ(input.available_space.bottom(), vertical.end.bottom());
+}
+
+TEST(YeeSurfaceGeometryTest, InfoBarSlotUsesOnlyCurrentActiveBody) {
+  ExternalInfoBarSlotInput input;
+  input.multi_contents_bounds = gfx::Rect(250, 6, 944, 788);
+  input.active_pane_bounds_in_multi_contents = gfx::Rect(476, 0, 468, 788);
+  input.notice_flow_bounds = gfx::Rect(250, 6, 944, 788);
+  input.split = true;
+  input.split_header_height = 42;
+  input.split_body_horizontal_inset = 1;
+  input.semantic_height = 54;
+
+  EXPECT_EQ(gfx::Rect(727, 48, 466, 54), ResolveExternalInfoBarSlot(input));
+
+  input.semantic_height = 800;
+  EXPECT_TRUE(ResolveExternalInfoBarSlot(input).IsEmpty());
 }
 
 TEST(YeeSurfaceGeometryTest, HoverCardAnchorOnlyAddsContentSideClearance) {

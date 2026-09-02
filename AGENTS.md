@@ -48,6 +48,13 @@ Ask before guessing, especially for:
 - `.local-build/` is generated. After Chromium glue changes, regenerate
   `0001` as a `git diff` of every touched Chromium file, and drop files
   that match upstream again.
+- `0001` is itself a unified diff. Repository-root `git diff --check` can
+  misreport its required single-space context lines as trailing whitespace.
+  Check the actual Chromium source paths with
+  `git -C .local-build/chromium/src diff --check`, verify `0001` with
+  `git apply --reverse --check`, and exclude the patch file from the
+  repository-root whitespace check. Do not edit valid unified-diff context
+  markers to silence the outer check.
 - One visual contract: `yee::kSidebarMetrics`. Do not fork the same
   numbers into Chromium layout constants.
 
@@ -60,9 +67,6 @@ Ask before guessing, especially for:
 - Before each real-app validation, request a graceful shutdown of every
   running Yee browser process, wait until it has exited, and then launch the
   newly built app. Do not validate a new build through an existing process.
-- Do not invent launch URLs. Use `./chromium-dev/run.sh` only with URLs
-  the user named.
-
 ## Git
 
 Do not commit, push, or open a PR unless asked.

@@ -167,6 +167,11 @@ macOS and prevent a nearly-full volume from failing late in the workflow.
 
 인자 없이 `run.sh`를 실행하면 URL을 추가하지 않고 기존 개발 profile 상태로
 브라우저만 연다. URL이나 Chromium 플래그를 넘기면 전달한 인자를 그대로 사용한다.
+기본 실행은 macOS Launch Services로 Yee 앱 번들을 foreground 활성화하고 브라우저가
+종료될 때까지 기다린다. 이 방식은 실행 파일을 직접 시작했을 때 프로세스만 남고
+화면 창이 등록되지 않을 수 있는 문제를 피한다. 자동화처럼 호출 즉시 반환해야 하는
+경우에는 `./chromium-dev/run.sh --background`를 사용하며, 이 모드는 앱을 활성화하지
+않는다.
 
 `build-ui.sh`는 `//chrome/browser/ui/views/yee:yee_ui`만 빌드한다. Yee의 배경,
 콘텐츠 외곽선, Agent activity 버튼처럼 분리된 시각 코드를 수정할 때 사용하는
@@ -181,6 +186,8 @@ macOS의 `run.sh`와 `smoke-test.sh`는 분리 링크된 Yee Framework가 앱 �
 Framework보다 새로우면 실행을 중단하고 `build.sh`를 안내한다. 이 guard는 빠른
 UI 빌드만 통과한 오래된 앱을 새 결과로 오인하지 않도록 하며,
 `test-run-preflight.sh`가 시간 순서와 누락 산출물 계약을 검증한다.
+이 테스트는 foreground 앱 번들 활성화와 non-activating background 실행 모드도
+함께 고정한다.
 
 `run.sh`는 프로필과 개발용 lifecycle 인자만 전달하며 Glass, 색상, 투명도나
 테마를 지정하지 않는다. macOS 26의 native `GlassFrame`은 Yee 코드의 제품

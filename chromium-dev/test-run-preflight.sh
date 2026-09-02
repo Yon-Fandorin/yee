@@ -31,6 +31,19 @@ if integrated_yee_app_is_current "$newer" "$missing"; then
   exit 1
 fi
 
+if ! rg -Fq 'exec /usr/bin/open -W -n "$YEE_APP_DIR"' "$SCRIPT_DIR/run.sh"; then
+  print -u2 "FAIL: foreground launch must activate the app bundle and wait."
+  exit 1
+fi
+if ! rg -Fq '/usr/bin/open -g -n "$YEE_APP_DIR"' "$SCRIPT_DIR/run.sh"; then
+  print -u2 "FAIL: background launch must remain non-activating."
+  exit 1
+fi
+if rg -Fq 'exec "$YEE_BROWSER_BIN"' "$SCRIPT_DIR/run.sh"; then
+  print -u2 "FAIL: foreground launch must not execute the Mach-O directly."
+  exit 1
+fi
+
 fake_chromium_src="$TEST_DIR/chromium-src"
 mkdir -p "$fake_chromium_src/chrome/browser/ui/views/yee"
 touch "$fake_chromium_src/chrome/browser/ui/BUILD.gn"
@@ -44,4 +57,4 @@ if ! cmp -s \
   exit 1
 fi
 
-print "PASS: Yee build preflight detects stale bundles and synchronizes UI sources."
+print "PASS: Yee launch/build preflight and UI source synchronization contracts hold."
