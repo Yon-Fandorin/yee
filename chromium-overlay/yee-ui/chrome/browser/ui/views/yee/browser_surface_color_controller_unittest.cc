@@ -16,6 +16,8 @@
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/public/common/input/web_mouse_event.h"
+#include "third_party/skia/include/core/SkColorSpace.h"
 #include "ui/gfx/animation/animation_test_api.h"
 
 namespace yee {
@@ -45,6 +47,7 @@ class BrowserSurfaceColorControllerTest
 
   void StopSamplingForTesting(BrowserSurfaceColorController& controller) {
     controller.sample_timer_.Stop();
+    controller.late_page_sample_timer_.Stop();
     controller.scroll_sample_timer_.Stop();
     controller.scroll_sampling_timeout_timer_.Stop();
   }
@@ -157,7 +160,174 @@ class BrowserSurfaceColorControllerTest
                                 const content::CopyFromSurfaceResult& result) {
     controller.OnTopStripCaptured(sampling_epoch, result);
   }
+
+  bool HasLateVerification(BrowserSurfaceColorController& controller) {
+    return controller.late_page_sample_timer_.IsRunning();
+  }
+
+  void ClickForTesting(BrowserSurfaceColorController& controller) {
+    controller.DidGetUserInteraction(blink::WebMouseEvent(
+        blink::WebInputEvent::Type::kMouseDown, 0, base::TimeTicks::Now()));
+  }
+
+  void ResizeForTesting(BrowserSurfaceColorController& controller) {
+    controller.PrimaryMainFrameWasResized(true);
+  }
 };
+
+TEST(BrowserSurfaceColorSampleTest, AdjacentColorsCrossQuantizationBoundaries) {
+  for (int gray = 1; gray < 256; ++gray) {
+    SkBitmap bitmap;
+    bitmap.allocN32Pixels(96, 8);
+    bitmap.eraseColor(SkColorSetRGB(gray, gray, gray));
+    for (int y = 0; y < 8; ++y) {
+      for (int x = 0; x < 48; ++x) {
+        *bitmap.getAddr32(x, y) = SkColorSetRGB(gray - 1, gray - 1, gray - 1);
+      }
+    }
+    const auto result = ResolveBrowserSurfaceColorSample(bitmap);
+    ASSERT_TRUE(result) << gray;
+    EXPECT_GE(static_cast<int>(SkColorGetR(*result)), gray - 1);
+    EXPECT_LE(static_cast<int>(SkColorGetR(*result)), gray);
+  }
+}
+
+TEST(BrowserSurfaceColorSampleTest, BoundaryOwnsColorNotLowerMajority) {
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorRED);
+  bitmap.erase(SK_ColorBLUE, SkIRect::MakeWH(96, 2));
+  EXPECT_EQ(SK_ColorBLUE, ResolveBrowserSurfaceColorSample(bitmap));
+}
+
+TEST(BrowserSurfaceColorSampleTest, ConvertsDisplayP3ReadbackToHeaderSrgb) {
+  const auto p3 = SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB,
+                                       SkNamedGamut::kDisplayP3);
+  for (SkColor color : {SkColorSetRGB(80, 100, 120),
+                       SkColorSetRGB(200, 70, 40),
+                       SkColorSetRGB(40, 170, 90)}) {
+    SkBitmap original;
+    original.allocPixels(SkImageInfo::MakeN32Premul(
+        96, 8, SkColorSpace::MakeSRGB()));
+    original.eraseColor(color);
+    SkBitmap readback;
+    readback.allocPixels(SkImageInfo::MakeN32Premul(96, 8, p3));
+    ASSERT_TRUE(original.readPixels(readback.pixmap()));
+    // The old raw-RGB path must fail this fixture, not silently test sRGB.
+    EXPECT_NE(color, readback.getColor(0, 0));
+    const auto resolved = ResolveBrowserSurfaceColorSample(readback);
+    ASSERT_TRUE(resolved);
+    EXPECT_NEAR(SkColorGetR(color), SkColorGetR(*resolved), 1);
+    EXPECT_NEAR(SkColorGetG(color), SkColorGetG(*resolved), 1);
+    EXPECT_NEAR(SkColorGetB(color), SkColorGetB(*resolved), 1);
+  }
+}
+
+TEST(BrowserSurfaceColorSampleTest, ConvertsLinearReadbackAndPreservesSrgb) {
+  const SkColor color = SkColorSetRGB(80, 100, 120);
+  SkBitmap original;
+  original.allocPixels(SkImageInfo::MakeN32Premul(
+      96, 8, SkColorSpace::MakeSRGB()));
+  original.eraseColor(color);
+  EXPECT_EQ(color, ResolveBrowserSurfaceColorSample(original));
+  SkBitmap linear;
+  linear.allocPixels(SkImageInfo::Make(
+      96, 8, kRGBA_F16_SkColorType, kPremul_SkAlphaType,
+      SkColorSpace::MakeSRGBLinear()));
+  ASSERT_TRUE(original.readPixels(linear.pixmap()));
+  EXPECT_NE(color, linear.getColor(0, 0));
+  EXPECT_EQ(color, ResolveBrowserSurfaceColorSample(linear));
+}
+
+TEST(BrowserSurfaceColorSampleTest, SparseOpaqueEdgeDoesNotBecomeDominant) {
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorTRANSPARENT);
+  bitmap.erase(SK_ColorRED, SkIRect::MakeWH(1, 8));
+  EXPECT_FALSE(ResolveBrowserSurfaceColorSample(bitmap));
+}
+
+TEST(BrowserSurfaceColorSampleTest, AmbiguousRowsAndBroadGradientsFallBack) {
+  SkBitmap bitmap;
+  EXPECT_FALSE(ResolveBrowserSurfaceColorSample(bitmap));
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorWHITE);
+  bitmap.erase(SK_ColorBLACK, SkIRect::MakeWH(96, 1));
+  EXPECT_FALSE(ResolveBrowserSurfaceColorSample(bitmap));
+  for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 96; ++x) {
+      const int gray = x * 255 / 95;
+      *bitmap.getAddr32(x, y) = SkColorSetRGB(gray, gray, gray);
+    }
+  }
+  EXPECT_FALSE(ResolveBrowserSurfaceColorSample(bitmap));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       ClickAndResponsiveResizeRestartBoundedSampling) {
+  auto* source = SourceFor(web_contents());
+  StopSamplingForTesting(*source);
+  const auto epoch = SamplingEpochForTesting(*source);
+  ClickForTesting(*source);
+  EXPECT_GT(SamplingEpochForTesting(*source), epoch);
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  EXPECT_TRUE(HasLateVerification(*source));
+  StopSamplingForTesting(*source);
+  ResizeForTesting(*source);
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  EXPECT_TRUE(HasLateVerification(*source));
+  web_contents()->WasHidden();
+  EXPECT_FALSE(HasLateVerification(*source));
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+  ClickForTesting(*source);
+  EXPECT_FALSE(HasLateVerification(*source));
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest, LateVerificationIsOneShotNotPolling) {
+  auto* source = SourceFor(web_contents());
+  DidStopLoadingForTesting(*source);
+  EXPECT_TRUE(HasLateVerification(*source));
+  task_environment()->FastForwardBy(base::Seconds(2));
+  EXPECT_FALSE(HasLateVerification(*source));
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  task_environment()->FastForwardBy(base::Seconds(4));
+  EXPECT_FALSE(HasLateVerification(*source));
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       InjectedGeometryFixtureSurvivesResizeAndLateVerification) {
+  auto* source = SourceFor(web_contents());
+  source->SetThemeFallbackColor(SK_ColorWHITE);
+  source->SetPageSurfaceColorForTesting(SK_ColorBLUE);
+  ResizeForTesting(*source);
+  task_environment()->FastForwardBy(base::Seconds(3));
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+  EXPECT_FALSE(HasLateVerification(*source));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       LateVerificationCommitsChangedBoundaryWithoutMetadata) {
+  auto* source = SourceFor(web_contents());
+  source->SetPageSurfaceColorForTesting(SK_ColorBLACK);
+  DidStopLoadingForTesting(*source);
+  task_environment()->FastForwardBy(base::Seconds(2));
+  SetPageReadyForCommitForTesting(*source);
+  const auto epoch = SamplingEpochForTesting(*source);
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorBLUE);
+  for (int i = 0; i < 2; ++i) {
+    DeliverCaptureForTesting(*source, epoch,
+                             viz::CopyOutputBitmapWithMetadata(bitmap));
+    StopSamplingForTesting(*source);
+  }
+  task_environment()->FastForwardBy(base::Milliseconds(200));
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+  EXPECT_FALSE(HasLateVerification(*source));
+}
 
 TEST_F(BrowserSurfaceColorControllerTest,
        WebContentsOwnsOneStablePresentationSource) {

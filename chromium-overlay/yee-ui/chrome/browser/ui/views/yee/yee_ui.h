@@ -264,6 +264,10 @@ BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
 // darker stroke switch to the light endpoint to retain non-text contrast.
 SkColor ResolveBrowserSurfaceFocusStrokeColor(SkColor surface_color);
 
+// Keeps native semantic colors unchanged when readable, otherwise adjusts
+// luminance toward a contrasting endpoint without substituting a neutral role.
+SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic);
+
 // Paints the compact Omnibox's full-height surface while keeping its optional
 // one-DIP focus stroke inset from the control edge. This makes focus read as an
 // internal state without changing native bounds or hit testing.

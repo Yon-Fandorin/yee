@@ -3826,7 +3826,7 @@ index 263ca8ae6d..9082add241 100644
    // Note: when `SideBySide` feature is disabled, this separator is also
    // used when not overlaid. Once the feature is fully rolled out, we can
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 8a35c869b1..8efe08ee2a 100644
+index 8a35c869b1..2cd513067e 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -38,12 +38,18 @@
@@ -4931,7 +4931,7 @@ index 8a35c869b1..8efe08ee2a 100644
  
    // Lay out contents container. The contents container contains the multi-
    // contents view when multi-contents are enabled. The checks here are to
-@@ -1111,24 +1213,101 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1111,25 +1213,108 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // for the combination of minimum-sized contents pane and minimum-sized side
    // panel may exceed the width of the window. In this case, the contents pane
    // slides under the side panel.
@@ -5043,11 +5043,19 @@ index 8a35c869b1..8efe08ee2a 100644
 +  }
  
    // Maybe expand and clip the web contents to avoid issues during animation.
+-  if (features::UseSidePanelFlyoverAnimation()) {
++  // A pending fullscreen epoch has cancelled animation targets. Later panel
++  // or Sidebar ticks must not recreate them before the destination commits.
++  const bool allow_animation_target =
++      !uses_yee_browser_surface_geometry ||
++      layout_data_->surface_transition_phase ==
++          yee::SurfaceGeometryTransitionPhase::kStable;
 +  bool target_content_bounds_set = false;
-   if (features::UseSidePanelFlyoverAnimation()) {
++  if (allow_animation_target && features::UseSidePanelFlyoverAnimation()) {
      if (clip_content_for_animation) {
        // Vertical span is whatever it is, minus any shadow overlay insets.
-@@ -1154,23 +1333,75 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       unclipped_contents_region.set_y(contents_layout.bounds.y());
+@@ -1154,23 +1339,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
            unclipped_contents_region.InsetsFrom(contents_layout.bounds);
  
        // Set the target size of the contents.
@@ -5085,7 +5093,8 @@ index 8a35c869b1..8efe08ee2a 100644
 +           TabStripAnimations::kExpand ||
 +       vertical_tab_strip_animation.current_motion ==
 +           TabStripAnimations::kCollapse);
-+  if (!target_content_bounds_set && yee_sidebar_is_animating) {
++  if (allow_animation_target && !target_content_bounds_set &&
++      yee_sidebar_is_animating) {
 +    gfx::Insets collapsed_content_insets = content_config->insets;
 +    if (horizontal_layout.split && content_config->split_view_top_inset) {
 +      collapsed_content_insets.set_top(*content_config->split_view_top_inset);
@@ -5128,7 +5137,7 @@ index 8a35c869b1..8efe08ee2a 100644
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state) &&
-@@ -1202,8 +1433,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1202,8 +1440,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      int toolbar_height = 0;
      int caption_button_width = 0;
  
@@ -5146,7 +5155,7 @@ index 8a35c869b1..8efe08ee2a 100644
        // Calculate the toolbar height adjacent to the tabstrip. This will be
        // zero if the toolbar is in e.g. an immersive mode overlay, or is not
        // aligned with the tabstrip (which can happen in collapsed mode with
-@@ -1262,6 +1500,80 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1262,6 +1507,80 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          transition_button_opacity);
    }
  
@@ -5227,7 +5236,7 @@ index 8a35c869b1..8efe08ee2a 100644
    return layout;
  }
  
-@@ -1269,77 +1581,126 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
+@@ -1269,77 +1588,126 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
      ProposedLayout& layout,
      BrowserLayoutParams params,
      bool needs_exclusion) const {
@@ -5410,7 +5419,7 @@ index 8a35c869b1..8efe08ee2a 100644
    // The top container always draws an opaque background in tabbed browser mode
    // to avoid cracking between visual elements.
    background->SetVisible(true);
-@@ -1379,14 +1740,25 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
+@@ -1379,14 +1747,25 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
  }
  
  void BrowserViewTabbedLayoutImpl::OnLayoutParamsChanged(
@@ -5442,7 +5451,7 @@ index 8a35c869b1..8efe08ee2a 100644
  }
  
  void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
-@@ -1403,13 +1775,135 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
+@@ -1403,13 +1782,135 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
  void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
      const BrowserLayoutParams& params) {
    layout_data_ = std::make_unique<TransientLayoutData>(params);
@@ -5582,7 +5591,7 @@ index 8a35c869b1..8efe08ee2a 100644
  }
  
  void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
-@@ -1419,18 +1913,37 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1419,18 +1920,37 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    CustomCornersBackground::Cutouts top_container_cutout_views;
    CustomCornersBackground::Cutouts main_background_cutout_views;
    CustomCornersBackground::Cutouts tab_strip_cutout_views;
@@ -5623,7 +5632,7 @@ index 8a35c869b1..8efe08ee2a 100644
      auto* const vertical_tabs_background =
          views()
              .vertical_tab_strip_region_view->background()
-@@ -1438,7 +1951,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1438,7 +1958,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      CHECK(vertical_tabs_background)
          << "Expected vertical tab strip to have a CustomCornersBackground.";
  
@@ -5637,7 +5646,7 @@ index 8a35c869b1..8efe08ee2a 100644
        if (!is_fullscreen(layout_data_->window_state)) {
          frame_color.opacity = 0.0f;
        }
-@@ -1494,6 +2012,23 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1494,6 +2019,23 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
  
@@ -5661,7 +5670,7 @@ index 8a35c869b1..8efe08ee2a 100644
      vertical_tabs_background->SetCorners(vertical_tabs_corners);
  
      // When the organizer panel is animating open or closed and does not appear
-@@ -1551,6 +2086,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1551,6 +2093,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_outline.top = true;
      }
      if (animation.expand_on_hover_width > 0.0) {
@@ -5669,7 +5678,7 @@ index 8a35c869b1..8efe08ee2a 100644
        vertical_tabs_outline.bottom = true;
      }
      vertical_tabs_background->SetOutline(vertical_tabs_outline);
-@@ -1595,6 +2131,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1595,6 +2138,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
              views().vertical_tab_strip_region_view, blur_background_opacity);
        }
      }
@@ -5685,7 +5694,7 @@ index 8a35c869b1..8efe08ee2a 100644
    } else if (layout_data_->tab_strip_type == TabStripType::kHorizontal &&
               !is_fullscreen(layout_data_->window_state) && in_glass_mode()) {
      frame_color.opacity = 0.0f;
-@@ -1604,6 +2149,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1604,6 +2156,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().toolbar->background()->AsA<CustomCornersBackground>();
    CHECK(toolbar_background)
        << "Expected toolbar to have a CustomCornersBackground.";
@@ -5696,7 +5705,7 @@ index 8a35c869b1..8efe08ee2a 100644
  
    // Set toolbar corners.
    CustomCornersBackground::Corners toolbar_corners;
-@@ -1651,6 +2200,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1651,6 +2207,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().top_container->background()->AsA<CustomCornersBackground>();
    CHECK(top_container_background)
        << "Expected top container to have a CustomCornersBackground.";
@@ -5708,7 +5717,7 @@ index 8a35c869b1..8efe08ee2a 100644
  
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
-@@ -1674,29 +2228,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1674,29 +2235,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    // Clip the side panel so it doesn't run off the edge of the browser or into
    // the vertical tab strip.
    if (IsParentedToAndVisible(views().side_panel, views().browser_view)) {
@@ -5747,7 +5756,7 @@ index 8a35c869b1..8efe08ee2a 100644
    }
  
    if (views().main_background_region &&
-@@ -1744,8 +2284,58 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1744,8 +2291,58 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            main_background->GetWindowCorner(/*upper=*/false);
      }
  
@@ -5929,10 +5938,10 @@ index 219734679c..71af6b6ea6 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..5612f6f642 100644
+index 243d80a02d..1e8d55ae59 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,198 @@
+@@ -2,83 +2,200 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -5983,6 +5992,7 @@ index 243d80a02d..5612f6f642 100644
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/ui_features.h"
 +#include "chrome/browser/ui/views/animations/side_panel_animations.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 +#include "chrome/browser/ui/views/find_bar_host.h"
 +#include "chrome/browser/ui/views/find_bar_view.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -6049,6 +6059,7 @@ index 243d80a02d..5612f6f642 100644
 +#include "ui/gfx/geometry/rect_conversions.h"
 +#include "ui/gfx/geometry/rect_f.h"
  #include "ui/gfx/geometry/size.h"
++#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 +#include "ui/views/accessibility/view_accessibility.h"
 +#include "ui/views/background.h"
  #include "ui/views/controls/webview/webview.h"
@@ -6136,7 +6147,7 @@ index 243d80a02d..5612f6f642 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -349,6 +464,18 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +466,18 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -6155,7 +6166,7 @@ index 243d80a02d..5612f6f642 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +493,163 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +495,163 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -6319,7 +6330,7 @@ index 243d80a02d..5612f6f642 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +857,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +859,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -6349,7 +6360,7 @@ index 243d80a02d..5612f6f642 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,6 +907,1140 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,6 +909,1140 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -7490,7 +7501,7 @@ index 243d80a02d..5612f6f642 100644
  enum class TopContainerBackgroundTestMode {
    kDefault,
    kTouch,
-@@ -658,8 +2070,17 @@ IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+@@ -658,8 +2072,17 @@ IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
    }
    RunScheduledLayouts();
  
@@ -7510,7 +7521,51 @@ index 243d80a02d..5612f6f642 100644
    auto* const background =
        top_container->background()->AsA<CustomCornersBackground>();
    ASSERT_NE(nullptr, background);
-@@ -819,6 +2240,393 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+@@ -790,6 +2213,43 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+         Do([this]() { RunScheduledLayouts(); }));
+   }
+ 
++  void ExpectCombinedViewportContainment() {
++    RunScheduledLayouts();
++    auto* const browser_view =
++        BrowserView::GetBrowserViewForBrowser(browser());
++    auto* const multi = browser_view->multi_contents_view();
++    for (ContentsContainerView* container : multi->contents_container_views()) {
++      if (!container->GetVisible()) {
++        continue;
++      }
++      EXPECT_TRUE(multi->GetBoundsInScreen().Contains(
++          container->GetBoundsInScreen()));
++      const auto geometry = container->GetPageViewportGeometry();
++      EXPECT_FALSE(geometry.current_viewport_in_container.IsEmpty());
++      EXPECT_TRUE(container->GetLocalBounds().Contains(
++          geometry.page_environment_in_container));
++      EXPECT_TRUE(geometry.page_environment_in_container.Contains(
++          geometry.current_viewport_in_container));
++      auto* const clip = container->GetViewByID(yee::kPageViewportClipHostViewId);
++      ASSERT_TRUE(clip);
++      EXPECT_EQ(geometry.current_viewport_in_container, clip->bounds());
++      ASSERT_TRUE(clip->layer());
++      EXPECT_TRUE(clip->layer()->GetMasksToBounds());
++      auto& target = yee::GetPageTargetHost(*clip);
++      const gfx::Rect native_clip = geometry.current_clip_in_target.IsEmpty()
++                                        ? target.GetLocalBounds()
++                                        : geometry.current_clip_in_target;
++      EXPECT_EQ(native_clip,
++                container->contents_view()->holder()->GetNativeViewClipRect());
++      const gfx::Rect revealed_target =
++          views::View::ConvertRectToTarget(&target, clip, native_clip);
++      EXPECT_EQ(clip->GetLocalBounds(), revealed_target);
++      EXPECT_EQ(target.GetLocalBounds(), container->contents_view()->bounds());
++      EXPECT_EQ(clip->GetLocalBounds(),
++                yee::GetViewportOverlayHost(*clip).bounds());
++    }
++  }
++
+  private:
+   const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
+   GetContentsContainers() {
+@@ -819,6 +2279,544 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
        observation_{this};
  };
  
@@ -7526,6 +7581,157 @@ index 243d80a02d..5612f6f642 100644
 +  }
 +};
 +#endif  // BUILDFLAG(IS_MAC)
++
++IN_PROC_BROWSER_TEST_F(
++    BrowserViewTabbedLayoutImplContentLayoutUiTest,
++    YeeCombinedPanelSidebarTransitionsKeepViewportContained) {
++  auto* const sidebar = tabs::VerticalTabStripStateController::From(browser());
++  sidebar->SetVerticalTabsEnabled(true);
++  RunScheduledLayouts();
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const multi = view->multi_contents_view();
++  auto* const controller = BrowserAnimationController::From(browser());
++  auto panel_clock = base::MakeRefCounted<gfx::AnimationContainer>();
++  auto sidebar_clock = base::MakeRefCounted<gfx::AnimationContainer>();
++  controller->SetAnimationContainerForTesting(SidePanelAnimations::kSidePanel,
++                                               panel_clock.get());
++  controller->SetAnimationContainerForTesting(
++      TabStripAnimations::kVerticalTabStrip, sidebar_clock.get());
++  gfx::AnimationContainerTestApi panel_time(panel_clock.get());
++  gfx::AnimationContainerTestApi sidebar_time(sidebar_clock.get());
++
++  for (bool split : {false, true}) {
++    SCOPED_TRACE(split);
++    if (split) {
++      RunTestSequence(EnterSplitView());
++    }
++    RunTestSequence(ReplaceAndShowSidePanel(SidePanelType::kToolbar));
++    sidebar->RequestCollapse(true);
++    for (int frame = 0; frame < 3; ++frame) {
++      SCOPED_TRACE(frame);
++      panel_time.IncrementTime(base::Milliseconds(32));
++      sidebar_time.IncrementTime(base::Milliseconds(32));
++      ExpectCombinedViewportContainment();
++    }
++    EXPECT_TRUE(controller->IsAnimating(SidePanelAnimations::kSidePanel));
++    EXPECT_TRUE(controller->IsAnimating(TabStripAnimations::kVerticalTabStrip));
++
++    // Reverse one edge while the other changes alignment and the window
++    // changes size. This must not leave a clip from the previous frame.
++    sidebar->RequestCollapse(false);
++    view->side_panel()->Close(/*animated=*/true);
++    view->GetProfile()->GetPrefs()->SetBoolean(
++        prefs::kSidePanelHorizontalAlignment, split);
++    gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
++    bounds.set_size(split ? gfx::Size(1100, 800) : gfx::Size(1200, 850));
++    view->GetWidget()->SetBounds(bounds);
++    panel_time.IncrementTime(base::Milliseconds(32));
++    sidebar_time.IncrementTime(base::Milliseconds(32));
++    ExpectCombinedViewportContainment();
++    view->side_panel()->Open(/*animated=*/true);
++    panel_time.IncrementTime(base::Seconds(2));
++    ExpectCombinedViewportContainment();
++    EXPECT_TRUE(controller->IsAnimating(TabStripAnimations::kVerticalTabStrip));
++    EXPECT_TRUE(multi->target_content_bounds_for_testing());
++    sidebar_time.IncrementTime(base::Seconds(2));
++    ExpectCombinedViewportContainment();
++    EXPECT_FALSE(multi->target_content_bounds_for_testing());
++
++    // The fullscreen epoch cancels targets even if both animation clocks
++    // subsequently deliver another tick. Native OS completion timing is a
++    // separate platform test; this exercises the real layout consumers.
++    sidebar->RequestCollapse(true);
++    view->side_panel()->Close(/*animated=*/true);
++    panel_time.IncrementTime(base::Milliseconds(32));
++    sidebar_time.IncrementTime(base::Milliseconds(32));
++    ExpectCombinedViewportContainment();
++    auto* const epoch = yee::GetSurfaceGeometryTransition(*view);
++    ASSERT_TRUE(epoch);
++    const auto original = epoch->committed;
++    yee::BeginSurfaceGeometryTransition(
++        *epoch,
++        {yee::SurfaceGeometryStableState::kFullscreenHiddenChrome, false, true},
++        yee::SurfaceGeometryPlatformPath::kMacNativeAsync);
++    view->InvalidateLayout();
++    ExpectCombinedViewportContainment();
++    EXPECT_FALSE(multi->target_content_bounds_for_testing());
++    panel_time.IncrementTime(base::Milliseconds(32));
++    sidebar_time.IncrementTime(base::Milliseconds(32));
++    ExpectCombinedViewportContainment();
++    EXPECT_FALSE(multi->target_content_bounds_for_testing());
++    yee::BeginSurfaceGeometryTransition(
++        *epoch, original, yee::SurfaceGeometryPlatformPath::kMacNativeAsync);
++    ASSERT_TRUE(yee::CommitSurfaceGeometryTransition(*epoch, original));
++    sidebar->RequestCollapse(false);
++    panel_time.IncrementTime(base::Seconds(2));
++    sidebar_time.IncrementTime(base::Seconds(2));
++    ExpectCombinedViewportContainment();
++    EXPECT_FALSE(multi->target_content_bounds_for_testing());
++  }
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
++                       YeeSplitPanelDevToolsNoticeKeepOwningPane) {
++  tabs::VerticalTabStripStateController::From(browser())
++      ->SetVerticalTabsEnabled(true);
++  RunScheduledLayouts();
++  RunTestSequence(EnterSplitView(), OpenSidePanel());
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const multi = view->multi_contents_view();
++  auto* const owner = multi->GetActiveContentsView()->web_contents();
++  auto* const manager = infobars::ContentInfoBarManager::FromWebContents(owner);
++  ASSERT_TRUE(manager);
++  const infobars::InfoBar* const notice_bar = manager->AddInfoBar(ConfirmInfoBar::Create(
++      std::make_unique<YeeGeometryConfirmInfoBarDelegate>()));
++  ASSERT_TRUE(notice_bar);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return view->infobar_container()->GetVisible() &&
++           !notice_bar->animation().is_animating();
++  }));
++
++  for (auto axis : {split_tabs::SplitTabLayout::kSideBySide,
++                    split_tabs::SplitTabLayout::kStacked}) {
++    multi->UpdateSplitVisualData(split_tabs::SplitTabVisualData(axis));
++    for (auto dock : {devtools::DockSide::kLeft, devtools::DockSide::kRight,
++                      devtools::DockSide::kBottom}) {
++      auto* const container = multi->GetActiveContentsContainerView();
++      RunScheduledLayouts();
++      const auto environment =
++          container->GetPageViewportGeometry().page_environment_in_container;
++      const bool bottom = dock == devtools::DockSide::kBottom;
++      container->SetContentsResizingStrategy(DevToolsContentsResizingStrategy(
++          dock, gfx::Rect(dock == devtools::DockSide::kLeft ? 80 : 0, 0,
++                          environment.width() - (bottom ? 0 : 80),
++                          environment.height() - (bottom ? 80 : 0))));
++      ExpectCombinedViewportContainment();
++      gfx::Rect page_environment =
++          container->GetPageViewportGeometry().page_environment_in_container;
++      views::View::ConvertRectToScreen(container, &page_environment);
++      const auto notice = view->infobar_container()->GetBoundsInScreen();
++      EXPECT_EQ(notice.bottom(), page_environment.y());
++      EXPECT_EQ(notice.width(), page_environment.width());
++      EXPECT_FALSE(notice.Intersects(multi->GetInactiveContentsContainerView()
++                                         ->GetBoundsInScreen()));
++      EXPECT_EQ(yee::ResolveDirectChildClipInLocalSpace(
++                    container->devtools_web_view()->bounds(),
++                    container->GetPageViewportGeometry()
++                        .page_environment_in_container),
++                container->devtools_web_view()->holder()->GetNativeViewClipRect());
++      container->SetContentsResizingStrategy(DevToolsContentsResizingStrategy());
++    }
++  }
++  auto* const tabs = browser()->tab_strip_model();
++  tabs->ReverseTabsInSplit(tabs->GetActiveTab()->GetSplit().value());
++  ExpectCombinedViewportContainment();
++  EXPECT_EQ(owner, multi->GetActiveContentsView()->web_contents());
++  auto* const other = multi->GetInactiveContentsView()->web_contents();
++  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(other));
++  ExpectCombinedViewportContainment();
++  EXPECT_FALSE(view->infobar_container()->GetVisible());
++  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(owner));
++  ExpectCombinedViewportContainment();
++  EXPECT_TRUE(view->infobar_container()->GetVisible());
++}
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
 +                       NativePlannerMatchesAppliedAnimationFramesAndReversal) {
@@ -7904,7 +8110,7 @@ index 243d80a02d..5612f6f642 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -871,10 +2679,763 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +2869,849 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -7918,6 +8124,92 @@ index 243d80a02d..5612f6f642 100644
                    CheckResizeCounts(1U, 0U));
  }
  
++class YeeRendererResizeUiTest : public InteractiveBrowserTest,
++                              public testing::WithParamInterface<bool> {
++ public:
++  void SetUp() override {
++    if (GetParam()) {
++      features_.InitWithFeatures(
++          {tabs::kVerticalTabs, features::kSidePanelFlyoverAnimation}, {});
++    } else {
++      features_.InitWithFeatures(
++          {tabs::kVerticalTabs}, {features::kSidePanelFlyoverAnimation});
++    }
++    set_open_about_blank_on_browser_launch(true);
++    InteractiveBrowserTest::SetUp();
++  }
++
++ private:
++  base::test::ScopedFeatureList features_;
++  gfx::ScopedAnimationDurationScaleMode animation_scale_{
++      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION};
++};
++
++IN_PROC_BROWSER_TEST_P(YeeRendererResizeUiTest,
++                       YeeResizeCollapseReloadKeepsRendererLive) {
++  // Do not inject a surface color or force recursive layouts: the production
++  // resize/animation pipeline must update both the renderer and its embedding.
++  const GURL page(
++      "data:text/html,<style>html,body{margin:0;height:100%;"
++      "background:rgb(255,0,255)}div{height:8px;width:100%;"
++      "background:rgb(0,255,255)}</style><div></div>");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), page));
++  auto* const browser_view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const widget = browser_view->GetWidget();
++  auto* const contents = browser()->tab_strip_model()->GetActiveWebContents();
++  auto* const web_view = browser_view->multi_contents_view()
++                             ->GetActiveContentsContainerView()->contents_view();
++  const auto verify_live_renderer = [&] {
++    ASSERT_TRUE(base::test::RunUntil([&] {
++      return content::EvalJs(contents, "window.innerWidth").ExtractInt() ==
++             web_view->width();
++    }));
++    ui::Compositor* const compositor = widget->GetCompositor();
++    ASSERT_TRUE(compositor);
++    base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
++    auto request = std::make_unique<viz::CopyOutputRequest>(
++        viz::CopyOutputRequest::ResultFormat::RGBA,
++        viz::CopyOutputRequest::ResultDestination::kSystemMemory,
++        readback.GetCallback());
++    request->set_area(gfx::Rect(compositor->size()));
++    compositor->root_layer()->RequestCopyOfOutput(std::move(request));
++    compositor->ScheduleFullRedraw();
++    auto result = readback.Take();
++    ASSERT_TRUE(result);
++    ASSERT_FALSE(result->IsEmpty());
++    auto pixels = result->ScopedAccessSkBitmap();
++    const SkBitmap bitmap = pixels.GetOutScopedBitmap();
++    gfx::Point center = web_view->GetBoundsInScreen().CenterPoint();
++    center -= widget->GetRootView()->GetBoundsInScreen().OffsetFromOrigin();
++    center = gfx::ScaleToFlooredPoint(center, compositor->device_scale_factor());
++    ASSERT_TRUE(gfx::Rect(bitmap.width(), bitmap.height()).Contains(center));
++    const SkColor color = bitmap.getColor(center.x(), center.y());
++    EXPECT_GT(SkColorGetR(color), 220);
++    EXPECT_LT(SkColorGetG(color), 35);
++    EXPECT_GT(SkColorGetB(color), 220);
++  };
++  verify_live_renderer();
++  gfx::Rect bounds = widget->GetWindowBoundsInScreen();
++  bounds.set_size(gfx::Size(1000, 800));
++  widget->SetBounds(bounds);
++  verify_live_renderer();
++  RunTestSequence(
++      PressButton(kVerticalTabStripCollapseButtonElementId),
++      WaitForEvent(kTabStripRegionElementId,
++                   VerticalTabStripRegionView::kAnimationCompletedEvent));
++  verify_live_renderer();
++  chrome::Reload(browser(), WindowOpenDisposition::CURRENT_TAB);
++  ASSERT_TRUE(content::WaitForLoadStop(contents));
++  verify_live_renderer();
++  RunTestSequence(
++      PressButton(kVerticalTabStripCollapseButtonElementId),
++      WaitForEvent(kTabStripRegionElementId,
++                   VerticalTabStripRegionView::kAnimationCompletedEvent));
++  verify_live_renderer();
++}
++
++INSTANTIATE_TEST_SUITE_P(Flyover, YeeRendererResizeUiTest, testing::Bool());
++
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
 +                       YeeHeaderSnapshotInvalidatesToolbarChildLayout) {
 +  tabs::VerticalTabStripStateController::From(browser())
@@ -8669,7 +8961,7 @@ index 243d80a02d..5612f6f642 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +3444,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +3720,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -8687,7 +8979,7 @@ index 243d80a02d..5612f6f642 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +3508,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +3784,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -8705,7 +8997,7 @@ index 243d80a02d..5612f6f642 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +3528,14 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +3804,14 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -9954,10 +10246,10 @@ index 91de47263b..8d07454e32 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index 959386b621..5f0d9a74a6 100644
+index 959386b621..ddb0093941 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-@@ -4,20 +4,33 @@
+@@ -4,20 +4,34 @@
  
  #include "chrome/browser/ui/views/frame/multi_contents_view.h"
  
@@ -9970,6 +10262,7 @@ index 959386b621..5f0d9a74a6 100644
  #include "base/numerics/ranges.h"
 +#include "base/run_loop.h"
 +#include "base/task/sequenced_task_runner.h"
++#include "base/test/run_until.h"
  #include "base/test/scoped_feature_list.h"
  #include "chrome/app/chrome_command_ids.h"
 +#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
@@ -9991,7 +10284,7 @@ index 959386b621..5f0d9a74a6 100644
  #include "chrome/browser/ui/toolbar/app_menu_model.h"
  #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -32,17 +45,31 @@
+@@ -32,17 +46,31 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
@@ -10023,7 +10316,7 @@ index 959386b621..5f0d9a74a6 100644
  #include "components/split_tabs/split_tab_visual_data.h"
  #include "components/tabs/public/split_tab_collection.h"
  #include "content/public/test/browser_test.h"
-@@ -57,7 +84,11 @@
+@@ -57,7 +85,11 @@
  #include "ui/events/event_modifiers.h"
  #include "ui/events/keycodes/keyboard_codes.h"
  #include "ui/gfx/geometry/rect.h"
@@ -10035,7 +10328,7 @@ index 959386b621..5f0d9a74a6 100644
  
  #if BUILDFLAG(IS_MAC)
  #include "base/mac/mac_util.h"
-@@ -299,6 +330,205 @@ class MultiContentsViewUiTest
+@@ -299,6 +331,205 @@ class MultiContentsViewUiTest
                            }),
                   WaitForState(kSidePanelViewObserver, true));
    }
@@ -10241,7 +10534,7 @@ index 959386b621..5f0d9a74a6 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -422,6 +652,620 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -422,6 +653,674 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -10314,6 +10607,58 @@ index 959386b621..5f0d9a74a6 100644
 +}
 +
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
++                       YeeRenderedBoundaryTracksDelayedCssWithoutMetadata) {
++  RunTestSequence(CreateTabsAndEnterSplitView());
++  auto* const contents = tab_strip_model()->GetActiveWebContents();
++  ASSERT_TRUE(content::NavigateToURL(
++      contents,
++      GURL("data:text/html,<style>html,body{margin:0;background:rgb(255,0,0)}"
++           "[id=edge]{height:8px;background:rgb(20,40,60)}</style>"
++           "<div id='edge'></div><p>Real compositor boundary fixture</p>")));
++  auto* const source =
++      yee::BrowserSurfaceColorController::GetOrCreateForWebContents(contents);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return source->GetColor() == SkColorSetRGB(20, 40, 60);
++  }));
++  EXPECT_EQ(source->GetColor(),
++            location_bar()->GetCompactShellPopupSurfaceColor());
++  const auto background = contents->GetBackgroundColor();
++  const auto metadata = contents->GetThemeColor();
++  // No navigation, scroll, input event, or metadata change triggers this paint.
++  // It lands after the initial 80/100-ms settling samples have ended.
++  ASSERT_TRUE(content::ExecJs(contents, R"(
++    new Promise(resolve => setTimeout(() => {
++      document.getElementById('edge').style.background = 'rgb(80,100,120)';
++      resolve();
++    }, 1000));
++  )"));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return source->GetColor() == SkColorSetRGB(80, 100, 120);
++  }));
++  EXPECT_EQ(background, contents->GetBackgroundColor());
++  EXPECT_EQ(metadata, contents->GetThemeColor());
++  EXPECT_EQ(source->GetColor(),
++            location_bar()->GetCompactShellPopupSurfaceColor());
++  ASSERT_TRUE(content::ExecJs(contents, R"(
++    const button = document.createElement('button');
++    button.id = 'change-edge';
++    button.textContent = 'Change only the boundary';
++    button.onclick = () => {
++      document.getElementById('edge').style.background = 'rgb(30,60,90)';
++    };
++    document.body.appendChild(button);
++  )"));
++  content::SimulateMouseClickOrTapElementWithId(contents, "change-edge");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return source->GetColor() == SkColorSetRGB(30, 60, 90);
++  }));
++  EXPECT_EQ(background, contents->GetBackgroundColor());
++  EXPECT_EQ(metadata, contents->GetThemeColor());
++  EXPECT_EQ(source->GetColor(),
++            location_bar()->GetCompactShellPopupSurfaceColor());
++}
++
++IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 +                       YeePresentationFollowsSingleAndSplitSources) {
 +  ASSERT_TRUE(yee::IsShellEnabled());
 +  const SkColor kSurfaceA = SkColorSetRGB(0x18, 0x22, 0x34);
@@ -10352,8 +10697,10 @@ index 959386b621..5f0d9a74a6 100644
 +                   presentation.primary &&
 +               view->GetSecurityChipColorForTesting(
 +                   security_state::DANGEROUS) ==
-+                   view->GetColorProvider()->GetColor(
-+                       kColorOmniboxSecurityChipDangerous);
++                   yee::ResolveBrowserSurfaceSemanticColor(
++                       presentation.surface,
++                       view->GetColorProvider()->GetColor(
++                           kColorOmniboxSecurityChipDangerous));
 +      };
 +
 +  RunTestSequence(
@@ -10862,7 +11209,7 @@ index 959386b621..5f0d9a74a6 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -567,16 +1411,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -567,16 +1466,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -10888,7 +11235,7 @@ index 959386b621..5f0d9a74a6 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -671,9 +1514,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -671,9 +1569,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -10902,7 +11249,7 @@ index 959386b621..5f0d9a74a6 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -688,8 +1532,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -688,8 +1587,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -10917,7 +11264,7 @@ index 959386b621..5f0d9a74a6 100644
        }));
  }
  
-@@ -711,15 +1559,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -711,15 +1614,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -10937,7 +11284,7 @@ index 959386b621..5f0d9a74a6 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -735,8 +1581,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -735,8 +1636,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -10950,7 +11297,7 @@ index 959386b621..5f0d9a74a6 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -752,31 +1600,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -752,31 +1655,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -11003,7 +11350,7 @@ index 959386b621..5f0d9a74a6 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -796,8 +1645,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -796,8 +1700,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -11016,7 +11363,7 @@ index 959386b621..5f0d9a74a6 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -807,23 +1658,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -807,23 +1713,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -11056,7 +11403,7 @@ index 959386b621..5f0d9a74a6 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -867,12 +1719,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -867,12 +1774,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -11076,7 +11423,7 @@ index 959386b621..5f0d9a74a6 100644
                  }));
  }
  #endif
-@@ -880,11 +1735,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -880,11 +1790,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -12817,7 +13164,7 @@ index ea753618af..1b40cad746 100644
  
   protected:
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 07fdd70a0b..70c576762d 100644
+index 07fdd70a0b..e1e5ededdf 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -13325,7 +13672,7 @@ index 07fdd70a0b..70c576762d 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -2080,6 +2381,14 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2080,9 +2381,25 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -13340,7 +13687,18 @@ index 07fdd70a0b..70c576762d 100644
    ui::ColorId id = kColorOmniboxText;
    if (security_level == security_state::DANGEROUS) {
      id = kColorOmniboxSecurityChipDangerous;
-@@ -2133,6 +2442,19 @@ ui::ImageModel LocationBarView::GetLocationIcon(
++    if (compact_shell_mode_ && compact_shell_presentation_.has_value() &&
++        compact_shell_presentation_->palette_mode ==
++            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
++        GetNativeTheme()->preferred_contrast() !=
++            ui::NativeTheme::PreferredContrast::kMore) {
++      return yee::ResolveBrowserSurfaceSemanticColor(
++          compact_shell_presentation_->surface, GetColorProvider()->GetColor(id));
++    }
+   }
+ 
+   return GetColorProvider()->GetColor(id);
+@@ -2133,6 +2450,19 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -13360,7 +13718,7 @@ index 07fdd70a0b..70c576762d 100644
    if (ShouldShowAddContextButton()) {
      return GetOmniboxController()->edit_model()->GetAddContextIcon(dip_size);
    }
-@@ -2242,7 +2564,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2242,7 +2572,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  

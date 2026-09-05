@@ -106,27 +106,27 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     return std::array<std::pair<ui::ColorId, SkColor>, 25>{
         {{kColorOmniboxResultsBackground, presentation.surface},
          {kColorOmniboxResultsBackgroundHovered, presentation.popup_hover},
-         {kColorOmniboxResultsBackgroundSelected, presentation.popup_hover},
+         {kColorOmniboxResultsBackgroundSelected, presentation.popup_selected},
          {kColorOmniboxResultsBackgroundIph, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundHoverOverlay, hover_overlay},
          {kColorOmniboxBubbleOutline, presentation.popup_outline},
          {kColorOmniboxResultsChipBackground, presentation.popup_hover},
-         {kColorOmniboxText, presentation.primary},
-         {kColorOmniboxTextDimmed, presentation.secondary},
-         {kColorOmniboxResultsTextSelected, presentation.primary},
-         {kColorOmniboxResultsTextAnswer, presentation.primary},
-         {kColorOmniboxResultsTextDimmed, presentation.secondary},
-         {kColorOmniboxResultsTextDimmedSelected, presentation.secondary},
-         {kColorOmniboxResultsTextSecondary, presentation.secondary},
-         {kColorOmniboxResultsTextSecondarySelected, presentation.secondary},
-         {kColorOmniboxResultsUrl, presentation.primary},
-         {kColorOmniboxResultsUrlSelected, presentation.primary},
-         {kColorOmniboxKeywordSelected, presentation.primary},
-         {kColorOmniboxKeywordSeparator, presentation.secondary},
-         {kColorOmniboxResultsIcon, presentation.primary},
-         {kColorOmniboxResultsIconSelected, presentation.primary},
-         {kColorOmniboxResultsButtonIcon, presentation.primary},
-         {kColorOmniboxResultsButtonIconSelected, presentation.primary},
+         {kColorOmniboxText, presentation.popup_selected_primary},
+         {kColorOmniboxTextDimmed, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextSelected, presentation.popup_selected_primary},
+         {kColorOmniboxResultsTextAnswer, presentation.popup_selected_primary},
+         {kColorOmniboxResultsTextDimmed, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextDimmedSelected, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextSecondary, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextSecondarySelected, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsUrl, presentation.popup_selected_primary},
+         {kColorOmniboxResultsUrlSelected, presentation.popup_selected_primary},
+         {kColorOmniboxKeywordSelected, presentation.popup_selected_primary},
+         {kColorOmniboxKeywordSeparator, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsIcon, presentation.popup_selected_primary},
+         {kColorOmniboxResultsIconSelected, presentation.popup_selected_primary},
+         {kColorOmniboxResultsButtonIcon, presentation.popup_selected_primary},
+         {kColorOmniboxResultsButtonIconSelected, presentation.popup_selected_primary},
          {kColorOmniboxResultsButtonBorder, presentation.popup_outline},
          {kColorOmniboxResultsIconGM3Background, presentation.popup_hover}}};
   };
@@ -201,6 +201,47 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     }
     EXPECT_EQ(cache_size, manager.color_provider_cache_size_for_testing());
   }
+}
+
+TEST(BrowserSurfacePresentationResolverTest,
+     PopupSelectionAndHoverKeepDistinctReadableRoles) {
+  for (int gray = 0; gray < 256; ++gray) {
+    const auto p = ResolveBrowserSurfacePresentation(
+        SkColorSetRGB(gray, gray, gray), 1, 1, 1);
+    EXPECT_NE(p.popup_hover, p.popup_selected) << gray;
+    EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary,
+                                           p.popup_selected), 4.5f)
+        << gray;
+    EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
+                                           p.popup_selected), 4.5f)
+        << gray;
+    for (SkColor chip_surface : {p.surface, p.popup_hover}) {
+      EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary,
+                                             chip_surface), 4.5f)
+          << gray;
+      EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
+                                             chip_surface), 4.5f)
+          << gray;
+    }
+  }
+}
+
+TEST(BrowserSurfacePresentationResolverTest,
+     SemanticWarningPreservesReadableNativeColorAndRepairsLowContrast) {
+  constexpr SkColor warning = SkColorSetRGB(0xC5, 0x22, 0x1F);
+  for (int gray = 0; gray < 256; ++gray) {
+    const SkColor surface = SkColorSetRGB(gray, gray, gray);
+    const SkColor result = ResolveBrowserSurfaceSemanticColor(surface, warning);
+    EXPECT_GE(color_utils::GetContrastRatio(result, surface), 4.5f) << gray;
+    if (color_utils::GetContrastRatio(warning, surface) >= 4.5f) {
+      EXPECT_EQ(warning, result) << gray;
+    }
+    EXPECT_GT(SkColorGetR(result), SkColorGetG(result));
+    EXPECT_GT(SkColorGetR(result), SkColorGetB(result));
+  }
+  EXPECT_GE(color_utils::GetContrastRatio(
+                ResolveBrowserSurfaceSemanticColor(warning, warning), warning),
+            4.5f);
 }
 
 class YeeRestingTextViewTest : public views::ViewsTestBase {

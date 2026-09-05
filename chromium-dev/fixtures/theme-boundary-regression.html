@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee theme boundary regression</title>
+<style>
+  html, body { margin: 0; background: #cf654e; color: #191919; }
+  body { font: 16px/1.6 system-ui, sans-serif; }
+  #edge {
+    height: 8px;
+    background: repeating-linear-gradient(90deg, #7f7f7f 0 1px, #808080 1px 2px);
+  }
+  main { margin: 48px; max-width: 680px; }
+  button { font: inherit; margin: 8px 8px 8px 0; padding: 8px 12px; }
+  @media (max-width: 800px) { #edge { background: #243750; } }
+</style>
+<div id="edge"></div>
+<main>
+  <h1>실제 페이지 경계색 회귀 검사</h1>
+  <p>Yee의 실제 탭으로 여세요. 이 페이지는 브라우저 UI를 흉내 내지 않습니다.</p>
+  <p>넓은 창에서 헤더는 이 본문의 주황색이 아니라, 맨 위 8px 띠의 회색을
+    따라야 합니다. 창을 800px 미만으로 줄이면 위쪽 띠와 함께 짙은 파랑으로
+    갱신돼야 합니다.</p>
+  <button id="delayed">1초 뒤 상단 색 변경</button>
+  <button id="reset">초기 상태</button>
+  <p id="status" aria-live="polite">검사 준비됨</p>
+  <p>지연 변경 버튼은 페이지 메타데이터나 전체 배경색을 변경하지 않습니다.
+    클릭 이후 한 번의 후속 검사에서 헤더도 따라오는지 확인하세요.</p>
+</main>
+<script>
+  let pending;
+  document.querySelector('#delayed').onclick = () => {
+    clearTimeout(pending);
+    document.querySelector('#status').textContent = '상단 띠만 변경 대기 중…';
+    pending = setTimeout(() => {
+      document.querySelector('#edge').style.background = '#506478';
+      document.querySelector('#status').textContent = '변경됨: #506478';
+    }, 1000);
+  };
+  document.querySelector('#reset').onclick = () => {
+    clearTimeout(pending);
+    document.querySelector('#edge').style.removeProperty('background');
+    document.querySelector('#status').textContent = '초기 상태로 복원됨';
+  };
+</script>

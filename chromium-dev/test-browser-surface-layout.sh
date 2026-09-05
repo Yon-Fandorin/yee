@@ -32,6 +32,26 @@ FAST_TARGETS=(
 NATIVE_FAST_FILTER='BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*'
 YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
 INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState:*TopContainerBackground*'
+# Keep transition and compositor regressions in the ordinary checkpoint gate,
+# including the combined states that isolated open/close tests cannot cover.
+TRANSITION_TESTS=(
+  YeeHeaderSnapshotInvalidatesToolbarChildLayout
+  YeeHardClipOwnersMatchAtDeviceScale
+  VerticalTabsSinglePaneCollapse
+  VerticalTabsSinglePaneExpand
+  VerticalTabsSplitViewCollapse
+  VerticalTabsSplitViewExpand
+  YeeCombinedPanelSidebarTransitionsKeepViewportContained
+  YeeSplitPanelDevToolsNoticeKeepOwningPane
+)
+TRANSITION_FILTERS=()
+for regression in "${TRANSITION_TESTS[@]}"; do
+  TRANSITION_FILTERS+=("BrowserViewTabbedLayoutImplContentLayoutUiTest.$regression")
+done
+TRANSITION_FILTER="${(j.:.)TRANSITION_FILTERS}"
+INTERACTIVE_FILTER+=":$TRANSITION_FILTER"
+RENDERER_LIFECYCLE_FILTER='Flyover/YeeRendererResizeUiTest.YeeResizeCollapseReloadKeepsRendererLive/*'
+INTERACTIVE_FILTER+=":$RENDERER_LIFECYCLE_FILTER"
 BROWSER_FILTER='SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView:LensOverlayControllerBrowserTest.OverlayClosesIfRendererExits:LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab:SelectionOverlayBrowserTest.SelectionUsedFromController:SelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle:SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView:ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm:ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab:ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash:BrowserViewTest.CloseWidgetWithTabsNoCrash'
 
 if [[ "$SKIP_BUILD" == false ]]; then
@@ -65,6 +85,17 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
     --gtest_filter="$INTERACTIVE_FILTER" \
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0 \
+    --ui-test-action-max-timeout=20000 \
+    --ui-test-action-timeout=10000
+
+  print "Running transition and hard-clip regressions in RTL at 125% scale."
+  gracefully_quit_yee
+  "$YEE_OUT_DIR/interactive_ui_tests" \
+    --gtest_filter="$TRANSITION_FILTER:$RENDERER_LIFECYCLE_FILTER" \
+    --force-ui-direction=rtl \
+    --force-device-scale-factor=1.25 \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
     --ui-test-action-max-timeout=20000 \

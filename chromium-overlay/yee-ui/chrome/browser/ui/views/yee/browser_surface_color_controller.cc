@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 #include "base/atomic_sequence_num.h"
 #include "base/functional/bind.h"
@@ -21,6 +22,7 @@
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColorSpace.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/geometry/rect.h"
@@ -28,13 +30,14 @@
 
 namespace {
 
-constexpr int kTopStripHeight = 32;
+constexpr int kTopStripHeight = 8;
 constexpr gfx::Size kSampleSize(96, 8);
 constexpr base::TimeDelta kInitialSampleDelay = base::Milliseconds(32);
 constexpr base::TimeDelta kFirstPaintSampleDelay = base::Milliseconds(16);
 constexpr base::TimeDelta kVerificationDelay = base::Milliseconds(48);
 constexpr base::TimeDelta kFirstSettlingSampleDelay = base::Milliseconds(80);
 constexpr base::TimeDelta kSecondSettlingSampleDelay = base::Milliseconds(100);
+constexpr base::TimeDelta kLatePageVerificationDelay = base::Seconds(2);
 constexpr base::TimeDelta kCaptureTimeout = base::Milliseconds(500);
 constexpr base::TimeDelta kScrollSampleInterval = base::Milliseconds(140);
 constexpr base::TimeDelta kScrollSamplingDuration = base::Milliseconds(1680);
@@ -59,52 +62,6 @@ base::AtomicSequenceNumber g_browser_surface_source_ids;
 bool ShouldAnimateSurfaceColor() {
   return gfx::Animation::ShouldRenderRichAnimation() &&
          !gfx::Animation::PrefersReducedMotion();
-}
-
-struct ColorBucket {
-  int count = 0;
-  int red = 0;
-  int green = 0;
-  int blue = 0;
-};
-
-std::optional<SkColor> FindDominantFlatColor(const SkBitmap& bitmap) {
-  if (bitmap.drawsNothing()) {
-    return std::nullopt;
-  }
-
-  std::array<ColorBucket, 4096> buckets;
-  int considered = 0;
-  int winner = 0;
-  for (int y = 0; y < bitmap.height(); ++y) {
-    for (int x = 0; x < bitmap.width(); ++x) {
-      const SkColor color = bitmap.getColor(x, y);
-      if (SkColorGetA(color) < kMinimumOpaqueAlpha) {
-        continue;
-      }
-
-      const int bucket_index = (SkColorGetR(color) >> 4) << 8 |
-                               (SkColorGetG(color) >> 4) << 4 |
-                               (SkColorGetB(color) >> 4);
-      ColorBucket& bucket = buckets[bucket_index];
-      ++bucket.count;
-      bucket.red += SkColorGetR(color);
-      bucket.green += SkColorGetG(color);
-      bucket.blue += SkColorGetB(color);
-      ++considered;
-      if (bucket.count > buckets[winner].count) {
-        winner = bucket_index;
-      }
-    }
-  }
-
-  const ColorBucket& dominant = buckets[winner];
-  if (considered == 0 || dominant.count < considered * kMinimumDominantShare) {
-    return std::nullopt;
-  }
-  return SkColorSetRGB(dominant.red / dominant.count,
-                       dominant.green / dominant.count,
-                       dominant.blue / dominant.count);
 }
 
 bool ColorsAreStable(SkColor first, SkColor second) {
@@ -153,9 +110,87 @@ bool IsScrollInteraction(const blink::WebInputEvent& event) {
          key_code == ui::VKEY_SPACE;
 }
 
+bool IsSurfaceChangingInteraction(const blink::WebInputEvent& event) {
+  // WebContents forwards activation-start events, not mouse/key release.
+  if (event.GetType() == blink::WebInputEvent::Type::kMouseDown ||
+      event.GetType() == blink::WebInputEvent::Type::kTouchStart) {
+    return true;
+  }
+  if (event.GetType() != blink::WebInputEvent::Type::kRawKeyDown &&
+      event.GetType() != blink::WebInputEvent::Type::kKeyDown) {
+    return false;
+  }
+  const int key_code =
+      static_cast<const blink::WebKeyboardEvent&>(event).windows_key_code;
+  return key_code == ui::VKEY_RETURN || key_code == ui::VKEY_SPACE ||
+         key_code == ui::VKEY_ESCAPE;
+}
+
 }  // namespace
 
 namespace yee {
+
+std::optional<SkColor> ResolveBrowserSurfaceColorSample(const SkBitmap& bitmap) {
+  if (bitmap.drawsNothing()) {
+    return std::nullopt;
+  }
+  // Bound both work and spatial ownership to the two rows touching the Header.
+  // CopyFromSurface produces 96x8 samples; larger test/input bitmaps cannot
+  // accidentally turn the distance-based clustering into unbounded work.
+  const int width = std::min(bitmap.width(), kSampleSize.width());
+  const int rows = std::min(bitmap.height(), 2);
+  // SkBitmap::getColor ignores the bitmap's color space, while SkColor used
+  // by the native Header is sRGB. Convert before clustering, otherwise a P3
+  // compositor readback is interpreted as sRGB a second time and the Header
+  // no longer matches the page. Limit conversion to the sampled boundary.
+  SkBitmap srgb;
+  if (!srgb.tryAllocPixels(SkImageInfo::MakeN32(
+          width, rows, kUnpremul_SkAlphaType, SkColorSpace::MakeSRGB())) ||
+      !bitmap.readPixels(srgb.pixmap())) {
+    return std::nullopt;
+  }
+  std::array<std::vector<SkColor>, 2> pixels;
+  for (int y = 0; y < rows; ++y) {
+    for (int x = 0; x < width; ++x) {
+      const SkColor color = srgb.getColor(x, y);
+      if (SkColorGetA(color) >= kMinimumOpaqueAlpha) {
+        pixels[y].push_back(color);
+      }
+    }
+    if (pixels[y].size() * 4 < static_cast<size_t>(width) * 3) {
+      return std::nullopt;
+    }
+  }
+
+  int best_count = 0;
+  std::optional<SkColor> best;
+  for (SkColor seed : pixels[0]) {
+    int count = 0;
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+    bool covers_each_row = true;
+    for (int y = 0; y < rows; ++y) {
+      int row_count = 0;
+      for (SkColor color : pixels[y]) {
+        if (!ColorsAreStable(seed, color)) {
+          continue;
+        }
+        ++row_count;
+        red += SkColorGetR(color);
+        green += SkColorGetG(color);
+        blue += SkColorGetB(color);
+      }
+      covers_each_row &= row_count >= width * kMinimumDominantShare;
+      count += row_count;
+    }
+    if (covers_each_row && count > best_count) {
+      best_count = count;
+      best = SkColorSetRGB(red / count, green / count, blue / count);
+    }
+  }
+  return best;
+}
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(BrowserSurfaceColorController);
 
@@ -220,7 +255,13 @@ std::optional<SkColor> BrowserSurfaceColorController::GetColor() const {
 
 void BrowserSurfaceColorController::SetPageSurfaceColorForTesting(
     SkColor color) {
+  // Geometry tests inject a synthetic color while displaying about:blank.
+  // Subsequent resize callbacks must not replace that fixture with white.
+  // Observer/timer state and manually delivered capture tests remain live;
+  // only actual compositor readback is suppressed for this test source.
+  suppress_compositor_capture_for_testing_ = true;
   sample_timer_.Stop();
+  late_page_sample_timer_.Stop();
   scroll_sample_timer_.Stop();
   scroll_sampling_timeout_timer_.Stop();
   weak_ptr_factory_.InvalidateWeakPtrs();
@@ -267,11 +308,11 @@ void BrowserSurfaceColorController::DidFirstVisuallyNonEmptyPaint() {
 }
 
 void BrowserSurfaceColorController::DidChangeThemeColor() {
-  RestartPageSampling(kFirstPaintSampleDelay);
+  BeginPageSettling();
 }
 
 void BrowserSurfaceColorController::OnBackgroundColorChanged() {
-  RestartPageSampling(kFirstPaintSampleDelay);
+  BeginPageSettling();
 }
 
 void BrowserSurfaceColorController::OnVisibilityChanged(
@@ -299,7 +340,16 @@ void BrowserSurfaceColorController::DidGetUserInteraction(
     const blink::WebInputEvent& event) {
   if (IsScrollInteraction(event)) {
     StartScrollSampling();
+  } else if (IsSurfaceChangingInteraction(event)) {
+    // Click/keyboard-driven CSS theme switches need not change page metadata.
+    // Reuse the bounded settling sequence, never a permanent polling timer.
+    BeginPageSettling();
   }
+}
+
+void BrowserSurfaceColorController::PrimaryMainFrameWasResized(bool) {
+  // Responsive headers can repaint without a navigation or metadata update.
+  BeginPageSettling();
 }
 
 void BrowserSurfaceColorController::DidChangeVerticalScrollDirection(
@@ -310,6 +360,7 @@ void BrowserSurfaceColorController::DidChangeVerticalScrollDirection(
 void BrowserSurfaceColorController::RestartPageSampling(
     base::TimeDelta initial_delay) {
   sample_timer_.Stop();
+  late_page_sample_timer_.Stop();
   scroll_sample_timer_.Stop();
   scroll_sampling_timeout_timer_.Stop();
   weak_ptr_factory_.InvalidateWeakPtrs();
@@ -329,6 +380,19 @@ void BrowserSurfaceColorController::RestartPageSampling(
 
 void BrowserSurfaceColorController::BeginPageSettling() {
   pending_page_settling_samples_ = kPageSettlingSampleCount;
+  RestartPageSampling(kFirstPaintSampleDelay);
+  if (web_contents() &&
+      web_contents()->GetVisibility() == content::Visibility::VISIBLE) {
+    late_page_sample_timer_.Start(
+        FROM_HERE, kLatePageVerificationDelay, this,
+        &BrowserSurfaceColorController::VerifyLatePageSurface);
+  }
+}
+
+void BrowserSurfaceColorController::VerifyLatePageSurface() {
+  // One delayed verification catches common hydration/theme-switch tails.
+  // Do not call BeginPageSettling(): that would rearm this timer forever.
+  pending_page_settling_samples_ = 0;
   RestartPageSampling(kFirstPaintSampleDelay);
 }
 
@@ -376,6 +440,7 @@ void BrowserSurfaceColorController::StartScrollSampling() {
   // Open a fresh sampling epoch and invalidate the old async callback before
   // changing modes.
   sample_timer_.Stop();
+  late_page_sample_timer_.Stop();
   scroll_sample_timer_.Stop();
   scroll_sampling_timeout_timer_.Stop();
   weak_ptr_factory_.InvalidateWeakPtrs();
@@ -407,7 +472,8 @@ void BrowserSurfaceColorController::StopScrollSampling() {
 }
 
 void BrowserSurfaceColorController::CaptureTopStrip() {
-  if (capture_in_flight_ || !web_contents() ||
+  if (suppress_compositor_capture_for_testing_ || capture_in_flight_ ||
+      !web_contents() ||
       web_contents()->GetVisibility() != content::Visibility::VISIBLE) {
     return;
   }
@@ -452,7 +518,7 @@ void BrowserSurfaceColorController::OnTopStripCaptured(
 
   std::optional<SkColor> candidate;
   if (result.has_value()) {
-    candidate = FindDominantFlatColor(result->bitmap);
+    candidate = ResolveBrowserSurfaceColorSample(result->bitmap);
   }
 
   if (candidate.has_value()) {

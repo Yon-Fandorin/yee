@@ -18,7 +18,14 @@
 #include "content/public/browser/web_contents_user_data.h"
 #include "third_party/skia/include/core/SkColor.h"
 
+class SkBitmap;
+
 namespace yee {
+
+// Pure boundary-color resolver for a low-resolution compositor sample. Rejects
+// sparse/ambiguous edges rather than allowing pixels farther down the page to
+// choose the Header color.
+std::optional<SkColor> ResolveBrowserSurfaceColorSample(const SkBitmap& bitmap);
 
 // The one page-surface source attached to each WebContents. Sampling,
 // stability, committed target, and the presented transition live here so the
@@ -75,9 +82,11 @@ class BrowserSurfaceColorController
   void DidGetUserInteraction(const blink::WebInputEvent& event) override;
   void DidChangeVerticalScrollDirection(
       viz::VerticalScrollDirection scroll_direction) override;
+  void PrimaryMainFrameWasResized(bool width_changed) override;
 
   void RestartPageSampling(base::TimeDelta initial_delay);
   void BeginPageSettling();
+  void VerifyLatePageSurface();
   bool ScheduleNextPageSettlingSample();
   void ResetCandidateSequence();
   void ScheduleSample(base::TimeDelta delay);
@@ -97,6 +106,7 @@ class BrowserSurfaceColorController
 
   base::RepeatingClosureList presentation_changed_callbacks_;
   base::OneShotTimer sample_timer_;
+  base::OneShotTimer late_page_sample_timer_;
   base::RepeatingTimer scroll_sample_timer_;
   base::OneShotTimer scroll_sampling_timeout_timer_;
   base::RepeatingTimer color_transition_timer_;
@@ -116,6 +126,7 @@ class BrowserSurfaceColorController
   bool waiting_for_load_completion_ = false;
   bool first_visually_non_empty_paint_seen_ = false;
   bool is_scroll_sampling_ = false;
+  bool suppress_compositor_capture_for_testing_ = false;
   const uint64_t source_id_;
   uint64_t revision_ = 0;
   uint64_t popup_revision_ = 0;

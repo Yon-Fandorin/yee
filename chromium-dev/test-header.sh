@@ -25,6 +25,9 @@ require_chromium_src
 
 UNIT_FILTER='BrowserSurfaceColorControllerTest.*:BrowserSurfacePresentationResolverTest.*:YeeRestingTextViewTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
 INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeaderOmitsUnsupportedSidebarControl:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/MultiContentsViewUiTest.YeeLocationBarRehostSynchronizesOncePerGeneration/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
+UNIT_FILTER+=':BrowserSurfaceColorSampleTest.*'
+INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
+RTL_FILTER='SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Header regression targets"
@@ -43,7 +46,8 @@ if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
   print "Native View tests still require access to the active GUI session."
   "$YEE_OUT_DIR/yee_header_unittests" \
     --gtest_filter="$UNIT_FILTER" \
-    --test-launcher-jobs=1
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0
 fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
@@ -52,6 +56,18 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   "$YEE_OUT_DIR/interactive_ui_tests" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0 \
+    --ui-test-action-max-timeout=20000 \
+    --ui-test-action-timeout=10000
+
+  print "Running rendered color/binding regressions in RTL at 125% scale."
+  gracefully_quit_yee
+  "$YEE_OUT_DIR/interactive_ui_tests" \
+    --gtest_filter="$RTL_FILTER" \
+    --force-ui-direction=rtl \
+    --force-device-scale-factor=1.25 \
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0 \
     --ui-test-action-max-timeout=20000 \
     --ui-test-action-timeout=10000
 fi

@@ -159,7 +159,18 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   간격의 두 sample이 안정적일 때 채택한다. 첫 채택은 늦추지 않되 약 80ms와 100ms
   간격의 bounded settling sample 두 번을 이어서 실행한다. hydration이나 reveal
   animation 뒤 실제 최상단 색이 달라지면 안정성 gate를 거쳐 현재 화면색에서
-  retarget하고, 변화가 없으면 sampling을 끝낸다. navigation 중 첫 유효 화면 전에는
+  retarget한다. load·노출·색 변경·클릭/키보드 조작·viewport resize 뒤에는 같은
+  bounded 검사와 함께 2초 뒤 한 번의 후속 검사를 예약해 늦은 hydration을 보완한다.
+  후속 검사는 자신을 재예약하지 않으며, hidden/occluded·navigation·scroll burst
+  시작 시 취소한다. 상시 polling이나 임의 시점의 모든 DOM 변경 감지는 하지 않는다.
+  색 추출은 상단 8 DIP를 96×8로 축소한 뒤 Header에 닿는 두 행의 색 거리와
+  행별 지배 비율을 사용한다. 캡처의 색 공간을 존중해 이 두 행을 native Header의
+  sRGB로 변환한 뒤 분석한다. Display P3·linear RGB 채널을 sRGB로 그대로
+  재해석해 페이지와 Header 사이에 색 단차를 만들지 않는다.
+  각 행의 75% 이상이 유효한 불투명 픽셀이어야 하며,
+  같은 색 군집이 각 행 너비의 55% 이상을 차지해야 한다. RGB 양자화 경계나
+  아래쪽의 다른 배경이 Header 색을 결정하지 않도록 한다.
+  navigation 중 첫 유효 화면 전에는
   직전에 확정한 같은 Tab의 Header 색을 지우지 않고 새 결과를 candidate로만 유지한다.
   각 WebContents는 마지막으로 확정한 색을 자신의 수명 동안 보관한다. 이미 샘플링한
   Tab으로 돌아오면 다른 Tab의 색을 목표로 유지하지 않고 해당 Tab의 캐시 색을 즉시
@@ -184,13 +195,19 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   ring으로 구분한다. 주소·제목·중립 control은 고정 theme 색을 사용하지 않고 resolved
   surface에서 primary(읽기 대비), secondary(비텍스트 가시 대비), disabled 역할색을
   계산한다. 위험·보안·제품 상태의 의미 색은 이 중립 팔레트보다 우선한다.
+  위험 보안 표시는 native 의미 색이 page-aware 배경에서 4.5:1 대비를 충족하면
+  그대로 사용하고, 부족할 때만 의미 색을 대비 endpoint 쪽으로 보정한다.
+  고대비 모드에서는 native 팔레트를 그대로 보존한다.
 - 분할 상태에서는 active native Omnibox와 inactive 주소 표면이 각각 자신이 속한
   WebContents의 resolved color를 사용한다. 두 페이지 색이 다르면 좌우 주소 표면도
   다를 수 있다. active 상태는 주소 표면의 상시 border가 아니라 카드 전체 outline과
   shadow로 표시한다.
 - Address suggestions의 중립 배경·텍스트·아이콘도 열리는 시점의 같은 resolved
-  surface에서 계산한다. hover·선택 행은 최대 대비색을 6%만 혼합하고, 위험·보안
-  상태색과 고대비 모드는 Chromium의 native 팔레트를 유지한다.
+  surface에서 계산한다. hover는 6%, 키보드 선택은 14% tint로 구분하고,
+  두 상태 모두 읽기 대비를 확보할 수 있는 tint 방향을 선택한다. 팝업 글자·아이콘은
+  기본·hover·선택 배경 모두에서 대비를 보장하는 공통 역할색을 사용한다.
+  팝업의 위험·보안 상태색과 고대비 모드는 Chromium의
+  native 팔레트를 유지한다. 자세한 계약은 아래 Address suggestions 절을 따른다.
 - Glass 활성화, 전체 창 적용 범위, tint 불투명도는 Yee 코드의 제품 기본값이다.
   실행 스크립트와 강제 theme seed에 의존하지 않는다.
 - macOS 26 미만, Windows, Linux와 macOS의 ‘투명도 줄이기’ 환경에서는 현재 theme
@@ -505,8 +522,12 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
   않는다. compact shell의 open/close opacity 전환은 140ms easing을 사용하며 별도
   화면 dim은 사용하지 않는다.
 - 중립 배경·텍스트·아이콘은 열리는 시점의 Browser Surface Header 색 역할을
-  공유하고, hover·선택 행은 6% 대비 tint만 더한다. semantic 색과 고대비 모드는
-  native 값을 보존한다. 패널이 열린 뒤 페이지 surface가 확정되거나 바뀌면 현재
+  공유한다. hover는 6%, 키보드 선택 행은 14% tint로 구분한다. 물리적인
+  black/white 글자 endpoint가 선택 배경에서 4.5:1을 확보할 수 없으면 두 상태의
+  tint 방향을 함께 반전한다. 팝업 primary/secondary는 세 배경 모두에서 4.5:1을
+  유지하도록 보정하고 native 답변·칩에도 공유한다. 상태 이동 때 글자 극성은
+  바뀌지 않으며 Header 자체의 역할색은 유지한다. 고대비 모드와 팝업의 native semantic
+  색은 보존한다. 패널이 열린 뒤 페이지 surface가 확정되거나 바뀌면 현재
   Widget의 color provider를 닫기·재열기 없이 교체하고, Omnibox 배경·결과 영역·
   텍스트·아이콘을 같은 palette로 함께 갱신한다.
 - 주소·검색 제안, 방문 기록, bookmark, 열린 tab을 탐색 대상으로 삼는다.

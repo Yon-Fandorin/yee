@@ -198,6 +198,37 @@ required before judging the stable fullscreen result.
   Siso can update virtual build-log state without producing the output.
 - `chromium-dev/test-run-preflight.sh`: passed.
 
+## Compound-transition regression checkpoint (2026-09-05)
+
+- The new combined Side Panel/Sidebar test reproduced a missing F11 guard:
+  a pending fullscreen epoch cleared target bounds once, but subsequent panel
+  and Sidebar layout ticks could recreate them. Both target-producing paths
+  now require a stable epoch; Chromium's feature-off behavior is unchanged.
+- `YeeCombinedPanelSidebarTransitionsKeepViewportContained` checks single and
+  split panes, independent animation clocks, reversal, panel alignment, window
+  resize, one animation finishing first, and pending/reversed fullscreen epochs.
+  Every sampled frame checks current viewport containment and the native clip,
+  PageTargetHost, and ViewportOverlayHost relationship.
+- `YeeSplitPanelDevToolsNoticeKeepOwningPane` combines a Side Panel with both
+  split orientations, three DevTools resizing strategies, and an InfoBar. It
+  checks clipping and notice ownership through split reversal and active-tab
+  changes. This is applied geometry coverage, not a real DevTools frontend test.
+- The ordinary `interactive` gate includes these two cases plus the six
+  previously omitted Header snapshot, hard-clip, and Sidebar transition cases.
+  It also runs these eight cases in RTL at DSF 1.25 with retries disabled.
+- The fullscreen case injects the transition epoch into real layout consumers;
+  it does not establish native OS callback timing or transition-time pixels.
+- Validation: pure geometry 40/40; rebuilt interactive gate 31/31 followed by
+  RTL/DSF 1.25 8/8, all with launcher retries disabled. `build.sh` succeeded.
+  The first pre-fix run also had a Header foreground-pixel failure in the
+  existing `NativePlannerMatchesAppliedAnimationFramesAndReversal` test; its
+  standalone rerun and the final full gate passed without changing that test's
+  assertions. The cause of that intermittent pixel failure remains unresolved.
+- A graceful-stop/fresh-launch opened `about:blank` and the local theming
+  fixture in the rebuilt Yee app. Computer Use discovered the running app but
+  could not access its window (`cgWindowNotFound`), so no fresh manual visual
+  pass is claimed for this checkpoint.
+
 ## Remaining gaps
 
 - F5/F20 final pixels: the 2026-09-03 exact PDF pass covers the hidden-Header

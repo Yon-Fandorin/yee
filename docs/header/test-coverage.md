@@ -25,6 +25,8 @@
 ## 2. 실제 native View 구조
 
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
+렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
+단위·GUI 실행 모두 launcher retry를 0으로 고정한다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
@@ -36,6 +38,14 @@
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 
 ## 3. 실제 화면에서만 확인할 것
+
+2026-09-05 테마 보강의 새 자동 검사와 빌드/실행 결과는
+[`theme-hardening-20260905.md`](../sidebar/theme-hardening-20260905.md)를 따른다.
+`BrowserSurfaceColorSampleTest.*`는 양자화 경계·상단 경계 소유·투명도·불균일
+샘플을 검사한다. 컨트롤러 검사는 입력/resize 재검사, 후속 검사의 종료 및
+hidden 취소를 다루며, `YeeRenderedBoundaryTracksDelayedCssWithoutMetadata`는
+실제 페이지의 지연 CSS 변경과 클릭을 두 split 방향에서 검증한다.
+선택/hover 및 보안색 대비는 `BrowserSurfacePresentationResolverTest.*`에 포함한다.
 
 아래는 geometry 한 프레임만으로 체감 품질을 판단할 수 없어 실제 Yee 앱 검수를
 유지한다.

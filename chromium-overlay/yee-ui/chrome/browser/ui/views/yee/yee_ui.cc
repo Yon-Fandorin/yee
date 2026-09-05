@@ -75,6 +75,7 @@ constexpr float kHeaderSecondaryPreferredOpacity = 0.34f;
 constexpr float kHeaderDisabledOpacity = 0.28f;
 constexpr float kHeaderFocusStrokePreferredOpacity = 0.44f;
 constexpr float kOmniboxPopupHoverOpacity = 0.06f;
+constexpr float kOmniboxPopupSelectedOpacity = 0.14f;
 constexpr float kOmniboxPopupOutlineOpacity = 0.18f;
 constexpr int kBrowserSurfaceShadowElevation = 3;
 constexpr int kBrowserSurfaceOutlineAlpha = 0x18;
@@ -1013,6 +1014,15 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
                                                 focus_stroke_color);
 }
 
+SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic) {
+  return color_utils::BlendForMinContrast(
+             semantic, surface,
+             color_utils::PickContrastingColor(SK_ColorBLACK, SK_ColorWHITE,
+                                               surface),
+             color_utils::kMinimumReadableContrastRatio)
+      .color;
+}
+
 BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
     SkColor surface,
     uint64_t source_id,
@@ -1022,6 +1032,36 @@ BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
   const BrowserSurfaceHeaderColors colors =
       ResolveBrowserSurfaceHeaderColors(surface);
   const SkColor endpoint = color_utils::GetColorWithMaxContrast(surface);
+  const SkColor text_endpoint = color_utils::PickContrastingColor(
+      SK_ColorBLACK, SK_ColorWHITE, surface);
+  SkColor tint_endpoint = endpoint;
+  if (color_utils::GetContrastRatio(
+          text_endpoint,
+          color_utils::AlphaBlend(tint_endpoint, surface,
+                                  kOmniboxPopupSelectedOpacity)) <
+      color_utils::kMinimumReadableContrastRatio) {
+    tint_endpoint = text_endpoint == SK_ColorBLACK ? SK_ColorWHITE : SK_ColorBLACK;
+  }
+  const SkColor popup_hover = color_utils::AlphaBlend(
+      tint_endpoint, surface, kOmniboxPopupHoverOpacity);
+  const SkColor popup_selected = color_utils::AlphaBlend(
+      tint_endpoint, surface, kOmniboxPopupSelectedOpacity);
+  // Protect the strongest state by adjusting popup ink, not by washing the
+  // state fills out to white/black. Share this ink across popup rows and native
+  // answer/chip children so moving selection never changes text polarity.
+  auto selected_colors = colors;
+  for (SkColor background : {popup_hover, popup_selected}) {
+    selected_colors.primary = color_utils::BlendForMinContrast(
+                                  selected_colors.primary, background,
+                                  text_endpoint,
+                                  color_utils::kMinimumReadableContrastRatio)
+                                  .color;
+    selected_colors.secondary = color_utils::BlendForMinContrast(
+                                    selected_colors.secondary, background,
+                                    text_endpoint,
+                                    color_utils::kMinimumReadableContrastRatio)
+                                    .color;
+  }
   return {
       .palette_mode = BrowserSurfacePresentation::PaletteMode::kCustomSurface,
       .source_id = source_id,
@@ -1036,8 +1076,10 @@ BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
       .header_separator = ResolveSurfaceSeparatorColor(surface),
       .resting_divider =
           color_utils::AlphaBlend(endpoint, surface, kRestingSeparatorOpacity),
-      .popup_hover =
-          color_utils::AlphaBlend(endpoint, surface, kOmniboxPopupHoverOpacity),
+      .popup_hover = popup_hover,
+      .popup_selected = popup_selected,
+      .popup_selected_primary = selected_colors.primary,
+      .popup_selected_secondary = selected_colors.secondary,
       .popup_outline = color_utils::AlphaBlend(endpoint, surface,
                                                kOmniboxPopupOutlineOpacity),
   };
@@ -1060,30 +1102,34 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   ui::ColorMixer& mixer = provider.AddMixer();
   mixer[kColorOmniboxResultsBackground] = {presentation.surface};
   mixer[kColorOmniboxResultsBackgroundHovered] = {presentation.popup_hover};
-  mixer[kColorOmniboxResultsBackgroundSelected] = {presentation.popup_hover};
+  mixer[kColorOmniboxResultsBackgroundSelected] = {presentation.popup_selected};
   mixer[kColorOmniboxResultsBackgroundIph] = {presentation.popup_hover};
   mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
       SkColorSetA(endpoint, 0x0F)};
   mixer[kColorOmniboxBubbleOutline] = {presentation.popup_outline};
   mixer[kColorOmniboxResultsChipBackground] = {presentation.popup_hover};
 
-  mixer[kColorOmniboxText] = {presentation.primary};
-  mixer[kColorOmniboxTextDimmed] = {presentation.secondary};
-  mixer[kColorOmniboxResultsTextSelected] = {presentation.primary};
-  mixer[kColorOmniboxResultsTextAnswer] = {presentation.primary};
-  mixer[kColorOmniboxResultsTextDimmed] = {presentation.secondary};
-  mixer[kColorOmniboxResultsTextDimmedSelected] = {presentation.secondary};
-  mixer[kColorOmniboxResultsTextSecondary] = {presentation.secondary};
-  mixer[kColorOmniboxResultsTextSecondarySelected] = {presentation.secondary};
-  mixer[kColorOmniboxResultsUrl] = {presentation.primary};
-  mixer[kColorOmniboxResultsUrlSelected] = {presentation.primary};
-  mixer[kColorOmniboxKeywordSelected] = {presentation.primary};
-  mixer[kColorOmniboxKeywordSeparator] = {presentation.secondary};
+  mixer[kColorOmniboxText] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxTextDimmed] = {presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsTextSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsTextAnswer] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsTextDimmed] = {presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsTextDimmedSelected] = {
+      presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsTextSecondary] = {
+      presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsTextSecondarySelected] = {
+      presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsUrl] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsUrlSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxKeywordSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxKeywordSeparator] = {presentation.popup_selected_secondary};
 
-  mixer[kColorOmniboxResultsIcon] = {presentation.primary};
-  mixer[kColorOmniboxResultsIconSelected] = {presentation.primary};
-  mixer[kColorOmniboxResultsButtonIcon] = {presentation.primary};
-  mixer[kColorOmniboxResultsButtonIconSelected] = {presentation.primary};
+  mixer[kColorOmniboxResultsIcon] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsIconSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsButtonIcon] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsButtonIconSelected] = {
+      presentation.popup_selected_primary};
   mixer[kColorOmniboxResultsButtonBorder] = {presentation.popup_outline};
   mixer[kColorOmniboxResultsIconGM3Background] = {presentation.popup_hover};
 }
