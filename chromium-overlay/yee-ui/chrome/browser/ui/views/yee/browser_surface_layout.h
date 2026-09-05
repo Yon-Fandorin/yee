@@ -41,6 +41,15 @@ struct ResolvedBrowserSurfaceSeed {
 ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
     const BrowserSurfaceSeedInput& input);
 
+// The native Side Panel shadow box consumes padding from every physical edge
+// of the remaining BrowserView allocation. In Yee's shared-row presentation,
+// that padding is card spacing rather than an additional shell inset. Restore
+// it before ResolveBrowserSurfaceSeed() applies Yee's one outer-gutter
+// contract; the Side Panel's visible width remains allocated separately.
+gfx::Rect RestoreBrowserSurfaceContentColumnAfterSidePanel(
+    const gfx::Rect& native_remaining_bounds,
+    const gfx::Insets& native_shadow_insets);
+
 struct BrowserSurfaceFrameInput {
   ResolvedBrowserSurfaceSeed seed;
 

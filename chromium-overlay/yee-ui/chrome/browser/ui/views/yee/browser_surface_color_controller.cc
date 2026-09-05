@@ -22,6 +22,7 @@
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/animation/animation.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -54,6 +55,11 @@ constexpr double kMinimumDominantShare = 0.55;
 constexpr int kMaximumStableChannelDelta = 12;
 
 base::AtomicSequenceNumber g_browser_surface_source_ids;
+
+bool ShouldAnimateSurfaceColor() {
+  return gfx::Animation::ShouldRenderRichAnimation() &&
+         !gfx::Animation::PrefersReducedMotion();
+}
 
 struct ColorBucket {
   int count = 0;
@@ -177,9 +183,15 @@ void BrowserSurfaceColorController::SetThemeFallbackColor(SkColor color) {
   if (theme_fallback_color_ == color) {
     return;
   }
+  const bool theme_changed = theme_fallback_color_.has_value();
   theme_fallback_color_ = color;
   if (!committed_color_.has_value()) {
     StartColorTransition(color, kTabSwitchColorTransitionDuration);
+  }
+  if (theme_changed) {
+    // CSS media queries can repaint a page without changing its metadata.
+    // Retain the cached color until the new rendered surface is verified.
+    BeginPageSettling();
   }
 }
 
@@ -190,7 +202,7 @@ void BrowserSurfaceColorController::ActivateFrom(
   if (!target.has_value()) {
     return;
   }
-  if (current_surface.has_value()) {
+  if (current_surface.has_value() && ShouldAnimateSurfaceColor()) {
     StopColorTransition();
     SetPresentedColor(*current_surface, /*popup_policy_changed=*/false);
   }
@@ -269,6 +281,17 @@ void BrowserSurfaceColorController::OnVisibilityChanged(
     // have already fired. Sample when Chromium makes that WebContents visible
     // instead of waiting for the first subsequent scroll interaction.
     BeginPageSettling();
+  } else {
+    // Invalidate captures and stop both sampling modes as soon as this tab
+    // becomes hidden/occluded. RestartPageSampling does not schedule hidden
+    // contents and preserves the last committed presentation.
+    pending_page_settling_samples_ = 0;
+    RestartPageSampling(kFirstPaintSampleDelay);
+    if (transition_target_color_.has_value()) {
+      const SkColor target = *transition_target_color_;
+      StopColorTransition();
+      SetPresentedColor(target, /*popup_policy_changed=*/true);
+    }
   }
 }
 
@@ -334,7 +357,8 @@ void BrowserSurfaceColorController::ScheduleSample(base::TimeDelta delay) {
 }
 
 void BrowserSurfaceColorController::StartScrollSampling() {
-  if (!web_contents()) {
+  if (!web_contents() ||
+      web_contents()->GetVisibility() != content::Visibility::VISIBLE) {
     return;
   }
   if (is_scroll_sampling_) {
@@ -383,7 +407,8 @@ void BrowserSurfaceColorController::StopScrollSampling() {
 }
 
 void BrowserSurfaceColorController::CaptureTopStrip() {
-  if (capture_in_flight_) {
+  if (capture_in_flight_ || !web_contents() ||
+      web_contents()->GetVisibility() != content::Visibility::VISIBLE) {
     return;
   }
   content::RenderWidgetHostView* const view =
@@ -485,7 +510,8 @@ void BrowserSurfaceColorController::CommitColor(SkColor color) {
 void BrowserSurfaceColorController::StartColorTransition(
     SkColor target_color,
     base::TimeDelta duration) {
-  if (!presented_color_.has_value() || *presented_color_ == target_color) {
+  if (!ShouldAnimateSurfaceColor() || !presented_color_.has_value() ||
+      *presented_color_ == target_color) {
     StopColorTransition();
     SetPresentedColor(target_color, /*popup_policy_changed=*/true);
     return;
@@ -513,7 +539,7 @@ void BrowserSurfaceColorController::AdvanceColorTransition() {
       (base::TimeTicks::Now() - transition_start_time_).InMillisecondsF() /
           transition_duration_.InMillisecondsF(),
       0.0, 1.0);
-  if (progress >= 1.0) {
+  if (!ShouldAnimateSurfaceColor() || progress >= 1.0) {
     const SkColor target_color = *transition_target_color_;
     StopColorTransition();
     SetPresentedColor(target_color, /*popup_policy_changed=*/true);
@@ -573,6 +599,12 @@ void BrowserSurfaceColorController::CommitPageMetadataColorIfReady() {
   if (const std::optional<SkColor> page_metadata_color =
           GetPageMetadataColor()) {
     CommitColor(*page_metadata_color);
+  } else if (theme_fallback_color_.has_value()) {
+    // A completed navigation with no usable pixels or metadata must not
+    // inherit the previous document's color indefinitely. Keep fallback out
+    // of the page cache so future theme changes still retarget it.
+    committed_color_.reset();
+    StartColorTransition(*theme_fallback_color_, kPageColorTransitionDuration);
   }
 }
 
@@ -586,7 +618,7 @@ std::optional<SkColor> BrowserSurfaceColorController::GetPageMetadataColor()
   if (!color.has_value() || SkColorGetA(*color) == SK_AlphaTRANSPARENT) {
     color = web_contents()->GetThemeColor();
   }
-  if (color.has_value()) {
+  if (color.has_value() && SkColorGetA(*color) != SK_AlphaTRANSPARENT) {
     return SkColorSetA(*color, SK_AlphaOPAQUE);
   }
   return std::nullopt;

@@ -317,6 +317,41 @@ TEST(YeeSurfaceGeometryTest,
 }
 
 TEST(YeeSurfaceGeometryTest,
+     SidePanelShadowPaddingDoesNotBecomeASecondOuterGutter) {
+  const gfx::Rect content_column(244, 0, 956, 800);
+  const ResolvedBrowserSurfaceSeed closed_seed = ResolveBrowserSurfaceSeed(
+      BrowserSurfaceSeedInput{content_column, gfx::Insets(6), /*split=*/false,
+                              /*header_participates=*/true,
+                              /*header_height=*/42});
+
+  // A trailing 300-DIP panel has already consumed its width. The native
+  // shadow box then consumes six DIPs at the top, bottom, and panel-facing
+  // edge. Yee must restore those shadow insets before applying its own uniform
+  // six-DIP Surface gutter.
+  gfx::Rect native_remaining_bounds(244, 0, 656, 800);
+  const gfx::Insets native_shadow_insets =
+      gfx::Insets::TLBR(6, 0, 6, 6);
+  native_remaining_bounds.Inset(native_shadow_insets);
+
+  const gfx::Rect restored_content_column =
+      RestoreBrowserSurfaceContentColumnAfterSidePanel(
+          native_remaining_bounds, native_shadow_insets);
+  const ResolvedBrowserSurfaceSeed open_seed = ResolveBrowserSurfaceSeed(
+      BrowserSurfaceSeedInput{restored_content_column, gfx::Insets(6),
+                              /*split=*/false,
+                              /*header_participates=*/true,
+                              /*header_height=*/42});
+
+  EXPECT_EQ(gfx::Rect(244, 0, 656, 800), restored_content_column);
+  EXPECT_EQ(closed_seed.surface_seed_bounds.y(),
+            open_seed.surface_seed_bounds.y());
+  EXPECT_EQ(closed_seed.surface_seed_bounds.bottom(),
+            open_seed.surface_seed_bounds.bottom());
+  EXPECT_EQ(gfx::Rect(250, 6, 644, 788), open_seed.surface_seed_bounds);
+  EXPECT_EQ(gfx::Rect(250, 6, 644, 42), open_seed.header_bounds);
+}
+
+TEST(YeeSurfaceGeometryTest,
      NativeUnderlapCanWidenBodyWithoutWideningInfoBarFlow) {
   BrowserSurfaceFrameInput input;
   input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{

@@ -16,6 +16,7 @@
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/gfx/animation/animation_test_api.h"
 
 namespace yee {
 
@@ -27,6 +28,12 @@ class BrowserSurfaceColorControllerTest
             base::test::TaskEnvironment::TimeSource::MOCK_TIME) {}
 
  protected:
+  gfx::AnimationTestApi::RenderModeResetter rich_animation_ =
+      gfx::AnimationTestApi::SetRichAnimationRenderMode(
+          gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  gfx::AnimationTestApi::PrefersReducedMotionResetter reduced_motion_ =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
+
   BrowserSurfaceColorController* SourceFor(content::WebContents* contents) {
     return BrowserSurfaceColorController::GetOrCreateForWebContents(contents);
   }
@@ -88,6 +95,14 @@ class BrowserSurfaceColorControllerTest
     controller.DidStopLoading();
   }
 
+  void ResolveFallbackForTesting(BrowserSurfaceColorController& controller) {
+    controller.CommitPageMetadataColorIfReady();
+  }
+
+  bool IsColorTransitionRunning(BrowserSurfaceColorController& controller) {
+    return controller.color_transition_timer_.IsRunning();
+  }
+
   uint64_t SamplingEpochForTesting(BrowserSurfaceColorController& controller) {
     return controller.sampling_epoch_;
   }
@@ -117,6 +132,10 @@ class BrowserSurfaceColorControllerTest
       BrowserSurfaceColorController& controller) {
     controller.waiting_for_load_completion_ = false;
     controller.first_visually_non_empty_paint_seen_ = true;
+  }
+
+  void SetPageLoadingForTesting(BrowserSurfaceColorController& controller) {
+    controller.waiting_for_load_completion_ = true;
   }
 
   std::optional<SkColor> CandidateColorForTesting(
@@ -334,7 +353,7 @@ TEST_F(BrowserSurfaceColorControllerTest,
 }
 
 TEST_F(BrowserSurfaceColorControllerTest,
-       ThemeChangesOnlyRetargetUnresolvedTabs) {
+       ThemeChangesRevalidatePagesWithoutDiscardingTheirColor) {
   BrowserSurfaceColorController* source = SourceFor(web_contents());
   const SkColor initial_theme = SkColorSetRGB(0xF4, 0xF2, 0xED);
   source->SetThemeFallbackColor(initial_theme);
@@ -343,6 +362,10 @@ TEST_F(BrowserSurfaceColorControllerTest,
 
   const SkColor updated_theme = SkColorSetRGB(0x20, 0x22, 0x26);
   source->SetThemeFallbackColor(updated_theme);
+  // This harness has no compositor pixels. Test theme transitions separately
+  // from the exhausted-capture fallback covered below.
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  StopSamplingForTesting(*source);
   task_environment()->FastForwardBy(base::Milliseconds(160));
   ASSERT_EQ(updated_theme, source->GetColor());
 
@@ -350,8 +373,123 @@ TEST_F(BrowserSurfaceColorControllerTest,
   CommitForTesting(*source, page);
   task_environment()->FastForwardBy(base::Milliseconds(200));
   source->SetThemeFallbackColor(SK_ColorBLACK);
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  EXPECT_EQ(page, source->GetColor());
+  StopSamplingForTesting(*source);
   task_environment()->FastForwardBy(base::Milliseconds(200));
   EXPECT_EQ(page, source->GetColor());
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       ReducedMotionPublishesOnlyTheFinalTabAndPageColors) {
+  auto reduced_motion =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetPageSurfaceColorForTesting(SK_ColorBLACK);
+  const uint64_t revision = source->GetPresentation()->revision;
+
+  source->ActivateFrom(SK_ColorWHITE);
+  EXPECT_EQ(SK_ColorBLACK, source->GetColor());
+  EXPECT_EQ(revision + 1, source->GetPresentation()->revision);
+  EXPECT_FALSE(IsColorTransitionRunning(*source));
+
+  CommitForTesting(*source, SK_ColorBLUE);
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+  EXPECT_FALSE(IsColorTransitionRunning(*source));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       EnablingReducedMotionFinishesAnInFlightTransition) {
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetPageSurfaceColorForTesting(SK_ColorWHITE);
+  CommitForTesting(*source, SK_ColorBLACK);
+  task_environment()->FastForwardBy(base::Milliseconds(32));
+  ASSERT_TRUE(IsColorTransitionRunning(*source));
+  const uint64_t popup_revision = source->GetPresentation()->popup_revision;
+
+  auto reduced_motion =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  task_environment()->FastForwardBy(base::Milliseconds(16));
+  EXPECT_EQ(SK_ColorBLACK, source->GetColor());
+  EXPECT_FALSE(IsColorTransitionRunning(*source));
+  EXPECT_EQ(popup_revision + 1, source->GetPresentation()->popup_revision);
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       HidingTabCancelsScrollAndRejectsPendingCapture) {
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetPageSurfaceColorForTesting(SK_ColorBLACK);
+  StartScrollSamplingForTesting(*source);
+  const uint64_t epoch = SamplingEpochForTesting(*source);
+  SetCaptureInFlightForTesting(*source, true);
+  CommitForTesting(*source, SK_ColorBLUE);
+
+  web_contents()->WasHidden();
+  EXPECT_GT(SamplingEpochForTesting(*source), epoch);
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+  EXPECT_FALSE(IsScrollTimerRunningForTesting(*source));
+  EXPECT_FALSE(IsScrollTimeoutRunningForTesting(*source));
+  EXPECT_FALSE(CaptureInFlightForTesting(*source));
+  EXPECT_FALSE(IsColorTransitionRunning(*source));
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorRED);
+  DeliverCaptureForTesting(*source, epoch,
+                           viz::CopyOutputBitmapWithMetadata(bitmap));
+  StartScrollSamplingForTesting(*source);
+  task_environment()->FastForwardBy(base::Seconds(2));
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+  EXPECT_FALSE(IsScrollTimerRunningForTesting(*source));
+
+  web_contents()->WasShown();
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  StopSamplingForTesting(*source);
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       MissingPageColorFallsBackWithoutCachingTheOldDocumentOrTheme) {
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetThemeFallbackColor(SK_ColorWHITE);
+  source->SetPageSurfaceColorForTesting(SK_ColorBLUE);
+  SetPageReadyForCommitForTesting(*source);
+  ResolveFallbackForTesting(*source);
+  task_environment()->FastForwardBy(base::Milliseconds(200));
+  EXPECT_EQ(SK_ColorWHITE, source->GetColor());
+
+  source->SetThemeFallbackColor(SK_ColorBLACK);
+  StopSamplingForTesting(*source);
+  task_environment()->FastForwardBy(base::Milliseconds(200));
+  EXPECT_EQ(SK_ColorBLACK, source->GetColor());
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       MissingColorDuringNavigationPreservesPreviousPresentation) {
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetThemeFallbackColor(SK_ColorWHITE);
+  source->SetPageSurfaceColorForTesting(SK_ColorBLACK);
+  SetPageLoadingForTesting(*source);
+  ResolveFallbackForTesting(*source);
+  task_environment()->FastForwardBy(base::Milliseconds(200));
+  EXPECT_EQ(SK_ColorBLACK, source->GetColor());
+  EXPECT_FALSE(IsColorTransitionRunning(*source));
+}
+
+TEST_F(BrowserSurfaceColorControllerTest,
+       ThemeChangeOnHiddenTabWaitsForVisibilityBeforeSampling) {
+  web_contents()->WasHidden();
+  BrowserSurfaceColorController* source = SourceFor(web_contents());
+  source->SetThemeFallbackColor(SK_ColorWHITE);
+  source->SetPageSurfaceColorForTesting(SK_ColorBLUE);
+  source->SetThemeFallbackColor(SK_ColorBLACK);
+  EXPECT_FALSE(IsPageSampleScheduled(*source));
+  EXPECT_EQ(SK_ColorBLUE, source->GetColor());
+
+  web_contents()->WasShown();
+  EXPECT_TRUE(IsPageSampleScheduled(*source));
+  StopSamplingForTesting(*source);
 }
 
 TEST_F(BrowserSurfaceColorControllerTest,

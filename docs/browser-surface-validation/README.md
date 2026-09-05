@@ -40,7 +40,7 @@ window was captured directly by WindowServer ID.
 | Native compositor hard-clip readback, single/animation-target/split | `BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeHardClipOwnersMatchAtDeviceScale` | pass at forced DSF 1.0/1.25/1.5/2.0 with launcher retries disabled — Views and NativeViewHost clip/radius inputs are exact matches; compositor sentinel pixels outside the owning body, including Sidebar/gutter/divider/inactive-pane space, are exactly zero |
 | 1000×700 native Customize Chrome Side Panel, hidden/open, LTR/RTL | `f13-f14-side-panel-hidden-ltr.png`, `f13-f14-side-panel-open-ltr.png`, `f13-f14-side-panel-hidden-rtl.png`, `f13-f14-side-panel-open-rtl.png` | pass for stable real-app pixels — the panel remains inside the Surface and outer edge, starts exactly below the shared Header row, and mirrors from physical right to physical left without entering the Yee Sidebar |
 | 1131×768 real split plus native Customize Chrome Side Panel | `macos-real-app-split-native-side-panel-settled-20260903.png` | pass for the settled state — the final native panel allocation remains to the physical right of both split panes and does not cover the Sidebar, divider, or either page |
-| Native Side Panel transition gutter readback: closed, open start/mid/end, alignment switch, close, and reversal | `BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal` | pass with launcher retries disabled — 21 actual compositor samples across the leading, trailing, and bottom 6-DIP gutters remain Yee shell material rather than the Chromium toolbar-white anti-crack background; applied Side Panel paint and background bounds also remain inside the one resolved Surface |
+| Native Side Panel transition gutter readback: closed, open start/mid/end, alignment switch, close, and reversal | `BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal` | pass with launcher retries disabled — 21 actual compositor samples across the leading, trailing, and bottom 6-DIP gutters remain Yee shell material rather than the Chromium toolbar-white anti-crack background; the applied main Surface top and bottom now also remain exactly equal to the closed baseline through every transition frame instead of inheriting a second native shadow inset |
 | Rendered native before-unload tab-modal dialog in a real split | `macos-real-app-split-beforeunload-navigation-modal-20260903.png` | partial pass — the real warning renders and its Cancel path works from the keyboard/accessibility surface, but Computer Use crops the modal window without the underlying browser, so pane-relative placement is not visually proven by this file |
 | 1152×768 host-migrated Contents, two real tabs in split | `f18-host-migration-split-real-app.jpeg` | pass — both nested Contents surfaces remain below their Pane Headers and inside the Sidebar, divider, and outer rounded boundaries |
 | 1152×768 host-migrated Contents plus right-docked DevTools in the right split pane | `f18-host-migration-split-devtools-real-app.jpeg` | pass for stable open/close pixels — the nested Contents and direct DevTools branch partition only the owning pane; closing DevTools restores Contents to the full pane without a crash or boundary escape |
@@ -68,10 +68,10 @@ required before judging the stable fullscreen result.
 ## Automated regression
 
 - `YeeSurfaceGeometryTest.*`: 10/10 passed.
-- The repaired fast gate runs `BrowserViewTabbedLayoutNativeGeometryTest.*` in
-  `yee_layout_unittests` and all Browser Surface transition, multi-contents,
-  viewport-geometry, and migration tests in
-  `multi_contents_geometry_unittests`: 28/28 passed. This covers strict row
+- The repaired fast gate runs `BrowserViewTabbedLayoutNativeGeometryTest.*`
+  and `YeeSurfaceGeometryTest.*` in `yee_layout_unittests`, plus all Browser
+  Surface transition, multi-contents, viewport-geometry, and migration tests
+  in `multi_contents_geometry_unittests`: 40/40 passed. This covers strict row
   thresholds, both panel types, horizontal/vertical/no-tab inputs, exclusions,
   width allocation, separator facts, one finalized-Header top-child
   calculation, reveal and transition rounding, four-edge local panel clipping,
@@ -103,11 +103,14 @@ required before judging the stable fullscreen result.
   compositor surface and verified single, non-empty animation-target, active
   split, and inactive split clip ownership without a visual tolerance.
 - `NativePlannerMatchesAppliedAnimationFramesAndReversal`: passes inside the
-  complete 22/22 interactive gate with retries disabled. In addition to exact
+  complete 23/23 interactive gate with retries disabled. In addition to exact
   planner/applied bounds, it reads the actual compositor at three physical
   Surface gutters in seven controlled Side Panel states. All 21 samples are
   closer to Yee's shell material than Chromium's toolbar background, directly
   guarding the white-strip regression that a bounds-only assertion missed.
+  The same states require the main Surface and Header top plus the main Surface
+  bottom to remain equal to the closed baseline, guarding against native
+  shadow padding being counted as a second Yee outer gutter.
 - `YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth`: passed with launcher
   retries disabled at 800×600; the current LTR run reports a 265-DIP active
   pane and 265-DIP Find Bar, and every visible child stays inside the Widget.

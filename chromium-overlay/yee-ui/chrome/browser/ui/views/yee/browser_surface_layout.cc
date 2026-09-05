@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "ui/gfx/geometry/outsets.h"
 
 namespace yee {
 
@@ -32,6 +33,16 @@ ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
         std::min(input.header_height, result.surface_seed_bounds.height()));
   }
   return result;
+}
+
+gfx::Rect RestoreBrowserSurfaceContentColumnAfterSidePanel(
+    const gfx::Rect& native_remaining_bounds,
+    const gfx::Insets& native_shadow_insets) {
+  gfx::Rect content_column = native_remaining_bounds;
+  content_column.Outset(gfx::Outsets::TLBR(
+      native_shadow_insets.top(), native_shadow_insets.left(),
+      native_shadow_insets.bottom(), native_shadow_insets.right()));
+  return content_column;
 }
 
 ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
