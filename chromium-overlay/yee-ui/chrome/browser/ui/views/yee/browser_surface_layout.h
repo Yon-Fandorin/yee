@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_LAYOUT_H_
 
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/views/yee/multi_contents_geometry.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/rect.h"
 
@@ -52,12 +53,36 @@ struct BrowserSurfaceFrameInput {
   gfx::Rect native_body_allocation;
 };
 
+enum class BrowserSurfaceHeaderSeparatorOwner {
+  kNone,
+  kCombinedSurfaceOutline,
+  kSplitPane,
+};
+
+// Paint and clipping decisions derived from the same structural frame as the
+// Header, InfoBar flow, MCV, and combined outline bounds. Native layout glue
+// consumes this value instead of inferring decoration from unrelated config
+// carriers or already-applied View bounds.
+struct ResolvedBrowserSurfaceDecoration {
+  gfx::Rect combined_outline_bounds;
+  bool combined_outline_visible = false;
+  BrowserSurfaceHeaderSeparatorOwner header_separator_owner =
+      BrowserSurfaceHeaderSeparatorOwner::kNone;
+  int combined_header_separator_offset = 0;
+  bool show_native_multi_contents_separator = false;
+  bool contain_infobar_shadow_horizontally = true;
+  float infobar_top_corner_radius = 0.0f;
+
+  bool operator==(const ResolvedBrowserSurfaceDecoration&) const = default;
+};
+
 struct ResolvedBrowserSurfaceFrame {
   gfx::Rect surface_seed_bounds;
   gfx::Rect main_surface_bounds;
   gfx::Rect header_bounds;
   gfx::Rect notice_flow_bounds;
   gfx::Rect multi_contents_bounds;
+  ResolvedBrowserSurfaceDecoration decoration;
   bool split = false;
 };
 
@@ -74,48 +99,6 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
 gfx::Insets ResolveBrowserSurfaceSplitViewInsets(
     bool split,
     const gfx::Insets& native_insets);
-
-enum class PaneSplitAxis {
-  kHorizontal,
-  kVertical,
-};
-
-struct CurrentPaneGeometryInput {
-  gfx::Rect available_space;
-  bool split = false;
-  PaneSplitAxis axis = PaneSplitAxis::kHorizontal;
-  double start_ratio = 0.5;
-  int divider_size = 0;
-  int minimum_pane_size = 0;
-};
-
-struct CurrentPaneGeometry {
-  gfx::Rect start;
-  gfx::Rect divider;
-  gfx::Rect end;
-};
-
-// Pure current-frame pane calculation. Target-size renderer geometry is a
-// separate concern and must never be used to place direct BrowserView chrome.
-CurrentPaneGeometry ComputeCurrentPaneGeometry(
-    const CurrentPaneGeometryInput& input);
-
-struct ExternalInfoBarSlotInput {
-  gfx::Rect multi_contents_bounds;
-  gfx::Rect active_pane_bounds_in_multi_contents;
-  gfx::Rect notice_flow_bounds;
-  bool split = false;
-  int split_header_height = 0;
-  int split_body_horizontal_inset = 0;
-  int semantic_height = 0;
-  int paint_offset = 0;
-};
-
-// Places Chromium's one direct InfoBar inside the current active page body.
-// The returned rectangle is in BrowserView coordinates. An empty result means
-// the current native notice slot and active body do not form a contiguous
-// visible region for this frame.
-gfx::Rect ResolveExternalInfoBarSlot(const ExternalInfoBarSlotInput& input);
 
 }  // namespace yee
 

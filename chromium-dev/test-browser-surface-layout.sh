@@ -25,10 +25,14 @@ fi
 require_depot_tools
 require_chromium_src
 
-FAST_TARGET='chrome/browser/ui/views/tabs/common:yee_layout_unittests'
-FAST_FILTER='BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*'
-INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:*TopContainerBackground*'
-BROWSER_FILTER='SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView'
+FAST_TARGETS=(
+  'chrome/browser/ui/views/tabs/common:yee_layout_unittests'
+  'chrome/browser/ui/views/yee:multi_contents_geometry_unittests'
+)
+NATIVE_FAST_FILTER='BrowserViewTabbedLayoutNativeGeometryTest.*'
+YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
+INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState:*TopContainerBackground*'
+BROWSER_FILTER='SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView:LensOverlayControllerBrowserTest.OverlayClosesIfRendererExits:LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab:SelectionOverlayBrowserTest.SelectionUsedFromController:SelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle:SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView:ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm:ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab:ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash:BrowserViewTest.CloseWidgetWithTabsNoCrash'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Browser Surface layout ${MODE} gate"
@@ -36,7 +40,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
 
   targets=()
   [[ "$MODE" == "fast" || "$MODE" == "all" ]] && \
-    targets+=("$FAST_TARGET")
+    targets+=("${FAST_TARGETS[@]}")
   [[ "$MODE" == "interactive" || "$MODE" == "all" ]] && \
     targets+=(interactive_ui_tests)
   [[ "$MODE" == "browser" || "$MODE" == "all" ]] && \
@@ -47,7 +51,11 @@ fi
 if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
   print "Running the small pure native/Yee Browser Surface layout gate."
   "$YEE_OUT_DIR/yee_layout_unittests" \
-    --gtest_filter="$FAST_FILTER" \
+    --gtest_filter="$NATIVE_FAST_FILTER" \
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0
+  "$YEE_OUT_DIR/multi_contents_geometry_unittests" \
+    --gtest_filter="$YEE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
 fi
@@ -64,7 +72,7 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
 fi
 
 if [[ "$MODE" == "browser" || "$MODE" == "all" ]]; then
-  print "Running the explicit browser-level Side Panel coordinator gate."
+  print "Running the explicit browser-level Side Panel and overlay lifecycle gate."
   gracefully_quit_yee
   "$YEE_OUT_DIR/browser_tests" \
     --gtest_filter="$BROWSER_FILTER" \

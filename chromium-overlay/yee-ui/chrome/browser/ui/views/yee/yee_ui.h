@@ -32,6 +32,8 @@ class View;
 namespace yee {
 
 inline constexpr int kCombinedSurfaceOutlineViewId = 92003;
+inline constexpr int kSidePanelSurfaceViewId = 92018;
+inline constexpr int kBrowserSurfaceFillViewId = 92019;
 
 // Geometry owned by Yee's vertical sidebar presentation. Keeping these values
 // together lets Chromium's native tab and group views consume one stable
@@ -312,12 +314,35 @@ double GetNativeGlassTintOpacity(bool is_dark_mode);
 std::unique_ptr<views::View> CreateCombinedSurfaceOutlineView(
     BrowserSurfacePresentationCallback presentation_callback);
 
+// Creates the page-aware fill hosted by Chromium's existing animated main
+// background region. The host owns compositor clipping and geometry; this
+// non-interactive Yee child owns only Browser Surface color presentation.
+std::unique_ptr<views::View> CreateBrowserSurfaceFillView(
+    std::optional<BrowserSurfacePresentation> presentation);
+void UpdateBrowserSurfaceFillView(
+    views::View& view,
+    std::optional<BrowserSurfacePresentation> presentation);
+
+// Creates the non-interactive card backing for Chromium's native Side Panel.
+// The native SidePanel remains the owner of content, focus, resizing, and
+// commands; this view only supplies Yee's shared surface fill, outline, and
+// shadow treatment.
+std::unique_ptr<views::View> CreateSidePanelSurfaceView();
+
 // Keeps the combined Browser Surface backing and boundary in single-tab
 // presentation. Split presentation suppresses that fill, outline, and shadow;
 // the transparent Split Canvas only lays out Pane Cards, which own their visual
 // boundaries.
 void UpdateCombinedSurfaceOutlineView(views::View& view,
                                       bool split_presentation);
+
+// Applies the decoration portion of the resolved Browser Surface frame after
+// native layout has installed the frame's bounds. `header_separator_offset`
+// is local to the outline host and is zero when another owner paints the
+// boundary or when no Header participates.
+void UpdateCombinedSurfaceOutlineLayout(views::View& view,
+                                        bool split_presentation,
+                                        int header_separator_offset);
 
 // Split panes are independent cards aligned directly to Yee's Browser Surface.
 // Chromium continues to own split layout, resizing, and semantic highlights.

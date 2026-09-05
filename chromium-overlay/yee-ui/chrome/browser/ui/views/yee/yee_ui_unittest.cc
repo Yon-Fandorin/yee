@@ -331,6 +331,52 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_EQ(400, frame.main_surface_bounds.right());
 }
 
+TEST(YeeSurfaceGeometryTest,
+     SurfaceDecorationUsesOnlyTheResolvedStructuralFrame) {
+  BrowserSurfaceFrameInput input;
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/false,
+      /*header_participates=*/true, /*header_height=*/42});
+  input.native_notice_flow_allocation = gfx::Rect(250, 48, 944, 746);
+  input.native_body_allocation = gfx::Rect(250, 48, 944, 746);
+
+  ResolvedBrowserSurfaceFrame frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_EQ(frame.main_surface_bounds,
+            frame.decoration.combined_outline_bounds);
+  EXPECT_TRUE(frame.decoration.combined_outline_visible);
+  EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kCombinedSurfaceOutline,
+            frame.decoration.header_separator_owner);
+  EXPECT_EQ(frame.header_bounds.bottom() - frame.main_surface_bounds.y(),
+            frame.decoration.combined_header_separator_offset);
+  EXPECT_FALSE(frame.decoration.show_native_multi_contents_separator);
+  EXPECT_TRUE(frame.decoration.contain_infobar_shadow_horizontally);
+  EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
+
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/false,
+      /*header_participates=*/false, /*header_height=*/42});
+  input.native_notice_flow_allocation = gfx::Rect(250, 6, 944, 788);
+  input.native_body_allocation = gfx::Rect(250, 6, 944, 788);
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_TRUE(frame.decoration.combined_outline_visible);
+  EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kNone,
+            frame.decoration.header_separator_owner);
+  EXPECT_EQ(0, frame.decoration.combined_header_separator_offset);
+  EXPECT_EQ(kSidebarMetrics.content_corner_radius -
+                kSidebarMetrics.browser_surface_outline_width,
+            frame.decoration.infobar_top_corner_radius);
+
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/true,
+      /*header_participates=*/false, /*header_height=*/42});
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_FALSE(frame.decoration.combined_outline_visible);
+  EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kSplitPane,
+            frame.decoration.header_separator_owner);
+  EXPECT_EQ(0, frame.decoration.combined_header_separator_offset);
+  EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
+}
+
 TEST(YeeSurfaceGeometryTest, SplitInsetsResolveBeforeMultiContentsApplication) {
   const gfx::Insets native_insets = gfx::Insets::TLBR(0, 8, 8, 8);
   EXPECT_EQ(
@@ -369,7 +415,7 @@ TEST(YeeSurfaceGeometryTest, CurrentPaneGeometryIsPureAndDirectional) {
   input.axis = PaneSplitAxis::kHorizontal;
   input.start_ratio = 0.4;
   input.divider_size = 8;
-  input.minimum_pane_size = 200;
+  input.minimums = {200, 200};
 
   const CurrentPaneGeometry horizontal = ComputeCurrentPaneGeometry(input);
   EXPECT_EQ(gfx::Rect(0, 0, 357, 600), horizontal.start);
@@ -391,12 +437,8 @@ TEST(YeeSurfaceGeometryTest, CurrentPaneGeometryIsPureAndDirectional) {
 
 TEST(YeeSurfaceGeometryTest, InfoBarSlotUsesOnlyCurrentActiveBody) {
   ExternalInfoBarSlotInput input;
-  input.multi_contents_bounds = gfx::Rect(250, 6, 944, 788);
-  input.active_pane_bounds_in_multi_contents = gfx::Rect(476, 0, 468, 788);
+  input.manager_body_bounds_in_browser = gfx::Rect(727, 48, 466, 745);
   input.notice_flow_bounds = gfx::Rect(250, 6, 944, 788);
-  input.split = true;
-  input.split_header_height = 42;
-  input.split_body_horizontal_inset = 1;
   input.semantic_height = 54;
 
   EXPECT_EQ(gfx::Rect(727, 48, 466, 54), ResolveExternalInfoBarSlot(input));
