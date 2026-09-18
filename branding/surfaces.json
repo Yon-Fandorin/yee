@@ -1,0 +1,1113 @@
+{
+  "schema_version": 1,
+  "scope": "Desktop source inventory only; platform/channel branches included as candidates, runtime coverage not claimed. Android/ChromeOS product surfaces require separate scope decisions.",
+  "string_roots": [
+    "chrome/app/chromium_strings.grd",
+    "components/components_chromium_strings.grd",
+    "extensions/strings/extensions_strings.grd"
+  ],
+  "status_definitions": {
+    "managed": "Configuration consumer is implemented; input application and runtime validation are separate.",
+    "pending": "Known consumer lacks complete configurable branding connection.",
+    "preserved": "Compatibility, attribution, security or stable identity requires preservation or explicit node-level exception.",
+    "not_verified": "Known validation boundary has not been executed."
+  },
+  "surfaces": [
+    {
+      "id": "core-product-name-inputs",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/chromium/BRANDING"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chromium_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/yee_product_names.grdp"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/yee_app_menu_name.grdp"
+        }
+      ],
+      "symbols": [
+        "PRODUCT_FULLNAME",
+        "PRODUCT_SHORTNAME",
+        "PRODUCT_INSTALLER_FULLNAME",
+        "PRODUCT_INSTALLER_SHORTNAME",
+        "IDS_PRODUCT_NAME",
+        "IDS_SHORT_PRODUCT_NAME",
+        "IDS_APP_MENU_PRODUCT_NAME"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "Generated names and GRIT connections are checked separately from runtime.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_PRODUCT_NAME",
+        "IDS_SHORT_PRODUCT_NAME",
+        "IDS_APP_MENU_PRODUCT_NAME"
+      ],
+      "input_check": "product_inputs",
+      "candidate_policy": "Normal desktop product IDs are generated; Chrome for Testing conditional branding remains a separate product."
+    },
+    {
+      "id": "owned-native-ui-name-accessor",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "browser/ui/brand.h"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/agent_bridge_prompt.cc"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/sidebar_footer.cc"
+        }
+      ],
+      "symbols": [
+        "yee::branding::ProductName",
+        "version_info::GetProductName"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "Source accessor exists; long-name layout and built application are not verified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "shell-agent-accessibility-name",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0001-integrate-yee-shell.patch"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/agent_bridge.cc"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/agent_bridge.h"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/views/tabs/common/tab_view.cc"
+        }
+      ],
+      "symbols": [
+        "yee::AgentActivityAccessibleDescription",
+        "yee::branding::ProductName"
+      ],
+      "configuration_roles": [
+        "name",
+        "localized_message_parameters"
+      ],
+      "notes": "Shell accessibility delegates to an owned helper with configured name; source application and runtime still require separate verification.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "settings-text-and-accessibility",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/settings_chromium_strings.grdp"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc"
+        }
+      ],
+      "symbols": [
+        "AddAboutStrings",
+        "IDS_SETTINGS_ABOUT_PROGRAM",
+        "IDS_SETTINGS_UPGRADE_UP_TO_DATE",
+        "IDS_SETTINGS_SAFETY_HUB_VERSION_NAVIGATION_ARIA_LABEL"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name",
+        "localization"
+      ],
+      "notes": "Includes about/update/help labels, Safety Hub accessibility and permission descriptions; regenerate GRDP/XTB together.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_SETTINGS_ABOUT_PROGRAM",
+        "IDS_SETTINGS_GET_HELP_USING_CHROME",
+        "IDS_SETTINGS_UPGRADE_UPDATING",
+        "IDS_SETTINGS_UPGRADE_UPDATING_PERCENT",
+        "IDS_SETTINGS_UPGRADE_SUCCESSFUL_RELAUNCH",
+        "IDS_SETTINGS_UPGRADE_UP_TO_DATE",
+        "IDS_SETTINGS_SAFETY_HUB_VERSION_NAVIGATION_ARIA_LABEL",
+        "IDS_SETTINGS_SAFETY_HUB_VERSION_RELAUNCH_ARIA_LABEL"
+      ]
+    },
+    {
+      "id": "native-menu-window-and-task-manager",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chromium_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/toolbar/app_menu_model.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/views/task_manager_view.cc"
+        }
+      ],
+      "symbols": [
+        "IDS_ABOUT",
+        "IDS_TASK_MANAGER_TITLE",
+        "IDS_BROWSER_WINDOW_TITLE_FORMAT"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name",
+        "localization",
+        "menu_mnemonic_escape"
+      ],
+      "notes": "Product-name core IDs do not substitute branding embedded in these messages.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_ABOUT",
+        "IDS_TASK_MANAGER_TITLE",
+        "IDS_BROWSER_WINDOW_TITLE_FORMAT",
+        "IDS_APP_MENU_YOUR_CHROME_HEADER",
+        "IDS_APPMENU_TOOLTIP_UPDATE_AVAILABLE",
+        "IDS_APPMENU_TOOLTIP_ALERT",
+        "IDS_RELAUNCH_TO_UPDATE"
+      ]
+    },
+    {
+      "id": "startup-profile-default-and-password-prompts",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chromium_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/passwords/manage_passwords_ui_controller.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc"
+        }
+      ],
+      "symbols": [
+        "IDS_COULDNT_STARTUP_PROFILE_ERROR",
+        "IDS_PASSWORDS_PAGE_AUTHENTICATION_PROMPT",
+        "IDS_DEFAULT_BROWSER_INFOBAR_TEXT",
+        "IDS_PIN_INFOBAR_DOCK_TEXT"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization"
+      ],
+      "notes": "Includes infobars, OS authentication and errors; remaining message IDs outside this reviewed list remain unreviewed.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_COULDNT_STARTUP_PROFILE_ERROR",
+        "IDS_PASSWORDS_PAGE_AUTHENTICATION_PROMPT",
+        "IDS_DEFAULT_BROWSER_INFOBAR_TEXT",
+        "IDS_PIN_INFOBAR_DOCK_TEXT",
+        "IDS_PIN_INFOBAR_TEXT",
+        "IDS_PIN_INFOBAR_BUTTON",
+        "IDS_UNINSTALL_CHROME",
+        "IDS_DEFAULT_BROWSER_CHANGED_MESSAGE"
+      ]
+    },
+    {
+      "id": "components-error-crash-page-info",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "components/components_chromium_strings.grd"
+        }
+      ],
+      "symbols": [
+        "IDS_ERRORPAGES_SUMMARY_BLOCKED_BY_CLIENT",
+        "IDS_PAGE_INFO_INTERNAL_PAGE",
+        "IDS_SESSION_CRASHED_VIEW_MESSAGE"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization",
+        "internal_url_scheme"
+      ],
+      "notes": "Components strings are independent from chrome/app strings.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_ERRORPAGES_SUGGESTION_NETWORK_PREDICTION_BODY",
+        "IDS_ERRORPAGES_SUGGESTION_FIREWALL_CONFIG_HEADER",
+        "IDS_ERRORPAGES_SUMMARY_BLOCKED_BY_CLIENT",
+        "IDS_ERRORPAGES_SUGGESTION_PROXY_DISABLE_PLATFORM",
+        "IDS_PAYMENTS_AUTOFILL_MANDATORY_REAUTH_PROMPT",
+        "IDS_PAYMENTS_AUTOFILL_EDIT_CARD_MANDATORY_REAUTH_PROMPT",
+        "IDS_FLAGS_UI_RELAUNCH_NOTICE",
+        "IDS_CRASH_DISABLED_MESSAGE",
+        "IDS_SHORT_PRODUCT_LOGO_ALT_TEXT",
+        "IDS_PAGE_INFO_INTERNAL_PAGE",
+        "IDS_SESSION_CRASHED_VIEW_MESSAGE",
+        "IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH",
+        "IDS_INTERNAL_DEBUG_PAGES_DISABLED_BODY"
+      ]
+    },
+    {
+      "id": "attribution-project-links-and-copyright",
+      "status": "preserved",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "components/components_chromium_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chromium_strings.grd"
+        }
+      ],
+      "symbols": [
+        "IDS_VERSION_UI_LICENSE",
+        "IDS_VERSION_UI_LICENSE_CHROMIUM",
+        "IDS_ABOUT_VERSION_COPYRIGHT",
+        "IDS_ABOUT_VERSION_COMPANY_NAME"
+      ],
+      "configuration_roles": [
+        "attribution_policy",
+        "name"
+      ],
+      "notes": "Preserve upstream project link text, company and copyright; product prefixes in license messages are a separate pending surface.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_ABOUT_VERSION_COMPANY_NAME",
+        "IDS_ABOUT_VERSION_COPYRIGHT"
+      ],
+      "candidate_policy": "Preserve upstream company and copyright attribution."
+    },
+    {
+      "id": "extension-install-error-and-pdf-manifest",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "extensions/strings/extensions_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/pdf/pdf_extension_util.cc"
+        }
+      ],
+      "symbols": [
+        "IDS_EXTENSION_INSTALL_PROCESS_CRASHED",
+        "GetManifest",
+        "kExtensionName"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization",
+        "generated_native_constants"
+      ],
+      "notes": "PDF Viewer manifest embeds a C++ literal outside GRIT; extension install error lives outside branded app strings.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_EXTENSION_INSTALL_PROCESS_CRASHED"
+      ]
+    },
+    {
+      "id": "external-products-and-web-compatibility",
+      "status": "preserved",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "extensions/strings/extensions_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/version_info/version_info_with_user_agent.h"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/version_info/version_info_with_user_agent.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/embedder_support/user_agent_utils.cc"
+        }
+      ],
+      "symbols": [
+        "IDS_EXTENSION_WEB_STORE_TITLE",
+        "IDS_EXTENSION_INSTALL_KIOSK_MODE_ONLY",
+        "GetProductNameAndVersionForUserAgent",
+        "GenerateBrandVersionList"
+      ],
+      "configuration_roles": [
+        "web_compatibility_policy"
+      ],
+      "notes": "Preserve Chrome Web Store, ChromeOS products, Chrome/ UA token and Chromium base UA-CH brand; display-name changes must not globally replace them.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_EXTENSION_WEB_STORE_TITLE",
+        "IDS_EXTENSION_INSTALL_KIOSK_MODE_ONLY"
+      ]
+    },
+    {
+      "id": "translations-and-message-fingerprint",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/resources/chromium_strings_ko.xtb"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/strings/components_chromium_strings_ko.xtb"
+        }
+      ],
+      "symbols": [
+        "translation id",
+        "GRIT message fingerprint"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization",
+        "translation_mapping"
+      ],
+      "notes": "GRD/GRDP and XTB must derive from a fixed upstream baseline; source candidates do not prove translation coverage.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "mac-helper-permissions-and-shortcut-localization",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chromium_strings.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/tools/build/mac/infoplist_strings_util.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/app-Info.plist"
+        }
+      ],
+      "symbols": [
+        "IDS_HELPER_NAME",
+        "IDS_SHORT_HELPER_NAME",
+        "IDS_RUNTIME_PERMISSION_OS_REASON_TEXT",
+        "IDS_CHROMIUM_SHORCUT_DESCRIPTION",
+        "NSCameraUsageDescription",
+        "Chromium Shortcut"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name",
+        "localization",
+        "stable_document_type_identity"
+      ],
+      "notes": "Localized Helper and many OS permission descriptions read GRIT; Shortcut localization key must match plist document type.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_HELPER_NAME",
+        "IDS_SHORT_HELPER_NAME",
+        "IDS_RUNTIME_PERMISSION_OS_REASON_TEXT",
+        "IDS_LOCAL_NETWORK_ACCESS_PERMISSION_DESC",
+        "IDS_CHROMIUM_SHORCUT_DESCRIPTION"
+      ]
+    },
+    {
+      "id": "stable-os-install-profile-keychain-and-uttypes",
+      "status": "preserved",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/app-Info.plist"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/chromium/BRANDING"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/install_static/chromium_install_modes.h"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/os_crypt/common/keychain_password_mac.mm"
+        }
+      ],
+      "symbols": [
+        "MAC_BUNDLE_ID",
+        "CFBundleDocumentTypes",
+        "org.chromium",
+        "InstallConstants",
+        "Keychain service/account"
+      ],
+      "configuration_roles": [
+        "identity",
+        "data_migration_policy"
+      ],
+      "notes": "Stable IDs are independent from provisional display name; preserve current values until a separately defined identity/data migration.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "external-browser-launch-scheme",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "build/apple/tweak_info_plist.py"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/shell_integration_mac.mm"
+        }
+      ],
+      "symbols": [
+        "CFBundleURLSchemes",
+        "direct browser launch scheme"
+      ],
+      "configuration_roles": [
+        "external_launch_scheme",
+        "identity"
+      ],
+      "notes": "OS launch protocol is separate from internal WebUI scheme; generator and consumer must match.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "installed-web-app-folder-and-assets",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/web_applications/os_integration/mac/apps_folder_support.mm"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/shell_integration.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/chrome_unscaled_resources.grd"
+        }
+      ],
+      "symbols": [
+        "GetLocalizableAppShortcutsSubdirName",
+        "GetAppShortcutsSubdirName",
+        "UpdateAppShortcutsSubdirLocalizedName",
+        "PWA overlay SVG"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization",
+        "identity",
+        "pwa_assets"
+      ],
+      "notes": "Finder display, stable directory path and installed app overlay assets have separate consumers.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_APP_SHORTCUTS_SUBDIR_NAME",
+        "IDS_APP_SHORTCUTS_SUBDIR_NAME_CANARY"
+      ]
+    },
+    {
+      "id": "internal-url-input-and-normalization",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/browser_about_handler.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/chrome_content_browser_client.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "content/browser/renderer_host/navigation_controller_impl.cc"
+        }
+      ],
+      "symbols": [
+        "GetInputTypeForScheme",
+        "HandleChromeAboutAndChromeSyncRewrite",
+        "RewriteUrlForNavigation"
+      ],
+      "configuration_roles": [
+        "internal_url_scheme",
+        "legacy_aliases",
+        "canonical_virtual_url_policy"
+      ],
+      "notes": "Do not derive scheme from display name. Browser handler rewrites real URL while virtual initially retains original input.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "internal-url-display-copy-drag-and-compact-address",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/omnibox/browser/omnibox_text_util.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/views/location_bar/location_bar_view.cc"
+        }
+      ],
+      "symbols": [
+        "FormattedStringWithEquivalentMeaning",
+        "AdjustTextForCopy",
+        "GetURL",
+        "UpdateCompactShellRestingText",
+        "SetURLAndDragImage"
+      ],
+      "configuration_roles": [
+        "internal_url_scheme",
+        "canonical_virtual_url_policy"
+      ],
+      "notes": "Display formatting does not automatically change hyperlink clipboard or drag data. Compact resting origin currently only handles HTTP(S).",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "internal-url-bookmark-session-and-non-navigation",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/bookmarks/bookmark_utils.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/sessions/content/content_serialized_navigation_builder.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/navigator/browser_navigator.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/views/page_info/page_info_bubble_view.cc"
+        }
+      ],
+      "symbols": [
+        "GetURLToBookmark",
+        "FromNavigationEntry",
+        "SetVirtualURL",
+        "HandleNonNavigationAboutURL",
+        "InternalPageInfoBubbleView"
+      ],
+      "configuration_roles": [
+        "internal_url_scheme",
+        "canonical_virtual_url_policy",
+        "legacy_aliases"
+      ],
+      "notes": "Bookmark stores visible URL; session stores virtual URL; quit/restart precede LoadURL; internal PageInfo CHECK assumes Chrome scheme.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "webui-link-text-and-destinations",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/net_internals/index.html"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/history/side_bar.html.ts"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/extensions/detail_view.ts"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/components_chromium_strings.grd"
+        }
+      ],
+      "symbols": [
+        "chrome://net-export",
+        "chrome://settings/clearBrowserData",
+        "chrome://chrome-urls"
+      ],
+      "configuration_roles": [
+        "internal_url_scheme",
+        "webui_load_time_data"
+      ],
+      "notes": "Address formatting does not change in-page literal link text or destinations; keep resource imports distinct from display links.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "webui-origin-bindings-and-untrusted-boundaries",
+      "status": "preserved",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "content/common/url_schemes.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "content/browser/security/cpsp/child_process_security_policy_impl.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/chrome_web_ui_controller_factory.cc"
+        }
+      ],
+      "symbols": [
+        "kChromeUIScheme",
+        "kChromeUIUntrustedScheme",
+        "GrantWebUIBindings",
+        "CanRequestURL",
+        "WebUIConfig"
+      ],
+      "configuration_roles": [
+        "internal_url_scheme",
+        "security_boundary_policy"
+      ],
+      "notes": "Keep Chromium WebUI origin/bindings/CSP, resources, chrome-untrusted and chrome-search semantics; alias registration needs tests without broadening renderer privileges.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "mac-app-icon-catalog-and-compiled-assets",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/chromium/mac/Assets.car"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/chromium/mac/AppIcon.icon/icon.json"
+        },
+        {
+          "scope": "chromium",
+          "path": "tools/mac/icons/compile_car.py"
+        }
+      ],
+      "symbols": [
+        "Assets.car",
+        "AppIcon.icon",
+        "compile_car"
+      ],
+      "configuration_roles": [
+        "logo_source",
+        "mac_asset_catalog",
+        "toolchain_assets"
+      ],
+      "notes": "ICNS alone does not update mac asset catalog; Xcode26 catalog inputs/toolchain are separate and runtime unverified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "scaled-webui-native-and-payment-logos",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "ui/webui/resources/images/BUILD.gn"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/vector_icons/BUILD.gn"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/theme/theme_resources.grd"
+        }
+      ],
+      "symbols": [
+        "dark product logo",
+        "native product vector icons",
+        "payment wordmarks"
+      ],
+      "configuration_roles": [
+        "logo_source",
+        "scaled_logos",
+        "wordmark_source",
+        "vector_sources",
+        "third_party_asset_policy"
+      ],
+      "notes": "Raster logo cannot automatically produce all wordmarks/vectors; preserve unrelated payment-provider marks.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "windows-document-icons-tiles-and-visual-elements",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/app/chrome_exe.rc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/setup/generate_visual_elements_manifest_work_item.cc"
+        }
+      ],
+      "symbols": [
+        "icon resource indices",
+        "GenerateVisualElementsManifest"
+      ],
+      "configuration_roles": [
+        "windows_icon_assets",
+        "windows_tile_assets",
+        "identity"
+      ],
+      "notes": "Document/list/incognito resource indices are compatibility-sensitive; tiles include logos and background.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "windows-services-and-policy-registry",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/install_static/install_util.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/policy/tools/generate_policy_source.py"
+        }
+      ],
+      "symbols": [
+        "Elevation service",
+        "Tracing service",
+        "policyRegistryPath"
+      ],
+      "configuration_roles": [
+        "identity",
+        "service_ids",
+        "policy_registry_path"
+      ],
+      "notes": "Some service identifiers derive from display metadata; freeze stable identity before arbitrary name changes.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "updater-independent-branding",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/updater/branding.gni"
+        }
+      ],
+      "symbols": [
+        "updater branding names",
+        "updater app IDs",
+        "updater endpoints"
+      ],
+      "configuration_roles": [
+        "updater_identity",
+        "updater_display_name",
+        "update_endpoints"
+      ],
+      "notes": "Browser BRANDING does not fully control updater identity, labels or endpoints.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "platform-channel-language-runtime-validation",
+      "status": "not_verified",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "docs/product-branding.md"
+        },
+        {
+          "scope": "repository",
+          "path": "docs/brave-branding-analysis.md"
+        }
+      ],
+      "symbols": [
+        "built browser surface validation",
+        "language/channel/platform matrix"
+      ],
+      "configuration_roles": [
+        "verification_matrix"
+      ],
+      "notes": "No browser build or launch is part of this audit. Actual UI, saved-data and renderer-security behavior remain unverified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "license-app-name-prefix",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "components/components_chromium_strings.grd"
+        }
+      ],
+      "symbols": [
+        "IDS_VERSION_UI_LICENSE",
+        "IDS_VERSION_UI_LICENSE_CHROMIUM"
+      ],
+      "configuration_roles": [
+        "name",
+        "localization",
+        "attribution_policy"
+      ],
+      "notes": "The first Chromium token denotes this application; linked Chromium denotes the upstream project. Transform the app prefix only and preserve project-link nodes.",
+      "runtime_verification": "not_verified",
+      "message_ids": [
+        "IDS_VERSION_UI_LICENSE",
+        "IDS_VERSION_UI_LICENSE_CHROMIUM"
+      ],
+      "candidate_policy": "Mixed message: application prefix pending; preserve linked project attribution; never replace whole message globally."
+    },
+    {
+      "id": "windows-existing-output-source-sync",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "tools/dev/build.ps1"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/install-yee-ui-sources.ps1"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/install-branding.ps1"
+        }
+      ],
+      "symbols": [
+        "build.ps1 UI source sync",
+        "Get-YeeBrandConfig"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name",
+        "source_synchronization"
+      ],
+      "notes": "Main build now synchronizes UI sources on existing output; Windows execution/build is not verified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "mac-output-bundle-name-discovery",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "tools/dev/common.zsh"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/dev/browser_bundle_executables.py"
+        }
+      ],
+      "symbols": [
+        "browser_bundle_executables.py",
+        "MAC_BUNDLE_ID",
+        "graceful shutdown"
+      ],
+      "configuration_roles": [
+        "name",
+        "identity",
+        "output_directory"
+      ],
+      "notes": "Discovers current and previous-name app bundles with matching Bundle ID inside selected output, independent of provisional name. This does not attest complete process coverage.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "mac-deleted-or-outside-output-running-bundles",
+      "status": "not_verified",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "tools/dev/common.zsh"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/dev/browser_bundle_executables.py"
+        }
+      ],
+      "symbols": [
+        "running process inventory",
+        "deleted app bundle"
+      ],
+      "configuration_roles": [
+        "identity",
+        "process_validation"
+      ],
+      "notes": "Running browsers whose bundles were deleted or lie outside selected output are not guaranteed to be discovered by output bundle enumeration.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "windows-installer-declared-product-part",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0002-brand-yee-application.patch"
+        },
+        {
+          "scope": "chromium",
+          "path": "base/win/embedded_i18n/create_string_rc.py"
+        },
+        {
+          "scope": "chromium",
+          "path": "base/win/embedded_i18n/generate_embedded_i18n.gni"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/util/BUILD.gn"
+        }
+      ],
+      "symbols": [
+        "GrdHandler",
+        "--source-part",
+        "source_parts",
+        "IDS_PRODUCT_NAME_BASE"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "0002 supplies optional in-place expansion of declared source parts and GN action dependencies. Actual generator temporary EN_US/KO RC rename verified without building. Real source wiring/application and Windows install/service display names remain separate validation boundaries.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "unicode-generated-metadata-and-windows-version-rc",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0002-brand-yee-application.patch"
+        },
+        {
+          "scope": "chromium",
+          "path": "build/util/version.py"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/process_version_rc_template.gni"
+        },
+        {
+          "scope": "chromium",
+          "path": "build/toolchain/win/rc/rc.py"
+        }
+      ],
+      "symbols": [
+        "--output-encoding",
+        "WriteIfChanged",
+        "ReadInput"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "0002 supplies UTF-8 metadata IO and UTF-16 Windows version RC output. Actual driver read function accepts temporary Unicode RC; resource compiler, Windows execution and crash server identity are not verified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "windows-crash-product-name-utf8-conversion",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0002-brand-yee-application.patch"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/setup/installer_crash_reporter_client.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/notification_helper/notification_helper_crash_reporter_client.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/windows_services/service_program/crash_reporting.cc"
+        }
+      ],
+      "symbols": [
+        "PRODUCT_SHORTNAME_STRING",
+        "base::UTF8ToWide"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "0002 replaces ASCII conversion of configured short name. C++ build and crash collection server identity are unverified.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "linux-branding-key-value-parser",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0002-brand-yee-application.patch"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/linux/common/installer.py"
+        }
+      ],
+      "symbols": [
+        "parse_simple",
+        "branding_vars"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name"
+      ],
+      "notes": "0002 preserves equals inside branding values using first-delimiter split and UTF-8 input. Actual parser temporary fixture verified; Linux packaging remains outside current desktop activation scope.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "gcm-persistent-product-category",
+      "status": "pending",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "patches/0002-brand-yee-application.patch"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/gcm/gcm_product_util.cc"
+        }
+      ],
+      "symbols": [
+        "PRODUCT_SHORTNAME_STRING",
+        "GetProductCategoryForSubtypes",
+        "prefs"
+      ],
+      "configuration_roles": [
+        "stable_service_identity",
+        "profile_migration"
+      ],
+      "notes": "GCM category derives ASCII alnum from display short name and stores it in profile prefs. Unicode/new profile/rename needs an independent stable service identity and migration/server review.",
+      "runtime_verification": "not_verified"
+    }
+  ]
+}

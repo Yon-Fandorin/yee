@@ -15,7 +15,8 @@ Favorites에 가깝고, Arc Pinned Tabs가 아니다. Chromium pin이 백킹이�
 - 높이는 파비콘 16 DIP와 상하 padding 8 DIP뿐이다. 높이 32 DIP. 폭과 높이를
   묶지 않는다.
 - 한 행에 최대 4열, 전체 최대 12개.
-- 모서리 8 DIP. 기본 채움 알파 110, hover 150, 활성 220. 스트로크 72 / 활성 140.
+- 모서리 8 DIP. 채움 알파는 기본 18, hover 30, 활성 42, drag 58이다.
+  스트로크 알파는 기본 28, 활성 52, drag 68이다.
   RGB는 고정 흰색이 아니라 현재 theme의 elevated surface와 neutral outline에서
   계산하고, 비활성 창에서는 같은 상태의 대비를 낮춘다.
 - 독은 Tab 행과 같은 좌우 8 DIP 정렬선을 한 번만 적용하고 Sidebar Header 바로

@@ -1,0 +1,34 @@
+import("//testing/test.gni")
+
+source_set("browser") {
+  public = [ "filtering_url_loader_factory.h" ]
+  sources = [ "filtering_url_loader_factory.cc" ]
+  public_deps = [
+    "//components/yee_content_blocking:core",
+    "//components/yee_content_blocking:notices",
+    "//services/network/public/cpp",
+    "//url",
+  ]
+  deps = [
+    "//base",
+    "//content/public/common",
+    "//mojo/public/cpp/bindings",
+    "//mojo/public/cpp/system",
+    "//net",
+    "//services/network/public/mojom",
+  ]
+}
+
+test("yee_filtering_factory_unittests") {
+  sources = [ "filtering_url_loader_factory_unittest.cc" ]
+  deps = [
+    ":browser",
+    "//base/test:run_all_unittests",
+    "//base/test:test_support",
+    "//mojo/core/embedder",
+    "//net/traffic_annotation:test_support",
+    "//services/network:test_support",
+    "//testing/gtest",
+    "//third_party/blink/public/mojom:mojom_platform_shared",
+  ]
+}

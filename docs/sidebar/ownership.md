@@ -18,7 +18,7 @@ Tab Sidebar는 새 탭 모델이 아니다. Chromium이 탭의 존재를 소유�
 
 ## 표현은 Yee
 
-제품 UI는 `chromium-overlay/yee-ui/`에 둔다. Chromium 원본 파일은 Yee 헤더를
+제품 UI는 `src/`에 둔다. Chromium 원본 파일은 Yee 헤더를
 포함하고 헬퍼를 호출하는 최소 접착만 가진다.
 
 Yee 제품 정책은 `TabStripModel`에 넣지 않는다. 해당하는 예:

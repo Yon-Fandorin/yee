@@ -715,9 +715,9 @@ Linux는 100%, 200% scale을 확인한다. 주요 edge와 inset은 목표의 ±1
 ## 10. 프로토타입 확인 URL
 
 ```text
-/prototype/?titlebar=regular&tenant=offset&sidebar=open&os=windows
-/prototype/?titlebar=regular&tenant=offset&sidebar=open&os=mac
-/prototype/?titlebar=regular&tenant=offset&sidebar=open&os=linux
+/experiments/shell-prototype/?titlebar=regular&tenant=offset&sidebar=open&os=windows
+/experiments/shell-prototype/?titlebar=regular&tenant=offset&sidebar=open&os=mac
+/experiments/shell-prototype/?titlebar=regular&tenant=offset&sidebar=open&os=linux
 ```
 
 프로토타입은 의도 확인용이다. native 구현 완료 판정은 위 체크리스트와 실제
@@ -728,7 +728,7 @@ Chromium 화면 캡처를 기준으로 한다.
 UI 결정을 변경할 때는 다음 순서를 따른다.
 
 1. 이 문서의 원칙, token 또는 정보 구조를 먼저 갱신한다.
-2. `prototype/`에서 Windows, macOS, Linux 변형을 함께 수정한다.
+2. `experiments/shell-prototype/`에서 Windows, macOS, Linux 변형을 함께 수정한다.
 3. native Chromium overlay를 수정하고 실제 browser capture로 비교한다.
 4. PR 설명에 9절 체크리스트 결과와 확인한 OS/DPI를 기록한다.
 

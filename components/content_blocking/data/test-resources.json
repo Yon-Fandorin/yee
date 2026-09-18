@@ -1,0 +1,30 @@
+[
+  {
+    "name": "yee-fixture.js",
+    "kind": {
+      "mime": "application/javascript"
+    },
+    "content": "d2luZG93Ll9feWVlRmlsdGVyRml4dHVyZSA9IHRydWU7"
+  },
+  {
+    "name": "yee-utf8.html",
+    "kind": {
+      "mime": "text/html"
+    },
+    "content": "PHN0cm9uZz7PgDwvc3Ryb25nPg=="
+  },
+  {
+    "name": "yee-binary.png",
+    "kind": {
+      "mime": "image/png"
+    },
+    "content": "iVBORw0KGgoA/wA="
+  },
+  {
+    "name": "yee-zero.txt",
+    "kind": {
+      "mime": "text/plain"
+    },
+    "content": ""
+  }
+]

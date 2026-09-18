@@ -1,0 +1,12 @@
+[package]
+name = "yee_adblock_bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+adblock = "=0.13.3"
+serde_json = "1"
+cxx = "=1.0.198"
+
+[workspace]

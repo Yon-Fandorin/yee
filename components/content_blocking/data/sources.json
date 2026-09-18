@@ -1,0 +1,20 @@
+[
+  {
+    "file": "easylist.txt",
+    "source": "https://easylist-downloads.adblockplus.org/easylist.txt",
+    "sha256": "49796ef3dcdc601be000d44d0b18e83b576529a245c8aa8554c17846dfd758d2",
+    "license": "CC-BY-SA-3.0-or-later (selected dual-license option)",
+    "attribution": "The EasyList authors (https://easylist.to/)",
+    "license_url": "https://easylist.to/pages/licence.html",
+    "retrieved": "2026-09-12"
+  },
+  {
+    "file": "easyprivacy.txt",
+    "source": "https://easylist-downloads.adblockplus.org/easyprivacy.txt",
+    "sha256": "401dc99e67d8d537536fcc5e34242c7aeb5276fcc2bdc40e8c6d20905314d0e4",
+    "license": "CC-BY-SA-3.0-or-later (selected dual-license option)",
+    "attribution": "The EasyList authors (https://easylist.to/)",
+    "license_url": "https://easylist.to/pages/licence.html",
+    "retrieved": "2026-09-12"
+  }
+]

@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee agent form verification</title>
+<h1>Agent browser verification</h1>
+<p>This local fixture sends no requests. It does not simulate a running agent.</p>
+<form id="form">
+  <label>Name <input id="name" required autocomplete="off"></label>
+  <button>Save locally</button>
+</form>
+<p role="status" id="result">Waiting for input</p>
+<script>
+document.querySelector('#form').addEventListener('submit', event => {
+  event.preventDefault();
+  document.querySelector('#result').textContent =
+    'Saved: ' + document.querySelector('#name').value;
+});
+</script>

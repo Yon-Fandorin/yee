@@ -13,7 +13,7 @@ Product layout and names:
   page actions. Do not replace them or rewrite the sidebar around a new
   tab model.
 - Yee owns chrome presentation. New product UI belongs in
-  `chromium-overlay/yee-ui/`. Chromium originals get the smallest glue
+  `browser/ui/`. Chromium originals get the smallest glue
   that can host it.
 - Do not put Yee product policy (Favorites cap, dock geometry, group
   mark painting) in `TabStripModel` or other tab-model targets. Views and
@@ -40,8 +40,9 @@ Ask before guessing, especially for:
 
 ## Overlay edits
 
-- Yee sources: `chromium-overlay/yee-ui/`, synced with
-  `install-yee-ui-sources.sh`.
+- Yee product sources: `browser/`, `renderer/`, `components/`, and
+  `third_party/`. `build/overlay.json` maps owned directories into Chromium.
+  Sync with `tools/overlay/install-yee-ui-sources.sh`.
 - Chromium wiring: `patches/0001-integrate-yee-shell.patch`. Branding
   is `0002`, Windows proto aliases `0003`. Do not add a new patch for UI
   polish.
@@ -62,12 +63,12 @@ Ask before guessing, especially for:
 
 - Use the tiered Browser Surface layout gate instead of rebuilding every large
   Chromium test binary for each edit:
-  - `./chromium-dev/test-browser-surface-layout.sh` (default `fast`) builds the
+  - `./tools/dev/test-browser-surface-layout.sh` (default `fast`) builds the
     small pure native/Yee geometry target and runs its focused tests.
-  - `./chromium-dev/test-browser-surface-layout.sh interactive` is the normal
+  - `./tools/dev/test-browser-surface-layout.sh interactive` is the normal
     checkpoint gate when applied BrowserView, Side Panel, animation, or
     immersive layout changed.
-  - `./chromium-dev/test-browser-surface-layout.sh browser` is a heavy explicit
+  - `./tools/dev/test-browser-surface-layout.sh browser` is a heavy explicit
     gate only when browser-level Side Panel coordinator behavior changed.
   - `all` is a milestone/final-integration gate, not an inner-loop command.
 - Keep related findings that mutate the same layout pipeline in one structural

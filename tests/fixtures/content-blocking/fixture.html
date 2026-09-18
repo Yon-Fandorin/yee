@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee native content blocking fixture</title>
+<script>
+window.results = {beforeFirstInline: !!window.__yeeFilterFixture};
+</script>
+<style>.yee-ad,.yee-generic-ad{display:block!important;padding:12px;background:#ffc0c0}</style>
+<h1>Yee native content blocking fixture</h1>
+<div class="yee-ad" id="site-ad">Site advertisement</div>
+<div class="yee-generic-exception" id="exception">Excepted content</div>
+<div id="dynamic">Dynamic advertisement</div>
+<pre id="report">Running</pre>
+<script>
+(async () => {
+  const port = location.port;
+  const freshBlank = document.createElement('iframe');
+  document.body.append(freshBlank);
+  // Inspect synchronously, before its load event or a manual installation.
+  results.initialBlankBeforeReturn = !!freshBlank.contentWindow.__yeeFilterFixture;
+  freshBlank.remove();
+  const replacement = await fetch(`http://yee-redirect.test:${port}/ad.js`);
+  results.replacementBody = await replacement.text();
+  const cleaned = await fetch(`http://yee-query.test:${port}/resource?tracking=1&keep=2`);
+  results.cleanedURL = cleaned.url;
+  results.cleanedRedirected = cleaned.redirected;
+  results.cleanedBody = await cleaned.text();
+  const blocked = `http://yee-block.test:${port}`;
+  try { await fetch(blocked + '/blocked'); results.fetchBlocked = false; }
+  catch { results.fetchBlocked = true; }
+  const allowed = await fetch(`http://yee-allow.test:${port}/content`);
+  results.allowedStatus = allowed.status;
+  results.allowedHeader = allowed.headers.get('X-Yee-Fixture');
+  results.allowedBody = await allowed.text();
+  try { await fetch('/redirect-block'); results.redirectBlocked = false; }
+  catch { results.redirectBlocked = true; }
+  results.workerBlocked = await new Promise(resolve => {
+    const worker = new Worker('/worker.js');
+    worker.onmessage = event => { resolve(event.data); worker.terminate(); };
+    worker.onerror = () => resolve('worker-error');
+  });
+  navigator.sendBeacon(blocked + '/beacon', 'fixture');
+  navigator.sendBeacon(`http://yee-ping.test:${port}/typed-beacon`, 'fixture');
+  const pingFetch = await fetch(`http://yee-ping.test:${port}/fetch`);
+  results.pingFetchStatus = pingFetch.status;
+  const addFrame = (url, srcdoc) => new Promise(resolve => {
+    const frame = document.createElement('iframe');
+    frame.onload = () => resolve(frame);
+    if (srcdoc !== undefined) frame.srcdoc = srcdoc;
+    else frame.src = url;
+    document.body.append(frame);
+  });
+  // The server log proves network blocking; iframe error/load behavior varies.
+  const blockedFrame = document.createElement('iframe');
+  blockedFrame.src = blocked + '/iframe-navigation';
+  document.body.append(blockedFrame);
+  const redirectFrame = document.createElement('iframe');
+  redirectFrame.src = '/redirect-frame';
+  document.body.append(redirectFrame);
+  const typedFrame = document.createElement('iframe');
+  typedFrame.src = `http://yee-frame-type.test:${port}/iframe-type`;
+  document.body.append(typedFrame);
+  const typedFetch = await fetch(`http://yee-frame-type.test:${port}/iframe-fetch`);
+  results.iframeFetchStatus = typedFetch.status;
+  const inherited = await addFrame(null, '<div id="inherited-ad" class="yee-ad">Inherited origin advertisement</div>');
+  const blank = await addFrame('about:blank');
+  blank.contentDocument.body.innerHTML = '<div id="blank-ad" class="yee-generic-ad">Blank origin advertisement</div>';
+  const csp = await addFrame('/csp-frame');
+  document.getElementById('dynamic').className = 'yee-generic-ad';
+  const late = document.createElement('div');
+  late.id = 'late'; late.className = 'yee-generic-ad'; late.textContent = 'Late advertisement';
+  document.body.append(late);
+  // More mutations than the collector queue can retain must still reach the
+  // native generic matcher, even when only the final class matches a rule.
+  for (let i = 0; i < 600; ++i) {
+    const node = document.createElement('div'); node.className = `yee-stress-${i}`;
+    document.body.append(node);
+  }
+  const overflow = document.createElement('div');
+  overflow.id = 'overflow'; overflow.className = 'yee-overflow-ad';
+  document.body.append(overflow);
+  await new Promise(resolve => setTimeout(resolve, 600));
+  if (results.beforeFirstInline) {
+    for (let i = 0; i < 50 && getComputedStyle(overflow).display !== 'none'; ++i)
+      await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  for (const id of ['site-ad', 'dynamic', 'late', 'overflow', 'exception'])
+    results[id] = getComputedStyle(document.getElementById(id)).display;
+  results.inheritedAd = inherited.contentWindow.getComputedStyle(inherited.contentDocument.getElementById('inherited-ad')).display;
+  results.blankAd = blank.contentWindow.getComputedStyle(blank.contentDocument.getElementById('blank-ad')).display;
+  results.cspAd = csp.contentWindow.getComputedStyle(csp.contentDocument.getElementById('csp-ad')).display;
+  results.done = true;
+  document.getElementById('report').textContent = JSON.stringify(results, null, 2);
+})();
+</script>

@@ -45,23 +45,23 @@ geometry, tab ownership, profile policy, and reserved Sidebar slots are unchange
   then use a real synthesized click to change the boundary again.
 
 For a manual real-tab check, open
-`chromium-dev/fixtures/theme-boundary-regression.html` in a freshly built Yee app.
+`tests/fixtures/theme-boundary-regression.html` in a freshly built Yee app.
 It is page content, not a browser mockup. The large body deliberately disagrees
 with its thin top edge. Use the delayed button and resize below 800px.
 
 ## Verification status
 
-- `./chromium-dev/test-header.sh all`: final-source build succeeded; 38/38
+- `./tools/dev/test-header.sh all`: final-source build succeeded; 38/38
   unit tests, 12/12 interactive tests, and 4/4 RTL/125%-scale tests passed.
 - Expanded color suite: 42/42 passed, including shell/sidebar/resting-text
   roles. This overlaps the Header unit suite; counts are not additive.
-- `./chromium-dev/test-browser-surface-layout.sh interactive --no-build`:
+- `./tools/dev/test-browser-surface-layout.sh interactive --no-build`:
   31/31 applied-layout tests and 8/8 RTL/125%-scale transition tests passed
   against the freshly rebuilt interactive binary. Launcher retries were zero.
 - Added ten unit tests and one renderer test parameterized for both split
   orientations. The new grayscale test caught collapsed hover/selection fills
   on white during implementation; the final algorithm and all suites pass.
-- `./chromium-dev/build.sh`: succeeded (integrated app current, no remaining
+- `./tools/dev/build.sh`: succeeded (integrated app current, no remaining
   build steps). Native whitespace checks, overlay whitespace checks excluding
   the unified patch, reverse patch applicability, and Header shell syntax pass.
 - Launched the freshly built app with real `about:blank` and regression-fixture

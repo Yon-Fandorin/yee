@@ -900,7 +900,7 @@ reach the same final layout and focus state.
 
 ### Yee-owned code
 
-`chromium-overlay/yee-ui/chrome/browser/ui/views/yee/` owns:
+`browser/ui/` owns:
 
 - metric values, plain native snapshot input, `BrowserSurfaceLayoutInput`,
   `ResolvedBrowserSurfaceFrame`, the stable BrowserView minimum composition,
@@ -979,7 +979,7 @@ delegates.
     target outsets without changing the spec's inset/corner policy.
 12. Remove only config fields made dead by the working resolver; do not combine
     unrelated Chromium layout abstractions for cleanup.
-13. Regenerate `chromium-overlay/patches/0001-integrate-yee-shell.patch`, run the
+13. Regenerate `patches/0001-integrate-yee-shell.patch`, run the
     appropriate full build, gracefully stop every Yee process, relaunch, and
     validate the evidence matrix in the real app.
 

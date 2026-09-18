@@ -4,7 +4,7 @@
 
 Yee already has the right ownership boundary: Chromium retains ThemeService,
 ColorProvider, WebContents and the native Omnibox. Yee resolves presentation in
-`chromium-overlay/yee-ui/chrome/browser/ui/views/yee/`. No replacement theme or
+`browser/ui/`. No replacement theme or
 tab model is necessary for the findings below.
 
 There are intentionally two background sources, not two competing themes:
@@ -62,15 +62,15 @@ internal theme architecture or to have tested their installed applications.
 
 ## Verification
 
-- `./chromium-dev/test-header.sh unit`: **28/28 passed**, including six new
+- `./tools/dev/test-header.sh unit`: **28/28 passed**, including six new
   controller regressions and the updated theme-refresh regression. The first
   sandboxed execution could not create native test profiles/GUI resources;
   the successful run used the required local macOS access.
 - Overlay source sync, repository whitespace check excluding the unified patch,
   Chromium source `diff --check`, and `0001` reverse-apply check: **passed**.
-- `./chromium-dev/build.sh`: **passed**; the updated framework was copied into
+- `./tools/dev/build.sh`: **passed**; the updated framework was copied into
   the integrated Yee.app bundle.
-- `./chromium-dev/test-header.sh interactive`: **10/10 passed** in real native
+- `./tools/dev/test-header.sh interactive`: **10/10 passed** in real native
   browser windows/tabs, covering single/split geometry, presentation sources,
   LocationBar rehosting, inactive-pane address activation and Omnibox popups.
   The script gracefully quit Yee before starting its browser processes.

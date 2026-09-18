@@ -1,79 +1,81 @@
-# Tab Sidebar UX decisions
+# 사이드바의 제품 결정
 
-이 디렉터리는 Tab Sidebar의 **제품 UX/UI 결정**을 주제별로 둔다. 셸 전체의
-불변 조건과 용어는 여기에 복제하지 않는다.
+Tab Sidebar의 배치와 동작을 주제별로 기록한다.
+전체 화면의 규칙과 용어는 [셸 명세](../browser-shell-spec.md)와
+[레이아웃 용어](../browser-shell-layout-glossary.md)를 따른다.
+작업 절차는 [`AGENTS.md`](../../AGENTS.md)에 있다.
 
-- 셸 불변 조건: [`../browser-shell-spec.md`](../browser-shell-spec.md)
-- 표준 용어: [`../browser-shell-layout-glossary.md`](../browser-shell-layout-glossary.md)
-- 구현 작업 규칙: [`../../AGENTS.md`](../../AGENTS.md)
+실제 구현의 치수는 `yee::kSidebarMetrics`를 기준으로 한다.
+결정이 바뀌면 관련 문서와 공통 치수를 함께 수정한다.
+제품 명세와 충돌할 때는 먼저 확인하고 임의로 명세를 바꾸지 않는다.
 
-수치는 이 문서의 문장보다 `yee::kSidebarMetrics`가 앞선다. 결정이 바뀌면 해당
-주제 파일과 메트릭을 함께 고친다. 스펙과 충돌하면 조용히 스펙을 고치지 않고
-먼저 묻는다.
+## 주제별 문서
 
-## 문서
-
-| 파일 | 다루는 결정 |
+| 문서 | 내용 |
 | --- | --- |
-| [ownership.md](./ownership.md) | Yee 표현 vs Chromium 모델, Favorites의 pin 백킹, 예약 슬롯 |
-| [layout.md](./layout.md) | 섹션 순서, 펼침/접힘, 스펙과 native 체크포인트의 차이 |
-| [favorites.md](./favorites.md) | Favorites 독의 모양, 용량, 빈 상태 |
-| [favorites-drag.md](./favorites-drag.md) | 드래그로 옮기기, 재배치, 영역 전환, 새 창 분리 |
-| [groups.md](./groups.md) | Group 헤더, color mark, Agent와의 구분 |
-| [tabs.md](./tabs.md) | Tab 행 표현, 세로 목록 드래그 |
-| [footer.md](./footer.md) | Context Switcher, 선별된 Browser tools, Yee Workspace 기능의 통합 Footer 흐름 |
-| [test-coverage.md](./test-coverage.md) | 자동 회귀 범위와 실제 화면 검수의 경계 |
-| [dark-theme-audit.md](./dark-theme-audit.md) | 다크 Sidebar 표면 계층 감사와 검증 근거 |
+| [ownership.md](./ownership.md) | 제품 UI와 Chromium 탭 모델의 역할, 고정 탭 연결과 예약 기능 |
+| [layout.md](./layout.md) | 영역 순서, 펼침·접힘, 명세와 현재 구현의 차이 |
+| [favorites.md](./favorites.md) | Favorites 영역의 모양, 용량과 빈 상태 |
+| [favorites-drag.md](./favorites-drag.md) | 탭 이동·재배치, 영역 전환과 새 창 분리 |
+| [groups.md](./groups.md) | 그룹 제목·색상 표시와 Agent 상태의 구분 |
+| [tabs.md](./tabs.md) | 탭 행의 모양과 목록 드래그 |
+| [footer.md](./footer.md) | 작업 공간 전환, 브라우저 도구와 하단 메뉴 |
+| [test-coverage.md](./test-coverage.md) | 자동 테스트와 실제 화면 확인 범위 |
+| [dark-theme-audit.md](./dark-theme-audit.md) | 어두운 테마의 사이드바 색상과 검토 결과 |
 
-## 검증 배치
+과거 구현의 원인과 검증 경위가 필요할 때는
+[Footer 디자인 검토](./footer-design-audit.md),
+[Side Panel resize gutter 기록](./resize-gutter-20260905.md),
+[테마 구조 검토](../theming-structural-audit.md)를 참고한다. 현재 제품 규칙은 위의
+주제별 문서와 셸 명세를 우선한다.
 
-문서의 동작 규칙을 한 종류의 테스트에 몰아넣지 않는다. 구현과 같은 변경에서
-아래 가장 낮은 계층에 회귀 근거를 둔다.
+## 테스트 방법
 
-| 규칙 | 검증 위치 |
+규칙에 맞는 테스트를 선택한다.
+
+| 확인할 내용 | 방법 |
 | --- | --- |
-| 용량, pin/unpin 의도, 레이아웃·삽입·hit geometry, RTL | `favorites_unittest.cc` 같은 Yee 유닛 테스트 |
-| 실제 View 배치·`TabStripModel` 순서·Group 소속·취소 복원 | Chromium `interactive_ui_tests` |
-| 색 대비, 클리핑, hover·drag motion의 시각적 연속성 | 각 문서의 Native 회귀 체크리스트를 실제 Yee 앱에서 검수 |
+| 용량, 고정·해제, 크기·위치, 클릭·드래그 판정, 좌우 반전 | `favorites_unittest.cc` 같은 단위 테스트 |
+| 실제 UI 배치, `TabStripModel` 순서, 그룹 소속과 취소 복원 | Chromium `interactive_ui_tests` |
+| 색 대비, 화면 잘림과 애니메이션 | 실제 개발 브라우저의 화면 확인 |
 
-새 규칙이 순수 입력과 출력으로 표현되면 유닛 테스트를 함께 추가한다. 실제
-Chromium View 생명주기나 모델 커밋이 핵심이면 억지로 mock 유닛 테스트를 만들지
-않고 interactive browser test를 둔다. 체감 모션처럼 픽셀과 시간의 조합이 핵심인
-항목은 자동화 가능한 불변 조건만 테스트하고 최종 시각 검수 항목을 유지한다.
+입력과 결과만으로 확인할 수 있는 규칙은 단위 테스트로 검사한다.
+실제 UI나 탭 상태의 변경이 중요하면 브라우저 UI 테스트를 사용한다.
+색감과 움직임처럼 실제 화면이 필요한 항목은 수동 확인 목록을 유지한다.
 
-저장소 루트에서 아래 배치로 같은 범위를 반복 실행한다.
+저장소 루트에서 실행한다.
 
 ```sh
-# 브라우저 창을 열지 않는 정책·geometry·View 유닛 테스트
-# (native View 테스트이므로 macOS GUI 세션 접근은 필요)
-./chromium-dev/test-sidebar.sh unit
+# 브라우저 창을 열지 않는 규칙·배치·UI 단위 테스트
+# macOS 화면 세션 접근은 필요
+./tools/dev/test-sidebar.sh unit
 
-# 실제 Yee 창의 Sidebar 배치·drag·Group·scroll 통합 테스트
-./chromium-dev/test-sidebar.sh interactive
+# 실제 창의 배치·드래그·그룹·스크롤 테스트
+./tools/dev/test-sidebar.sh interactive
 
-# 빌드와 두 배치를 순서대로 실행
-./chromium-dev/test-sidebar.sh all
+# 빌드와 두 테스트를 순서대로 실행
+./tools/dev/test-sidebar.sh all
 ```
 
-`interactive`와 `all`은 기존 Yee 프로세스에 정상 종료를 요청한 뒤 새 테스트 창을
-열기 때문에 실행 중 포커스를 가져갈 수 있다. 이미 해당 target을 빌드했다면 마지막에
-`--no-build`를 붙인다. native 체크리스트는 자동화가 놓치는 페이드의 리듬, 색의 체감
-대비, 클리핑 가장자리처럼 실제 화면으로 판단해야 하는 항목만 남긴다.
+`interactive`와 `all`은 기존 개발 브라우저를 정상 종료한 뒤 테스트 창을 연다.
+테스트 창이 입력 초점을 가져갈 수 있다.
+필요한 프로그램을 이미 빌드했다면 마지막에 `--no-build`를 붙인다.
 
-## 아직 묻기
+## 아직 결정하지 않은 항목
 
-아래는 추측하지 않고 물을 질문이다.
+DIP는 화면 배율과 독립된 UI 크기 단위다.
 
-- Arc Favorites와 Arc Pinned Tabs를 동시에 둘지. 지금은 Chromium pin = Favorites
-  독이고, `kPins`는 비어 있는 예약 슬롯이다.
-- Bookmarks, Chat, Agent History를 언제 켤지. Bookmarks는 스펙 2번째지만
-  지금은 화면에 없다.
-- Agent 상태를 Tab Sidebar에 어떻게 보여줄지. Group color mark에는 넣지 않는다.
-- 스펙의 Tab 행 40 DIP로 native 32 DIP를 되돌릴지. hostname을 행에 둘지
-  hover card에 둘지도 같이 정한다.
-- Group 헤더 chrome: 스펙 `+`/개수 vs 지금 ⋮ 에디터. Note를 붙일지.
-- Groups를 Favorites 아래 한 블록으로 모을지, 지금처럼 목록 순서에 섞을지.
-- 스펙 3×20 mint 활성 표시 vs native 세로 탭 필.
-- Split Favorite이 그 칸만 두 칸 폭인지.
-- 드래그 중 나타나는 빈 Favorites 한글 카피를 잠글지.
-- Title Bar Create 메뉴의 Chat vs 스펙 New note.
+- Arc Favorites와 Arc Pinned Tabs를 함께 제공할지:
+  현재는 Chromium 고정 탭을 Favorites로 사용하며 `kPins`는 비어 있는 예약 영역이다.
+- Bookmarks, Chat, Agent History를 언제 켤지:
+  Bookmarks는 명세의 두 번째 영역이지만 현재 화면에는 없다.
+- Agent 상태를 Sidebar에 어떻게 보여줄지:
+  그룹 색상 표시에는 넣지 않는다.
+- 탭 행을 현재 32 DIP에서 명세의 40 DIP로 바꿀지:
+  호스트 이름을 행에 넣을지, 마우스를 올렸을 때 나오는 카드에 넣을지도 정해야 한다.
+- 그룹 제목 영역에서 명세의 `+`·개수와 현재 ⋮ 편집 메뉴 중 무엇을 사용할지, Note를 붙일지
+- 그룹을 Favorites 아래에 모을지, 현재처럼 탭 순서에 섞을지
+- 명세의 3×20 민트색 활성 표시와 현재 세로 탭의 채워진 표시 중 무엇을 사용할지
+- Split Favorite만 두 칸 너비를 사용할지
+- 드래그 중 빈 Favorites 영역에 표시할 한글 문구
+- Title Bar Create 메뉴에 Chat과 명세의 New note 중 무엇을 넣을지

@@ -1,0 +1,344 @@
+diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
+--- a/chrome/app/theme/chromium/BRANDING
++++ b/chrome/app/theme/chromium/BRANDING
+@@ -7,3 +7,4 @@
+ COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
++OVERLAY_BRANDING_MANAGED=1
+ MAC_BUNDLE_ID=org.chromium.Chromium
+ MAC_CREATOR_CODE=Cr24
+diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
+--- a/chrome/app/chromium_strings.grd
++++ b/chrome/app/chromium_strings.grd
+@@ -293,12 +293,7 @@
+           </message>
+         </then>
+         <else>
+-          <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
+-            Chromium
+-          </message>
+-          <message name="IDS_SHORT_PRODUCT_NAME" desc="The Chrome application short name." translateable="false">
+-            Chromium
+-          </message>
++          <part file="yee_product_names.grdp" />
+         </else>
+       </if>
+       <message name="IDS_APP_MENU_YOUR_CHROME_HEADER" desc="Header title for the Your Chromium section in the main App Menu">
+@@ -1182,9 +1177,7 @@
+       </if>
+ 
+       <if expr="is_macosx">
+-        <message name="IDS_APP_MENU_PRODUCT_NAME" desc="The application's short name, used for the Mac's application menu, activity monitor, etc. This should be less than 16 characters. Example: Chrome, not Google Chrome." translateable="false">
+-          Chromium
+-        </message>
++        <part file="yee_app_menu_name.grdp" />
+         <message name="IDS_HELPER_NAME" desc="The helper application's name.  Should contain the Chrome application name (IDS_PRODUCT_NAME). Example: Google Chrome Helper.">
+           Chromium Helper
+         </message>
+diff --git a/chrome/installer/mac/signing/build_props_config.py.in b/chrome/installer/mac/signing/build_props_config.py.in
+--- a/chrome/installer/mac/signing/build_props_config.py.in
++++ b/chrome/installer/mac/signing/build_props_config.py.in
+@@ -25,11 +25,11 @@
+ 
+     @property
+     def app_product(self):
+-        return '@PRODUCT_FULLNAME@'
++        return "@PRODUCT_FULLNAME@"
+ 
+     @property
+     def product(self):
+-        return '@PRODUCT_FULLNAME@'
++        return "@PRODUCT_FULLNAME@"
+ 
+     @property
+     def version(self):
+diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n/create_string_rc.py
+--- a/base/win/embedded_i18n/create_string_rc.py
++++ b/base/win/embedded_i18n/create_string_rc.py
+@@ -83,7 +83,7 @@
+     referenced_xtb_files: A list of all xtb files referenced inside the .grd
+       file.
+   """
+-  def __init__(self, string_id_set):
++  def __init__(self, string_id_set, source_parts=(), active_parts=()):
+     """Constructs a handler that reads selected strings from a .grd file.
+ 
+     The dict attribute |messages| is populated with the strings that are read.
+@@ -96,6 +96,11 @@
+     self.messages = collections.defaultdict(dict)
+     self.referenced_xtb_files = []
+     self.__id_set = string_id_set
++    # Only explicitly declared action inputs are expanded. Existing callers
++    # retain their original extraction behavior and dependency graph.
++    self.__source_parts = {os.path.abspath(path) for path in source_parts}
++    self.__active_parts = active_parts
++    self.__locator = None
+     self.__message_name = None
+     self.__element_stack = []
+     self.__text_scraps = []
+@@ -106,9 +111,24 @@
+ 
+     self.__characters_callback = None
+ 
++  def setDocumentLocator(self, locator):
++    self.__locator = locator
++
+   def startElement(self, name, attrs):
+     self.__element_stack.append(name)
+-    if name == 'message':
++    if name == 'part':
++      current = os.path.abspath(self.__locator.getSystemId())
++      path = os.path.abspath(os.path.join(os.path.dirname(current),
++                                          attrs.getValue('file')))
++      if path in self.__source_parts:
++        active = self.__active_parts + (current,)
++        if path in active:
++          raise ValueError('Cyclic source part: ' + path)
++        handler = GrdHandler(self.__id_set, self.__source_parts, active)
++        sax.parse(path, handler)
++        self.messages.update(handler.messages)
++        self.referenced_xtb_files.extend(handler.referenced_xtb_files)
++    elif name == 'message':
+       self.__OnOpenMessage(attrs.getValue('name'))
+     elif name == 'ph':
+       self.__OnOpenPlaceholder(attrs.getValue('name'))
+@@ -271,7 +291,8 @@
+ class StringRcMaker(object):
+   """Makes .h and .rc files containing strings and translations."""
+   def __init__(self, inputs, expected_xtb_input_files, header_file, rc_file,
+-    brand, first_resource_id, string_ids_to_extract, mode_specific_strings):
++    brand, first_resource_id, string_ids_to_extract, mode_specific_strings,
++    source_parts=()):
+     """Constructs a maker.
+ 
+     Args:
+@@ -294,6 +315,7 @@
+         dictionary.
+     """
+     self.inputs = inputs
++    self.source_parts = source_parts
+     self.expected_xtb_input_files = expected_xtb_input_files
+     self.expected_xtb_input_files.sort()
+     self.header_file = header_file
+@@ -386,7 +408,7 @@
+     sax_parser = sax.make_parser()
+ 
+     # Read the source (en-US) string from the .grd file.
+-    grd_handler = GrdHandler(self.string_id_set)
++    grd_handler = GrdHandler(self.string_id_set, self.source_parts)
+     sax_parser.setContentHandler(grd_handler)
+     sax_parser.parse(grd_file)
+     source_strings = grd_handler.messages
+@@ -560,6 +582,9 @@
+                       required=True,
+                       help='expected xtb input files to read',
+                       dest='expected_xtb_input_files')
++  parser.add_argument('--source-part', action='append', default=[],
++                      help='explicit GRDP action input to expand in place',
++                      dest='source_parts')
+   parser.add_argument('--header-file',
+                       required=True,
+                       help='path to generated .h file to write',
+@@ -635,7 +660,7 @@
+ 
+   StringRcMaker(inputs, args.expected_xtb_input_files, args.header_file,
+     args.rc_file,  brand, args.first_resource_id, string_ids_to_extract,
+-    mode_specific_strings).MakeFiles()
++    mode_specific_strings, args.source_parts).MakeFiles()
+   return 0
+ 
+ if '__main__' == __name__:
+diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedded_i18n/generate_embedded_i18n.gni
+--- a/base/win/embedded_i18n/generate_embedded_i18n.gni
++++ b/base/win/embedded_i18n/generate_embedded_i18n.gni
+@@ -47,6 +47,9 @@
+ #       The branding used to determine specific string extractions.
+ #       Will not be passed to the generation script if it is undefined.
+ #
++#   source_parts (optional)
++#       Explicit GRDP inputs to expand during extraction.
++#
+ #   deps (optional)
+ #   visibility (optional)
+ 
+@@ -87,6 +90,9 @@
+   action_with_pydeps(target_name) {
+     script = "//base/win/embedded_i18n/create_string_rc.py"
+     inputs = []
++    if (defined(invoker.source_parts)) {
++      inputs += invoker.source_parts
++    }
+ 
+     output_dir = rebase_path(target_gen_dir, root_build_dir)
+ 
+@@ -106,6 +112,15 @@
+       "--first-resource-id",
+       first_resource_id,
+     ]
++
++    if (defined(invoker.source_parts)) {
++      foreach(source_part, invoker.source_parts) {
++        args += [
++          "--source-part",
++          rebase_path(source_part, root_build_dir),
++        ]
++      }
++    }
+ 
+     foreach(grd_file_info, grd_files_info) {
+       grdfile_folder = grd_file_info[0]
+diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
+--- a/chrome/installer/util/BUILD.gn
++++ b/chrome/installer/util/BUILD.gn
+@@ -244,6 +244,9 @@
+   output_file_name_base = "installer_util_strings"
+ 
+   branding = branding_path_product
++  if (branding_path_product == "chromium") {
++    source_parts = [ "//chrome/app/yee_product_names.grdp" ]
++  }
+ }
+ 
+ # Compile the generated .rc file.
+diff --git a/build/util/version.py b/build/util/version.py
+--- a/build/util/version.py
++++ b/build/util/version.py
+@@ -25,7 +25,7 @@
+ 
+     The file must exist, otherwise you get the Python exception from open().
+     """
+-    with open(file_name, 'r') as f:
++    with open(file_name, 'r', encoding='utf-8') as f:
+         for line in f.readlines():
+             key, val = line.rstrip('\r\n').split('=', 1)
+             values_dict[key] = val
+@@ -99,21 +99,21 @@
+ 
+     This is like SubstTemplate, except it operates on a file.
+     """
+-    with open(file_name, 'r') as f:
++    with open(file_name, 'r', encoding='utf-8') as f:
+         template = f.read()
+     return SubstTemplate(template, values)
+ 
+ 
+-def WriteIfChanged(file_name, contents, mode):
++def WriteIfChanged(file_name, contents, mode, encoding='utf-8'):
+     """
+     Writes the specified contents to the specified file_name.
+ 
+     Does nothing if the contents aren't different than the current contents.
+     """
+     try:
+-        with open(file_name, 'r') as f:
++        with open(file_name, 'r', encoding=encoding) as f:
+             old_contents = f.read()
+-    except EnvironmentError:
++    except (EnvironmentError, UnicodeError):
+         pass
+     else:
+         if contents == old_contents and mode == stat.S_IMODE(
+@@ -121,7 +121,7 @@
+         ):
+             return
+         os.unlink(file_name)
+-    with open(file_name, 'w') as f:
++    with open(file_name, 'w', encoding=encoding) as f:
+         f.write(contents)
+     os.chmod(file_name, mode)
+ 
+@@ -147,6 +147,12 @@
+         '--output',
+         default=None,
+         help='Write substituted strings to FILE.',
++    )
++    parser.add_argument(
++        '--output-encoding',
++        choices=('utf-8', 'utf-16'),
++        default='utf-8',
++        help='Encoding for generated output; Windows RC requires utf-16.',
+     )
+     parser.add_argument(
+         '-t',
+@@ -315,7 +321,8 @@
+ 
+     if output['options'].output is not None:
+         WriteIfChanged(
+-            output['options'].output, output['contents'], output['mode']
++            output['options'].output, output['contents'], output['mode'],
++            output['options'].output_encoding
+         )
+     else:
+         print(output['contents'])
+diff --git a/chrome/process_version_rc_template.gni b/chrome/process_version_rc_template.gni
+--- a/chrome/process_version_rc_template.gni
++++ b/chrome/process_version_rc_template.gni
+@@ -53,10 +53,19 @@
+   process_version(target_name) {
+     template_file = _template_file
+     sources = _sources
++    extra_args = []
++    if (defined(invoker.extra_args)) {
++      extra_args += invoker.extra_args
++    }
++    if (is_win) {
++      # rc.py recognizes Unicode input through the UTF-16 BOM.
++      extra_args += [ "--output-encoding", "utf-16" ]
++    }
+     forward_variables_from(invoker,
+                            "*",
+                            [
+                              "sources",
++                             "extra_args",
+                              "template_file",
+                            ])
+   }
+diff --git a/chrome/installer/setup/installer_crash_reporter_client.cc b/chrome/installer/setup/installer_crash_reporter_client.cc
+--- a/chrome/installer/setup/installer_crash_reporter_client.cc
++++ b/chrome/installer/setup/installer_crash_reporter_client.cc
+@@ -38,7 +38,7 @@
+     std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+ 
+   std::unique_ptr<FileVersionInfo> version_info(
+       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
+diff --git a/chrome/notification_helper/notification_helper_crash_reporter_client.cc b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
+--- a/chrome/notification_helper/notification_helper_crash_reporter_client.cc
++++ b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
+@@ -60,7 +60,7 @@
+     std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+ 
+   std::unique_ptr<FileVersionInfo> version_info(
+       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
+diff --git a/chrome/windows_services/service_program/crash_reporting.cc b/chrome/windows_services/service_program/crash_reporting.cc
+--- a/chrome/windows_services/service_program/crash_reporting.cc
++++ b/chrome/windows_services/service_program/crash_reporting.cc
+@@ -116,7 +116,7 @@
+                                            std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+   *version = base::ASCIIToWide(CHROME_VERSION_STRING);
+   special_build->clear();
+   *channel_name =
+diff --git a/chrome/installer/linux/common/installer.py b/chrome/installer/linux/common/installer.py
+--- a/chrome/installer/linux/common/installer.py
++++ b/chrome/installer/linux/common/installer.py
+@@ -390,8 +390,8 @@
+             return env
+ 
+         def parse_simple(file_path: pathlib.Path) -> dict[str, str]:
+-            return dict(
+-                line.strip().split("=") for line in file_path.open("r") if line)
++            with file_path.open("r", encoding="utf-8") as stream:
++                return dict(line.strip().split("=", 1) for line in stream if line)
+ 
+         data["info_vars"] = parse_shell(
+             output_dir / "installer/common" /

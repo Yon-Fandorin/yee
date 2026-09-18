@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee Agent prototype test</title>
+<style>
+  :root { color-scheme: light dark; font: 16px system-ui; }
+  body { max-width: 660px; margin: 36px; line-height: 1.5; }
+  label { display: block; margin: 12px 0; }
+  input, button { font: inherit; padding: 6px 10px; }
+  output { display: block; margin: 20px 0; }
+</style>
+<h1>Yee Agent prototype test</h1>
+<p>Local-only form. No network requests, credentials or external side effects.</p>
+<form id="form">
+  <label>Name <input id="name" autocomplete="off" required></label>
+  <label>Password redaction test <input id="password" type="password" value="fixture-secret-do-not-observe"></label>
+  <button>Save locally</button>
+</form>
+<output id="result" role="status">Waiting for input</output>
+<button id="replace" type="button">Replace name field</button>
+<p id="long" aria-label="Long text verification"></p>
+<script>
+  document.querySelector('#form').addEventListener('submit', event => {
+    event.preventDefault();
+    document.querySelector('#result').textContent = 'Saved: ' + document.querySelector('#name').value;
+  });
+  document.querySelector('#replace').addEventListener('click', () => {
+    const field = document.querySelector('#name');
+    field.replaceWith(field.cloneNode());
+  });
+  document.querySelector('#long').textContent = 'Long observation text. '.repeat(12) + 'TAIL_MARKER_42';
+  // Opt-in viewport traversal fixture. Default Cedar smoke stays unchanged.
+  if (new URLSearchParams(location.search).has('scroll-test')) {
+    const section = document.createElement('section');
+    for (let i = 1; i <= 24; i++) {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = 'Synthetic long document section ' + i + '. ' + 'Viewport traversal content. '.repeat(8);
+      section.appendChild(paragraph);
+    }
+    const tail = document.createElement('p');
+    tail.textContent = 'SCROLL_END_MARKER_73';
+    section.appendChild(tail);
+    document.body.appendChild(section);
+  }
+</script>

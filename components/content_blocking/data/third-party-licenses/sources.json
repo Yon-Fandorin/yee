@@ -1,0 +1,18 @@
+[
+  {
+    "name": "flatbuffers",
+    "version": "25.12.19",
+    "file": "flatbuffers-25.12.19.txt",
+    "source": "https://raw.githubusercontent.com/google/flatbuffers/7e163021e59cca4f8e1e35a7c828b5c6b7915953/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "note": "Original pinned upstream repository license omitted from the published crate."
+  },
+  {
+    "name": "seahash",
+    "version": "4.1.0",
+    "file": "seahash-4.1.0.txt",
+    "source": "https://gitlab.redox-os.org/redox-os/seahash/-/raw/3088c5c912b70b586d27bf553fbe964e025a2c89/LICENSE",
+    "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "note": "The published 4.1.0 crate declares MIT but omits a license file; this is the license text subsequently added by the original project in commit 3088c5c912b70b586d27bf553fbe964e025a2c89 (fix: add missing MIT license text)."
+  }
+]

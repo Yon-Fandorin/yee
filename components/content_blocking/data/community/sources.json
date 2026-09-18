@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "revision": "019d5d477da8fc60f3aaf6a3b41bd51a5e961b39",
+  "license_file": "uAssets/LICENSE",
+  "license_sha256": "589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2",
+  "supported_redirects": [
+    "blank-js",
+    "noop.js",
+    "noopjs",
+    "abp-resource:blank-js",
+    "blank-mp4",
+    "noop-1s.mp4",
+    "noopmp4-1s",
+    "abp-resource:blank-mp4"
+  ],
+  "sources": [
+    {
+      "file": "uAssets/filters/filters.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters.txt",
+      "sha256": "ae28628dab8a17964b923a04d4f7ebdb06ff4cc1b875c11c028970f6e80d6f72",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2020.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2020.txt",
+      "sha256": "0ea355d42ea90c8e43234cda92220dc6e6a845b806180d5ca05c5d531efebc81",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2021.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2021.txt",
+      "sha256": "ae15989bd7680d373d9b51cbce88f20734e855d26320e3e2e8f94df491c52d8a",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2022.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2022.txt",
+      "sha256": "25e87e3efe00f834b6e072297f1fbc95b4778a9e4c3a028254e58751e7261502",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2023.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2023.txt",
+      "sha256": "6a9fe5672c15ecf2d3e0c9601a83462b42099bee8cc443881ad8b055d3257701",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2024.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2024.txt",
+      "sha256": "7e577f24ed3aa7df380bd7443fef01575ccdb18b369e2ec534913129d208590c",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2025.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2025.txt",
+      "sha256": "4683f1181834e7c609e80fe21c70044817f448b5e3f38c489f5b81fa037d4522",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-2026.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-2026.txt",
+      "sha256": "a97e8270db108d4a7e3a5003a6b901dfe1ed509d11fa80b7f39fdc01cc29c950",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/filters-general.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/filters-general.txt",
+      "sha256": "66badba0079fa1c9af5a834dad85ed0ebc7a3ce9bae6e3881edd50d304128869",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/badware.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/badware.txt",
+      "sha256": "bf81c209614c4fd3efdb995bd5eed2adcd2aac6994b6e75b0c7eda2af87b6afd",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/resource-abuse.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/resource-abuse.txt",
+      "sha256": "25c6c655699c89cbb2e46ea8bcff7d7022b4bbe9ef8e5583791aba417729249b",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/unbreak.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/unbreak.txt",
+      "sha256": "7b96ccb34357cceffb0d06d12ebb7d2b6e0f9926258e1dc6d1d60ac6c73265fc",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/quick-fixes.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/quick-fixes.txt",
+      "sha256": "6e82417f6f244d1e2af887d9f9986ed404ed72d0fe11361372736e4dc41107c8",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/ubo-link-shorteners.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/ubo-link-shorteners.txt",
+      "sha256": "f509e4c916d0d5fab00ea09238435b25074602d7458166fca9d9d0d26641cfac",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "default"
+    },
+    {
+      "file": "uAssets/filters/privacy.txt",
+      "source": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/019d5d477da8fc60f3aaf6a3b41bd51a5e961b39/filters/privacy.txt",
+      "sha256": "c968dce16ac0c01e564ad3db4dd12b534a0b10a2becc37e5afef550a5eceadeb",
+      "license": "GPL-3.0",
+      "attribution": "The uBlock Origin contributors",
+      "group": "privacy"
+    }
+  ],
+  "modification_date": "2026-09-13"
+}

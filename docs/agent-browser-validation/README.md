@@ -7,6 +7,8 @@
 - [기계 판독 비교](comparison.json)
 - [증거·해시 색인](evidence-index.json)
 - [검증 기준](../agent-browser-gate.md)
+- [전사 형식](../agent-browser-transcript-format.md)
+- [UI 자동화 운영](../ui-automation-session.md)
 - [다음 작업](../agent-browser-worklist.md)
 
 날짜별 중간 보고서와 단일 표본은 현재 결론으로 사용하지 않는다. 재현에 필요한

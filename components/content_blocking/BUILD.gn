@@ -1,0 +1,186 @@
+import("//build/rust/rust_static_library.gni")
+import("//testing/test.gni")
+import("//third_party/rust/yee_adblock/sources.gni")
+import("community_scriptlet_sources.gni")
+
+rust_static_library("rust_bridge") {
+  allow_unsafe = true
+  crate_name = "yee_adblock_bridge"
+  crate_root = "rust/src/lib.rs"
+  sources = [ "rust/src/lib.rs" ]
+  cxx_bindings = sources
+  edition = "2024"
+  deps = [
+    "//third_party/rust/yee_adblock/adblock_0_13_3:lib",
+    "//third_party/rust/yee_adblock/serde_json_1_0_151:lib",
+  ]
+}
+
+action("bundled_rules") {
+  script = "embed_rules.py"
+  inputs = [
+    "data/easylist.txt",
+    "data/easyprivacy.txt",
+    "data/filters.txt",
+    "data/resources.json",
+    "data/test-filters.txt",
+    "data/test-resources.json",
+    "data/sources.json",
+    "scriptlet_runtime.js",
+  ]
+  outputs = [ "$target_gen_dir/bundled_rules.h" ]
+  args = rebase_path(inputs + outputs, root_build_dir)
+  inputs += [ "preprocess_filters.py" ]
+}
+
+action("community_filter_data") {
+  script = "build_filter_pack.py"
+  inputs = [
+    "preprocess_filters.py",
+    "build_scriptlet_resources.mjs",
+    "scriptlet_runtime.js",
+    "data/community/package.json",
+    "//third_party/node/node.py",
+    "data/community/scriptlet-sources.json",
+    "data/community/sources.json",
+    "data/community/README.md",
+    "data/community/LICENSE-builder",
+    "data/community/uAssets/LICENSE",
+    "data/community/uAssets/filters/filters.txt",
+    "data/community/uAssets/filters/filters-2020.txt",
+    "data/community/uAssets/filters/filters-2021.txt",
+    "data/community/uAssets/filters/filters-2022.txt",
+    "data/community/uAssets/filters/filters-2023.txt",
+    "data/community/uAssets/filters/filters-2024.txt",
+    "data/community/uAssets/filters/filters-2025.txt",
+    "data/community/uAssets/filters/filters-2026.txt",
+    "data/community/uAssets/filters/filters-general.txt",
+    "data/community/uAssets/filters/badware.txt",
+    "data/community/uAssets/filters/resource-abuse.txt",
+    "data/community/uAssets/filters/unbreak.txt",
+    "data/community/uAssets/filters/quick-fixes.txt",
+    "data/community/uAssets/filters/ubo-link-shorteners.txt",
+    "data/community/uAssets/filters/privacy.txt",
+  ]
+  inputs += community_scriptlet_sources
+  outputs = [
+    "$target_gen_dir/community/YeeCommunityFilters.txt",
+    "$target_gen_dir/community/YeeCommunityResources.json",
+    "$target_gen_dir/community/YeeCommunityFilterManifest.json",
+    "$target_gen_dir/community/YeeCommunityFilterNotices.txt",
+    "$target_gen_dir/community/YeeCommunityFilterSources.tar.xz",
+  ]
+  args = rebase_path([
+                       "data/community",
+                       "$target_gen_dir/community",
+                       "//third_party/node/node.py",
+                     ],
+                     root_build_dir)
+}
+
+source_set("filter_data") {
+  public = [ "filter_data.h" ]
+  sources = [ "filter_data.cc" ]
+  deps = [
+    ":bundled_rules",
+    ":rust_bridge",
+    "//crypto",
+  ]
+  public_deps = [ "//base" ]
+}
+
+source_set("core") {
+  public = [
+    "engine.h",
+    "selector_styles.h",
+    "settings.h",
+  ]
+  sources = [
+    "engine.cc",
+    "selector_styles.cc",
+    "settings.cc",
+  ]
+  deps = [
+    ":bundled_rules",
+    ":rust_bridge",
+    "//crypto",
+  ]
+  public_deps = [
+    ":filter_data",
+    "//base",
+    "//url",
+  ]
+}
+
+action("package_notices") {
+  script = "package_notices.py"
+  inputs = [
+    "//third_party/rust/yee_adblock/manifest.json",
+    "//third_party/rust/yee_adblock/sources.gni",
+    "//LICENSE",
+    "data/sources.json",
+    "data/LICENSE-EasyList.txt",
+    "data/third-party-licenses/sources.json",
+    "data/third-party-licenses/flatbuffers-25.12.19.txt",
+    "data/third-party-licenses/seahash-4.1.0.txt",
+    "data/easylist.txt",
+    "data/easyprivacy.txt",
+  ]
+  inputs += yee_adblock_original_sources
+  outputs = [
+    "$target_gen_dir/YeeContentBlockingNotices.txt",
+    "$target_gen_dir/YeeContentBlockingSources.tar.xz",
+  ]
+  args = rebase_path([
+                           "//third_party/rust/yee_adblock",
+                           ".",
+                         ] + outputs,
+                     root_build_dir)
+}
+
+if (is_mac) {
+  bundle_data("notices") {
+    sources = get_target_outputs(":package_notices") +
+              get_target_outputs(":community_filter_data")
+    outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
+    public_deps = [
+      ":community_filter_data",
+      ":package_notices",
+    ]
+  }
+} else {
+  copy("notices") {
+    sources = get_target_outputs(":package_notices") +
+              get_target_outputs(":community_filter_data")
+    outputs = [ "$root_out_dir/{{source_file_part}}" ]
+    public_deps = [
+      ":community_filter_data",
+      ":package_notices",
+    ]
+  }
+}
+
+copy("community_filter_test_data") {
+  testonly = true
+  sources = get_target_outputs(":community_filter_data")
+  outputs = [ "$root_out_dir/community-filter-test-data/{{source_file_part}}" ]
+  deps = [ ":community_filter_data" ]
+}
+
+test("yee_content_blocking_unittests") {
+  sources = [
+    "engine_unittest.cc",
+    "filter_data_unittest.cc",
+    "selector_styles_unittest.cc",
+    "settings_unittest.cc",
+  ]
+  deps = [
+    ":bundled_rules",
+    ":core",
+    "//base/test:run_all_unittests",
+    "//base/test:test_support",
+    "//crypto",
+    "//testing/gtest",
+  ]
+  data_deps = [ ":community_filter_test_data" ]
+}

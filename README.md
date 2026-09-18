@@ -1,123 +1,82 @@
-# yee
+# 브라우저 프로젝트
 
-Chromium을 기반으로 사용자와 에이전트가 함께 사용하는 브라우저를 탐색하는
-pilot 프로젝트다. 현재 목표는 실제 Chromium 탭 모델을 유지하면서, 사용자에게는
-Arc/Aside 계열의 조용한 sidebar-first 셸을 제공하고 에이전트에는 브라우저 내부
-상태로 이어지는 명확한 통합 경계를 만드는 것이다.
+Chromium 기반의 브라우저를 만든다. 탭과 웹페이지, 주소창의 기본 동작은
+Chromium을 사용하고, 창의 UI와 Agent 연결은 별도 제품 코드로 구현한다.
+표시 이름과 로고는 [`branding/brand.json`](branding/brand.json)에서 관리한다.
 
-실제 Chromium 구현에서 지켜야 할 레이아웃 치수, OS별 경계, Sidebar 정보 구조와
-회귀 체크리스트는 [`docs/browser-shell-spec.md`](docs/browser-shell-spec.md)를
-기준으로 한다.
+## 디렉터리 안내
 
-## Native Chromium checkpoint
+| 디렉터리 | 역할 |
+| --- | --- |
+| [`browser/`](browser/README.md) | 브라우저 창의 UI, Agent 연결과 요청 차단 |
+| [`renderer/`](renderer/README.md) | 웹페이지의 CSS·스크립트 처리 |
+| [`components/`](components/README.md) | 공용 차단 엔진, 설정과 데이터 |
+| [`third_party/`](third_party/README.md) | 외부 라이브러리 원본과 라이선스 |
+| [`patches/`](patches/README.md) | Chromium 원본의 변경 내역 |
+| [`branding/`](branding/README.md) | 표시 이름·로고 설정과 적용 목록 |
+| [`build/`](build/README.md) | 빌드 설정과 소스 복사 경로 |
+| [`tools/`](tools/README.md) | 개발·테스트·Agent 연동 도구 |
+| [`tests/`](tests/README.md) | 도구 테스트와 테스트용 페이지 |
+| [`experiments/`](experiments/README.md) | 화면 배치와 동작 실험 |
+| [`native-pilot/`](native-pilot/README.md) | 설치된 Chrome으로 실제 탭 동작 확인 |
+| [`assets/`](assets/README.md) | 로고 등 원본 이미지 |
+| [`docs/`](docs/README.md) | 제품 명세, 설계와 테스트 기록 |
 
-[`native-pilot/`](native-pilot/)은 설치된 현재 Chrome의 Chromium 런타임과 native
-vertical tabs를 격리 프로필로 실행하는 가장 작은 실제 브라우저 체크포인트다.
-Electron, CEF, `<webview>`를 사용하지 않으며 탭과 페이지는 실제
-`TabStripModel`/`WebContents` 상태다.
+파일 배치는 [프로젝트 구조](docs/project-structure.md), 화면 배치와 용어는
+[브라우저 셸 명세](docs/browser-shell-spec.md)와
+[레이아웃 용어](docs/browser-shell-layout-glossary.md)를 따른다.
+작업 절차는 [`AGENTS.md`](AGENTS.md)에 있다.
 
-```sh
-./native-pilot/launch.sh
-```
+## 빌드 없이 확인
 
-설치된 바이너리를 사용하는 이 체크포인트와 별도로,
-[`chromium-dev/`](chromium-dev/)가 얕은 Chromium 체크아웃과 단일 compact Release
-빌드 환경을 관리한다. 커스텀 Tenant/Workspace Launcher는 Chromium Views/WebUI
-소스 통합에서 추가한다.
-
-[`chromium-overlay/`](chromium-overlay/)에는 동일한 native vertical-tab 기본값을
-upstream Chromium checkout에 적용하는 최소 source patch와 GN 설정을 둔다.
-macOS 26에서는 Chromium의 native `GlassFrame` 합성이 Yee 제품 기본값으로
-활성화된다. 실행 스크립트는 시각 정책이나 테마를 강제하지 않으며, 지원되지 않는
-플랫폼과 시스템의 ‘투명도 줄이기’ 환경은 테마 기반 불투명 셸로 전환한다.
-
-## Local Chromium build
-
-Chromium 소스, `depot_tools`, 빌드 산출물은 모두 Git에서 제외된
-`.local-build/`에 생성한다.
+저장소 루트에서 실행한다. 첫 명령에는 기존 Chromium 소스가 필요하다.
+패치 적용 가능 여부와 도구 테스트를 확인하며 브라우저를 빌드하거나 실행하지 않는다.
 
 ```sh
-./chromium-dev/doctor.sh
-./chromium-dev/checkout.sh
-./chromium-dev/configure.sh
-./chromium-dev/build-ui.sh
-./chromium-dev/build.sh
-./chromium-dev/smoke-test.sh
+./tools/overlay/apply.sh "$PWD/.local-build/chromium/src" --check --skip-brand-assets
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test_*.py'
 ```
 
-Windows uses equivalent PowerShell entry points:
+이름과 로고 변경은 [브랜딩 안내](branding/README.md)를 참고한다.
+
+## 빌드와 실행
+
+Chromium 소스, 개발 도구, 캐시와 빌드 결과는 Git에서 제외된 `.local-build/`에 둔다.
+빌드를 진행할 때는 아래 명령을 사용한다.
+
+macOS:
+
+```sh
+./tools/dev/doctor.sh
+./tools/dev/checkout.sh
+./tools/dev/setup-metal.sh
+./tools/dev/configure.sh
+./tools/dev/build-ui.sh
+./tools/dev/build.sh
+./tools/dev/smoke-test.sh
+./tools/dev/run.sh
+```
+
+Windows PowerShell:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\chromium-dev\doctor.ps1
-.\chromium-dev\checkout.ps1
-.\chromium-dev\configure.ps1
-.\chromium-dev\build-ui.ps1
-.\chromium-dev\build.ps1
-.\chromium-dev\smoke-test.ps1
+.\tools\dev\doctor.ps1
+.\tools\dev\checkout.ps1
+.\tools\dev\configure.ps1
+.\tools\dev\build-ui.ps1
+.\tools\dev\build.ps1
+.\tools\dev\smoke-test.ps1
+.\tools\dev\run.ps1
 ```
 
-SDK and Visual Studio can remain on `C:` while checkout/build data is redirected
-to another drive with `YEE_LOCAL_BUILD_ROOT`. See
-[`chromium-dev/README.md`](chromium-dev/README.md) for the supported Windows
-layout and installer target.
+`build-ui.*`는 `yee_ui`만 컴파일한다. 실제 앱을 다시 만들려면 `build.*`를 실행한다.
+Windows 개발 실행 파일은 `chrome.exe`다.
+환경 준비, 디스크 여유 공간과 실행 방법은 [개발 도구](tools/dev/README.md)에 있다.
 
-전체 Git 이력과 별도 Git cache를 받지 않으며, 디버그 심볼을 만들지 않고
-`out/YeePilot` 하나만 유지한다. 상세한 용량 정책과 일상 명령은
-[`chromium-dev/README.md`](chromium-dev/README.md)에 있다.
+## 화면 실험과 실제 앱 확인
 
-Yee 고유 시각 컴포넌트는 Chromium 핵심 `BrowserView`와 `ToolbarView`에서
-`//chrome/browser/ui/views/yee:yee_ui` 타깃으로 분리되어 있다. 평소 UI 컴파일
-확인은 `build-ui.sh`로 끝내고, 실제 앱 링크와 통합 확인이 필요할 때만
-`build.sh`를 실행한다.
-
-정적 셸 프로토타입과 함께 실제 Chromium `WebContents`를 사용하는 Yee 빌드를
-검증하고 있다. 현재 구현 범위는 Title bar, native Toolbar, Tab sidebar와
-Browser Content 경계다. 탭 버튼으로 sidebar를 고정하거나 닫을 수 있고, 닫힌
-상태에서는 왼쪽 끝 hover로 콘텐츠 위에 flyout된다.
-
-## Browser shell prototype
-
-별도 빌드 없이 저장소 루트에서 임시 서버를 실행해
-[`prototype/index.html`](prototype/index.html)을 확인할 수 있다.
-
-```sh
-python3 -m http.server 4173 --bind 127.0.0.1
-```
-
-기본 확인 주소는
-`http://127.0.0.1:4173/prototype/?titlebar=regular&tenant=offset&sidebar=open`이다.
-
-화면 변형은 쿼리로 비교한다.
-
-- `titlebar=regular|thin`: OS별 기본 Title bar와 압축형
-- `tenant=squircle|offset|inset`: Tenant 이미지 실루엣 비교
-- `sidebar=open|closed`: 고정 사이드바와 닫힌 사이드바
-- `os=windows|mac|linux`: 플랫폼 frame과 caption controls 비교
-
-Tenant/Workspace 맥락은 Title bar가 아니라 Sidebar footer에 유지한다. 현재 기본
-실루엣은 한쪽 곡률을 강조한 `offset`이다.
-
-현재 방향은 Arc와 Aside의 sidebar-first 탐색을 참고한 정적 WebUI형 셸이다.
-
-- Title bar의 Leading rail은 Sidebar, New item, Agent activity와 탐색 action을
-  소유한다. Omnibox 시작점은 Browser Content 시작점과 맞춘다.
-- Command Runway는 주소/검색/명령과 확장 프로그램을 하나의 표면에 묶는다.
-- 상세 Agent Status는 Sidebar에 두고 Toolbar에는 compact status만 둔다.
-- Tab sidebar의 Group은 사용자가 탭을 정리하는 UI 도구일 뿐 Agent Task를
-  소유하지 않는다.
-- 사이드바를 닫으면 웹 표면이 전체 폭을 사용한다. 왼쪽 끝에 가리키면 글라스
-  패널로 미리 보이고, 클릭하거나 단축키를 사용하면 고정되어 웹 표면을 민다.
-
-프로토타입의 동작 코드는 화면 개념별 ES module로 분리한다.
-
-- `js/launcher.js`: Title bar의 전역 Launcher
-- `js/workspace.js`: Tab/Group과 Sidebar의 추가, 선택, 닫기, 고정 상태
-- `js/dom.js`: DOM contract helper
-
-`+` 버튼이나 `⌘T`로 새 Tab을 추가하고, `⌘K` 또는 `⌘L`로 Launcher를 연다.
-`⌘W`는 현재 Tab을 닫고 `⌘B`는 Sidebar 고정 상태를 전환한다. Launcher에서는
-`↑`/`↓`로 열린 Tab을 이동하고 `Enter`로 선택한다.
-
-동작 코드는 시각 클래스 대신 `data-action`, `data-field`, `data-region`을 계약으로
-사용한다.
+[화면 프로토타입](experiments/shell-prototype/README.md)은 HTML·CSS로 배치와 동작을 비교한다.
+[설치된 Chrome 확인 환경](native-pilot/README.md)은 별도 프로필로 실제 탭을 실행한다.
+직접 구현한 기능의 테스트 범위는 [제품 코드](browser/README.md)와
+[테스트 기록](docs/README.md)에 있다.

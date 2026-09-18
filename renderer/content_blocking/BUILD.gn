@@ -1,0 +1,26 @@
+action("scripts") {
+  script = "embed_scripts.py"
+  inputs = [
+    "generic_cosmetic.js",
+    "youtube.js",
+    "selector_validation.js",
+  ]
+  outputs = [ "$target_gen_dir/scripts.h" ]
+  args = rebase_path(inputs + outputs, root_build_dir)
+}
+source_set("renderer") {
+  public = [ "document_filter_agent.h" ]
+  sources = [ "document_filter_agent.cc" ]
+  deps = [
+    ":scripts",
+    "//base",
+    "//chrome/common",
+    "//gin",
+  ]
+  public_deps = [
+    "//components/yee_content_blocking:core",
+    "//content/public/renderer",
+    "//third_party/blink/public:blink",
+    "//v8",
+  ]
+}

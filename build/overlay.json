@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "patches": [
+    {
+      "role": "shell",
+      "file": "patches/0001-integrate-yee-shell.patch",
+      "strategy": "whole"
+    },
+    {
+      "role": "branding",
+      "file": "patches/0002-brand-yee-application.patch",
+      "strategy": "sections"
+    },
+    {
+      "role": "windows_tools",
+      "file": "patches/0003-fix-windows-protoc-python-aliases.patch",
+      "strategy": "whole"
+    }
+  ],
+  "source_roots": [
+    {
+      "source": "browser/ui",
+      "destination": "chrome/browser/ui/views/yee"
+    },
+    {
+      "source": "browser/content_blocking",
+      "destination": "chrome/browser/yee_content_blocking"
+    },
+    {
+      "source": "renderer/content_blocking",
+      "destination": "chrome/renderer/yee_content_blocking"
+    },
+    {
+      "source": "components/content_blocking",
+      "destination": "components/yee_content_blocking"
+    },
+    {
+      "source": "third_party/yee_adblock",
+      "destination": "third_party/rust/yee_adblock"
+    }
+  ],
+  "generated_roots": [
+    "chrome/app/theme/chromium"
+  ],
+  "new_glue": [
+    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.cc",
+    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.h",
+    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc"
+  ],
+  "ignored_source_names": [
+    ".DS_Store",
+    "__pycache__"
+  ]
+}

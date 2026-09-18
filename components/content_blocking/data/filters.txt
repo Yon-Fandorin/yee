@@ -1,0 +1,25 @@
+! Yee initial independently authored rules. BSD-style license.
+! Upstream general lists are added with their original licenses and provenance.
+||doubleclick.net^
+||googlesyndication.com^
+||googleadservices.com^
+||google-analytics.com^
+||adnxs.com^
+||adsrvr.org^
+||scorecardresearch.com^
+||criteo.com^
+||criteo.net^
+||taboola.com^
+||outbrain.com^
+youtube.com##ytd-ad-slot-renderer
+youtube.com##ytd-display-ad-renderer
+youtube.com##ytd-promoted-sparkles-web-renderer
+youtube.com##ytd-in-feed-ad-layout-renderer
+youtube.com##.ytp-ad-overlay-container
+! Advertisement-only playback identifiers; retain ordinary media requests.
+||youtube.com/youtubei/v1/log_event^$xmlhttprequest,domain=youtube.com|youtube-nocookie.com|youtubekids.com
+/\/initplayback\?(?:[^#]*&)?source=yt_ads(?:&|$)/$domain=youtube.com|youtube-nocookie.com|youtubekids.com
+/\/initplayback\?(?:[^#]*&)?c=TVHTML5&(?:[^#]*&)?oad=/$domain=youtube.com|youtube-nocookie.com|youtubekids.com
+/\/initplayback\?(?:[^#]*&)?oad=[^&#]*&(?:[^#]*&)?c=TVHTML5(?:&|$)/$domain=youtube.com|youtube-nocookie.com|youtubekids.com
+*_ad_*$media,third-party,domain=youtube.com|youtube-nocookie.com|youtubekids.com
+||googlevideo.com^*3p_ad_$domain=youtube.com|youtube-nocookie.com|youtubekids.com

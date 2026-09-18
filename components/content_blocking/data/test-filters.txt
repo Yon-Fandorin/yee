@@ -1,0 +1,23 @@
+! Test-only rules, enabled with --yee-content-blocking-test-rules.
+||yee-block.test^
+@@||yee-block.test/allowed^
+yee-fixture.test##.yee-ad
+##.yee-generic-ad
+yee-fixture.test#@#.yee-generic-exception
+##.yee-generic-exception
+yee-fixture.test##+js(yee-fixture.js)
+||yee-ping.test^$ping
+##.yee-overflow-ad
+||yee-frame-type.test^$subdocument
+||yee-request-source.test^$subdocument,domain=iframe-source.test
+||yee-document-party.test^$document,third-party
+||yee-csp.test^$csp=img-src 'none'
+@@||yee-csp.test/except^$csp
+||yee-fixture.test^*/csp-frame^$csp=img-src 'none'
+||yee-redirect.test^$redirect=blank-js
+||yee-video.test^$rewrite=abp-resource:blank-mp4
+||yee-redirect-rule.test^$redirect-rule=blank-js
+||yee-query.test^$removeparam=tracking
+||yee-utf8.test^$redirect=yee-utf8.html
+||yee-binary.test^$redirect=yee-binary.png
+||yee-zero.test^$redirect=yee-zero.txt

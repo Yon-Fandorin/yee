@@ -1,6 +1,10 @@
 # macOS metadata
 .DS_Store
 
+# Generated Python bytecode
+__pycache__/
+*.py[cod]
+
 # Keep brand explorations local; the selected v8c mark remains versioned.
 /assets/brand/*.png
 !/assets/brand/yee-logo-v8c-dino-nubs.png

@@ -1,0 +1,12 @@
+EasyList and EasyPrivacy
+
+Attribution: The EasyList authors (https://easylist.to/).
+These bundled lists are redistributed under the CC BY-SA 3.0-or-later option
+of their dual license. The original headers and rules are retained.
+
+License URI: https://creativecommons.org/licenses/by-sa/3.0/
+Legal code: https://creativecommons.org/licenses/by-sa/3.0/legalcode
+Original licensing statement: https://easylist.to/pages/licence.html
+Sources, retrieval date and SHA-256: sources.json
+
+Yee rules in filters.txt are separately authored and identified.

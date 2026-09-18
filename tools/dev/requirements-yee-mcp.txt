@@ -1,0 +1,2 @@
+# Optional stdio adapter only; the standalone CLI remains stdlib-only.
+mcp==2.1.1
