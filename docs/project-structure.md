@@ -55,8 +55,7 @@ yee/
 └── .local-exclude/                   로컬 실험 산출물
 ```
 
-`native-pilot/`의 실행 경로와 기존 `runtime/profile`은 유지했다. 기존 격리
-프로필은 이번 소스 디렉토리 정리에서 이동하지 않았다.
+`native-pilot/runtime/`은 실행할 때 다시 만드는 격리 프로필이며 Git에 보관하지 않는다.
 
 제품명은 `branding/brand.json`에서 바꾼다. 디렉토리와 C++ namespace의 `yee`는
 안정된 소스 식별자이므로, 표시 이름을 바꿀 때 이동하지 않는다.
@@ -84,24 +83,10 @@ yee/
 제외한다. 새 Chromium glue 파일은 `new_glue`에 등록하여 untracked 상태에서도
 패치에 포함되게 한다. UI 개선은 독립 소스와 기존 `0001`에 반영한다.
 
-## 기존 경로에서의 이동
+## 검증 진입점
 
-| 이전 | 현재 |
-| --- | --- |
-| `chromium-overlay/yee-ui/` | 위의 다섯 소스 소유 디렉토리 |
-| `chromium-overlay/patches/` | `patches/` |
-| `chromium-overlay/brand.json` | `branding/brand.json` |
-| `chromium-overlay/branding-surfaces.json` | `branding/surfaces.json` |
-| `chromium-overlay/args.gn`, `overlay.json` | `build/` |
-| 오버레이 실행 스크립트·Python 구현 | `tools/overlay/` |
-| `chromium-dev/`의 개발·자동화 명령 | `tools/dev/` |
-| 기존 브랜딩·번들 테스트 구현 | `tests/tooling/` |
-| `chromium-dev/fixtures/` | `tests/fixtures/` |
-| `prototype/` | `experiments/shell-prototype/` |
-
-명령 이름과 옵션은 유지하고 디렉토리 경로를 갱신했다. 현재 명령은 아래와 같다.
-이미 남은 검증 영수증·실험 JSON에는 당시의 이전 경로가 남을 수 있다. 과거 기록은
-현재 파일 배치를 맞추기 위해 다시 쓰지 않는다.
+이전 디렉터리의 호환 복사본이나 실행 wrapper는 유지하지 않는다. 현재 경로만 문서와
+자동화에서 사용한다. 구조와 overlay를 빠르게 검사하는 명령은 아래와 같다.
 
 ```sh
 ./tools/dev/doctor.sh
@@ -110,19 +95,7 @@ yee/
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test_*.py'
 ```
 
-위 검증 명령은 Chromium을 빌드하거나 브라우저를 실행하지 않는다. 실제 빌드가
-필요할 때는 `tools/dev/build-ui.sh`와 `tools/dev/build.sh`를 사용한다. 네이티브
-검증 gate와 C++ `*_unittest.cc`는 기존 역할을 유지한다. C++ 테스트는 제품 소스
-옆에 둔다. 개발 도구 내부의 CLI·MCP·비교 실험 하위 분리는 후속 작업이다.
-
-## 이번 정리의 검증
-
-- 소스·패치 2,378개 파일의 이동 전후 SHA-256이 일치한다. 기존 파일의 바이트를 유지했다.
-- 구조·브랜딩·개발 도구 테스트 52개, Agent 브리지 JS 테스트 28개가 통과했다.
-- generic cosmetic/YouTube JS adapter fixture와 실제 checkout의 패치 역방향 검사,
-  소스 동기화·실행 사전 조건 검사가 통과했다.
-- 추가 Python fixture 진입점 검증은 대부분 통과했다. loopback socket과 `ps`가
-  필요한 두 테스트 묶음은 현재 sandbox 제한으로 검증을 마치지 못했다. 보존된 실제
-  trial 경로를 요구하는 evidence 검증은 opt-in으로 남겼다.
-- Windows PowerShell 실행은 이 macOS 환경에서 검증하지 않았다.
-- Yee 브랜딩 생성 입력을 새 설정 위치에 맞췄다. Chromium 빌드·앱 실행은 하지 않았다.
+이 명령들은 Chromium을 빌드하거나 브라우저를 실행하지 않는다. 제품 소스가 바뀌면
+`tools/dev/build-ui.sh` 또는 `tools/dev/build.sh`를 실행하고, 화면 배치는
+`tools/dev/test-browser-surface-layout.sh`의 해당 gate로 확인한다. C++ 테스트는 제품
+소스 옆에 둔다. 특정 실행의 통과 수와 로컬 로그 경로는 구조 문서에 고정하지 않는다.

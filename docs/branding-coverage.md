@@ -1,6 +1,7 @@
 # 브랜딩 적용 범위와 검증 경계
 
-확인일: 2026-09-12. 로컬 Chromium `153.0.8005.0`, upstream 커밋
+최초 소스 감사일: 2026-09-12. 런타임 후속 확인일: 2026-09-28.
+로컬 Chromium `153.0.8005.0`, upstream 커밋
 `25189dfe0a49b3f8324586374b8251b8d12ad1c2`의 소비 경로와 현재 overlay를
 읽기 전용으로 감사했다. 아래 Chromium 소스 경로의 기준 디렉터리는
 `.local-build/chromium/src/`다. Brave의 연결 방식은
@@ -13,10 +14,11 @@
 자동으로 바꾸지 않는다. 확정 이름을 코드와 패치에 직접 넣는 대신 설정에서
 제품 메타데이터와 표시 리소스를 생성한다.
 
-현재 판정은 **source-ready / build-not-verified**다. 이는 설정과 연결 지점,
-누락 검사 및 후속 수용 기준을 소스 수준에서 준비한다는 뜻이다. 모든 사용자
-표시·OS 등록이 전환됐거나 출시할 수 있다는 완료 판정은 아니다. 아직 연결하지
-않은 문자열·URL·자산·설치 식별자가 있으며 빌드와 실제 앱 검증은 수행하지 않았다.
+현재 판정은 **macOS core build verified / branding coverage incomplete**다.
+설정된 제품명과 핵심 리소스는 macOS 앱 번들에 적용되어 빌드·실행됐고, Yee 소유
+native UI도 같은 빌드에서 사용됐다. 모든 사용자 표시·OS 등록이 전환됐거나
+출시할 수 있다는 완료 판정은 아니다. 아직 연결하지 않은 문자열·URL·자산·설치
+식별자가 있으며 Windows/Linux와 설치·업데이트 경로는 실행 검증하지 않았다.
 
 ## 설정의 독립 역할
 
@@ -38,7 +40,7 @@
 
 ## 판정 읽는 법
 
-- **연결 확인:** 현재 설정에서 해당 입력까지 연결한 경로다. 최종 빌드 결과는 미검증이다.
+- **연결 확인:** 현재 설정에서 해당 입력까지 연결한 소스·생성 경로다. 빌드와 런타임 검증 범위는 각 행에 별도로 적는다.
 - **소비 확인 / 미연결:** Chromium에서 실제 사용 지점을 찾았지만 우리 브랜드 설정을 아직 연결하지 않았다.
 - **별도 원본 필요:** 현재 PNG의 크기 조절만으로 완성되지 않는 벡터·워드마크·레이어·애니메이션 입력이다.
 - **호환성 유지:** 공유 형식·기술 식별자·저작권·외부 제품명으로, 전역 치환에서 제외한다.
@@ -57,9 +59,9 @@
 | 비ASCII 메타데이터·Windows 버전 RC | `build/util/version.py`; `chrome/process_version_rc_template.gni`; `build/toolchain/win/rc/rc.py:139` | 연결 확인. 공통 읽기·출력은 UTF-8, Windows RC는 UTF-16 BOM으로 생성하도록 연결했다. 실제 RC driver의 읽기 함수가 임시 한글 RC를 Unicode로 인식하는 것을 검증했다. RC compiler와 Windows 실행은 미검증이다. |
 | Windows crash client 제품명 변환 | `chrome/installer/setup/installer_crash_reporter_client.cc:41`; `chrome/notification_helper/notification_helper_crash_reporter_client.cc:63`; `chrome/windows_services/service_program/crash_reporting.cc:119` | 연결 확인. `ASCIIToWide`를 `UTF8ToWide`로 바꿔 설정된 short name의 UTF-8을 읽도록 했다. 컴파일·오류 수집 서버의 product identity는 미검증이다. |
 | Linux installer KV | `chrome/installer/linux/common/installer.py:394` | 파서 보완 확인. 첫 등호만 분리해 `Orbit = Browser` 같은 값을 보존하고 파일을 UTF-8로 읽는다. 실제 helper 임시 입력 테스트 통과. Linux 패키징 전체는 범위 밖이다. |
-| 우리 소유 UI | `browser/ui/brand.h`, `agent_bridge.cc`, `agent_bridge_prompt.cc`, `sidebar_footer.cc` | 연결 확인. 공통 helper로 제품명을 읽는다. 탭 glue 접근성 문구도 연결했고, Agent 포인터 폭은 이름의 텍스트 폭에서 계산한다. 실제 geometry는 빌드 미검증이다. |
-| 실행·빌드 진입점 | `tools/dev/common.zsh`, `common.ps1`, `build.*`, `build-ui.*`, `apply.*`, `configure.*` | 연결 확인. Windows 전체 빌드도 기존 output에 UI 소스를 복사하고 이름 입력을 갱신하도록 보완했다. Windows 실행 환경은 미검증이다. |
-| 이름 변경 전 실행 프로세스 | `tools/dev/common.zsh`; `browser_bundle_executables.py`; `gracefully-quit-yee.swift` | 같은 output에 남은 이전 이름 번들 탐색 연결 확인. 동일 Bundle ID의 plist 실행 경로만 선택하고 native helper가 정확한 앱·실행 경로를 확인한다. 임시 번들 테스트 통과. 삭제된 번들·다른 output의 프로세스는 범위 밖이며 실제 종료는 미검증이다. |
+| 우리 소유 UI | `browser/ui/brand.h`, `agent_bridge.cc`, `agent_bridge_prompt.cc`, `sidebar_footer.cc` | 연결 확인. 공통 helper로 제품명을 읽는다. 탭 glue 접근성 문구와 Agent 질문 제목도 연결했고, Agent 포인터 폭은 이름의 텍스트 폭에서 계산한다. macOS `yee_ui` 빌드와 native prompt test를 통과했다. 다른 제품명으로 바꾼 실제 앱 geometry는 별도 검증 대상이다. |
+| 실행·빌드 진입점 | `tools/dev/common.zsh`, `common.ps1`, `build.*`, `build-ui.*`, `apply.*`, `configure.*` | 연결 확인. macOS 전체/UI 빌드 경로는 실제 output 동기화와 앱 생성을 확인했다. Windows 전체 빌드도 기존 output에 UI 소스를 복사하고 이름 입력을 갱신하도록 보완했으나 Windows 실행 환경은 미검증이다. |
+| 이름 변경 전 실행 프로세스 | `tools/dev/common.zsh`; `browser_bundle_executables.py`; `gracefully-quit-yee.swift` | 같은 output에 남은 이전 이름 번들 탐색 연결 확인. 동일 Bundle ID의 plist 실행 경로만 선택하고 native helper가 정확한 앱·실행 경로를 확인한다. 임시 번들 테스트와 macOS 실제 앱 검증 전 정상 종료 경로를 통과했다. 삭제된 번들·다른 output의 프로세스는 범위 밖이다. |
 | 문장 속 제품명·번역 | `chrome/app/chromium_strings.grd`; `components/components_chromium_strings.grd`; 각 locale `.xtb` | 소비 확인 / 미연결. GRD 원문과 XTB 번역 ID를 같은 원본에서 변환한다. 이전 생성물에 재치환하지 않는다. 외부 제품명·Attribution 예외를 명시한다. |
 | macOS Helper·권한 안내 | `chrome/tools/build/mac/infoplist_strings_util.cc:147`, `:165`, `:169`, `:184` | 소비 확인 / 미연결. Helper 이름, 카메라·마이크·Bluetooth·위치·로컬 네트워크·credential 권한 문장은 제품명 세 ID만 변경해도 모두 바뀌지 않는다. |
 | WebUI 링크의 문구 | `chrome/browser/resources/net_internals/index.html:24`; `components/components_chromium_strings.grd:318` | 소비 확인 / 미연결. 주소 포매터 밖의 `chrome://` 안내·링크 본문도 포함한다. 실제 링크 destination과 표시 문자열을 구분한다. |
@@ -144,7 +146,7 @@ Brave의 입력 정규화·표시·복사를 참고할 수 있지만 about handl
 | WebUI 권한·origin | scheme 등록, WebUI controller·bindings, origin 포매터·CSP·renderer 접근 검사 | trusted/untrusted 경계를 유지한다. 외부 페이지 iframe·window.open·location 이동과 guest/private 제한을 확인한다. |
 | 읽기 전용 pane 주소 | Yee split-pane 표시와 native Omnibox | 같은 표시 helper와 URL 정책을 사용한다. menu·자동완성·내부 link·bookmark가 동일한 alias로 이동해야 한다. |
 
-이 경계는 모두 **소비 확인 / URL alias 미연결 / 빌드 미검증**이다. source-level
+이 경계는 모두 **소비 확인 / URL alias 미연결 / runtime 미검증**이다. source-level
 검사만으로 `PageInfo CHECK`나 origin 경계가 안전하다고 완료 처리하지 않는다.
 
 ## 처리 순서와 완료 조건
@@ -162,9 +164,9 @@ Brave의 입력 정규화·표시·복사를 참고할 수 있지만 about handl
    명령·PageInfo·권한 경계를 하나의 integration checkpoint로 연결한다.
 6. 독립 OS/updater identity는 표시 이름과 별도로 적용한다. profile·Keychain·
    설치 등록·PWA·정책·서비스·업데이트의 최초 전환과 복구를 함께 설계한다.
-7. 사용자가 빌드를 진행하도록 요청한 이후 실제 앱·패키지·등록 결과를 검사한다.
-   그 전에는 source-ready/build-not-verified 상태를 유지한다. 실행 전에는
-   기존 브라우저를 정상 종료하고 새로 빌드된 앱을 실행한다.
+7. 지원 플랫폼별 실제 앱·패키지·등록 결과를 검사한다. macOS 핵심 앱은 빌드와
+   실행을 확인했으며, 설치·서명·업데이트와 Windows/Linux 결과는 아직 남아 있다.
+   실행 전에는 기존 브라우저를 정상 종료하고 새로 빌드된 앱을 실행한다.
 
 자동화 감사 진입점은 다음 형식으로 관리한다. 빌드나 앱 실행은 하지 않는다.
 
@@ -181,7 +183,9 @@ strict 검사를 통과시키지 않는다. 감사가 통과해도 적용된 빌
 검증했다는 의미는 아니다. 번역·asset 원본·URL 및 identity 연결이 미완료라면
 이를 숨기지 않고 coverage의 미연결 상태로 보고한다.
 
-## 이번 검토에서 확인한 결과
+## 검증 기록
+
+### 2026-09-12 최초 소스 감사
 
 2026-09-12 기준 선언된 소비 범주와 재귀 GRD part를 검사했다. 문자열 후보
 697개 중 632개는 개별 판정 전이다. 조건부 플랫폼·제품 분기와 외부 제품명도
@@ -203,4 +207,20 @@ rename·preview·재적용 및 패치 소유 분리를 검사했다. 실제 소�
 감사의 적용 상태는 `applied`다. 패치 역적용·소스 whitespace 검사도 통과했다.
 미연결·미검토·임시 이름과 runtime 미검증이 남아 `--require-complete`는 exit 1이다.
 Windows PowerShell 런타임은 이 환경에 없으므로 실행 검증하지 않았다.
-브라우저 빌드·앱 실행·설치 등록 검증도 수행하지 않았다.
+브라우저 빌드·앱 실행·설치 등록 검증도 이 최초 감사에서는 수행하지 않았다.
+
+### 2026-09-28 후속 확인
+
+제품명 입력은 현재 checkout에 적용되어 있고 생성된 macOS `Yee.app`의
+`CFBundleDisplayName`과 `CFBundleName`은 모두 `Yee`다. 전체 Chromium/Yee 빌드와
+새 앱 실행을 완료했으며, 이후 UI 전용 변경도 `build-ui.sh`와 native prompt
+test로 확인한다. 실제 앱에서 Sidebar·Agent UI와 일반 탭 동작을 확인한 기록은
+각 주제별 검증 문서에 남아 있다.
+
+자동 감사는 694개 문자열 후보 중 632개를 아직 개별 판정 전으로 보고한다.
+소유 C++의 이름 휴리스틱에 남는 항목은 내부 URL·명령줄 switch와 개발 로그이며,
+사용자 질문 제목은 공통 제품명 accessor를 사용한다. 감사 도구 자체는 빌드나
+실행 증거를 읽지 않으므로 `runtime_verification: not_verified`를 계속 보고한다.
+미연결 문자열·번역·asset·URL·identity와 임시 제품명이 남아
+`--require-complete`도 계속 실패해야 한다. 이 결과는 위 macOS 핵심 빌드 확인과
+모순되지 않으며, 브랜딩 전체 완료를 뜻하지 않는다.

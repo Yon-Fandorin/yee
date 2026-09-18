@@ -1,8 +1,8 @@
 # Browser Surface layout and clipping design
 
-Status: red-team-hardened implementation design with a partial built
-checkpoint. The audit tracks completed evidence and the remaining implementation
-and real-app matrix; full completion is still pending.
+Status: red-team-hardened implementation design. All F1-F26 findings in the
+audit have built evidence. Cross-platform and remaining real-app validation
+cells are tracked separately and are still pending.
 
 This document closes the layout gap exposed by Chromium's native PDF InfoBar.
 It is an implementation design under `browser-shell-spec.md`, not a replacement
@@ -30,7 +30,7 @@ The design must guarantee that:
 
 ## 2. Confirmed baseline failure that motivated the checkpoint
 
-Before the partial implementation recorded in the audit,
+Before the implementation recorded in the audit,
 `InfoBarContainerView` and `MultiContentsView` were laid out as BrowserView
 siblings with independent rectangles. The InfoBar used Chromium's intermediate
 `params.visual_client_area`, while Yee later rebuilt the MCV rectangle from
@@ -111,70 +111,45 @@ inputs while the work is staged, but they may not independently reconstruct the
 same final Surface rectangle.
 
 Yee owns the product-state mapping and final frame result in `yee-ui`. Chromium
-glue first exposes the native top-container/Side Panel calculation as a value;
-the Yee resolver must not pretend that this value already exists today:
+glue exposes native horizontal, top-container, Side Panel, and body allocation
+as values. The current Yee boundary is:
 
 ```cpp
 namespace yee {
 
-struct NativeHorizontalPlan {
-  bool force_top_container_to_top = false;
-  bool top_container_shares_panel_row = false;
-  int top_container_height = 0;
-  int panel_target_width = 0;
-  int panel_visible_width = 0;
-  // Remaining intrinsic/animation inputs needed by the native child planner.
-};
-
-struct NativeTopAndSidePanelLayout {
-  bool force_top_container_to_top = false;
-  bool top_container_shares_panel_row = false;
-  bool panel_visible = false;
-  bool panel_leading = false;
-  bool panel_animating = false;
-  double panel_reveal = 0.0;
-  int panel_target_width = 0;
-  int panel_visible_width = 0;
-  int underlap_deficit = 0;
-  gfx::Rect top_container_bounds;
-  gfx::Rect surface_frame_allocation;
-  // Post-panel/shadow allocation used by the native InfoBar before any
-  // minimum-width content-underlap expansion.
-  gfx::Rect notice_flow_allocation;
-  // MCV allocation after native minimum-width underlap rules.
-  gfx::Rect body_allocation;
-  gfx::Rect body_occlusion_rect;
-  bool has_contiguous_notice_flow = true;
-  std::optional<gfx::Rect> panel_bounds;
-  std::optional<gfx::Rect> panel_animation_content_bounds;
-  gfx::Insets shadow_overlay_insets;
-  gfx::Rect main_shadow_overlay_bounds;
-  gfx::Rect unclipped_contents_region;
-  bool native_main_background_required = false;
-};
-
-struct BrowserSurfaceLayoutInput {
-  gfx::Rect visual_client_area;
-  // Yee-resolved once from the actual Sidebar reservation.
+struct BrowserSurfaceSeedInput {
   gfx::Rect content_column_bounds;
-  NativeTopAndSidePanelLayout native_layout;
+  gfx::Insets surface_insets;
   bool split = false;
-  bool toolbar_participates = false;
+  bool header_participates = false;
+  int header_height = 0;
+};
+
+struct ResolvedBrowserSurfaceSeed {
+  gfx::Rect content_column_bounds;
+  gfx::Rect surface_seed_bounds;
+  gfx::Rect header_bounds;
+  bool split = false;
+};
+
+struct BrowserSurfaceFrameInput {
+  ResolvedBrowserSurfaceSeed seed;
+  gfx::Rect native_notice_flow_allocation;
+  gfx::Rect native_body_allocation;
 };
 
 struct ResolvedBrowserSurfaceFrame {
-  gfx::Rect content_column_bounds;
+  gfx::Rect surface_seed_bounds;
   gfx::Rect main_surface_bounds;
   gfx::Rect header_bounds;
-  gfx::Rect body_bounds;
+  gfx::Rect notice_flow_bounds;
   gfx::Rect multi_contents_bounds;
-  NativeTopAndSidePanelLayout native_layout;
-  SurfaceMode mode;
-  SurfaceCornerRoles corners;
+  ResolvedBrowserSurfaceDecoration decoration;
+  bool split = false;
 };
 
 ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
-    const BrowserSurfaceLayoutInput& input);
+    const BrowserSurfaceFrameInput& input);
 
 }  // namespace yee
 ```
@@ -187,12 +162,12 @@ Native/Yee calculation is an acyclic pipeline:
    child bounds;
 2. Yee applies the one `kSidebarMetrics.content_gutter` contract and resolves a
    final Surface seed plus participating `header_bounds` from that plan;
-3. pure `ResolveNativeTopAndSidePanelLayout()` receives those final Header/body
-   candidate rectangles and calculates top-container child proposed layouts,
-   panel current/final/animation-content bounds, notice-flow/body allocations,
-   underlap, and shadow values exactly once;
-4. `ResolveBrowserSurfaceFrame()` consumes the native value without restarting
-   from raw `browser_params`.
+3. pure `CalculateNativeTopContainerLayout()`,
+   `ResolveNativeSidePanelGeometry()`, and `ResolveNativeBodyAllocation()`
+   calculate top children, panel current/final/animation bounds,
+   notice-flow/body allocations, underlap, and shadow values exactly once;
+4. `ResolveBrowserSurfaceFrame()` consumes the seed and the two native body
+   rectangles without restarting from raw `browser_params`.
 
 The top-container child proposal is native glue returned alongside the plain
 Yee snapshot and applied directly by BrowserView; it is never computed first in
@@ -318,19 +293,23 @@ For any animation frame `t`, the rectangle equations are:
 C(t) = InsetEdge(visual_client_area, physical_sidebar_edge,
                  actual_sidebar_reservation(t))
 H(t) = PlanNativeHorizontalLayout(C(t), native_state_snapshot(t))
-S(t) = ResolveYeeSurfaceSeed(Inset(C(t), 6 DIP), H(t), chrome_state(t))
-N(t) = ResolveNativeTopAndSidePanelLayout(H(t), S(t).header_bounds,
-                                          S(t).body_candidate, native_state(t))
-M(t) = ResolveBrowserSurfaceFrame(S(t), N(t)).main_surface_bounds
-V(t) = Intersect(N(t).body_allocation, BodyBelowParticipatingHeader(M(t)))
+S(t) = ResolveBrowserSurfaceSeed(seed_input(C(t), H(t), chrome_state(t)))
+T(t) = CalculateNativeTopContainerLayout(S(t).header_bounds, native_state(t))
+G(t) = ResolveNativeSidePanelGeometry(H(t), S(t), native_state(t))
+A(t) = ResolveNativeBodyAllocation(G(t), native_state(t))
+M(t) = ResolveBrowserSurfaceFrame(frame_input(S(t),
+                                             A(t).notice_flow_allocation,
+                                             A(t).body_allocation))
+V(t) = M(t).multi_contents_bounds
 P(t) = ComputeCurrentPaneGeometry(V(t).size, current_mcv_snapshot(t),
                                   pane_mins(t))
 ```
 
 `C(t)` is `content_column_bounds`, `H(t)` is the no-child native horizontal
-plan, `S(t)` is the Yee Surface/Header seed, `N(t)` is the complete native child
-allocation value, `M(t)` is `main_surface_bounds`, `V(t)` is
-`multi_contents_bounds`, and `P(t)` is current pane geometry. RTL changes the
+plan, `S(t)` is the Yee Surface/Header seed, `T(t)` is the native top-container
+layout, `G(t)` is Side Panel geometry, `A(t)` is native body allocation,
+`M(t)` is the resolved frame, `V(t)` is `multi_contents_bounds`, and `P(t)` is
+current pane geometry. RTL changes the
 resolved physical edges in the inputs; it does not change these equations. All
 producers and clip consumers share these integer DIP rectangles. The final
 device-pixel clip must be exactly equal; a one-DIP tolerance is permitted only
@@ -707,6 +686,13 @@ The initial ledger is concrete (`CCV` = owning `ContentsContainerView`):
 | Lens host | MCV direct; raw member; global Lens host id / FillLayout | current Lens is shared; controller requires BrowserView/MCV sibling ordering; MCV destructor nulls before child removal | permanent shared MCV host for this work |
 | tab-modal / Find / Status | native host/Widget outside the page-host tree | tab-modal uses CCV context; Find owner uses BrowserView; Status is transient Widget on native Contents | never reparent; consume pane-local screen/container geometry only |
 
+That table records the phase-one baseline before family gates closed. The
+current checked ledger is `browser/ui/page_viewport_migration.cc`: Contents,
+data protection, Indigo, Read Anything, and actor are approved for
+`PageTargetHost`; AI, Glic selection, and toast are approved for
+`ViewportOverlayHost`; DevTools, its scrim, NTP footer, and contents scrim remain
+blocked direct; Glic context border and card chrome remain permanent direct.
+
 Rules:
 
 - `PageViewportClipHost` and `ViewportOverlayHost` never adopt the oversized
@@ -902,7 +888,7 @@ reach the same final layout and focus state.
 
 `browser/ui/` owns:
 
-- metric values, plain native snapshot input, `BrowserSurfaceLayoutInput`,
+- metric values, plain native snapshot input, `BrowserSurfaceFrameInput`,
   `ResolvedBrowserSurfaceFrame`, the stable BrowserView minimum composition,
   and the separate supported-notice minimum query;
 - Yee-specific state mapping for Sidebar/gutter/Header/Surface roles;
@@ -939,7 +925,10 @@ to exist already and not hidden inside a Yee config struct. They may not import
 Yee product policy into `TabStripModel`, Side Panel entry models, or InfoBar
 delegates.
 
-## 12. Implementation sequence
+## 12. Implemented sequence
+
+The following list records the order used to reach the built checkpoint. It is
+not a list of pending steps.
 
 1. Add characterization tests for browser-class routing, current InfoBar
    parent/manager/focus/AX and synchronous manager switch, native Side Panel
@@ -950,7 +939,8 @@ delegates.
    ContentsContainer code; prove all ineligible browser classes retain their
    existing hierarchy and bounds.
 3. Extract no-child `PlanNativeHorizontalLayout()` and finalized-Header
-   `ResolveNativeTopAndSidePanelLayout()` with equivalence tests before Yee use.
+   `CalculateNativeTopContainerLayout()`, `ResolveNativeSidePanelGeometry()`,
+   and `ResolveNativeBodyAllocation()` with equivalence tests before Yee use.
    Sample start/mid/end ticks; assert top children are calculated once in final
    Header coordinates and panel/notice-flow/body/occlusion/animation/shadow
    values equal applied native layout without raw/previous-bound resets.
@@ -989,6 +979,11 @@ by the outline or renderer boundary, or a host reparent whose old lookup,
 coordinate, focus, z-order, and destructor assumptions have not been removed.
 
 ## 13. Required automated coverage
+
+The identifiers in the following two subsections are design-era acceptance
+labels, not literal executable test names. The Findings table in
+[`browser-surface-layout-design-audit.md`](browser-surface-layout-design-audit.md)
+maps each requirement to the current test names, binaries, and evidence.
 
 ### Geometry tests
 
@@ -1102,9 +1097,9 @@ disabled broad BrowserView layout test is also not proof. Pixel evidence is
 required for renderer, auxiliary WebViews, rounded corners, and InfoBar shadow
 leakage.
 
-## 14. Acceptance criteria
+## 14. Release-level acceptance criteria
 
-The design is implemented only when:
+Release-level validation is complete only when:
 
 - the PDF default-viewer InfoBar is inside the correct single or active split
   body selected by manager identity and pushes the entire page/DevTools

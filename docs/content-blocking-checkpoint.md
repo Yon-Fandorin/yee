@@ -1,20 +1,29 @@
 # Yee 네이티브 차단 통합 checkpoint
 
-작성일: 2026-09-12. 최종 검토 갱신: 2026-09-18.
-
-이 문서는 콘텐츠 차단의 현재 구조, 기능 범위와 남은 실제 앱 gate를 설명하는
+이 문서는 콘텐츠 차단의 현재 구조, 기능 범위와 남은 검증 항목을 설명하는
 단일 진입점이다. 현재 패키지·라이선스 판정과 최종 수치는
-[비공개 본체·공개 필터·원본 scriptlet](content-blocking-private-core-filter-data.md),
-회귀 보강 내역은 [Brave 테스트 보강](content-blocking-brave-test-hardening-20260913.md)을
-따른다. 구현 경위는 [광고 차단·YouTube 개선 기록](content-blocking-implementation-20260913.md)에
-있다. 그보다 앞선 날짜별 연구·검토 문서의 실패, 미수정 표기와 시험 수는 당시
-상태를 보존한 연혁이며 현재 판정으로 사용하지 않는다.
-[초기 조사](content-blocking-research-20260912.md)와
-[첫 통합 재검토](content-blocking-review-20260913.md)는 설계 경위가 필요할 때만 참고한다.
+[비공개 본체·공개 필터·원본 scriptlet](content-blocking-private-core-filter-data.md)을
+따른다. 중간 조사·수정 보고서는 이 문서에 필요한 결론만 합치고 제거했다.
 
-상태: 엔진·요청·페이지 연결, 전체 앱 빌드와 최신 오프라인 회귀 검증은 통과했다.
-실제 Yee의 document-start 자동 주입과 실제 YouTube 서버·영상 재생은 아직 검증하지
-않았다. Chrome fixture 결과를 이 실앱 gate의 통과로 간주하지 않는다.
+상태: 엔진·요청·페이지 연결, 전체 앱 빌드와 오프라인 회귀 검증, 실제 Yee의
+document-start 자동 주입 fixture는 통과했다. 실제 YouTube 대조군에서 프리롤 영상
+두 개를 재현했고, 차단 켠 앱에서는 프리롤 없이 본 영상이 시작됐다. 중간 광고,
+광고 음성, 영상 전체의 정상 재생은 아직 검증되지 않았다.
+
+## 반복 검토에서 유지한 원칙
+
+- 필터링은 navigation과 subresource의 실제 URLLoaderFactory 경로에 연결하고,
+  요청 종류·top origin·redirect마다 사이트 예외를 다시 판정한다.
+- malformed selector나 리소스 하나가 정상 규칙 전체를 삼키지 않게 입력 경계를
+  분리하되, 권한·checksum·canonical 이름이 불완전한 실행 리소스 묶음은 거부한다.
+- 초기 빈 문서, 동적 iframe과 새 JavaScript realm도 document-start 설치보다 먼저
+  실행되지 않는지 검증한다. 임시 Chrome fixture는 실제 Yee 연결의 증거로 바꾸지 않는다.
+- YouTube 객체는 설치 시점 이후에도 변할 수 있다. 재관찰과 작업량 상한을 함께 두고,
+  JSON 문자열은 대상 member span만 제거해 큰 정수와 escape를 보존한다.
+- overlay와 vendoring은 검증한 staging tree를 원자적으로 교체한다. 대소문자 충돌,
+  파일·디렉터리 전환, stale 파일과 manifest 밖 GN 입력을 적용 전에 거부한다.
+- 실행 프로세스는 저장된 이름이 아니라 현재 bundle ID와 실제 executable 경로로
+  식별한다. 다른 브라우저나 사용자의 일반 프로필을 정리 대상으로 삼지 않는다.
 
 후속 요청을 반영해 `adblock-rust` 0.13.3 원본을 유지하고, Yee의 Rust/C++ API,
 요청 proxy와 문서 처리를 독립 작성했다. 엔진 핵심 파일을 번역하거나 이름을 바꾸어
@@ -97,8 +106,8 @@ CSS는 문서별 dedup과 64 KiB chunk/전체 4 MiB 제한을 적용하며 변�
 엔진의 `$csp` 결과는 document/subdocument 응답의 기존 서버 정책과 parsed security metadata를
 유지하면서 추가 enforce 정책으로 연결한다.
 기본 번들을 두 프로세스에 동일하게 포함하므로 document-start의 async Mojo 조회나
-download 대기가 없다. 초기화·dynamic CSS·iframe·CSP·BFCache의 최종 실제 동작은
-실앱 gate에서 확인한다. callback 자체는 다른 문서의 준비 결과를 기다리지 않는다.
+download 대기가 없다. 초기화·dynamic CSS·iframe·CSP는 실앱 fixture에서 확인했다.
+BFCache 복원은 별도 실앱 확인이 남았다. callback 자체는 다른 문서의 준비 결과를 기다리지 않는다.
 
 ## 데이터와 배포 고지
 
@@ -119,10 +128,12 @@ Adblock Plus 서버의 원본을 보존하고, dual license의 CC BY-SA 3.0-or-l
 FlatBuffers와 SeaHash의 published crate에 빠진 전문은 공식 저장소에서 보완하고
 별도 출처·hash를 기록했다. 원본 crate 파일은 수정하지 않았다.
 
-범용 uBO/Brave scriptlet 묶음을 복사하지 않았다. production resources는 빈 목록이다.
-예약 `.test`의 검증 규칙·scriptlet은 `--yee-content-blocking-test-rules`를 켠 경우에만
-적용한다. 기본 실행에서 fixture host 차단·global fixture selector·scriptlet이 없는
-것을 검증했다. YouTube 코드는 Yee 자체 모듈이다.
+기본 실행은 고정된 community pack에서 uBO scriptlet 152개, redirect resource 45개와
+Brave resource 17개를 선별해 로드한다. 별도의 내장 Yee resource에는 빈 JavaScript와
+빈 MP4 대체 응답만 둔다. 예약 `.test`의 검증 규칙·scriptlet은
+`--yee-content-blocking-test-rules`를 켠 경우에만 적용한다. 기본 실행에서 fixture host
+차단·global fixture selector·test scriptlet이 없는 것을 검증했다. YouTube 코드는 Yee
+자체 모듈이다.
 
 빌드는 `YeeContentBlockingNotices.txt`와 `YeeContentBlockingSources.tar.xz`를 생성한다.
 소스 묶음에는 모든 원본 crate와 외부 filter 데이터·고지를 포함한다. 독립 작성한
@@ -149,9 +160,34 @@ Known player container는 arbitrary enumeration보다 먼저 처리하고, 기�
 작업량 제한은 inherited/own check와 object/property 방문 수도 포함한다. 큰 배열 하나에서
 큐를 무제한 늘리지 않고, page-defined getter/Proxy 오류로 player 설정이 깨지지 않도록 처리한다.
 
-이 연결이 실제 YouTube 광고 차단 성공을 의미하지 않는다. 서버가 광고를 영상 스트림에
-결합하는 변형, 다른 데이터 경로, 광고 차단 감지와 실계정 A/B 변형은 실제 재생 검증이
-필요하다. 광고 영상·소리가 재생되지 않으면서 본 영상이 정상 재생되어야 성공이다.
+### 실제 YouTube 검증
+
+비로그인 새 프로필의 동일한 탐색 순서에서 차단 끔은 15초와 30초 프리롤을
+연속 재생한 뒤 본 영상을 시작했다. 차단 켬은 광고 데이터가 제거됐고 프리롤 없이
+본 영상을 시작했다. 디버깅 옵션이 없는 일반 Yee UI에서는 본 영상이 1분 38초까지
+연속 재생됐고, 8분 35초와 17분 10초로 이동한 뒤에도 정상 재생됐다.
+
+임시 프로필과 원격 디버깅을 사용한 자동화에서는 Yee, Chrome, Brave가 모두
+42~44초 부근에서 같은 재생 오류를 보였다. 일반 Yee와 Brave에서는 재현되지 않아
+제품 회귀로 판정하지 않았고 자동화 환경 전용 복구도 제품 코드에 넣지 않았다.
+라이브 YouTube 결과는 광고 전달, 계정과 A/B 상태에 따라 달라질 수
+있으므로 중간 광고, 광고 음성 및 영상 전체 재생은 계속 별도 수용 항목으로 둔다.
+
+### 체감 성능
+
+두 가지 비공식 Chromium 기본값이 애니메이션 성능을 낮추고 있었다.
+
+- 비 Chrome 브랜딩의 fieldtrial testing config가 macOS main frame을 60Hz로
+  제한했다. `disable_fieldtrial_testing_config = true`로 비활성화했다.
+- `is_debug=false`인 비공식 빌드도 `DCHECK`와 `EXPENSIVE_DCHECK`를
+  활성화했다. `dcheck_always_on = false`로 production 수준에 맞췄다.
+
+120Hz 환경의 실제 YouTube 검색 결과에서 수정 전 Yee의 첫 스크롤 95백분위
+프레임 간격은 약 58ms였다. 전체 재빌드 후 안정 구간은 차단 끔 9.2ms,
+차단 켬 9.1ms, Chrome 9.3ms였고 세 경우 모두 16ms 초과 프레임과 long task가
+0개였다. 9,608개 요소의 로컬 fixture도 Yee 9.2ms, Chrome 9.3ms였다.
+초기 페이지 로딩의 네트워크·비동기 작업에 따른 일시적인 긴 프레임은 별도
+개선 범위로 남는다.
 
 ## 제어와 현재 한계
 
@@ -161,12 +197,12 @@ Known player container는 arbitrary enumeration보다 먼저 처리하고, 기�
 host 예외이며 대소문자는 구분하지 않고 renderer child에도 전달한다. ASCII/punycode
 host 입력을 사용하는 임시 CLI 제어다. UI·영구 프로필 설정은 아직 만들지 않았다.
 
-이번 consumer는 차단 결과, 일반 CSS와 generic class/id, 준비된 scriptlet을 연결한다.
-엔진이 파싱할 수 있는 모든 동작을 실행하는 것은 아니다. 대체 응답, removeparam,
-procedural/action CSS 전체 실행기는 후속 범위다. CSP response directive는 위의
-document/subdocument 응답 경로에 연결했다.
+이번 consumer는 차단 결과, 일반 CSS와 generic class/id, 준비된 scriptlet,
+지원하는 대체 응답·URL 변환·removeparam을 연결한다. 엔진이 파싱할 수 있는 모든
+동작을 실행하는 것은 아니다. procedural/action CSS 전체 실행기는 후속 범위다.
+CSP response directive는 위의 document/subdocument 응답 경로에 연결했다.
 WebSocket/WebTransport 연결에는 Yee interceptor가 없다. `about:blank/srcdoc` 문서의
-cosmetic 처리는 frame의 상속 HTTP(S) origin으로 연결했으며 실제 탭 검증은 남아 있다.
+cosmetic 처리는 frame의 상속 HTTP(S) origin으로 연결했으며 실제 fixture 탭에서 확인했다.
 HTTP(S) factory를 거치지 않는 service worker/cache
 응답, inherited/opaque 문맥과 prefetch/prerender의 상세 범위는 별도 통합 검증이 남았다.
 일반 CSS와 document MutationObserver는 shadow root 내부를 관찰하거나 관통하지 않는다.
@@ -174,17 +210,24 @@ HTTP(S) factory를 거치지 않는 service worker/cache
 
 ## 검증 기록
 
-- native core/settings/style/data 41개와 Mojo factory 47개, 총 **88개 통과**.
-- tooling **12개 통과**. 공개 source archive 129개 파일과 배포 파일을 byte 단위로 확인했다.
+- native core/settings/style/data 42개와 Mojo factory 47개, 총 **89개 통과**.
+- tooling **13개 통과**. 공개 source archive 129개 파일과 배포 파일을 byte 단위로 확인하고,
+  vendored manifest 입력이 모두 Git에 포함되는지 검사했다.
 - 실제 엔진 출력의 Chrome fixture **1,239개 assertion**, 기존 Web API/CSS/MP4 fixture
   **25개 assertion** 통과. 이는 실제 Yee 자동 주입이나 YouTube 재생 증거가 아니다.
-- YouTube lossless JSON **71개 case**, protocol/playback **242개 assertion** 통과.
+- YouTube lossless JSON **71개 case**, protocol/playback **248개 assertion** 통과.
 - `tools/dev/build.sh` 전체 chrome target과 macOS 앱 bundle 검증 통과.
+- 실제 YouTube 스크롤 안정 구간에서 Yee 차단 끔·켬과 Chrome 모두 95백분위
+  약 9ms, 16ms 초과 프레임과 long task 0개를 확인했다.
+- 실제 Yee fixture의 차단 끔·켬·사이트 예외 3개 모드 통과. document-start,
+  요청 차단, 정상 응답, cosmetic, iframe, CSP와 예외를 검증했다.
+- 실제 YouTube 비로그인 영상에서 차단 끔·켬의 광고 데이터 차이를 확인했다.
+  추가 탐색의 MrBeast 영상에서 대조군의 15초·30초 프리롤 두 개와 차단 켠 앱의
+  광고 없는 본 영상 시작을 확인했다. 중간 광고·광고 음성·영상 전체 재생은 검증하지 않았다.
 - owned 입력 167개와 원본 116개 hash, Chromium whitespace와 `0001` reverse apply 검증 통과.
 
-세부 대조군, 배포 파일 수와 로그 위치는
-[현재 패키지 설계](content-blocking-private-core-filter-data.md)와
-[회귀 테스트 보강 기록](content-blocking-brave-test-hardening-20260913.md)에 둔다.
+세부 대조군과 배포 파일 수는
+[현재 패키지 설계](content-blocking-private-core-filter-data.md)에 둔다.
 
 실앱 fixture는 `tools/dev/test-content-blocking.mjs`다. 별도 프로필의 실제 Yee 탭에서
 첫 inline script 이전 적용, fetch·redirect·worker·beacon, 허용 응답 보존, 동적 CSS와
@@ -192,4 +235,5 @@ HTTP(S) factory를 거치지 않는 service worker/cache
 실행 전 모든 Yee의 graceful shutdown이 필요하다. runner는 각 launch 전에 실행 중인
 stable bundle ID와 실제 executable inventory로 제품 browser process가 없는지 검사한다.
 CDP 준비 전/연결 실패 시 자신이 launch한 child PID에만 AppKit 정상 종료를 요청한다.
-현재 이 gate와 실제 YouTube 재생은 아직 수행하지 않았다.
+이 gate는 실제 Yee 앱에서 세 모드 모두 통과했다. 라이브 YouTube의 광고 노출과
+성능은 네트워크·계정 상태에 영향을 받으므로 위의 수동 통합 결과와 별도로 판단한다.

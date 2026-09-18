@@ -12,7 +12,7 @@
 | --- | --- |
 | 각 `WebContents`가 하나의 source identity와 transition timeline만 소유하고 Tab 재활성화는 현재 화면색에서 시작 | `BrowserSurfaceColorControllerTest.WebContentsOwnsOneStablePresentationSource`, `TabActivationTransitionsFromTheCurrentlyPresentedColor` |
 | 각 persistent content container가 현재 `WebContents` source 하나만 전달하고 detach 시 presentation을 즉시 비움 | `BrowserSurfaceColorControllerTest.ContainerBindingPublishesOnlyItsCurrentWebContentsSource`, `ContainerBindingClearsPresentationWhenContentsDetach` |
-| 테마 변경은 아직 page 색이 없는 Tab의 fallback만 바꾸고 확정된 page 색을 덮지 않음 | `BrowserSurfaceColorControllerTest.ThemeChangesOnlyRetargetUnresolvedTabs` |
+| 테마 변경은 미확정 fallback을 갱신하고 page 재검증을 시작하되 확정된 page 색은 검증 전까지 보존 | `BrowserSurfaceColorControllerTest.ThemeChangesRevalidatePagesWithoutDiscardingTheirColor` |
 | 첫 유효 paint와 load 완료 뒤 bounded settling, 진행 중 전환의 연속 retarget | `BrowserSurfaceColorControllerTest.FirstPaintAndLoadCompletionStartBoundedSettlingSamples`, `RetargetingStartsFromTheCurrentlyPresentedColor` |
 | 연속 scroll 입력은 진행 중 epoch·capture·안정 후보를 보존하면서 관찰 window만 연장하고, 실제 timeout 후 page sampling 모드로 돌아가 반복·timeout timer를 모두 정리 | `BrowserSurfaceColorControllerTest.RepeatedScrollSignalsPreserveTheActiveSamplingEpoch`, `ScrollSamplingTimeoutReturnsToPageSamplingMode` |
 | 두 Pane Header가 각자 `WebContents` 색을 독립적으로 유지 | `BrowserSurfaceColorControllerTest.SplitPaneSourcesKeepIndependentSurfaceColors` |
@@ -39,8 +39,8 @@
 
 ## 3. 실제 화면에서만 확인할 것
 
-2026-09-05 테마 보강의 새 자동 검사와 빌드/실행 결과는
-[`theme-hardening-20260905.md`](../sidebar/theme-hardening-20260905.md)를 따른다.
+테마 보강의 자동 검사와 빌드/실행 범위는
+[`theming-structural-audit.md`](../theming-structural-audit.md)를 따른다.
 `BrowserSurfaceColorSampleTest.*`는 양자화 경계·상단 경계 소유·투명도·불균일
 샘플을 검사한다. 컨트롤러 검사는 입력/resize 재검사, 후속 검사의 종료 및
 hidden 취소를 다루며, `YeeRenderedBoundaryTracksDelayedCssWithoutMetadata`는

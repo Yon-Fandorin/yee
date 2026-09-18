@@ -122,18 +122,21 @@ response/URL 변환 35개는 계속 제외한다.
 일부 regex removeparam·새 인자 문법 등은 upstream engine 단계에서 거부할 수 있다.
 모든 원본 scriptlet의 모든 사이트 계약이나 Brave 전체 동등성을 증명한 상태도 아니다.
 원본 JS의 JSONPath 편집은 자체 parse/stringify 계약을 유지하므로 임의의 tagged 요청
-편집 전후 JSON 숫자 표기까지 lossless라고 주장하지 않는다. 실제 Yee 자동 주입·라이브
-YouTube 재생은 사용자의 MCP 실험 종료 후 확인할 gate다.
+편집 전후 JSON 숫자 표기까지 lossless라고 주장하지 않는다. 실제 Yee 자동 주입 fixture는
+통과했고, 라이브 YouTube에서 프리롤 영상 차단을 관찰했다. 중간 광고·광고 음성·
+전체 영상 재생은 아직 검증하지 않았다. 자세한 결과는
+[현재 checkpoint](content-blocking-checkpoint.md#검증-기록)에 있다.
 
 ## 검증
 
-Brave 테스트 대조와 보강 내역은
-[회귀 테스트 보강 기록](content-blocking-brave-test-hardening-20260913.md)에 정리했다.
+Brave 테스트에서 유지할 설계 원칙과 보강 범위는
+[현재 checkpoint](content-blocking-checkpoint.md#반복-검토에서-유지한-원칙)에 정리했다.
 최종 실행 결과:
 
-- tooling **12개 통과**. 공개 아카이브 129개 파일만 추출해 다섯 배포 파일을 byte 단위로
-  동일하게 재생성했다. 비공개 sentinel·C++·Rust·자체 YouTube 코드가 포함되지 않는다.
-- native core/settings/style/data **41개**와 Mojo factory **47개**, 총 **88개 통과**.
+- tooling **13개 통과**. 공개 아카이브 129개 파일만 추출해 다섯 배포 파일을 byte 단위로
+  동일하게 재생성했고, vendored manifest 입력이 모두 Git에 포함되는지 검사했다.
+  비공개 sentinel·C++·Rust·자체 YouTube 코드가 포함되지 않는다.
+- native core/settings/style/data **42개**와 Mojo factory **47개**, 총 **89개 통과**.
   원본 generated script, trusted 권한·예외, redirect 별칭 우선순위, 잘못된 리소스의
   전체 거부와 canonical 충돌·과도한 의존성 깊이 거부를 확인했다. 복합 permission mask,
   dependency 권한, 이름 대소문자, 전체 scriptlet 예외, 목록 간 예외·CSP와 원본 redirect
@@ -147,23 +150,12 @@ Brave 테스트 대조와 보강 내역은
   이스케이프 보존·bodyUsed·두 번째 읽기 거부·unmatched 응답을 확인했다.
   기존 실제 Web API/CSS/MP4 fixture **25개도 통과**했다. 이는 실제 Yee document-start callback이나
   실제 YouTube 서버 계약·영상 재생 증명이 아니다.
-- 기존 YouTube lossless JSON **71 cases**, 확장 protocol/playback **242 assertions 통과**.
+- 기존 YouTube lossless JSON **71 cases**, 확장 protocol/playback **248 assertions 통과**.
 - `tools/dev/build.sh` 전체 chrome target **빌드 성공**. macOS 실제 앱 bundle에서
   다섯 별도 자료의 byte·hash, GPL 원문·공개 도구 아카이브와 기존 MPL 자료를 확인했다.
 - owned 차단 입력 **167개**가 적용 Chromium과 일치하고, 원본 **116개**의 hash가 일치한다.
   filter_data/core GN header dependency check, Chromium whitespace, `0001` reverse apply,
   patch를 제외한 repository whitespace check를 통과했다.
 
-최종 로그는 ignored `.local-build/original-scriptlet-tooling-final2.log`,
-`.local-build/original-scriptlet-native-final3.log`,
-`.local-build/original-scriptlet-browser-final-verified.log`,
-`.local-build/original-scriptlet-browser-fixture.json`,
-`.local-build/original-scriptlet-full-build.log`,
-`.local-build/original-scriptlet-integrity.json`에 있다.
-
-이전 데이터 전용 69 native/11 tooling/전체 빌드
-checkpoint 결과는 `.local-build/community-filter-*.log`와
-`.local-build/community-filter-integrity.json`에 남아 있으며 현재 scriptlet 포함 결과와 구분한다.
-
-실행 중인 Yee를 종료하거나 새 Yee를 실행하지 않았다. 사용자의 MCP 실험 종료 후에만
-모든 Yee의 정상 종료·새 빌드 실행 규칙에 따라 실제 앱을 확인한다.
+실제 앱을 확인할 때는 모든 Yee를 정상 종료하고 새 빌드를 실행한 뒤 별도 임시
+프로필을 사용한다. 로컬 `.local-build` 로그는 현재 판정의 영구 근거로 간주하지 않는다.

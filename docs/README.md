@@ -15,7 +15,7 @@
 | Brave에서 참고한 구조 | [Brave 브랜딩 분석](brave-branding-analysis.md) |
 | 웹페이지 영역의 배치 | [레이아웃 설계](browser-surface-layout-design.md), [구조 검토](browser-surface-layout-design-audit.md) |
 | Agent 구조와 사용 | [Agent 구조](agent-browser-architecture.md), [MCP 사용](agent-browser-mcp-usage.md), [검증 자료](agent-browser-validation/README.md), [UI 자동화](ui-automation-session.md) |
-| 콘텐츠 차단 구현과 남은 작업 | [설계](content-blocking-design.md), [현재 checkpoint](content-blocking-checkpoint.md), [패키지·라이선스](content-blocking-private-core-filter-data.md) |
+| 콘텐츠 차단 구현과 검증 | [현재 checkpoint](content-blocking-checkpoint.md), [패키지·라이선스](content-blocking-private-core-filter-data.md) |
 
 ## 테스트 기록 읽기
 

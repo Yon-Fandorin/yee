@@ -23,11 +23,8 @@ Tab Sidebar의 배치와 동작을 주제별로 기록한다.
 | [test-coverage.md](./test-coverage.md) | 자동 테스트와 실제 화면 확인 범위 |
 | [dark-theme-audit.md](./dark-theme-audit.md) | 어두운 테마의 사이드바 색상과 검토 결과 |
 
-과거 구현의 원인과 검증 경위가 필요할 때는
-[Footer 디자인 검토](./footer-design-audit.md),
-[Side Panel resize gutter 기록](./resize-gutter-20260905.md),
-[테마 구조 검토](../theming-structural-audit.md)를 참고한다. 현재 제품 규칙은 위의
-주제별 문서와 셸 명세를 우선한다.
+테마의 구조와 검증 범위는 [테마 구조 검토](../theming-structural-audit.md)를 참고한다.
+중간 구현 보고서의 현재 결정은 위 주제별 문서와 테스트 범위에 합치고 제거했다.
 
 ## 테스트 방법
 
@@ -77,5 +74,4 @@ DIP는 화면 배율과 독립된 UI 크기 단위다.
 - 그룹을 Favorites 아래에 모을지, 현재처럼 탭 순서에 섞을지
 - 명세의 3×20 민트색 활성 표시와 현재 세로 탭의 채워진 표시 중 무엇을 사용할지
 - Split Favorite만 두 칸 너비를 사용할지
-- 드래그 중 빈 Favorites 영역에 표시할 한글 문구
 - Title Bar Create 메뉴에 Chat과 명세의 New note 중 무엇을 넣을지
