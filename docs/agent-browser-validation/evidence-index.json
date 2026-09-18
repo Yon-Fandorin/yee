@@ -1,0 +1,360 @@
+{
+  "schema": "yee.validation-evidence-index.v1",
+  "candidate": ".local-build/agent-validation/consumer-baseline-20260913-v1",
+  "candidate_disposition": {
+    "schema": "yee.consumer-baseline.disposition.v1",
+    "created_at_ns": 1789306721266595000,
+    "baseline_fix_retained": true,
+    "whole_performance_improvement_verified": false,
+    "accuracy_preserving_full_improvement_verified": false,
+    "all48_passed": false,
+    "summary_ko": "관측 baseline 제품 보정은 유지한다. 전체 검증은46/48이며 직전 Yee 대비 토큰0.78%가 늘어 전체 성능 개선 목표는 미달이다.",
+    "baseline_fix_disposition_ko": "유지. 이전 제품에서 외부 관측/문서 교체와 잠금 경합으로13개 실패를 재현했고 새9개 검사·전체206개 영향 검사·실제 SDK에서 보정을 확인했다. 실제 소비자가 받은 기준만 사용하며 알려진 delta를 불필요하게 full로 바꾸지 않는다.",
+    "remaining_limits_ko": "남은 요구사항 실패는 cold29 S09의 반품 절차 답변/관찰 출처에 절차가 없음 설명 누락, 지속29 S09의 배송비3000원 금액 출처 누락이다. 두 초안은 Native fill 입력과 실제 저장 본문이 정확히 같고 발송0회라 저장 손실로 분류하지 않는다. 모든 시나리오 통과와 안정적인 시간·토큰 절감 목표는 아직 미달이다. 새 안내 후보를 추측으로 추가하거나 같은 시험을 재추첨하지 않았으며 기존 미채택 안내/API 롤백은 유지한다.",
+    "failed_requirements": [
+      {
+        "mode": "fresh-acp",
+        "seed": 29,
+        "scenario": "S09",
+        "cause": "Customer asks how to return; no procedure answer or explicit absence in observed sources."
+      },
+      {
+        "mode": "persistent",
+        "seed": 29,
+        "scenario": "S09",
+        "cause": "Shipping amount 3000 cites only policy; amount belongs to inquiry, policy supplies nonrefund rule only."
+      }
+    ],
+    "source_sha256": {
+      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/actual-native-sdk-gate.json": "274a19cf78f932b4245a9f28081ec99c3d0c0a68c63b8e55270de1b53cf0f375",
+      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/offline-product-gates.json": "d0f47eda18f481cd0db390872ace1dfa2ebd922344d7e63ce0bef7b8f8726dbf",
+      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/baseline-delivery-audit.json": "aadc562a7387f11023c09eb38e0a0ed5e5a4b1f5c977fec59f6d3e1105e9ec45",
+      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/failed-draft-input-and-storage-proof.json": "16780d200a61f997edc35cd9f998d8f240a949d9fd7d3c198f579d4fa0fbbba2",
+      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-integrity-check.json": "4ed1ff8dc0cae095b0706a94718199aa963faeca190567cab6c488ef235e554a"
+    }
+  },
+  "final_report": {
+    "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-original48-comparison.json",
+    "sha256": "2843fd787160171b18a07fdf2454fecf497dab6a233868e7c46165a62731c176",
+    "bytes": 108836
+  },
+  "current_comparison": {
+    "path": "docs/agent-browser-validation/comparison.json",
+    "sha256": "2843fd787160171b18a07fdf2454fecf497dab6a233868e7c46165a62731c176",
+    "bytes": 108836
+  },
+  "scope": {
+    "original_scenarios": 12,
+    "modes": [
+      "fresh-acp",
+      "persistent"
+    ],
+    "fixture_seeds": [
+      11,
+      29
+    ],
+    "total": 48,
+    "collected_once": 48,
+    "accepted": 46,
+    "human_wait_comparison_seconds": 0,
+    "failed_costs_preserved": true
+  },
+  "Aside_reuse": {
+    "browser_reruns": 0,
+    "passed": 36,
+    "total": 48,
+    "native_approval_total": null,
+    "policy": {
+      "path": ".local-build/agent-validation/native-readiness-20260913-v24/aside-baseline-reuse-policy.json",
+      "sha256": "8eeb2fae89affde018d197a3b1d11229186be22b8a49f31563c4847e9e37160b",
+      "bytes": 104691
+    }
+  },
+  "unavailable_source_records": [
+    {
+      "path": "/private/tmp/yee-consumer-baseline-final-report-20260913-v1.py",
+      "sha256": "8d99c5830bdd5b4b7e208849fa7d903c5fc2ea2ffce4e211e701db88f2a2fb49",
+      "bytes": 7000,
+      "reason": "Temporary report generator was not retained; its receipt remains in comparison.json."
+    }
+  ],
+  "source_records": [
+    {
+      "path": ".local-build/agent-validation/condition-followup-20260913-v2/verification/final-original48-comparison.json",
+      "sha256": "687ca15ac83b3a7805f4b0eacd4b5402eefd0e31eb20de9974bf16ec3737682c",
+      "bytes": 106342
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/runtime-native-freeze.json",
+      "sha256": "633386342ddfbff6389aba61bbb6d59bc4c06e4d2f76647a8630e30cb6f3083e",
+      "bytes": 102990
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/offline-product-gates.json",
+      "sha256": "d0f47eda18f481cd0db390872ace1dfa2ebd922344d7e63ce0bef7b8f8726dbf",
+      "bytes": 2529
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/freeze-evidence.json",
+      "sha256": "9d1cc10ca71381eafe4ae1c74a70465b30b25ad08f8c3c3625f9e1dba4f059cd",
+      "bytes": 214
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/aside-S09-coverage-correction.json",
+      "sha256": "1e66fdd915ab86dbec2455f97af7846fc215fa9cd0944f67114b5a75b1be4f15",
+      "bytes": 2209
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/native-build-and-UI-reuse.json",
+      "sha256": "6bc02b56ba3d6bf88137d02c66f55fec9bdbe75ed5580481eafaf34d4eeb784d",
+      "bytes": 759
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/call-adoption-and-cost.json",
+      "sha256": "282242f115a446b784e8b2db9e7d31a6cabd8c793b43f09d64719e7080a83ab8",
+      "bytes": 126247
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-paired-comparison.json",
+      "sha256": "e3c382beb9bfc36fb194592e99df4aa6f1fd961fbed2fa745fc5fd528e806e65",
+      "bytes": 34070
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-approval-counts.json",
+      "sha256": "529f8f540334b25a33e20dfb8c744fe6edbe181fe08032563dd533257452e5e3",
+      "bytes": 56455
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-gate.json",
+      "sha256": "62009abb1d1f52ff95d12e09916f0e992c5d217ba2f741c22fc65b6dbe97ccbf",
+      "bytes": 467
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-yee-independent-inspection.json",
+      "sha256": "769e89f982b8bb60e8cc62fee49ad46d26ec037cfd9c5c2596a61da5cf40fa2d",
+      "bytes": 301304
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-paired-comparison.json",
+      "sha256": "cceff47c17f1e0eb61e37c6bbac5f067afe2a5b67c0fb8ddf771e1c54ac56027",
+      "bytes": 34095
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-approval-counts.json",
+      "sha256": "cd32100aaf98f08eb8958cb592eac7075dae8fb7ab677e0e49ba4f5e19a443bd",
+      "bytes": 50351
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-gate.json",
+      "sha256": "29b94329745746556b2201665cd522d0f95c385d16e1852f156a244077c5855f",
+      "bytes": 468
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-yee-independent-inspection.json",
+      "sha256": "9898b0ae5659a36c44577cdf4893163ec7ce7149e88abfe4454781071258b68a",
+      "bytes": 289277
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-paired-comparison.json",
+      "sha256": "2ba496bdf5b7270b1206dddc2d271453a45aa4ac89627e406f2e78f22aa5b693",
+      "bytes": 33668
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-approval-counts.json",
+      "sha256": "b979f92d65ba2a33460d39af7c71ce513ca6a9563e65299c95e9d1c9b1d2ce72",
+      "bytes": 47153
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-gate.json",
+      "sha256": "1a14184d05fa03e7d7319f3d14d28e2f624b837e6f7616140ff133c9d2f54bb6",
+      "bytes": 473
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-yee-independent-inspection.json",
+      "sha256": "4302094e3e5c2860063ce41a7b60c3729f4cf569198ec819baf1f101bc860bb4",
+      "bytes": 296876
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-paired-comparison.json",
+      "sha256": "5c62a2198896dde81eada67742df94d21d69b1d932ae3233131f0ceda811830a",
+      "bytes": 33781
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-approval-counts.json",
+      "sha256": "b41fbce906fec130fae0f43c576539ec0377ab058cddd6c75cc4d0b18d5ce99f",
+      "bytes": 49596
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-gate.json",
+      "sha256": "fee5a077c0a3134af9bc8ed6e733864611aa7c0d52b2334287be324c02908a4e",
+      "bytes": 474
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-yee-independent-inspection.json",
+      "sha256": "a89f55ef838bbc0aa1dc63bcaa54b86c015e121278a63af2960a0311458a0b3a",
+      "bytes": 295956
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/actual-native-sdk-gate.json",
+      "sha256": "274a19cf78f932b4245a9f28081ec99c3d0c0a68c63b8e55270de1b53cf0f375",
+      "bytes": 2492
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/baseline-delivery-audit.json",
+      "sha256": "aadc562a7387f11023c09eb38e0a0ed5e5a4b1f5c977fec59f6d3e1105e9ec45",
+      "bytes": 154324
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/failed-draft-input-and-storage-proof.json",
+      "sha256": "16780d200a61f997edc35cd9f998d8f240a949d9fd7d3c198f579d4fa0fbbba2",
+      "bytes": 1773
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/candidate-disposition.json",
+      "sha256": "a16dacf5edf86a9c9c1ae46163ae3d840f718fe672220f47cd1a9696e13f6082",
+      "bytes": 2706
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/product-reproduction-before-fix.json",
+      "sha256": "db5f1ae0deecccda9aa37554516294b586c70ae68e5ecef14b443edd7258f5a7",
+      "bytes": 316
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/initial-reproduction-runner-issue.json",
+      "sha256": "dc29b7f804d0a8037c8d4abb4b65510e85f3f9509ac6036138349ff1ec8bedea",
+      "bytes": 314
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/initial-storage-proof-reader-error.json",
+      "sha256": "a0f944450cc6493198c6c947f09dd5d89da7e909c5544df07291220b0858a33e",
+      "bytes": 301
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/checkpoint-timing-and-failure-review.json",
+      "sha256": "e91445f2a6945a686a967249c8566fa745ff1256e76ebdfb09a6d506442a9738",
+      "bytes": 6164
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-integrity-check.json",
+      "sha256": "4ed1ff8dc0cae095b0706a94718199aa963faeca190567cab6c488ef235e554a",
+      "bytes": 3145
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-test-profile-cleanup.json",
+      "sha256": "0474cb4b6bc792dd7c27740379810d75998c70ce2f4678e24ad98d8a659a6afb",
+      "bytes": 115046
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-owned-browser-process-check.json",
+      "sha256": "294b91866a4b0c3b438664ec020f95ebe5cf507337eef28e7e330250c116c25e",
+      "bytes": 228
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/parent/results.md",
+      "sha256": "f5eb6c06a530cd62a9e85eb92353695879a6569014fa097c0f9da4920d03192d",
+      "bytes": 10907
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/parent/comparison.json",
+      "sha256": "0ec4ab184c669fb2a28df77946fea8e02cb274585f5edb3d9d20d8c7fbe03abc",
+      "bytes": 126550
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/parent/evidence-index.json",
+      "sha256": "333c4c22ef722fd5db57d903794c6b4d148df612e4f970e195f0cdb2bcd1288a",
+      "bytes": 16017
+    },
+    {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/acceptance-regression-source-audit-20260914.json",
+      "sha256": "3ffd5006fa34b785366a1d2eba57788141418928e3c8f1450b12294021b7ad27",
+      "bytes": 7388
+    }
+  ],
+  "working_implementation": {
+    "schema": "yee.consumer-baseline.final-integrity.v1",
+    "created_at_ns": 1789306570346249000,
+    "all_frozen_inputs_unchanged": true,
+    "frozen_input_count": 496,
+    "changed_frozen_inputs": [],
+    "working_MCP_sources": [
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/yee-browser-mcp.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/yee-browser-mcp.py",
+        "frozen_sha256": "50d58e03262a20bb49ae5f9d4401dc890af698820c61e8f0129038713fb2ba4b",
+        "workspace_sha256": "50d58e03262a20bb49ae5f9d4401dc890af698820c61e8f0129038713fb2ba4b",
+        "matches": true
+      },
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/yee-browser.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/yee-browser.py",
+        "frozen_sha256": "96adbe5f8b6aedf31b530430cfa69bf0876895c88bf53bca52ac3ad4a7e57e81",
+        "workspace_sha256": "96adbe5f8b6aedf31b530430cfa69bf0876895c88bf53bca52ac3ad4a7e57e81",
+        "matches": true
+      },
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/yee_browser_results.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/yee_browser_results.py",
+        "frozen_sha256": "67a780c76f6c31563c1d49a89f9407675df6189196cd66a4a76291ef9dc1a448",
+        "workspace_sha256": "67a780c76f6c31563c1d49a89f9407675df6189196cd66a4a76291ef9dc1a448",
+        "matches": true
+      },
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/test-yee-browser-mcp.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/test-yee-browser-mcp.py",
+        "frozen_sha256": "272e5be55efaf77956a2428384b8f21d5ba10aa373fd38ca6c59718e830b181c",
+        "workspace_sha256": "272e5be55efaf77956a2428384b8f21d5ba10aa373fd38ca6c59718e830b181c",
+        "matches": true
+      },
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/test-yee-browser-baseline.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/test-yee-browser-baseline.py",
+        "frozen_sha256": "7ed85526f9cca74c350a901bdd03607229200af575ce4a8f285ccbef3b381e8c",
+        "workspace_sha256": "7ed85526f9cca74c350a901bdd03607229200af575ce4a8f285ccbef3b381e8c",
+        "matches": true
+      },
+      {
+        "workspace_path": "/Users/yongjunkim/erast/yee/tools/dev/test-yee-browser-results.py",
+        "frozen_path": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime/chromium-dev/test-yee-browser-results.py",
+        "frozen_sha256": "d8efd8a5b68f6696db601b8bddc62b7fdc95d51137ef54659f013c0b9be758e8",
+        "workspace_sha256": "d8efd8a5b68f6696db601b8bddc62b7fdc95d51137ef54659f013c0b9be758e8",
+        "matches": true
+      }
+    ],
+    "working_mcp_sources_match_frozen": true,
+    "checker_sha256": "547257f14bca08e81bb1c64b822b43dc61d7e44b826d73c88dbc5c03f8d41f5f"
+  },
+  "Native_build": {
+    "new_builds": 0,
+    "frozen_inputs": 496,
+    "Grok_test_profiles_reclaimed": 26,
+    "SDK_test_profiles_reclaimed": 1,
+    "owned_browser_processes_remaining": 0
+  },
+  "active_job": null,
+  "all_required_gates_passed": false,
+  "limits": [
+    "Fixed single samples per condition do not prove statistical/all-site/all-scenario advantage.",
+    "API variation with unchanged calls is not attributed to product code.",
+    "Direct Luna/Kimi runner-only totals are separate from Grok/Aside48; Kimi full autonomy/timeline remains unverified.",
+    "Full Aside Native approval count/provider internal retries/backend/hard-cap are unverified.",
+    "Consumer-owned baseline changes only read-only observe full/delta selection; tool description/schema unchanged. Product206 and actual SDK gates fresh; direct model performance not remeasured."
+  ],
+  "acceptance_review": {
+    "date": "2026-09-14",
+    "whole_improvement_accepted": false,
+    "previous_completed_passed": 48,
+    "current_passed": 46,
+    "token_growth_pct": 0.7795146177880907,
+    "source_audit": {
+      "path": ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/acceptance-regression-source-audit-20260914.json",
+      "sha256": "3ffd5006fa34b785366a1d2eba57788141418928e3c8f1450b12294021b7ad27",
+      "bytes": 7388
+    },
+    "causal_code_regression_established": false,
+    "model_variation_causality_established": false,
+    "product_changes": 0,
+    "new_model_runs": 0,
+    "Aside_browser_reruns": 0,
+    "independent_baseline_correctness_fix_retained": true
+  }
+}
