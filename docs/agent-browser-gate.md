@@ -15,7 +15,7 @@
 
 현재 비교 대상은 Yee/Aside이며 브라우저끼리는 같은 모델을 사용한다. 현재 48개 표본은 선언된 Grok 4.6/high, timeout240초, 요청 재시도0, 원래 12-turn 판정 조건, viewport1440×900/dpr1이다. provider 내부 재시도와 실제 hard cap을 관측하지 못한 범위는 미확인으로 둔다. 모델 설정이나 원래 판정을 변경하지 않는다.
 
-교정 Aside baseline은 실제 모델·프롬프트/프로필·fixture hash·seed·viewport·승인 정책·cold/지속 조건과 원본 비용이 맞으면 재사용한다. Yee만 변경한 경우 Aside 전체 재시험을 요구하지 않는다. 공통 조건의 변경 영향이나 누락이 있으면 해당 자료만 보완하고, 다른 조건의 과거 결과를 현재 표본으로 섞지 않는다. 재사용 근거와 원본 SHA는 [증거 색인](agent-browser-validation/evidence-index.json)에 기록한다.
+교정 Aside baseline은 실제 모델·프롬프트/프로필·fixture hash·seed·viewport·승인 정책·cold/지속 조건과 원본 비용이 맞으면 재사용한다. Yee만 변경한 경우 Aside 전체 재시험을 요구하지 않는다. 공통 조건의 변경 영향이나 누락이 있으면 해당 자료만 보완하고, 다른 조건의 과거 결과를 현재 표본으로 섞지 않는다. 작고 결과에 중요하지 않은 조건 차이를 사용자가 명시적으로 수용한 경우에는 운영 비교로 표시할 수 있지만, 정확히 일치한 표본처럼 표현하지 않고 차이의 크기·영향과 엄격히 일치한 보조 표본을 함께 기록한다. 재사용 근거와 원본 SHA는 [증거 색인](agent-browser-validation/evidence-index.json)에 기록한다.
 
 Browser Use와 Codex Browser는 신규 비교·연결 복구 범위에서 제외한다. Grok/Kimi/Luna의 Yee 직접 사용 호환성 검증은 비교 대상 선택과 별개다. 다른 모델의 결과를 Aside 대비 속도 우위로 합산하지 않는다.
 

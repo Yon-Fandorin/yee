@@ -16,8 +16,13 @@ class TaskBoundaryTests(unittest.IsolatedAsyncioTestCase):
             {'ok': True, 'execution_settled': True},
             {'ok': True, 'execution_settled': True, 'tabs': []}])
         with patch.object(runner, 'owner_cli', cli):
-            await runner.release_previous_task(Path('case'), Path('bridge'), 123)
+            await runner.release_previous_task(
+                Path('case'), Path('bridge'), 123, 'task-boundary')
         self.assertEqual([call.args[-1] for call in cli.call_args_list], ['detach', 'tabs'])
+        self.assertEqual(
+            [call.args[3] for call in cli.call_args_list],
+            ['task-boundary-release-previous-task',
+             'task-boundary-released-inventory'])
 
     async def test_unsettled_release_has_no_further_request(self):
         cli = AsyncMock(return_value={'ok': True, 'execution_settled': False})

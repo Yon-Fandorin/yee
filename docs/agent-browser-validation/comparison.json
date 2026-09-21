@@ -1,40 +1,57 @@
 {
-  "schema": "yee.fixed48.consumer-baseline.comparison.v1",
-  "created_at_ns": 1789306533220463000,
-  "candidate": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1",
+  "schema": "yee.agent-browser-comparison.v2",
+  "date": "2026-09-21",
+  "scope": {
+    "scenarios": 12,
+    "seeds": [
+      11,
+      29
+    ],
+    "modes": [
+      "fresh-acp",
+      "persistent"
+    ],
+    "pairs": 48,
+    "model": "grok-4.6",
+    "reasoning_effort": "high",
+    "viewport": "1440x900@1",
+    "model_retries": 0,
+    "approval_wait_comparison_seconds": 0,
+    "failed_costs_included": true
+  },
+  "candidate": {
+    "app": "/private/tmp/yee-agent-recheck-20260918-v1/Yee.app",
+    "executable_sha256": "bd12e9e5d913c3c92e63ccba496de9bdc613fbf21c90ac2b235fd3494906818b",
+    "framework_sha256": "12e9db13b09310f3e4e2d6d6fbe2c0a3a9be0e66a3f699929a466ca03a40df94",
+    "model": "grok-4.6",
+    "reasoning_effort": "high",
+    "model_retries": 0,
+    "viewport": "1440x900@1",
+    "approval_wait_comparison_seconds": 0
+  },
   "totals": {
     "yee": {
+      "passed": 48,
       "cases": 48,
-      "passed": 46,
-      "inclusive_raw_seconds": 2454.350847915,
-      "inclusive_human_wait_zero_seconds": 2386.329978915,
-      "actual_reported_usage": {
-        "inputTokens": 5107350,
-        "outputTokens": 94301,
-        "totalTokens": 5201651,
-        "cachedReadTokens": 4185600,
-        "reasoningTokens": 74538,
-        "modelCalls": 238,
-        "apiDurationMs": 1915317
+      "controlled_seconds": 2314.929804498,
+      "usage": {
+        "inputTokens": 4395366,
+        "outputTokens": 87803,
+        "totalTokens": 4483169,
+        "cachedReadTokens": 3703808,
+        "reasoningTokens": 69459,
+        "modelCalls": 226
       },
-      "approval_counts": {
-        "acp": 164,
-        "native_consent": 60,
-        "native_ui_activation_attempts": 60,
-        "native_ui_failed_attempts": 0,
-        "user_handoff": 8
-      },
-      "MCP_calls": 164,
-      "MCP_error_calls": 4,
-      "requested_retries": 0,
-      "provider_retry_count": null
+      "mcp_calls": 152,
+      "mcp_client_errors": 0,
+      "native_consent_count": 60,
+      "user_handoff_count": 8
     },
     "aside": {
-      "cases": 48,
       "passed": 36,
-      "inclusive_raw_seconds": 3710.052731751,
-      "inclusive_human_wait_zero_seconds": 3708.276963418,
-      "actual_reported_usage": {
+      "cases": 48,
+      "controlled_seconds": 3708.276963418,
+      "usage": {
         "inputTokens": 11776879,
         "outputTokens": 153332,
         "totalTokens": 11930211,
@@ -43,237 +60,150 @@
         "modelCalls": 463,
         "apiDurationMs": 3192285
       },
-      "approval_counts": {
-        "acp": 375,
-        "host_input_auth": 8,
-        "host_document_approval": 4,
-        "native_complete_approval_count": null
-      },
-      "MCP_calls": 375,
-      "MCP_error_calls": 19,
-      "requested_retries": 0,
-      "provider_retry_count": null
+      "mcp_calls": 375,
+      "mcp_client_errors": 19,
+      "native_complete_approval_count": null,
+      "host_input_auth_count": 8,
+      "host_document_approval_count": 4
     }
   },
-  "parent_completed_Yee": {
+  "yee_vs_aside_delta_percent": {
+    "controlled_seconds": -37.573977690051535,
+    "actual_total_tokens": -62.42171240726589,
+    "model_calls": -51.18790496760259
+  },
+  "previous_yee_checkpoint": {
+    "passed": 46,
     "cases": 48,
-    "passed": 48,
-    "inclusive_raw_seconds": 2487.269335333,
-    "inclusive_human_wait_zero_seconds": 2418.2344073329996,
-    "actual_reported_usage": {
-      "inputTokens": 5066124,
-      "outputTokens": 95293,
-      "totalTokens": 5161417,
-      "cachedReadTokens": 4215296,
-      "reasoningTokens": 74518,
-      "modelCalls": 238,
-      "apiDurationMs": 1925418
+    "controlled_seconds": 2386.329978915,
+    "actual_total_tokens": 5201651,
+    "model_calls": 238,
+    "current_delta_percent": {
+      "controlled_seconds": -2.9920495089896892,
+      "actual_total_tokens": -13.81257604556707,
+      "model_calls": -5.042016806722689
     },
-    "approval_counts": {
-      "acp": 165,
-      "native_consent": 60,
-      "native_ui_activation_attempts": 60,
-      "native_ui_failed_attempts": 0,
-      "user_handoff": 8
-    },
-    "MCP_calls": 165,
-    "MCP_error_calls": 4,
-    "requested_retries": 0,
-    "provider_retry_count": null
+    "superseded_comparison_sha256": "2843fd787160171b18a07fdf2454fecf497dab6a233868e7c46165a62731c176"
   },
   "conditions": [
     {
       "mode": "fresh-acp",
       "seed": 11,
-      "cohorts": {
-        "yee": {
-          "inclusive_raw_seconds": 732.786450208,
-          "declared_raw_user_wait_seconds": 17.078188,
-          "inclusive_user_wait_zero_seconds": 715.7082622080001,
-          "actual_usage": {
-            "inputTokens": 732817,
-            "outputTokens": 26784,
-            "totalTokens": 759601,
-            "cachedReadTokens": 404608,
-            "reasoningTokens": 20871,
-            "modelCalls": 66,
-            "apiDurationMs": 584840
-          },
-          "original_cases_passed": 12,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        },
-        "aside": {
-          "inclusive_raw_seconds": 1176.663341,
-          "declared_raw_user_wait_seconds": 0.684666292,
-          "inclusive_user_wait_zero_seconds": 1175.978674708,
-          "actual_usage": {
-            "inputTokens": 2130993,
-            "outputTokens": 49272,
-            "totalTokens": 2180265,
-            "cachedReadTokens": 1587456,
-            "reasoningTokens": 33956,
-            "modelCalls": 149,
-            "apiDurationMs": 1010422
-          },
-          "original_cases_passed": 6,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        }
-      }
+      "passed": 12,
+      "cases": 12,
+      "raw_seconds": 695.557507208,
+      "approval_wait_seconds": 60.543452,
+      "controlled_seconds": 635.014055208,
+      "usage": {
+        "inputTokens": 649858,
+        "outputTokens": 27281,
+        "totalTokens": 677139,
+        "cachedReadTokens": 401280,
+        "reasoningTokens": 22387,
+        "modelCalls": 65
+      },
+      "mcp_calls": 41,
+      "mcp_client_errors": 0,
+      "native_consent_count": 15,
+      "user_handoff_count": 2
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
-      "cohorts": {
-        "yee": {
-          "inclusive_raw_seconds": 642.918483041,
-          "declared_raw_user_wait_seconds": 17.642944999999997,
-          "inclusive_user_wait_zero_seconds": 625.2755380409999,
-          "actual_usage": {
-            "inputTokens": 712445,
-            "outputTokens": 28548,
-            "totalTokens": 740993,
-            "cachedReadTokens": 448896,
-            "reasoningTokens": 23754,
-            "modelCalls": 64,
-            "apiDurationMs": 495651
-          },
-          "original_cases_passed": 11,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        },
-        "aside": {
-          "inclusive_raw_seconds": 1130.818523334,
-          "declared_raw_user_wait_seconds": 0.230178416,
-          "inclusive_user_wait_zero_seconds": 1130.588344918,
-          "actual_usage": {
-            "inputTokens": 1698108,
-            "outputTokens": 45652,
-            "totalTokens": 1743760,
-            "cachedReadTokens": 1190912,
-            "reasoningTokens": 33868,
-            "modelCalls": 122,
-            "apiDurationMs": 970096
-          },
-          "original_cases_passed": 7,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        }
-      }
+      "passed": 12,
+      "cases": 12,
+      "raw_seconds": 789.89230079,
+      "approval_wait_seconds": 61.935323,
+      "controlled_seconds": 727.95697779,
+      "usage": {
+        "inputTokens": 603064,
+        "outputTokens": 24918,
+        "totalTokens": 627982,
+        "cachedReadTokens": 370304,
+        "reasoningTokens": 19451,
+        "modelCalls": 62
+      },
+      "mcp_calls": 38,
+      "mcp_client_errors": 0,
+      "native_consent_count": 15,
+      "user_handoff_count": 2
     },
     {
       "mode": "persistent",
       "seed": 11,
-      "cohorts": {
-        "yee": {
-          "inclusive_raw_seconds": 459.830679375,
-          "declared_raw_user_wait_seconds": 16.684117,
-          "inclusive_user_wait_zero_seconds": 443.146562375,
-          "actual_usage": {
-            "inputTokens": 1750692,
-            "outputTokens": 18122,
-            "totalTokens": 1768814,
-            "cachedReadTokens": 1652864,
-            "reasoningTokens": 13312,
-            "modelCalls": 54,
-            "apiDurationMs": 337086
-          },
-          "original_cases_passed": 12,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        },
-        "aside": {
-          "inclusive_raw_seconds": 659.751485625,
-          "declared_raw_user_wait_seconds": 0.176320124,
-          "inclusive_user_wait_zero_seconds": 659.575165501,
-          "actual_usage": {
-            "inputTokens": 3409139,
-            "outputTokens": 28966,
-            "totalTokens": 3438105,
-            "cachedReadTokens": 3212288,
-            "reasoningTokens": 16837,
-            "modelCalls": 91,
-            "apiDurationMs": 563180
-          },
-          "original_cases_passed": 12,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        }
-      }
+      "passed": 12,
+      "cases": 12,
+      "raw_seconds": 584.547630083,
+      "approval_wait_seconds": 60.0396639999999,
+      "controlled_seconds": 524.507966083,
+      "usage": {
+        "inputTokens": 1571322,
+        "outputTokens": 18569,
+        "totalTokens": 1589891,
+        "cachedReadTokens": 1472768,
+        "reasoningTokens": 14484,
+        "modelCalls": 49
+      },
+      "mcp_calls": 36,
+      "mcp_client_errors": 0,
+      "native_consent_count": 15,
+      "user_handoff_count": 2,
+      "same_model_session_and_browser_process": true
     },
     {
       "mode": "persistent",
       "seed": 29,
-      "cohorts": {
-        "yee": {
-          "inclusive_raw_seconds": 618.815235291,
-          "declared_raw_user_wait_seconds": 16.615619,
-          "inclusive_user_wait_zero_seconds": 602.199616291,
-          "actual_usage": {
-            "inputTokens": 1911396,
-            "outputTokens": 20847,
-            "totalTokens": 1932243,
-            "cachedReadTokens": 1679232,
-            "reasoningTokens": 16601,
-            "modelCalls": 54,
-            "apiDurationMs": 497740
-          },
-          "original_cases_passed": 11,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        },
-        "aside": {
-          "inclusive_raw_seconds": 742.819381792,
-          "declared_raw_user_wait_seconds": 0.684603501,
-          "inclusive_user_wait_zero_seconds": 742.134778291,
-          "actual_usage": {
-            "inputTokens": 4538639,
-            "outputTokens": 29442,
-            "totalTokens": 4568081,
-            "cachedReadTokens": 4309376,
-            "reasoningTokens": 18180,
-            "modelCalls": 101,
-            "apiDurationMs": 648587
-          },
-          "original_cases_passed": 11,
-          "initial_setup_preparation_verification_cleanup_retained": true,
-          "failed_costs_retained": true
-        }
-      }
+      "passed": 12,
+      "cases": 12,
+      "raw_seconds": 486.659715417,
+      "approval_wait_seconds": 59.208909999999946,
+      "controlled_seconds": 427.450805417,
+      "usage": {
+        "inputTokens": 1571122,
+        "outputTokens": 17035,
+        "totalTokens": 1588157,
+        "cachedReadTokens": 1459456,
+        "reasoningTokens": 13137,
+        "modelCalls": 50
+      },
+      "mcp_calls": 37,
+      "mcp_client_errors": 0,
+      "native_consent_count": 15,
+      "user_handoff_count": 2,
+      "same_model_session_and_browser_process": true
     }
   ],
-  "all48_pairs": [
+  "pairs": [
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S01",
       "yee": {
-        "whole_task_raw_seconds": 46.291582375,
-        "declared_raw_user_wait_seconds": 1.034384,
-        "whole_task_user_wait_zero_seconds": 45.257198374999994,
-        "actual_usage": {
-          "inputTokens": 38234,
-          "outputTokens": 1908,
-          "totalTokens": 40142,
-          "cachedReadTokens": 19328,
-          "reasoningTokens": 1612,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 83.45583045900001,
+        "usage": {
+          "inputTokens": 40581,
+          "outputTokens": 4425,
+          "totalTokens": 45006,
+          "cachedReadTokens": 17408,
+          "reasoningTokens": 4099,
           "modelCalls": 4,
-          "apiDurationMs": 34888
+          "apiDurationMs": 76045
         },
-        "provider_num_turns": 4,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v3/yee/S01",
+        "acp_span_sha256": "a8b6274b75e0e9289d4af30bed7cf94238e36241e9512d529f49bbcd9d9bd7c4"
       },
       "aside": {
-        "whole_task_raw_seconds": 102.880287125,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 102.880287125,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 102.880287125,
+        "usage": {
           "inputTokens": 268300,
           "outputTokens": 4856,
           "totalTokens": 273156,
@@ -282,48 +212,46 @@
           "modelCalls": 18,
           "apiDurationMs": 90237
         },
-        "provider_num_turns": 18,
         "mcp_calls": 15,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -19.424456665999983,
+        "totalTokens": -228150,
+        "modelCalls": -14
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S02",
       "yee": {
-        "whole_task_raw_seconds": 62.127897875,
-        "declared_raw_user_wait_seconds": 1.0828330000000002,
-        "whole_task_user_wait_zero_seconds": 61.045064875,
-        "actual_usage": {
-          "inputTokens": 75587,
-          "outputTokens": 2383,
-          "totalTokens": 77970,
-          "cachedReadTokens": 54528,
-          "reasoningTokens": 1882,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 50.611138792,
+        "usage": {
+          "inputTokens": 73152,
+          "outputTokens": 2427,
+          "totalTokens": 75579,
+          "cachedReadTokens": 59264,
+          "reasoningTokens": 1890,
           "modelCalls": 7,
-          "apiDurationMs": 51530
+          "apiDurationMs": 43181
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v3/yee/S02",
+        "acp_span_sha256": "6319887beb4057d49bef779ff4caf1769c3310e2cf2fe50b4558fd76b4d73d19"
       },
       "aside": {
-        "whole_task_raw_seconds": 121.865838458,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 121.865838458,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 121.865838458,
+        "usage": {
           "inputTokens": 241035,
           "outputTokens": 3801,
           "totalTokens": 244836,
@@ -332,48 +260,46 @@
           "modelCalls": 20,
           "apiDurationMs": 108886
         },
-        "provider_num_turns": 20,
         "mcp_calls": 18,
-        "mcp_error_calls": 2,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 2
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -71.254699666,
+        "totalTokens": -169257,
+        "modelCalls": -13
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S03",
       "yee": {
-        "whole_task_raw_seconds": 50.71218875,
-        "declared_raw_user_wait_seconds": 1.129428,
-        "whole_task_user_wait_zero_seconds": 49.582760750000006,
-        "actual_usage": {
-          "inputTokens": 47295,
-          "outputTokens": 1391,
-          "totalTokens": 48686,
-          "cachedReadTokens": 29184,
-          "reasoningTokens": 944,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 67.93279291600001,
+        "usage": {
+          "inputTokens": 51512,
+          "outputTokens": 1236,
+          "totalTokens": 52748,
+          "cachedReadTokens": 23040,
+          "reasoningTokens": 771,
           "modelCalls": 5,
-          "apiDurationMs": 40426
+          "apiDurationMs": 54546
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v5-s03-s12/yee/S03",
+        "acp_span_sha256": "67579833729c6918d182057335785efaeb0e9ebe358b7e34deeb809fdd974282"
       },
       "aside": {
-        "whole_task_raw_seconds": 55.752319791,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 55.752319791,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "independent_aside_complete_input_review_required"
+        ],
+        "controlled_seconds": 55.752319791,
+        "usage": {
           "inputTokens": 122510,
           "outputTokens": 2455,
           "totalTokens": 124965,
@@ -382,48 +308,44 @@
           "modelCalls": 12,
           "apiDurationMs": 45606
         },
-        "provider_num_turns": 12,
         "mcp_calls": 10,
-        "mcp_error_calls": 3,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "independent_aside_complete_input_review_required"
-        ]
+        "mcp_client_errors": 3
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": 12.180473125000013,
+        "totalTokens": -72217,
+        "modelCalls": -7
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S04",
       "yee": {
-        "whole_task_raw_seconds": 34.463745291,
-        "declared_raw_user_wait_seconds": 1.063438,
-        "whole_task_user_wait_zero_seconds": 33.400307291000004,
-        "actual_usage": {
-          "inputTokens": 47933,
-          "outputTokens": 1366,
-          "totalTokens": 49299,
-          "cachedReadTokens": 11136,
-          "reasoningTokens": 988,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 34.300980333999995,
+        "usage": {
+          "inputTokens": 45365,
+          "outputTokens": 1304,
+          "totalTokens": 46669,
+          "cachedReadTokens": 27648,
+          "reasoningTokens": 980,
           "modelCalls": 5,
-          "apiDurationMs": 24600
+          "apiDurationMs": 27053
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v7-s04-s12/yee/S04",
+        "acp_span_sha256": "d985e6c3f23fe66f7b924020068d7dee850674fb4d8adbc9114e4d8c898e1ddf"
       },
       "aside": {
-        "whole_task_raw_seconds": 57.025592042,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 57.025592042,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 57.025592042,
+        "usage": {
           "inputTokens": 73106,
           "outputTokens": 2179,
           "totalTokens": 75285,
@@ -432,46 +354,44 @@
           "modelCalls": 7,
           "apiDurationMs": 41315
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -22.724611708000005,
+        "totalTokens": -28616,
+        "modelCalls": -2
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S05",
       "yee": {
-        "whole_task_raw_seconds": 46.76521725,
-        "declared_raw_user_wait_seconds": 1.100654,
-        "whole_task_user_wait_zero_seconds": 45.66456325,
-        "actual_usage": {
-          "inputTokens": 57966,
-          "outputTokens": 1181,
-          "totalTokens": 59147,
-          "cachedReadTokens": 39552,
-          "reasoningTokens": 792,
-          "modelCalls": 6,
-          "apiDurationMs": 36424
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 49.352530208,
+        "usage": {
+          "inputTokens": 78601,
+          "outputTokens": 2379,
+          "totalTokens": 80980,
+          "cachedReadTokens": 60032,
+          "reasoningTokens": 1879,
+          "modelCalls": 8,
+          "apiDurationMs": 41993
         },
-        "provider_num_turns": 6,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 6,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v7-s04-s12/yee/S05",
+        "acp_span_sha256": "7f44c39357e821de8b071a6b9dfd6f0e756063e85802ec60316de868c9ff1143"
       },
       "aside": {
-        "whole_task_raw_seconds": 52.973932459,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 52.973932459,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 52.973932459,
+        "usage": {
           "inputTokens": 56603,
           "outputTokens": 1895,
           "totalTokens": 58498,
@@ -480,46 +400,46 @@
           "modelCalls": 6,
           "apiDurationMs": 44288
         },
-        "provider_num_turns": 6,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -3.6214022509999992,
+        "totalTokens": 22482,
+        "modelCalls": 2
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S06",
       "yee": {
-        "whole_task_raw_seconds": 83.379276125,
-        "declared_raw_user_wait_seconds": 1.072901,
-        "whole_task_user_wait_zero_seconds": 82.306375125,
-        "actual_usage": {
-          "inputTokens": 72816,
-          "outputTokens": 2584,
-          "totalTokens": 75400,
-          "cachedReadTokens": 52736,
-          "reasoningTokens": 2116,
-          "modelCalls": 7,
-          "apiDurationMs": 72804
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 43.315780125,
+        "usage": {
+          "inputTokens": 55981,
+          "outputTokens": 2022,
+          "totalTokens": 58003,
+          "cachedReadTokens": 27520,
+          "reasoningTokens": 1634,
+          "modelCalls": 6,
+          "apiDurationMs": 36267
         },
-        "provider_num_turns": 7,
-        "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 4,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v7-s04-s12/yee/S06",
+        "acp_span_sha256": "f1ff0f821a600ec4ce85b2f8b3769809cda0fb690e30322d86cdb07ce8d34a1d"
       },
       "aside": {
-        "whole_task_raw_seconds": 157.287184625,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 157.287184625,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 157.287184625,
+        "usage": {
           "inputTokens": 312216,
           "outputTokens": 7459,
           "totalTokens": 319675,
@@ -528,48 +448,46 @@
           "modelCalls": 21,
           "apiDurationMs": 147014
         },
-        "provider_num_turns": 21,
         "mcp_calls": 18,
-        "mcp_error_calls": 3,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 3
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -113.9714045,
+        "totalTokens": -261672,
+        "modelCalls": -15
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S07",
       "yee": {
-        "whole_task_raw_seconds": 40.16716175,
-        "declared_raw_user_wait_seconds": 1.0551810000000001,
-        "whole_task_user_wait_zero_seconds": 39.11198075,
-        "actual_usage": {
-          "inputTokens": 37447,
-          "outputTokens": 1643,
-          "totalTokens": 39090,
-          "cachedReadTokens": 1280,
-          "reasoningTokens": 1410,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 34.780645166,
+        "usage": {
+          "inputTokens": 35806,
+          "outputTokens": 1562,
+          "totalTokens": 37368,
+          "cachedReadTokens": 18560,
+          "reasoningTokens": 1329,
           "modelCalls": 4,
-          "apiDurationMs": 29779
+          "apiDurationMs": 27822
         },
-        "provider_num_turns": 4,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v7-s04-s12/yee/S07",
+        "acp_span_sha256": "354cc0b1ff7d963bddbda71015a83b764a7b6128509a9173630bdcc64886fb25"
       },
       "aside": {
-        "whole_task_raw_seconds": 102.754879667,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 102.754879667,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 102.754879667,
+        "usage": {
           "inputTokens": 291454,
           "outputTokens": 3404,
           "totalTokens": 294858,
@@ -578,48 +496,44 @@
           "modelCalls": 17,
           "apiDurationMs": 92582
         },
-        "provider_num_turns": 17,
         "mcp_calls": 12,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -67.974234501,
+        "totalTokens": -257490,
+        "modelCalls": -13
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S08",
       "yee": {
-        "whole_task_raw_seconds": 42.252771042,
-        "declared_raw_user_wait_seconds": 2.1292910000000003,
-        "whole_task_user_wait_zero_seconds": 40.123480042,
-        "actual_usage": {
-          "inputTokens": 87758,
-          "outputTokens": 1420,
-          "totalTokens": 89178,
-          "cachedReadTokens": 59648,
-          "reasoningTokens": 1031,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 33.798145250000005,
+        "usage": {
+          "inputTokens": 44479,
+          "outputTokens": 1271,
+          "totalTokens": 45750,
+          "cachedReadTokens": 18944,
+          "reasoningTokens": 905,
           "modelCalls": 5,
-          "apiDurationMs": 30715
+          "apiDurationMs": 27028
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/preflight-fresh11-s08-hid-v2/yee/S08",
+        "acp_span_sha256": "4a4406a8f586122e558e81391510f3fae5e3791548d2f00851160ed613b3a16e"
       },
       "aside": {
-        "whole_task_raw_seconds": 61.412960708,
-        "declared_raw_user_wait_seconds": 0.047855125,
-        "whole_task_user_wait_zero_seconds": 61.365105583,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 61.365105583,
+        "usage": {
           "inputTokens": 148258,
           "outputTokens": 2883,
           "totalTokens": 151141,
@@ -628,46 +542,44 @@
           "modelCalls": 9,
           "apiDurationMs": 52433
         },
-        "provider_num_turns": 9,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -27.566960332999997,
+        "totalTokens": -105391,
+        "modelCalls": -4
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S09",
       "yee": {
-        "whole_task_raw_seconds": 141.52690825,
-        "declared_raw_user_wait_seconds": 1.078047,
-        "whole_task_user_wait_zero_seconds": 140.44886125,
-        "actual_usage": {
-          "inputTokens": 67421,
-          "outputTokens": 7482,
-          "totalTokens": 74903,
-          "cachedReadTokens": 41216,
-          "reasoningTokens": 5854,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 84.310003625,
+        "usage": {
+          "inputTokens": 70428,
+          "outputTokens": 4474,
+          "totalTokens": 74902,
+          "cachedReadTokens": 46208,
+          "reasoningTokens": 3786,
           "modelCalls": 6,
-          "apiDurationMs": 130878
+          "apiDurationMs": 77253
         },
-        "provider_num_turns": 6,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v8-s09-s12/yee/S09",
+        "acp_span_sha256": "bfeff62322a2b1ac2634495d82a91a66173dba6dd285da8a8eda69133041d720"
       },
       "aside": {
-        "whole_task_raw_seconds": 155.408388167,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 155.408388167,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 155.408388167,
+        "usage": {
           "inputTokens": 123950,
           "outputTokens": 8208,
           "totalTokens": 132158,
@@ -676,46 +588,44 @@
           "modelCalls": 9,
           "apiDurationMs": 145676
         },
-        "provider_num_turns": 9,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -71.098384542,
+        "totalTokens": -57256,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S10",
       "yee": {
-        "whole_task_raw_seconds": 76.997333541,
-        "declared_raw_user_wait_seconds": 2.969411,
-        "whole_task_user_wait_zero_seconds": 74.02792254100001,
-        "actual_usage": {
-          "inputTokens": 61273,
-          "outputTokens": 1925,
-          "totalTokens": 63198,
-          "cachedReadTokens": 27264,
-          "reasoningTokens": 1463,
-          "modelCalls": 5,
-          "apiDurationMs": 58132
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 39.831678333,
+        "usage": {
+          "inputTokens": 36763,
+          "outputTokens": 1442,
+          "totalTokens": 38205,
+          "cachedReadTokens": 18560,
+          "reasoningTokens": 1059,
+          "modelCalls": 4,
+          "apiDurationMs": 24897
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v9-s10-s12/yee/S10",
+        "acp_span_sha256": "c40c01a4614e7aa013ab6e13bf1218ad3e69b871fac3d8390f8172a17d93ef7e"
       },
       "aside": {
-        "whole_task_raw_seconds": 85.09614,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 85.09614,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 85.09614,
+        "usage": {
           "inputTokens": 85156,
           "outputTokens": 2392,
           "totalTokens": 87548,
@@ -724,46 +634,46 @@
           "modelCalls": 8,
           "apiDurationMs": 49506
         },
-        "provider_num_turns": 8,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -45.264461667000006,
+        "totalTokens": -49343,
+        "modelCalls": -4
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S11",
       "yee": {
-        "whole_task_raw_seconds": 59.436140708,
-        "declared_raw_user_wait_seconds": 1.0748710000000001,
-        "whole_task_user_wait_zero_seconds": 58.361269708,
-        "actual_usage": {
-          "inputTokens": 92906,
-          "outputTokens": 2321,
-          "totalTokens": 95227,
-          "cachedReadTokens": 49280,
-          "reasoningTokens": 1821,
-          "modelCalls": 7,
-          "apiDurationMs": 48722
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 66.73228808399999,
+        "usage": {
+          "inputTokens": 72764,
+          "outputTokens": 2981,
+          "totalTokens": 75745,
+          "cachedReadTokens": 56192,
+          "reasoningTokens": 2525,
+          "modelCalls": 6,
+          "apiDurationMs": 59728
         },
-        "provider_num_turns": 7,
-        "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 4,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v9-s10-s12/yee/S11",
+        "acp_span_sha256": "298db06d3970647a7d09ed0a616da24ea1508ab49911188617674ea9c29963e1"
       },
       "aside": {
-        "whole_task_raw_seconds": 162.33634825,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 162.33634825,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 162.33634825,
+        "usage": {
           "inputTokens": 253852,
           "outputTokens": 7639,
           "totalTokens": 261491,
@@ -772,48 +682,44 @@
           "modelCalls": 13,
           "apiDurationMs": 154142
         },
-        "provider_num_turns": 13,
         "mcp_calls": 10,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -95.604060166,
+        "totalTokens": -185746,
+        "modelCalls": -7
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 11,
       "scenario": "S12",
       "yee": {
-        "whole_task_raw_seconds": 37.311203333,
-        "declared_raw_user_wait_seconds": 2.287749,
-        "whole_task_user_wait_zero_seconds": 35.023454333000004,
-        "actual_usage": {
-          "inputTokens": 46181,
-          "outputTokens": 1180,
-          "totalTokens": 47361,
-          "cachedReadTokens": 19456,
-          "reasoningTokens": 958,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 46.59224191599999,
+        "usage": {
+          "inputTokens": 44426,
+          "outputTokens": 1758,
+          "totalTokens": 46184,
+          "cachedReadTokens": 27904,
+          "reasoningTokens": 1530,
           "modelCalls": 5,
-          "apiDurationMs": 25942
+          "apiDurationMs": 39598
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed11-current-v14-s12/yee/S12",
+        "acp_span_sha256": "2ba1f65f93f643008551024515f40bf65e7f592e3b54aac3ae4c9a5e5efcd451"
       },
       "aside": {
-        "whole_task_raw_seconds": 48.542125334,
-        "declared_raw_user_wait_seconds": 0.636811167,
-        "whole_task_user_wait_zero_seconds": 47.905314167,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 47.905314167,
+        "usage": {
           "inputTokens": 154553,
           "outputTokens": 2101,
           "totalTokens": 156654,
@@ -822,46 +728,46 @@
           "modelCalls": 9,
           "apiDurationMs": 38737
         },
-        "provider_num_turns": 9,
         "mcp_calls": 7,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -1.3130722510000084,
+        "totalTokens": -110470,
+        "modelCalls": -4
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S01",
       "yee": {
-        "whole_task_raw_seconds": 41.489194875,
-        "declared_raw_user_wait_seconds": 1.047088,
-        "whole_task_user_wait_zero_seconds": 40.442106875,
-        "actual_usage": {
-          "inputTokens": 38572,
-          "outputTokens": 2062,
-          "totalTokens": 40634,
-          "cachedReadTokens": 26368,
-          "reasoningTokens": 1766,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 66.911909084,
+        "usage": {
+          "inputTokens": 35703,
+          "outputTokens": 3816,
+          "totalTokens": 39519,
+          "cachedReadTokens": 18048,
+          "reasoningTokens": 3528,
           "modelCalls": 4,
-          "apiDurationMs": 30515
+          "apiDurationMs": 59633
         },
-        "provider_num_turns": 4,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S01",
+        "acp_span_sha256": "614ccc6df20506ef12b084ad1ba106748d1ac6e2af990e18d2f200c2644294bc"
       },
       "aside": {
-        "whole_task_raw_seconds": 76.281646291,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 76.281646291,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 76.281646291,
+        "usage": {
           "inputTokens": 135437,
           "outputTokens": 3081,
           "totalTokens": 138518,
@@ -870,48 +776,46 @@
           "modelCalls": 13,
           "apiDurationMs": 65772
         },
-        "provider_num_turns": 13,
         "mcp_calls": 11,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -9.369737207,
+        "totalTokens": -98999,
+        "modelCalls": -9
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S02",
       "yee": {
-        "whole_task_raw_seconds": 53.745878459,
-        "declared_raw_user_wait_seconds": 1.090675,
-        "whole_task_user_wait_zero_seconds": 52.655203459,
-        "actual_usage": {
-          "inputTokens": 77051,
-          "outputTokens": 2652,
-          "totalTokens": 79703,
-          "cachedReadTokens": 55936,
-          "reasoningTokens": 2118,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 62.584873666,
+        "usage": {
+          "inputTokens": 73157,
+          "outputTokens": 2240,
+          "totalTokens": 75397,
+          "cachedReadTokens": 50048,
+          "reasoningTokens": 1699,
           "modelCalls": 7,
-          "apiDurationMs": 43181
+          "apiDurationMs": 55362
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S02",
+        "acp_span_sha256": "6fb5b16b5c18b033019629ddd51032faf435a635c4b2b459ebc45503510cf45b"
       },
       "aside": {
-        "whole_task_raw_seconds": 72.843729625,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 72.843729625,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 72.843729625,
+        "usage": {
           "inputTokens": 229501,
           "outputTokens": 3652,
           "totalTokens": 233153,
@@ -920,48 +824,44 @@
           "modelCalls": 14,
           "apiDurationMs": 63126
         },
-        "provider_num_turns": 14,
         "mcp_calls": 11,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -10.258855958999995,
+        "totalTokens": -157756,
+        "modelCalls": -7
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S03",
       "yee": {
-        "whole_task_raw_seconds": 33.8403235,
-        "declared_raw_user_wait_seconds": 1.074381,
-        "whole_task_user_wait_zero_seconds": 32.765942499999994,
-        "actual_usage": {
-          "inputTokens": 47393,
-          "outputTokens": 1150,
-          "totalTokens": 48543,
-          "cachedReadTokens": 36352,
-          "reasoningTokens": 697,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 26.340931583,
+        "usage": {
+          "inputTokens": 45072,
+          "outputTokens": 1102,
+          "totalTokens": 46174,
+          "cachedReadTokens": 34560,
+          "reasoningTokens": 693,
           "modelCalls": 5,
-          "apiDurationMs": 23468
+          "apiDurationMs": 19502
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S03",
+        "acp_span_sha256": "0bcae58ed6139d7af1b8359f61bc0424c7279ec747aa959dc6a8b1859b667d1c"
       },
       "aside": {
-        "whole_task_raw_seconds": 42.625026875,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 42.625026875,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 42.625026875,
+        "usage": {
           "inputTokens": 64775,
           "outputTokens": 1650,
           "totalTokens": 66425,
@@ -970,46 +870,44 @@
           "modelCalls": 7,
           "apiDurationMs": 34370
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -16.284095292000003,
+        "totalTokens": -20251,
+        "modelCalls": -2
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S04",
       "yee": {
-        "whole_task_raw_seconds": 32.651775542,
-        "declared_raw_user_wait_seconds": 1.1015709999999999,
-        "whole_task_user_wait_zero_seconds": 31.550204542000003,
-        "actual_usage": {
-          "inputTokens": 47949,
-          "outputTokens": 1360,
-          "totalTokens": 49309,
-          "cachedReadTokens": 31616,
-          "reasoningTokens": 1023,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 150.127107084,
+        "usage": {
+          "inputTokens": 45082,
+          "outputTokens": 1264,
+          "totalTokens": 46346,
+          "cachedReadTokens": 28544,
+          "reasoningTokens": 947,
           "modelCalls": 5,
-          "apiDurationMs": 23549
+          "apiDurationMs": 143381
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S04",
+        "acp_span_sha256": "e6574484c209fc69f574ab7efb8323eb4737f1d2b8c351c3b2bcf8ee1f185e21"
       },
       "aside": {
-        "whole_task_raw_seconds": 59.498068208,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 59.498068208,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 59.498068208,
+        "usage": {
           "inputTokens": 77967,
           "outputTokens": 2483,
           "totalTokens": 80450,
@@ -1018,46 +916,44 @@
           "modelCalls": 8,
           "apiDurationMs": 44629
         },
-        "provider_num_turns": 8,
         "mcp_calls": 6,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": 90.62903887599998,
+        "totalTokens": -34104,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S05",
       "yee": {
-        "whole_task_raw_seconds": 41.6413475,
-        "declared_raw_user_wait_seconds": 1.067292,
-        "whole_task_user_wait_zero_seconds": 40.5740555,
-        "actual_usage": {
-          "inputTokens": 58787,
-          "outputTokens": 1467,
-          "totalTokens": 60254,
-          "cachedReadTokens": 31104,
-          "reasoningTokens": 1060,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 73.946111166,
+        "usage": {
+          "inputTokens": 55301,
+          "outputTokens": 1407,
+          "totalTokens": 56708,
+          "cachedReadTokens": 19072,
+          "reasoningTokens": 1009,
           "modelCalls": 6,
-          "apiDurationMs": 31295
+          "apiDurationMs": 66564
         },
-        "provider_num_turns": 6,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S05",
+        "acp_span_sha256": "a51c51147ac51b27b226368727ff6ae0d4cdc990eb01ed31df55d26208ee0754"
       },
       "aside": {
-        "whole_task_raw_seconds": 47.375200875,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 47.375200875,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 47.375200875,
+        "usage": {
           "inputTokens": 99546,
           "outputTokens": 1803,
           "totalTokens": 101349,
@@ -1066,46 +962,46 @@
           "modelCalls": 9,
           "apiDurationMs": 35562
         },
-        "provider_num_turns": 9,
         "mcp_calls": 6,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": 26.570910290999997,
+        "totalTokens": -44641,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S06",
       "yee": {
-        "whole_task_raw_seconds": 39.985849833,
-        "declared_raw_user_wait_seconds": 1.0698409999999998,
-        "whole_task_user_wait_zero_seconds": 38.91600883300001,
-        "actual_usage": {
-          "inputTokens": 47431,
-          "outputTokens": 1793,
-          "totalTokens": 49224,
-          "cachedReadTokens": 26624,
-          "reasoningTokens": 1445,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 36.915813459,
+        "usage": {
+          "inputTokens": 45216,
+          "outputTokens": 1654,
+          "totalTokens": 46870,
+          "cachedReadTokens": 28032,
+          "reasoningTokens": 1294,
           "modelCalls": 5,
-          "apiDurationMs": 29521
+          "apiDurationMs": 28623
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S06",
+        "acp_span_sha256": "5d3f3a55abfe6c767e954bba993e5510bf4fe272b984a870121b2e5c3bec9e77"
       },
       "aside": {
-        "whole_task_raw_seconds": 173.105728959,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 173.105728959,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 173.105728959,
+        "usage": {
           "inputTokens": 178177,
           "outputTokens": 6155,
           "totalTokens": 184332,
@@ -1114,48 +1010,44 @@
           "modelCalls": 15,
           "apiDurationMs": 164730
         },
-        "provider_num_turns": 15,
         "mcp_calls": 13,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -136.1899155,
+        "totalTokens": -137462,
+        "modelCalls": -10
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S07",
       "yee": {
-        "whole_task_raw_seconds": 41.713921166,
-        "declared_raw_user_wait_seconds": 1.010683,
-        "whole_task_user_wait_zero_seconds": 40.703238166,
-        "actual_usage": {
-          "inputTokens": 37420,
-          "outputTokens": 1813,
-          "totalTokens": 39233,
-          "cachedReadTokens": 26112,
-          "reasoningTokens": 1603,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 39.878811916000004,
+        "usage": {
+          "inputTokens": 35704,
+          "outputTokens": 1429,
+          "totalTokens": 37133,
+          "cachedReadTokens": 16256,
+          "reasoningTokens": 1226,
           "modelCalls": 4,
-          "apiDurationMs": 31229
+          "apiDurationMs": 32782
         },
-        "provider_num_turns": 4,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S07",
+        "acp_span_sha256": "157ea995cda5cdaad334fbf15f4ee4ed344bb88d488e969e661873933d8be3ac"
       },
       "aside": {
-        "whole_task_raw_seconds": 88.540480041,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 88.540480041,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 88.540480041,
+        "usage": {
           "inputTokens": 112120,
           "outputTokens": 2977,
           "totalTokens": 115097,
@@ -1164,46 +1056,44 @@
           "modelCalls": 11,
           "apiDurationMs": 78869
         },
-        "provider_num_turns": 11,
         "mcp_calls": 9,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -48.66166812499999,
+        "totalTokens": -77964,
+        "modelCalls": -7
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S08",
       "yee": {
-        "whole_task_raw_seconds": 39.545053458,
-        "declared_raw_user_wait_seconds": 2.089136,
-        "whole_task_user_wait_zero_seconds": 37.455917458,
-        "actual_usage": {
-          "inputTokens": 66729,
-          "outputTokens": 1406,
-          "totalTokens": 68135,
-          "cachedReadTokens": 50816,
-          "reasoningTokens": 1015,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 27.268166542000003,
+        "usage": {
+          "inputTokens": 44007,
+          "outputTokens": 1002,
+          "totalTokens": 45009,
+          "cachedReadTokens": 27264,
+          "reasoningTokens": 641,
           "modelCalls": 5,
-          "apiDurationMs": 28485
+          "apiDurationMs": 20480
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S08",
+        "acp_span_sha256": "e30854c17c57a0a08952c49f011322c25d318560665894d62a7bde41d66f3214"
       },
       "aside": {
-        "whole_task_raw_seconds": 55.451470208,
-        "declared_raw_user_wait_seconds": 0.046610333,
-        "whole_task_user_wait_zero_seconds": 55.40485987500001,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 55.40485987500001,
+        "usage": {
           "inputTokens": 100830,
           "outputTokens": 2411,
           "totalTokens": 103241,
@@ -1212,48 +1102,46 @@
           "modelCalls": 7,
           "apiDurationMs": 45003
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -28.136693333000004,
+        "totalTokens": -58232,
+        "modelCalls": -2
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S09",
       "yee": {
-        "whole_task_raw_seconds": 140.686886291,
-        "declared_raw_user_wait_seconds": 1.0858079999999999,
-        "whole_task_user_wait_zero_seconds": 139.60107829100002,
-        "actual_usage": {
-          "inputTokens": 68631,
-          "outputTokens": 7754,
-          "totalTokens": 76385,
-          "cachedReadTokens": 41600,
-          "reasoningTokens": 7129,
-          "modelCalls": 6,
-          "apiDurationMs": 130476
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 104.449856416,
+        "usage": {
+          "inputTokens": 51980,
+          "outputTokens": 5392,
+          "totalTokens": 57372,
+          "cachedReadTokens": 29312,
+          "reasoningTokens": 3876,
+          "modelCalls": 5,
+          "apiDurationMs": 96858
         },
-        "provider_num_turns": 6,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "original_scenario_oracle_failed"
-        ]
+        "mcp_calls": 3,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S09",
+        "acp_span_sha256": "81ddb49412133163b0c0fe01586bc5cc2b7d3f001f40785fdad6ccb681c62675"
       },
       "aside": {
-        "whole_task_raw_seconds": 190.967598541,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 190.967598541,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "requested_return_procedure_or_specific_source_gap_omitted"
+        ],
+        "controlled_seconds": 190.967598541,
+        "usage": {
           "inputTokens": 154720,
           "outputTokens": 9057,
           "totalTokens": 163777,
@@ -1262,48 +1150,44 @@
           "modelCalls": 11,
           "apiDurationMs": 178283
         },
-        "provider_num_turns": 11,
         "mcp_calls": 8,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "requested_return_procedure_or_specific_source_gap_omitted"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -86.517742125,
+        "totalTokens": -106405,
+        "modelCalls": -6
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S10",
       "yee": {
-        "whole_task_raw_seconds": 52.409017375,
-        "declared_raw_user_wait_seconds": 3.141511,
-        "whole_task_user_wait_zero_seconds": 49.267506374999996,
-        "actual_usage": {
-          "inputTokens": 61692,
-          "outputTokens": 2013,
-          "totalTokens": 63705,
-          "cachedReadTokens": 39296,
-          "reasoningTokens": 1548,
-          "modelCalls": 5,
-          "apiDurationMs": 32818
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 39.329530041000005,
+        "usage": {
+          "inputTokens": 36679,
+          "outputTokens": 1436,
+          "totalTokens": 38115,
+          "cachedReadTokens": 18432,
+          "reasoningTokens": 1052,
+          "modelCalls": 4,
+          "apiDurationMs": 24559
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S10",
+        "acp_span_sha256": "6c3bf03708386cb11548b445e72aad3b1cca90559ab8614cc73d8716ff79fdaa"
       },
       "aside": {
-        "whole_task_raw_seconds": 70.684221209,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 70.684221209,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 70.684221209,
+        "usage": {
           "inputTokens": 74920,
           "outputTokens": 2061,
           "totalTokens": 76981,
@@ -1312,46 +1196,46 @@
           "modelCalls": 7,
           "apiDurationMs": 35334
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -31.354691167999995,
+        "totalTokens": -38866,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S11",
       "yee": {
-        "whole_task_raw_seconds": 57.30762625,
-        "declared_raw_user_wait_seconds": 1.0670250000000001,
-        "whole_task_user_wait_zero_seconds": 56.24060125,
-        "actual_usage": {
-          "inputTokens": 93713,
-          "outputTokens": 2754,
-          "totalTokens": 96467,
-          "cachedReadTokens": 68096,
-          "reasoningTokens": 2259,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 57.716023458,
+        "usage": {
+          "inputTokens": 90556,
+          "outputTokens": 2394,
+          "totalTokens": 92950,
+          "cachedReadTokens": 72960,
+          "reasoningTokens": 1935,
           "modelCalls": 7,
-          "apiDurationMs": 46783
+          "apiDurationMs": 49701
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v2/yee/S11",
+        "acp_span_sha256": "e11b8aa83e154a79877d247307017f5fc5b08805ec239c99c5c644b1bdc60540"
       },
       "aside": {
-        "whole_task_raw_seconds": 174.468966959,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 174.468966959,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 174.468966959,
+        "usage": {
           "inputTokens": 365207,
           "outputTokens": 6805,
           "totalTokens": 372012,
@@ -1360,48 +1244,44 @@
           "modelCalls": 13,
           "apiDurationMs": 165994
         },
-        "provider_num_turns": 13,
         "mcp_calls": 9,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -116.752943501,
+        "totalTokens": -279062,
+        "modelCalls": -6
+      },
+      "equal_success": false
     },
     {
       "mode": "fresh-acp",
       "seed": 29,
       "scenario": "S12",
       "yee": {
-        "whole_task_raw_seconds": 56.360782125,
-        "declared_raw_user_wait_seconds": 2.7979339999999997,
-        "whole_task_user_wait_zero_seconds": 53.562848125,
-        "actual_usage": {
-          "inputTokens": 67077,
-          "outputTokens": 2324,
-          "totalTokens": 69401,
-          "cachedReadTokens": 14976,
-          "reasoningTokens": 2091,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 42.487843375,
+        "usage": {
+          "inputTokens": 44607,
+          "outputTokens": 1782,
+          "totalTokens": 46389,
+          "cachedReadTokens": 27776,
+          "reasoningTokens": 1551,
           "modelCalls": 5,
-          "apiDurationMs": 44331
+          "apiDurationMs": 33850
         },
-        "provider_num_turns": 5,
         "mcp_calls": 3,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/fresh-yee-seed29-current-v3-s12/yee/S12",
+        "acp_span_sha256": "0de053195e99b4dc481533b66b5ef0f4065fea8804b3260789c9103bff0ac17c"
       },
       "aside": {
-        "whole_task_raw_seconds": 67.484655875,
-        "declared_raw_user_wait_seconds": 0.183568083,
-        "whole_task_user_wait_zero_seconds": 67.301087792,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 67.301087792,
+        "usage": {
           "inputTokens": 104908,
           "outputTokens": 3517,
           "totalTokens": 108425,
@@ -1410,46 +1290,44 @@
           "modelCalls": 7,
           "apiDurationMs": 58424
         },
-        "provider_num_turns": 7,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -24.813244417000007,
+        "totalTokens": -62036,
+        "modelCalls": -2
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S01",
       "yee": {
-        "whole_task_raw_seconds": 46.919817083,
-        "declared_raw_user_wait_seconds": 1.1054760000000001,
-        "whole_task_user_wait_zero_seconds": 45.814341082999995,
-        "actual_usage": {
-          "inputTokens": 48776,
-          "outputTokens": 2388,
-          "totalTokens": 51164,
-          "cachedReadTokens": 31104,
-          "reasoningTokens": 2035,
-          "modelCalls": 5,
-          "apiDurationMs": 38294
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 88.868246584,
+        "usage": {
+          "inputTokens": 35886,
+          "outputTokens": 4621,
+          "totalTokens": 40507,
+          "cachedReadTokens": 9216,
+          "reasoningTokens": 4324,
+          "modelCalls": 4,
+          "apiDurationMs": 85139
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S01",
+        "acp_span_sha256": "88e546fc1c9c087472f346e23bc1a067e609c7ffb90e8ad640b0c0aa6796f51e"
       },
       "aside": {
-        "whole_task_raw_seconds": 61.373035458,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 61.373035458,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 61.373035458,
+        "usage": {
           "inputTokens": 85487,
           "outputTokens": 2778,
           "totalTokens": 88265,
@@ -1458,46 +1336,44 @@
           "modelCalls": 9,
           "apiDurationMs": 53152
         },
-        "provider_num_turns": 9,
         "mcp_calls": 7,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": 27.495211126000008,
+        "totalTokens": -47758,
+        "modelCalls": -5
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S02",
       "yee": {
-        "whole_task_raw_seconds": 35.903023708,
-        "declared_raw_user_wait_seconds": 1.024132,
-        "whole_task_user_wait_zero_seconds": 34.878891708,
-        "actual_usage": {
-          "inputTokens": 81453,
-          "outputTokens": 1658,
-          "totalTokens": 83111,
-          "cachedReadTokens": 74880,
-          "reasoningTokens": 1224,
-          "modelCalls": 5,
-          "apiDurationMs": 29408
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 58.788007167,
+        "usage": {
+          "inputTokens": 107759,
+          "outputTokens": 1855,
+          "totalTokens": 109614,
+          "cachedReadTokens": 97664,
+          "reasoningTokens": 1326,
+          "modelCalls": 6,
+          "apiDurationMs": 55179
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 5,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S02",
+        "acp_span_sha256": "408d7be880530b8308e1df8101efd077edce714bab73d579fa824b4b10e6d6f1"
       },
       "aside": {
-        "whole_task_raw_seconds": 59.834699916,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 59.834699916,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 59.834699916,
+        "usage": {
           "inputTokens": 153160,
           "outputTokens": 2808,
           "totalTokens": 155968,
@@ -1506,46 +1382,44 @@
           "modelCalls": 10,
           "apiDurationMs": 54900
         },
-        "provider_num_turns": 10,
         "mcp_calls": 9,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -1.0466927489999946,
+        "totalTokens": -46354,
+        "modelCalls": -4
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S03",
       "yee": {
-        "whole_task_raw_seconds": 23.581339959,
-        "declared_raw_user_wait_seconds": 0.985439,
-        "whole_task_user_wait_zero_seconds": 22.595900959,
-        "actual_usage": {
-          "inputTokens": 80580,
-          "outputTokens": 686,
-          "totalTokens": 81266,
-          "cachedReadTokens": 77312,
-          "reasoningTokens": 300,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 31.750733708,
+        "usage": {
+          "inputTokens": 89198,
+          "outputTokens": 817,
+          "totalTokens": 90015,
+          "cachedReadTokens": 65664,
+          "reasoningTokens": 410,
           "modelCalls": 4,
-          "apiDurationMs": 17314
+          "apiDurationMs": 28645
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S03",
+        "acp_span_sha256": "fdc5e90b7162cb4ae13a5d0be5b6ded03e9c3a98ab0c5de0965359cd49a6b5c9"
       },
       "aside": {
-        "whole_task_raw_seconds": 29.439259625,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 29.439259625,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 29.439259625,
+        "usage": {
           "inputTokens": 143235,
           "outputTokens": 1287,
           "totalTokens": 144522,
@@ -1554,46 +1428,44 @@
           "modelCalls": 7,
           "apiDurationMs": 26112
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": 2.3114740830000002,
+        "totalTokens": -54507,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S04",
       "yee": {
-        "whole_task_raw_seconds": 24.982957291,
-        "declared_raw_user_wait_seconds": 0.986092,
-        "whole_task_user_wait_zero_seconds": 23.996865291000002,
-        "actual_usage": {
-          "inputTokens": 115267,
-          "outputTokens": 874,
-          "totalTokens": 116141,
-          "cachedReadTokens": 111360,
-          "reasoningTokens": 517,
-          "modelCalls": 5,
-          "apiDurationMs": 18632
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 20.648083084,
+        "usage": {
+          "inputTokens": 99312,
+          "outputTokens": 768,
+          "totalTokens": 100080,
+          "cachedReadTokens": 96128,
+          "reasoningTokens": 456,
+          "modelCalls": 4,
+          "apiDurationMs": 17426
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 3,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S04",
+        "acp_span_sha256": "bd1aca68a0035a5112e92e5d3011a33a62bdf69b163075326064a9ce64b2b9e9"
       },
       "aside": {
-        "whole_task_raw_seconds": 35.510106667,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 35.510106667,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 35.510106667,
+        "usage": {
           "inputTokens": 214451,
           "outputTokens": 1691,
           "totalTokens": 216142,
@@ -1602,46 +1474,44 @@
           "modelCalls": 9,
           "apiDurationMs": 32442
         },
-        "provider_num_turns": 9,
         "mcp_calls": 8,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -14.862023583000003,
+        "totalTokens": -116062,
+        "modelCalls": -5
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S05",
       "yee": {
-        "whole_task_raw_seconds": 32.071368375,
-        "declared_raw_user_wait_seconds": 0.979921,
-        "whole_task_user_wait_zero_seconds": 31.091447374999998,
-        "actual_usage": {
-          "inputTokens": 131174,
-          "outputTokens": 1362,
-          "totalTokens": 132536,
-          "cachedReadTokens": 127872,
-          "reasoningTokens": 1009,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 34.964441083,
+        "usage": {
+          "inputTokens": 138112,
+          "outputTokens": 1247,
+          "totalTokens": 139359,
+          "cachedReadTokens": 134784,
+          "reasoningTokens": 878,
           "modelCalls": 5,
-          "apiDurationMs": 25907
+          "apiDurationMs": 31815
         },
-        "provider_num_turns": 5,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S05",
+        "acp_span_sha256": "6ed7cc7bca298f9ece936d47bbd92d883bacc7ffa5eb803440c035fd961884d6"
       },
       "aside": {
-        "whole_task_raw_seconds": 35.617543334,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 35.617543334,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 35.617543334,
+        "usage": {
           "inputTokens": 163933,
           "outputTokens": 1671,
           "totalTokens": 165604,
@@ -1650,46 +1520,44 @@
           "modelCalls": 6,
           "apiDurationMs": 31868
         },
-        "provider_num_turns": 6,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -0.653102251,
+        "totalTokens": -26245,
+        "modelCalls": -1
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S06",
       "yee": {
-        "whole_task_raw_seconds": 22.126840834,
-        "declared_raw_user_wait_seconds": 0.9739289999999999,
-        "whole_task_user_wait_zero_seconds": 21.152911834,
-        "actual_usage": {
-          "inputTokens": 117034,
-          "outputTokens": 739,
-          "totalTokens": 117773,
-          "cachedReadTokens": 87040,
-          "reasoningTokens": 433,
-          "modelCalls": 4,
-          "apiDurationMs": 15931
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 24.883574875,
+        "usage": {
+          "inputTokens": 90314,
+          "outputTokens": 585,
+          "totalTokens": 90899,
+          "cachedReadTokens": 88064,
+          "reasoningTokens": 366,
+          "modelCalls": 3,
+          "apiDurationMs": 21872
         },
-        "provider_num_turns": 4,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S06",
+        "acp_span_sha256": "8ea3d307561ffda15ae84679455f81e80eb340932ef5c9d8830bcdc5abe7ba73"
       },
       "aside": {
-        "whole_task_raw_seconds": 35.527364417,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 35.527364417,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 35.527364417,
+        "usage": {
           "inputTokens": 247840,
           "outputTokens": 1751,
           "totalTokens": 249591,
@@ -1698,46 +1566,44 @@
           "modelCalls": 8,
           "apiDurationMs": 32731
         },
-        "provider_num_turns": 8,
         "mcp_calls": 7,
-        "mcp_error_calls": 2,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 2
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -10.643789542,
+        "totalTokens": -158692,
+        "modelCalls": -5
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S07",
       "yee": {
-        "whole_task_raw_seconds": 21.661791791,
-        "declared_raw_user_wait_seconds": 1.008798,
-        "whole_task_user_wait_zero_seconds": 20.652993791,
-        "actual_usage": {
-          "inputTokens": 94901,
-          "outputTokens": 773,
-          "totalTokens": 95674,
-          "cachedReadTokens": 92032,
-          "reasoningTokens": 589,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 18.768016041,
+        "usage": {
+          "inputTokens": 96884,
+          "outputTokens": 783,
+          "totalTokens": 97667,
+          "cachedReadTokens": 93568,
+          "reasoningTokens": 602,
           "modelCalls": 3,
-          "apiDurationMs": 15768
+          "apiDurationMs": 15389
         },
-        "provider_num_turns": 3,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S07",
+        "acp_span_sha256": "7bad0a7de0698fee4b65080da6672954eaeadbd8036515767ab82d70e1b56cec"
       },
       "aside": {
-        "whole_task_raw_seconds": 30.365606041,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 30.365606041,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 30.365606041,
+        "usage": {
           "inputTokens": 207857,
           "outputTokens": 1370,
           "totalTokens": 209227,
@@ -1746,46 +1612,44 @@
           "modelCalls": 6,
           "apiDurationMs": 26031
         },
-        "provider_num_turns": 6,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -11.59759,
+        "totalTokens": -111560,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S08",
       "yee": {
-        "whole_task_raw_seconds": 19.03054575,
-        "declared_raw_user_wait_seconds": 2.054907,
-        "whole_task_user_wait_zero_seconds": 16.97563875,
-        "actual_usage": {
-          "inputTokens": 138251,
-          "outputTokens": 525,
-          "totalTokens": 138776,
-          "cachedReadTokens": 135680,
-          "reasoningTokens": 234,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 21.76345425,
+        "usage": {
+          "inputTokens": 140936,
+          "outputTokens": 678,
+          "totalTokens": 141614,
+          "cachedReadTokens": 137984,
+          "reasoningTokens": 366,
           "modelCalls": 4,
-          "apiDurationMs": 12340
+          "apiDurationMs": 18639
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S08",
+        "acp_span_sha256": "fd517e2ca85810cb00002e48728644fdbfb7e83614dc2b230671c42b0e63fb10"
       },
       "aside": {
-        "whole_task_raw_seconds": 39.0244255,
-        "declared_raw_user_wait_seconds": 0.046459958,
-        "whole_task_user_wait_zero_seconds": 38.977965542,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 38.977965542,
+        "usage": {
           "inputTokens": 299120,
           "outputTokens": 1503,
           "totalTokens": 300623,
@@ -1794,46 +1658,44 @@
           "modelCalls": 7,
           "apiDurationMs": 34474
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -17.214511292,
+        "totalTokens": -159009,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S09",
       "yee": {
-        "whole_task_raw_seconds": 86.552682083,
-        "declared_raw_user_wait_seconds": 1.032575,
-        "whole_task_user_wait_zero_seconds": 85.520107083,
-        "actual_usage": {
-          "inputTokens": 153864,
-          "outputTokens": 4682,
-          "totalTokens": 158546,
-          "cachedReadTokens": 145280,
-          "reasoningTokens": 3642,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 66.18542237499999,
+        "usage": {
+          "inputTokens": 154792,
+          "outputTokens": 2990,
+          "totalTokens": 157782,
+          "cachedReadTokens": 148352,
+          "reasoningTokens": 2453,
           "modelCalls": 4,
-          "apiDurationMs": 80126
+          "apiDurationMs": 62794
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S09",
+        "acp_span_sha256": "8035f0dda551dab57bf5f04ee34154411673a7a635ce39dc1b1a46777bbeb056"
       },
       "aside": {
-        "whole_task_raw_seconds": 104.4948795,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 104.4948795,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 104.4948795,
+        "usage": {
           "inputTokens": 336400,
           "outputTokens": 5516,
           "totalTokens": 341916,
@@ -1842,46 +1704,44 @@
           "modelCalls": 7,
           "apiDurationMs": 100330
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -38.30945712500001,
+        "totalTokens": -184134,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S10",
       "yee": {
-        "whole_task_raw_seconds": 61.043458041,
-        "declared_raw_user_wait_seconds": 2.99087,
-        "whole_task_user_wait_zero_seconds": 58.052588041,
-        "actual_usage": {
-          "inputTokens": 228981,
-          "outputTokens": 1910,
-          "totalTokens": 230891,
-          "cachedReadTokens": 223104,
-          "reasoningTokens": 1478,
-          "modelCalls": 5,
-          "apiDurationMs": 30517
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 62.096286458,
+        "usage": {
+          "inputTokens": 133467,
+          "outputTokens": 1574,
+          "totalTokens": 135041,
+          "cachedReadTokens": 129152,
+          "reasoningTokens": 1233,
+          "modelCalls": 3,
+          "apiDurationMs": 38103
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S10",
+        "acp_span_sha256": "22ce05ac389f196dab604ae74b5f801bdd7c1c899c2f51642424eb95803e7ff9"
       },
       "aside": {
-        "whole_task_raw_seconds": 65.586381708,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 65.586381708,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 65.586381708,
+        "usage": {
           "inputTokens": 333903,
           "outputTokens": 1780,
           "totalTokens": 335683,
@@ -1890,46 +1750,44 @@
           "modelCalls": 6,
           "apiDurationMs": 34681
         },
-        "provider_num_turns": 6,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -3.490095250000003,
+        "totalTokens": -200642,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S11",
       "yee": {
-        "whole_task_raw_seconds": 46.536851083,
-        "declared_raw_user_wait_seconds": 1.022101,
-        "whole_task_user_wait_zero_seconds": 45.514750083,
-        "actual_usage": {
-          "inputTokens": 323087,
-          "outputTokens": 1968,
-          "totalTokens": 325055,
-          "cachedReadTokens": 312832,
-          "reasoningTokens": 1501,
-          "modelCalls": 6,
-          "apiDurationMs": 40020
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 62.06844562500001,
+        "usage": {
+          "inputTokens": 257959,
+          "outputTokens": 1897,
+          "totalTokens": 259856,
+          "cachedReadTokens": 248448,
+          "reasoningTokens": 1519,
+          "modelCalls": 5,
+          "apiDurationMs": 58178
         },
-        "provider_num_turns": 6,
-        "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 4,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S11",
+        "acp_span_sha256": "9b2546b74ad28769c52bf777711815af93e8ae821fa33ea593ae2898a10218af"
       },
       "aside": {
-        "whole_task_raw_seconds": 104.757534708,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 104.757534708,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 104.757534708,
+        "usage": {
           "inputTokens": 628953,
           "outputTokens": 4988,
           "totalTokens": 633941,
@@ -1938,46 +1796,44 @@
           "modelCalls": 9,
           "apiDurationMs": 100539
         },
-        "provider_num_turns": 9,
         "mcp_calls": 8,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -42.689089082999985,
+        "totalTokens": -374085,
+        "modelCalls": -4
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 11,
       "scenario": "S12",
       "yee": {
-        "whole_task_raw_seconds": 20.4272835,
-        "declared_raw_user_wait_seconds": 2.519877,
-        "whole_task_user_wait_zero_seconds": 17.9074065,
-        "actual_usage": {
-          "inputTokens": 237324,
-          "outputTokens": 557,
-          "totalTokens": 237881,
-          "cachedReadTokens": 234368,
-          "reasoningTokens": 350,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 21.21242925,
+        "usage": {
+          "inputTokens": 226703,
+          "outputTokens": 754,
+          "totalTokens": 227457,
+          "cachedReadTokens": 223744,
+          "reasoningTokens": 551,
           "modelCalls": 4,
-          "apiDurationMs": 12829
+          "apiDurationMs": 17758
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6/yee/S12",
+        "acp_span_sha256": "9820f22ec97e0e10b9de0e2336dc63ca3d09e2f32bd20d9dbe790049145dc24a"
       },
       "aside": {
-        "whole_task_raw_seconds": 39.7714555,
-        "declared_raw_user_wait_seconds": 0.129860166,
-        "whole_task_user_wait_zero_seconds": 39.641595334,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 39.641595334,
+        "usage": {
           "inputTokens": 594800,
           "outputTokens": 1823,
           "totalTokens": 596623,
@@ -1986,46 +1842,46 @@
           "modelCalls": 7,
           "apiDurationMs": 35920
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -18.429166084000002,
+        "totalTokens": -369166,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S01",
       "yee": {
-        "whole_task_raw_seconds": 77.210060541,
-        "declared_raw_user_wait_seconds": 1.120137,
-        "whole_task_user_wait_zero_seconds": 76.089923541,
-        "actual_usage": {
-          "inputTokens": 52265,
-          "outputTokens": 3194,
-          "totalTokens": 55459,
-          "cachedReadTokens": 31616,
-          "reasoningTokens": 2853,
-          "modelCalls": 5,
-          "apiDurationMs": 69648
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 71.56480854099999,
+        "usage": {
+          "inputTokens": 35685,
+          "outputTokens": 3952,
+          "totalTokens": 39637,
+          "cachedReadTokens": 9728,
+          "reasoningTokens": 3659,
+          "modelCalls": 4,
+          "apiDurationMs": 67927
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S01",
+        "acp_span_sha256": "c0baf45bb81221cc2dfedd5401749e91197faabb45082296d827d69727e2ca90"
       },
       "aside": {
-        "whole_task_raw_seconds": 78.916139125,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 78.916139125,
-        "actual_usage": {
+        "accepted": false,
+        "failures": [
+          "provider_turn_cap_missing_or_exceeded"
+        ],
+        "controlled_seconds": 78.916139125,
+        "usage": {
           "inputTokens": 148409,
           "outputTokens": 3440,
           "totalTokens": 151849,
@@ -2034,48 +1890,44 @@
           "modelCalls": 13,
           "apiDurationMs": 70127
         },
-        "provider_num_turns": 13,
         "mcp_calls": 11,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "provider_turn_cap_missing_or_exceeded"
-        ]
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -7.35133058400001,
+        "totalTokens": -112212,
+        "modelCalls": -9
+      },
+      "equal_success": false
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S02",
       "yee": {
-        "whole_task_raw_seconds": 61.543071458,
-        "declared_raw_user_wait_seconds": 1.0509680000000001,
-        "whole_task_user_wait_zero_seconds": 60.492103458,
-        "actual_usage": {
-          "inputTokens": 111938,
-          "outputTokens": 2671,
-          "totalTokens": 114609,
-          "cachedReadTokens": 86400,
-          "reasoningTokens": 2183,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 47.834895875,
+        "usage": {
+          "inputTokens": 104335,
+          "outputTokens": 1889,
+          "totalTokens": 106224,
+          "cachedReadTokens": 65024,
+          "reasoningTokens": 1420,
           "modelCalls": 6,
-          "apiDurationMs": 55299
+          "apiDurationMs": 44106
         },
-        "provider_num_turns": 6,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S02",
+        "acp_span_sha256": "ac55f376d6daccdf7613c39ee67c558275d13b937fe4994e5a411128cd583239"
       },
       "aside": {
-        "whole_task_raw_seconds": 61.954536458,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 61.954536458,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 61.954536458,
+        "usage": {
           "inputTokens": 220640,
           "outputTokens": 2683,
           "totalTokens": 223323,
@@ -2084,46 +1936,44 @@
           "modelCalls": 11,
           "apiDurationMs": 57458
         },
-        "provider_num_turns": 11,
         "mcp_calls": 10,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -14.119640582999999,
+        "totalTokens": -117099,
+        "modelCalls": -5
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S03",
       "yee": {
-        "whole_task_raw_seconds": 28.547739,
-        "declared_raw_user_wait_seconds": 1.016678,
-        "whole_task_user_wait_zero_seconds": 27.531061,
-        "actual_usage": {
-          "inputTokens": 94097,
-          "outputTokens": 915,
-          "totalTokens": 95012,
-          "cachedReadTokens": 90496,
-          "reasoningTokens": 524,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 16.686711667,
+        "usage": {
+          "inputTokens": 85935,
+          "outputTokens": 625,
+          "totalTokens": 86560,
+          "cachedReadTokens": 77824,
+          "reasoningTokens": 254,
           "modelCalls": 4,
-          "apiDurationMs": 22401
+          "apiDurationMs": 13310
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S03",
+        "acp_span_sha256": "e47de2a87ac5659bb3a804ef835af043e2e8f72d6b11070dfc43dbf3676da776"
       },
       "aside": {
-        "whole_task_raw_seconds": 29.351935292,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 29.351935292,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 29.351935292,
+        "usage": {
           "inputTokens": 190589,
           "outputTokens": 1294,
           "totalTokens": 191883,
@@ -2132,46 +1982,44 @@
           "modelCalls": 7,
           "apiDurationMs": 26514
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -12.665223625,
+        "totalTokens": -105323,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S04",
       "yee": {
-        "whole_task_raw_seconds": 25.998274042,
-        "declared_raw_user_wait_seconds": 0.964153,
-        "whole_task_user_wait_zero_seconds": 25.034121042,
-        "actual_usage": {
-          "inputTokens": 105094,
-          "outputTokens": 829,
-          "totalTokens": 105923,
-          "cachedReadTokens": 77568,
-          "reasoningTokens": 525,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 27.218868542,
+        "usage": {
+          "inputTokens": 95628,
+          "outputTokens": 749,
+          "totalTokens": 96377,
+          "cachedReadTokens": 92800,
+          "reasoningTokens": 456,
           "modelCalls": 4,
-          "apiDurationMs": 20180
+          "apiDurationMs": 23971
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S04",
+        "acp_span_sha256": "06988071a06a206ce77c47561165fead59946a27262a0ad6785b4da9132e9198"
       },
       "aside": {
-        "whole_task_raw_seconds": 28.841220708,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 28.841220708,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 28.841220708,
+        "usage": {
           "inputTokens": 218493,
           "outputTokens": 997,
           "totalTokens": 219490,
@@ -2180,46 +2028,44 @@
           "modelCalls": 7,
           "apiDurationMs": 25960
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -1.6223521660000024,
+        "totalTokens": -123113,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S05",
       "yee": {
-        "whole_task_raw_seconds": 58.173690958,
-        "declared_raw_user_wait_seconds": 1.0536590000000001,
-        "whole_task_user_wait_zero_seconds": 57.120031958,
-        "actual_usage": {
-          "inputTokens": 146755,
-          "outputTokens": 1698,
-          "totalTokens": 148453,
-          "cachedReadTokens": 142976,
-          "reasoningTokens": 1336,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 30.133355333999997,
+        "usage": {
+          "inputTokens": 134039,
+          "outputTokens": 1396,
+          "totalTokens": 135435,
+          "cachedReadTokens": 130432,
+          "reasoningTokens": 1085,
           "modelCalls": 5,
-          "apiDurationMs": 51948
+          "apiDurationMs": 27001
         },
-        "provider_num_turns": 5,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S05",
+        "acp_span_sha256": "1c0f19382ad6a04f05174cb975241b8bc63a738abffd19fb7b39ce46a9d2a94e"
       },
       "aside": {
-        "whole_task_raw_seconds": 27.4239345,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 27.4239345,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 27.4239345,
+        "usage": {
           "inputTokens": 187815,
           "outputTokens": 1186,
           "totalTokens": 189001,
@@ -2228,46 +2074,44 @@
           "modelCalls": 5,
           "apiDurationMs": 25009
         },
-        "provider_num_turns": 5,
         "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": 2.709420833999996,
+        "totalTokens": -53566,
+        "modelCalls": 0
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S06",
       "yee": {
-        "whole_task_raw_seconds": 36.352035834,
-        "declared_raw_user_wait_seconds": 0.995694,
-        "whole_task_user_wait_zero_seconds": 35.356341834,
-        "actual_usage": {
-          "inputTokens": 129848,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 21.30652025,
+        "usage": {
+          "inputTokens": 118246,
           "outputTokens": 955,
-          "totalTokens": 130803,
-          "cachedReadTokens": 126336,
-          "reasoningTokens": 657,
+          "totalTokens": 119201,
+          "cachedReadTokens": 115072,
+          "reasoningTokens": 662,
           "modelCalls": 4,
-          "apiDurationMs": 29640
+          "apiDurationMs": 17944
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S06",
+        "acp_span_sha256": "f0038924982d5ea42f28e561fc5a617e54d2e85b626db4f28295aa5edb2f9d57"
       },
       "aside": {
-        "whole_task_raw_seconds": 57.379227666,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 57.379227666,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 57.379227666,
+        "usage": {
           "inputTokens": 386362,
           "outputTokens": 2463,
           "totalTokens": 388825,
@@ -2276,46 +2120,44 @@
           "modelCalls": 9,
           "apiDurationMs": 54224
         },
-        "provider_num_turns": 9,
         "mcp_calls": 8,
-        "mcp_error_calls": 2,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 2
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -36.072707416,
+        "totalTokens": -269624,
+        "modelCalls": -5
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S07",
       "yee": {
-        "whole_task_raw_seconds": 39.836769417,
-        "declared_raw_user_wait_seconds": 0.953928,
-        "whole_task_user_wait_zero_seconds": 38.882841417,
-        "actual_usage": {
-          "inputTokens": 105542,
-          "outputTokens": 1090,
-          "totalTokens": 106632,
-          "cachedReadTokens": 102400,
-          "reasoningTokens": 910,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 19.219251458,
+        "usage": {
+          "inputTokens": 96525,
+          "outputTokens": 820,
+          "totalTokens": 97345,
+          "cachedReadTokens": 93568,
+          "reasoningTokens": 645,
           "modelCalls": 3,
-          "apiDurationMs": 33696
+          "apiDurationMs": 15661
         },
-        "provider_num_turns": 3,
         "mcp_calls": 2,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S07",
+        "acp_span_sha256": "ab8fab9af41b539c9cd5eeaa012023859a85715cb6be19e9c62c1115b1e6fa3d"
       },
       "aside": {
-        "whole_task_raw_seconds": 54.057134417,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 54.057134417,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 54.057134417,
+        "usage": {
           "inputTokens": 428348,
           "outputTokens": 1762,
           "totalTokens": 430110,
@@ -2324,46 +2166,44 @@
           "modelCalls": 9,
           "apiDurationMs": 50638
         },
-        "provider_num_turns": 9,
         "mcp_calls": 8,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -34.837882959,
+        "totalTokens": -332765,
+        "modelCalls": -6
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S08",
       "yee": {
-        "whole_task_raw_seconds": 30.290039958,
-        "declared_raw_user_wait_seconds": 1.980124,
-        "whole_task_user_wait_zero_seconds": 28.309915958,
-        "actual_usage": {
-          "inputTokens": 153675,
-          "outputTokens": 674,
-          "totalTokens": 154349,
-          "cachedReadTokens": 150272,
-          "reasoningTokens": 392,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 16.803754417,
+        "usage": {
+          "inputTokens": 140458,
+          "outputTokens": 682,
+          "totalTokens": 141140,
+          "cachedReadTokens": 137600,
+          "reasoningTokens": 395,
           "modelCalls": 4,
-          "apiDurationMs": 23186
+          "apiDurationMs": 13636
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S08",
+        "acp_span_sha256": "fad294adfd43bb410d08ac4773622db78ad438692a53a5a1a98421d1ef5ad886"
       },
       "aside": {
-        "whole_task_raw_seconds": 36.634571292,
-        "declared_raw_user_wait_seconds": 0.046396334,
-        "whole_task_user_wait_zero_seconds": 36.588174957999996,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 36.588174957999996,
+        "usage": {
           "inputTokens": 379251,
           "outputTokens": 1385,
           "totalTokens": 380636,
@@ -2372,48 +2212,44 @@
           "modelCalls": 7,
           "apiDurationMs": 33069
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -19.784420540999996,
+        "totalTokens": -239496,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S09",
       "yee": {
-        "whole_task_raw_seconds": 93.0373265,
-        "declared_raw_user_wait_seconds": 1.035995,
-        "whole_task_user_wait_zero_seconds": 92.0013315,
-        "actual_usage": {
-          "inputTokens": 169120,
-          "outputTokens": 3860,
-          "totalTokens": 172980,
-          "cachedReadTokens": 119168,
-          "reasoningTokens": 3331,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 43.92809425,
+        "usage": {
+          "inputTokens": 154089,
+          "outputTokens": 2356,
+          "totalTokens": 156445,
+          "cachedReadTokens": 147840,
+          "reasoningTokens": 1831,
           "modelCalls": 4,
-          "apiDurationMs": 86838
+          "apiDurationMs": 40688
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "original_scenario_oracle_failed"
-        ]
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S09",
+        "acp_span_sha256": "72b706a44889a2b1bc09cde16958be4be548718d40b88d835533408194b84315"
       },
       "aside": {
-        "whole_task_raw_seconds": 127.491951834,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 127.491951834,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 127.491951834,
+        "usage": {
           "inputTokens": 734857,
           "outputTokens": 6265,
           "totalTokens": 741122,
@@ -2422,46 +2258,44 @@
           "modelCalls": 12,
           "apiDurationMs": 123334
         },
-        "provider_num_turns": 12,
         "mcp_calls": 11,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 1
       },
-      "equal_success_comparison_ready": false
+      "delta": {
+        "controlled_seconds": -83.563857584,
+        "totalTokens": -584677,
+        "modelCalls": -8
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S10",
       "yee": {
-        "whole_task_raw_seconds": 69.74306575,
-        "declared_raw_user_wait_seconds": 2.975763,
-        "whole_task_user_wait_zero_seconds": 66.76730275,
-        "actual_usage": {
-          "inputTokens": 246303,
-          "outputTokens": 2141,
-          "totalTokens": 248444,
-          "cachedReadTokens": 240256,
-          "reasoningTokens": 1709,
-          "modelCalls": 5,
-          "apiDurationMs": 38682
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 61.021740834,
+        "usage": {
+          "inputTokens": 130927,
+          "outputTokens": 1402,
+          "totalTokens": 132329,
+          "cachedReadTokens": 126464,
+          "reasoningTokens": 1079,
+          "modelCalls": 3,
+          "apiDurationMs": 21596
         },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 2,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S10",
+        "acp_span_sha256": "8280d1f0fced74b0a5c611effeb084f0c135ec5039bf5a3e42b0d82e60a5eb58"
       },
       "aside": {
-        "whole_task_raw_seconds": 76.216522375,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 76.216522375,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 76.216522375,
+        "usage": {
           "inputTokens": 417431,
           "outputTokens": 1736,
           "totalTokens": 419167,
@@ -2470,46 +2304,44 @@
           "modelCalls": 6,
           "apiDurationMs": 43397
         },
-        "provider_num_turns": 6,
         "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -15.194781540999998,
+        "totalTokens": -286838,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S11",
       "yee": {
-        "whole_task_raw_seconds": 50.2782665,
-        "declared_raw_user_wait_seconds": 1.01835,
-        "whole_task_user_wait_zero_seconds": 49.2599165,
-        "actual_usage": {
-          "inputTokens": 344720,
-          "outputTokens": 1916,
-          "totalTokens": 346636,
-          "cachedReadTokens": 274816,
-          "reasoningTokens": 1473,
-          "modelCalls": 6,
-          "apiDurationMs": 44095
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 43.823698207999996,
+        "usage": {
+          "inputTokens": 253248,
+          "outputTokens": 1663,
+          "totalTokens": 254911,
+          "cachedReadTokens": 243840,
+          "reasoningTokens": 1297,
+          "modelCalls": 5,
+          "apiDurationMs": 39926
         },
-        "provider_num_turns": 6,
-        "mcp_calls": 5,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_calls": 4,
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S11",
+        "acp_span_sha256": "8f3ee5bc1b92786511c7d5e19addda192813abefbdbcb665ccda935679cfdee1"
       },
       "aside": {
-        "whole_task_raw_seconds": 92.8965675,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 92.8965675,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 92.8965675,
+        "usage": {
           "inputTokens": 620170,
           "outputTokens": 4502,
           "totalTokens": 624672,
@@ -2518,46 +2350,44 @@
           "modelCalls": 8,
           "apiDurationMs": 89277
         },
-        "provider_num_turns": 8,
         "mcp_calls": 7,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -49.07286929200001,
+        "totalTokens": -369761,
+        "modelCalls": -3
+      },
+      "equal_success": true
     },
     {
       "mode": "persistent",
       "seed": 29,
       "scenario": "S12",
       "yee": {
-        "whole_task_raw_seconds": 29.553096292,
-        "declared_raw_user_wait_seconds": 2.45017,
-        "whole_task_user_wait_zero_seconds": 27.102926292,
-        "actual_usage": {
-          "inputTokens": 252039,
-          "outputTokens": 904,
-          "totalTokens": 252943,
-          "cachedReadTokens": 236928,
-          "reasoningTokens": 708,
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 15.693971084000001,
+        "usage": {
+          "inputTokens": 222007,
+          "outputTokens": 546,
+          "totalTokens": 222553,
+          "cachedReadTokens": 219264,
+          "reasoningTokens": 354,
           "modelCalls": 4,
-          "apiDurationMs": 22127
+          "apiDurationMs": 12363
         },
-        "provider_num_turns": 4,
         "mcp_calls": 3,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0,
+        "native_settlement_verified": true,
+        "source_record": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1/yee/S12",
+        "acp_span_sha256": "6d6ca979ba67ca9ee80f22273f170a167915f8e26e8389ab6d8c7a84a7a82ed3"
       },
       "aside": {
-        "whole_task_raw_seconds": 54.472203333,
-        "declared_raw_user_wait_seconds": 0.638207167,
-        "whole_task_user_wait_zero_seconds": 53.833996166000006,
-        "actual_usage": {
+        "accepted": true,
+        "failures": [],
+        "controlled_seconds": 53.833996166000006,
+        "usage": {
           "inputTokens": 606274,
           "outputTokens": 1729,
           "totalTokens": 608003,
@@ -2566,640 +2396,167 @@
           "modelCalls": 7,
           "apiDurationMs": 49580
         },
-        "provider_num_turns": 7,
         "mcp_calls": 6,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
+        "mcp_client_errors": 0
       },
-      "equal_success_comparison_ready": true
+      "delta": {
+        "controlled_seconds": -38.14002508200001,
+        "totalTokens": -385450,
+        "modelCalls": -3
+      },
+      "equal_success": true
     }
   ],
-  "scenario_totals_case_time_excludes_cross_case_setup": [
-    {
-      "scenario": "S01",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 207.603569874,
-        "actual_total_tokens": 187399,
-        "MCP_calls": 10
-      },
-      "aside": {
-        "passed": 1,
-        "case_time_user_wait_zero_seconds": 319.451107999,
-        "actual_total_tokens": 651788,
-        "MCP_calls": 44
-      }
-    },
-    {
-      "scenario": "S02",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 209.0712635,
-        "actual_total_tokens": 355393,
-        "MCP_calls": 19
-      },
-      "aside": {
-        "passed": 2,
-        "case_time_user_wait_zero_seconds": 316.498804457,
-        "actual_total_tokens": 857280,
-        "MCP_calls": 48
-      }
-    },
-    {
-      "scenario": "S03",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 132.475665209,
-        "actual_total_tokens": 273507,
-        "MCP_calls": 12
-      },
-      "aside": {
-        "passed": 3,
-        "case_time_user_wait_zero_seconds": 157.168541583,
-        "actual_total_tokens": 527795,
-        "MCP_calls": 27
-      }
-    },
-    {
-      "scenario": "S04",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 113.98149816600001,
-        "actual_total_tokens": 320672,
-        "MCP_calls": 13
-      },
-      "aside": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 180.87498762500002,
-        "actual_total_tokens": 591367,
-        "MCP_calls": 25
-      }
-    },
-    {
-      "scenario": "S05",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 174.450098083,
-        "actual_total_tokens": 400390,
-        "MCP_calls": 16
-      },
-      "aside": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 163.390611168,
-        "actual_total_tokens": 514452,
-        "MCP_calls": 19
-      }
-    },
-    {
-      "scenario": "S06",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 177.731637626,
-        "actual_total_tokens": 373200,
-        "MCP_calls": 14
-      },
-      "aside": {
-        "passed": 2,
-        "case_time_user_wait_zero_seconds": 423.299505667,
-        "actual_total_tokens": 1142423,
-        "MCP_calls": 46
-      }
-    },
-    {
-      "scenario": "S07",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 139.351054124,
-        "actual_total_tokens": 280629,
-        "MCP_calls": 8
-      },
-      "aside": {
-        "passed": 3,
-        "case_time_user_wait_zero_seconds": 275.718100166,
-        "actual_total_tokens": 1049292,
-        "MCP_calls": 34
-      }
-    },
-    {
-      "scenario": "S08",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 122.864952208,
-        "actual_total_tokens": 450438,
-        "MCP_calls": 12
-      },
-      "aside": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 192.33610595800002,
-        "actual_total_tokens": 935641,
-        "MCP_calls": 23
-      }
-    },
-    {
-      "scenario": "S09",
-      "yee": {
-        "passed": 2,
-        "case_time_user_wait_zero_seconds": 457.57137812400003,
-        "actual_total_tokens": 482814,
-        "MCP_calls": 14
-      },
-      "aside": {
-        "passed": 3,
-        "case_time_user_wait_zero_seconds": 578.362818042,
-        "actual_total_tokens": 1378973,
-        "MCP_calls": 31
-      }
-    },
-    {
-      "scenario": "S10",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 248.115319707,
-        "actual_total_tokens": 606238,
-        "MCP_calls": 14
-      },
-      "aside": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 297.583265292,
-        "actual_total_tokens": 919379,
-        "MCP_calls": 20
-      }
-    },
-    {
-      "scenario": "S11",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 209.376537541,
-        "actual_total_tokens": 863385,
-        "MCP_calls": 20
-      },
-      "aside": {
-        "passed": 2,
-        "case_time_user_wait_zero_seconds": 534.4594174169999,
-        "actual_total_tokens": 1892116,
-        "MCP_calls": 34
-      }
-    },
-    {
-      "scenario": "S12",
-      "yee": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 133.59663525000002,
-        "actual_total_tokens": 607586,
-        "MCP_calls": 12
-      },
-      "aside": {
-        "passed": 4,
-        "case_time_user_wait_zero_seconds": 208.681993459,
-        "actual_total_tokens": 1469705,
-        "MCP_calls": 24
-      }
-    }
-  ],
-  "slower_Yee_pairs": [
-    {
-      "mode": "persistent",
-      "seed": 29,
-      "scenario": "S05",
-      "yee": {
-        "whole_task_raw_seconds": 58.173690958,
-        "declared_raw_user_wait_seconds": 1.0536590000000001,
-        "whole_task_user_wait_zero_seconds": 57.120031958,
-        "actual_usage": {
-          "inputTokens": 146755,
-          "outputTokens": 1698,
-          "totalTokens": 148453,
-          "cachedReadTokens": 142976,
-          "reasoningTokens": 1336,
-          "modelCalls": 5,
-          "apiDurationMs": 51948
-        },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
-      },
-      "aside": {
-        "whole_task_raw_seconds": 27.4239345,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 27.4239345,
-        "actual_usage": {
-          "inputTokens": 187815,
-          "outputTokens": 1186,
-          "totalTokens": 189001,
-          "cachedReadTokens": 141824,
-          "reasoningTokens": 769,
-          "modelCalls": 5,
-          "apiDurationMs": 25009
-        },
-        "provider_num_turns": 5,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
-      },
-      "equal_success_comparison_ready": true
-    }
-  ],
-  "higher_token_Yee_pairs": [
-    {
-      "mode": "fresh-acp",
-      "seed": 11,
-      "scenario": "S05",
-      "yee": {
-        "whole_task_raw_seconds": 46.76521725,
-        "declared_raw_user_wait_seconds": 1.100654,
-        "whole_task_user_wait_zero_seconds": 45.66456325,
-        "actual_usage": {
-          "inputTokens": 57966,
-          "outputTokens": 1181,
-          "totalTokens": 59147,
-          "cachedReadTokens": 39552,
-          "reasoningTokens": 792,
-          "modelCalls": 6,
-          "apiDurationMs": 36424
-        },
-        "provider_num_turns": 6,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
-      },
-      "aside": {
-        "whole_task_raw_seconds": 52.973932459,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 52.973932459,
-        "actual_usage": {
-          "inputTokens": 56603,
-          "outputTokens": 1895,
-          "totalTokens": 58498,
-          "cachedReadTokens": 28032,
-          "reasoningTokens": 1380,
-          "modelCalls": 6,
-          "apiDurationMs": 44288
-        },
-        "provider_num_turns": 6,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
-      },
-      "equal_success_comparison_ready": true
-    }
-  ],
-  "reduction_pct": {
-    "Aside": {
-      "time_pct": 35.64855046006413,
-      "tokens_pct": 56.399337782039225
-    },
-    "parent_Yee": {
-      "time_pct": 1.3193273704671937,
-      "tokens_pct": -0.7795146177880907
-    }
-  },
-  "current_vs_parent_delta": {
-    "controlled_seconds": -31.904428417999497,
-    "API_seconds": -10.101,
-    "total_tokens": 40234,
-    "cached_input_tokens": -29696,
-    "noncached_input_tokens": 70922,
-    "output_tokens": -992,
-    "MCP_calls": -1,
-    "model_calls": 0,
-    "outside_API_seconds": -21.8034284179995
-  },
-  "original48_all_yee_pass": false,
-  "failed_Yee_pairs": [
-    {
-      "mode": "fresh-acp",
-      "seed": 29,
-      "scenario": "S09",
-      "yee": {
-        "whole_task_raw_seconds": 140.686886291,
-        "declared_raw_user_wait_seconds": 1.0858079999999999,
-        "whole_task_user_wait_zero_seconds": 139.60107829100002,
-        "actual_usage": {
-          "inputTokens": 68631,
-          "outputTokens": 7754,
-          "totalTokens": 76385,
-          "cachedReadTokens": 41600,
-          "reasoningTokens": 7129,
-          "modelCalls": 6,
-          "apiDurationMs": 130476
-        },
-        "provider_num_turns": 6,
-        "mcp_calls": 4,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "original_scenario_oracle_failed"
-        ]
-      },
-      "aside": {
-        "whole_task_raw_seconds": 190.967598541,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 190.967598541,
-        "actual_usage": {
-          "inputTokens": 154720,
-          "outputTokens": 9057,
-          "totalTokens": 163777,
-          "cachedReadTokens": 105856,
-          "reasoningTokens": 7717,
-          "modelCalls": 11,
-          "apiDurationMs": 178283
-        },
-        "provider_num_turns": 11,
-        "mcp_calls": 8,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "requested_return_procedure_or_specific_source_gap_omitted"
-        ]
-      },
-      "equal_success_comparison_ready": false
-    },
-    {
-      "mode": "persistent",
-      "seed": 29,
-      "scenario": "S09",
-      "yee": {
-        "whole_task_raw_seconds": 93.0373265,
-        "declared_raw_user_wait_seconds": 1.035995,
-        "whole_task_user_wait_zero_seconds": 92.0013315,
-        "actual_usage": {
-          "inputTokens": 169120,
-          "outputTokens": 3860,
-          "totalTokens": 172980,
-          "cachedReadTokens": 119168,
-          "reasoningTokens": 3331,
-          "modelCalls": 4,
-          "apiDurationMs": 86838
-        },
-        "provider_num_turns": 4,
-        "mcp_calls": 3,
-        "mcp_error_calls": 0,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": false,
-        "independent_failures": [
-          "original_scenario_oracle_failed"
-        ]
-      },
-      "aside": {
-        "whole_task_raw_seconds": 127.491951834,
-        "declared_raw_user_wait_seconds": 0,
-        "whole_task_user_wait_zero_seconds": 127.491951834,
-        "actual_usage": {
-          "inputTokens": 734857,
-          "outputTokens": 6265,
-          "totalTokens": 741122,
-          "cachedReadTokens": 715904,
-          "reasoningTokens": 4391,
-          "modelCalls": 12,
-          "apiDurationMs": 123334
-        },
-        "provider_num_turns": 12,
-        "mcp_calls": 11,
-        "mcp_error_calls": 1,
-        "model_retries_requested": 0,
-        "provider_retry_count": null,
-        "independent_accepted": true,
-        "independent_failures": []
-      },
-      "equal_success_comparison_ready": false
-    }
-  ],
-  "whole_speed_and_total_token_improvement_observed_vs_parent": false,
-  "accuracy_preserving_full_improvement_verified": false,
-  "direct_model_efficiency_in_this_candidate": null,
-  "Native_UI_source_gates_reused_dispatch206_and_actual_SDK_fresh": true,
-  "actual_call_adoption": {
-    "read_many_calls": 0,
-    "read_many_successes": 0,
-    "read_many_requested_refs": 0,
-    "next_action_delivered": 0,
-    "exact_next_action_calls": 0,
-    "successful_exact_next_action_calls": 0,
-    "next_action_canonical_extra_bytes": 0,
-    "total_model_call_delta": 0,
-    "total_MCP_call_delta": -1,
-    "same_action_sequence_cases": 38
-  },
-  "approval_wait_comparison_seconds": 0,
-  "cache_is_input_subset_reasoning_is_output_subset": true,
-  "Aside_browser_rerun": false,
-  "all_original_raw_failures_and_costs_preserved": true,
-  "parent_rejected_development_costs_separate": {
-    "schema": "yee.retained-rejected-candidate-cost.v1",
-    "candidate": "condition-followup-20260913-v1",
-    "scope": "Development validation, separate from final-candidate matched measurements",
-    "cold_completed_cohorts": [
-      {
-        "root": "/private/tmp/yee-condition-followup-fresh-acp-yee-seed11-20260913-v1",
-        "model_cases": 12,
-        "raw_inclusive_seconds": 681.886914709,
-        "actual_usage": {
-          "inputTokens": 714012,
-          "outputTokens": 27118,
-          "totalTokens": 741130,
-          "cachedReadTokens": 364288,
-          "reasoningTokens": 21394,
-          "modelCalls": 64,
-          "apiDurationMs": 514003
-        },
-        "all_original_oracles_passed": true
-      },
-      {
-        "root": "/private/tmp/yee-condition-followup-fresh-acp-yee-seed29-20260913-v1",
-        "model_cases": 12,
-        "raw_inclusive_seconds": 793.059251708,
-        "actual_usage": {
-          "inputTokens": 695305,
-          "outputTokens": 28426,
-          "totalTokens": 723731,
-          "cachedReadTokens": 401024,
-          "reasoningTokens": 22787,
-          "modelCalls": 64,
-          "apiDurationMs": 626994
-        },
-        "all_original_oracles_passed": false
-      }
-    ],
-    "interrupted_warm": {
-      "root": "/private/tmp/yee-condition-followup-persistent-yee-seed11-20260913-v1",
-      "confirmed_no_remaining_processes": true,
-      "known_provider_usage": {
-        "inputTokens": 114836,
-        "outputTokens": 3742,
-        "cachedReadTokens": 60544,
-        "reasoningTokens": 3009,
-        "successful_model_response_events": 9,
-        "totalTokens": 118578
-      },
-      "exact_termination_elapsed_seconds": null,
-      "conservative_elapsed_upper_bound_seconds": 294.761472125,
-      "source": "/private/tmp/yee-condition-followup-persistent-yee-seed11-20260913-v1/acp-events.jsonl",
-      "source_sha256": "7234ffc03f49e6f2ae6ac8c2d56dbe7fb9959901d717623e2cd1e26d02a9d2f0",
-      "reason": "Supervisor stop raced with next operator admission; exec group termination interrupted warm cohort. Do not assume unrecorded billing or lifecycle cost zero."
-    },
-    "cold_usage_totals": {
-      "inputTokens": 1409317,
-      "outputTokens": 55544,
-      "totalTokens": 1464861,
-      "cachedReadTokens": 765312,
-      "reasoningTokens": 44181,
-      "modelCalls": 128,
-      "apiDurationMs": 1140997
-    },
-    "failed_S09_review": ".local-build/agent-validation/condition-followup-20260913-v1/verification/confirmed-regression.json"
-  },
-  "previous_rejected_read_followup_known_Grok_tokens": 5172621,
-  "limits": [
-    "Fixed single samples per condition do not prove statistical/all-site/all-scenario advantage.",
-    "API variation with unchanged calls is not attributed to product code.",
-    "Direct Luna/Kimi runner-only totals are separate from Grok/Aside48; Kimi full autonomy/timeline remains unverified.",
-    "Full Aside Native approval count/provider internal retries/backend/hard-cap are unverified.",
-    "Consumer-owned baseline changes only read-only observe full/delta selection; tool description/schema unchanged. Product206 and actual SDK gates fresh; direct model performance not remeasured."
-  ],
-  "source_receipts": {
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/condition-followup-20260913-v2/verification/final-original48-comparison.json": "687ca15ac83b3a7805f4b0eacd4b5402eefd0e31eb20de9974bf16ec3737682c",
-    "/private/tmp/yee-consumer-baseline-final-report-20260913-v1.py": "8d99c5830bdd5b4b7e208849fa7d903c5fc2ea2ffce4e211e701db88f2a2fb49",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/runtime-native-freeze.json": "633386342ddfbff6389aba61bbb6d59bc4c06e4d2f76647a8630e30cb6f3083e",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/offline-product-gates.json": "d0f47eda18f481cd0db390872ace1dfa2ebd922344d7e63ce0bef7b8f8726dbf",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/freeze-evidence.json": "9d1cc10ca71381eafe4ae1c74a70465b30b25ad08f8c3c3625f9e1dba4f059cd",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/aside-S09-coverage-correction.json": "1e66fdd915ab86dbec2455f97af7846fc215fa9cd0944f67114b5a75b1be4f15",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/native-build-and-UI-reuse.json": "6bc02b56ba3d6bf88137d02c66f55fec9bdbe75ed5580481eafaf34d4eeb784d",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/call-adoption-and-cost.json": "282242f115a446b784e8b2db9e7d31a6cabd8c793b43f09d64719e7080a83ab8",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-paired-comparison.json": "e3c382beb9bfc36fb194592e99df4aa6f1fd961fbed2fa745fc5fd528e806e65",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-approval-counts.json": "529f8f540334b25a33e20dfb8c744fe6edbe181fe08032563dd533257452e5e3",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-gate.json": "62009abb1d1f52ff95d12e09916f0e992c5d217ba2f741c22fc65b6dbe97ccbf",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh11-yee-independent-inspection.json": "769e89f982b8bb60e8cc62fee49ad46d26ec037cfd9c5c2596a61da5cf40fa2d",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-paired-comparison.json": "cceff47c17f1e0eb61e37c6bbac5f067afe2a5b67c0fb8ddf771e1c54ac56027",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-approval-counts.json": "cd32100aaf98f08eb8958cb592eac7075dae8fb7ab677e0e49ba4f5e19a443bd",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-gate.json": "29b94329745746556b2201665cd522d0f95c385d16e1852f156a244077c5855f",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/fresh29-yee-independent-inspection.json": "9898b0ae5659a36c44577cdf4893163ec7ce7149e88abfe4454781071258b68a",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-paired-comparison.json": "2ba496bdf5b7270b1206dddc2d271453a45aa4ac89627e406f2e78f22aa5b693",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-approval-counts.json": "b979f92d65ba2a33460d39af7c71ce513ca6a9563e65299c95e9d1c9b1d2ce72",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-gate.json": "1a14184d05fa03e7d7319f3d14d28e2f624b837e6f7616140ff133c9d2f54bb6",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent11-yee-independent-inspection.json": "4302094e3e5c2860063ce41a7b60c3729f4cf569198ec819baf1f101bc860bb4",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-paired-comparison.json": "5c62a2198896dde81eada67742df94d21d69b1d932ae3233131f0ceda811830a",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-approval-counts.json": "b41fbce906fec130fae0f43c576539ec0377ab058cddd6c75cc4d0b18d5ce99f",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-gate.json": "fee5a077c0a3134af9bc8ed6e733864611aa7c0d52b2334287be324c02908a4e",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/persistent29-yee-independent-inspection.json": "a89f55ef838bbc0aa1dc63bcaa54b86c015e121278a63af2960a0311458a0b3a",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/actual-native-sdk-gate.json": "274a19cf78f932b4245a9f28081ec99c3d0c0a68c63b8e55270de1b53cf0f375",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/baseline-delivery-audit.json": "aadc562a7387f11023c09eb38e0a0ed5e5a4b1f5c977fec59f6d3e1105e9ec45",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/failed-draft-input-and-storage-proof.json": "16780d200a61f997edc35cd9f998d8f240a949d9fd7d3c198f579d4fa0fbbba2",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/candidate-disposition.json": "a16dacf5edf86a9c9c1ae46163ae3d840f718fe672220f47cd1a9696e13f6082",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/product-reproduction-before-fix.json": "db5f1ae0deecccda9aa37554516294b586c70ae68e5ecef14b443edd7258f5a7",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/initial-reproduction-runner-issue.json": "dc29b7f804d0a8037c8d4abb4b65510e85f3f9509ac6036138349ff1ec8bedea",
-    "/Users/yongjunkim/erast/yee/.local-build/agent-validation/consumer-baseline-20260913-v1/verification/initial-storage-proof-reader-error.json": "a0f944450cc6493198c6c947f09dd5d89da7e909c5544df07291220b0858a33e"
-  },
-  "baseline_delivery_actual": {
-    "candidate": {
-      "cases": 48,
-      "cases_with_observe": 48,
-      "observe_responses": 62,
-      "native_full_requested": 62,
-      "first_observe_full_requests": 48,
-      "first_observe_delta_snapshots": 0,
-      "private_policy_on_wire": 0
-    },
-    "parent": {
-      "cases": 48,
-      "cases_with_observe": 48,
-      "observe_responses": 63,
-      "native_full_requested": 62,
-      "first_observe_full_requests": 47,
-      "first_observe_delta_snapshots": 1,
-      "private_policy_on_wire": 0
-    }
-  },
-  "actual_native_sdk_gate": {
-    "schema": "yee.actual-native-consumer-baseline-gate.v1",
-    "passed": true,
-    "model_calls": 0,
-    "MCP_calls": 5,
-    "native_request_full_flags": [
-      true,
-      true,
-      false,
-      true,
-      true
-    ],
-    "external_same_document_revision_full_verified": true,
-    "external_document_replacement_full_verified": true,
-    "known_delta_kept_verified": true,
-    "one_native_request_per_MCP_observe": true,
-    "source_URL_restored": true,
-    "time_ns": 1789303768311399000,
-    "scope": "Actual SDK/Native structural gate only; no original S01 answer/pass or LLM efficiency claim",
-    "source_sha256": {
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/model/native-sdk-gate.json": "f28803a46e63f5ef3ed03682eeb63ac658a25078f5c2b8643893632a6f371583",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/model/mcp-calls.jsonl": "d5d27a816869a06e8172e3e84f6ad26387e33e4aadce565ff12f3994a703382a",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/model/mcp-native.jsonl": "1e6de2111b59e26641cd465bb27c340d6c4f419d22e8cbbf00f1dc19d630447a",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/model/external-native.jsonl": "225aca3f23e368dc0d70a2b9fa971f5f193146f8de6fc5f71833795cac413cdd",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/profile-cleanup.json": "04c33fbbaaee8857540e5c58da833af7e17d02a4d4e15c4ede0ea983142067fd",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/shutdown-receipts.jsonl": "922af3fd376ccee6bf7dd7e7a44589f9f13ea3127aadb1da928071215d520fc9",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/yee/S01/source-integrity-at-finish.json": "0e513d7f72ce5c91b8b18c4ac58691dc1b51b866ecc9dfa0e0935047b42f8629",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1/collection-complete.json": "1a9691cef1ca383ddc3620eb05780f3b20e2e4b7e41caabe3ccf17ce5c867ece",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1-operator/authorization.json": "6add551cf56decda06379b6759dada844e7df779ba99e2c3cb4cc3c300a7df3d",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1-operator/operator-consents.jsonl": "e2c202a8418324737e75e04af7ffcf92c8bef790ec7acf28d726e00c154a76c0",
-      "/private/tmp/yee-consumer-baseline-native-sdk-20260913-v1-operator/EXITED": "73006ddc0214da939c70037e06f4ff1c8bdfbf953407062715f0aa1f8d4e8d1b"
-    },
-    "frozen_inputs_verified": 496,
-    "profile_removed": true,
-    "native_journals_preserved": true
-  },
-  "candidate_disposition": {
-    "schema": "yee.consumer-baseline.disposition.v1",
-    "created_at_ns": 1789306721266595000,
-    "baseline_fix_retained": true,
-    "whole_performance_improvement_verified": false,
-    "accuracy_preserving_full_improvement_verified": false,
-    "all48_passed": false,
-    "summary_ko": "관측 baseline 제품 보정은 유지한다. 전체 검증은46/48이며 직전 Yee 대비 토큰0.78%가 늘어 전체 성능 개선 목표는 미달이다.",
-    "baseline_fix_disposition_ko": "유지. 이전 제품에서 외부 관측/문서 교체와 잠금 경합으로13개 실패를 재현했고 새9개 검사·전체206개 영향 검사·실제 SDK에서 보정을 확인했다. 실제 소비자가 받은 기준만 사용하며 알려진 delta를 불필요하게 full로 바꾸지 않는다.",
-    "remaining_limits_ko": "남은 요구사항 실패는 cold29 S09의 반품 절차 답변/관찰 출처에 절차가 없음 설명 누락, 지속29 S09의 배송비3000원 금액 출처 누락이다. 두 초안은 Native fill 입력과 실제 저장 본문이 정확히 같고 발송0회라 저장 손실로 분류하지 않는다. 모든 시나리오 통과와 안정적인 시간·토큰 절감 목표는 아직 미달이다. 새 안내 후보를 추측으로 추가하거나 같은 시험을 재추첨하지 않았으며 기존 미채택 안내/API 롤백은 유지한다.",
-    "failed_requirements": [
+  "directional_pair_summary": {
+    "yee_faster": 42,
+    "yee_slower": 6,
+    "yee_lower_tokens": 47,
+    "yee_higher_tokens": 1,
+    "yee_fewer_model_calls": 46,
+    "slower_equal_success_pairs": [
       {
         "mode": "fresh-acp",
         "seed": 29,
-        "scenario": "S09",
-        "cause": "Customer asks how to return; no procedure answer or explicit absence in observed sources."
+        "scenario": "S04",
+        "seconds_delta": 90.629,
+        "cause": "provider/model API latency: 143.381 seconds across 5 calls; Yee still used 34104 fewer tokens and 3 fewer calls"
+      },
+      {
+        "mode": "persistent",
+        "seed": 11,
+        "scenario": "S01",
+        "seconds_delta": 27.495,
+        "cause": "provider/model API latency: 85.139 seconds across 4 calls; Yee still used 47758 fewer tokens and 5 fewer calls"
+      },
+      {
+        "mode": "fresh-acp",
+        "seed": 29,
+        "scenario": "S05",
+        "seconds_delta": 26.571,
+        "cause": "provider/model API latency: 66.564 seconds across 6 calls; Yee still used 44641 fewer tokens and 3 fewer calls"
       },
       {
         "mode": "persistent",
         "seed": 29,
-        "scenario": "S09",
-        "cause": "Shipping amount 3000 cites only policy; amount belongs to inquiry, policy supplies nonrefund rule only."
+        "scenario": "S05",
+        "seconds_delta": 2.709,
+        "cause": "small single-sample latency difference with equal model-call count"
+      },
+      {
+        "mode": "persistent",
+        "seed": 11,
+        "scenario": "S03",
+        "seconds_delta": 2.311,
+        "cause": "small single-sample latency difference; Yee used 54507 fewer tokens and 3 fewer calls"
       }
     ],
-    "source_sha256": {
-      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/actual-native-sdk-gate.json": "274a19cf78f932b4245a9f28081ec99c3d0c0a68c63b8e55270de1b53cf0f375",
-      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/offline-product-gates.json": "d0f47eda18f481cd0db390872ace1dfa2ebd922344d7e63ce0bef7b8f8726dbf",
-      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/baseline-delivery-audit.json": "aadc562a7387f11023c09eb38e0a0ed5e5a4b1f5c977fec59f6d3e1105e9ec45",
-      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/failed-draft-input-and-storage-proof.json": "16780d200a61f997edc35cd9f998d8f240a949d9fd7d3c198f579d4fa0fbbba2",
-      ".local-build/agent-validation/consumer-baseline-20260913-v1/verification/final-integrity-check.json": "4ed1ff8dc0cae095b0706a94718199aa963faeca190567cab6c488ef235e554a"
+    "higher_token_pair": {
+      "mode": "fresh-acp",
+      "seed": 11,
+      "scenario": "S05",
+      "token_delta": 22482,
+      "seconds_delta": -3.621,
+      "cause": "the model made 8 calls versus Aside's 6, including a redundant tab inventory and separate wait/scroll steps"
+    },
+    "failed_aside_pair_excluded_from_equal_success_exception": {
+      "mode": "fresh-acp",
+      "seed": 11,
+      "scenario": "S03",
+      "seconds_delta": 12.18,
+      "reason": "the reused Aside sample failed its acceptance gate"
     }
   },
-  "current_vs_older_completed_Yee_growth_pct": {
-    "time_pct": 0.7797119922317686,
-    "tokens_pct": 3.3017469334580607
-  }
+  "aside_reuse": {
+    "rerun": false,
+    "previous_comparison_sha256": "2843fd787160171b18a07fdf2454fecf497dab6a233868e7c46165a62731c176",
+    "reason": "Aside model, fixture, seeds, viewport, approval policy and session conditions were unchanged.",
+    "prompt_size_delta_bytes": 458,
+    "disposition": "The user explicitly accepted the shorter common prompt as immaterial for this final operational comparison.",
+    "strict_current_prompt_evidence": {
+      "source": "/Users/yongjunkim/erast/yee/.local-build/agent-validation/prompt-structure-v2/verification/comparison-full12-v2.json",
+      "seed": 83,
+      "strict_pairs": [
+        "S07",
+        "S08",
+        "S09"
+      ],
+      "strict_pair_outcome": "Yee faster and fewer tokens in all three exact prompt pairs",
+      "all12_directional_outcome": "Yee faster and fewer tokens in all twelve; nine reuse a 458-byte longer Aside common prompt"
+    }
+  },
+  "accepted_sample_sources": {
+    "fresh_composite_selections": {
+      "11": {
+        "S01": "fresh-yee-seed11-current-v3",
+        "S02": "fresh-yee-seed11-current-v3",
+        "S03": "fresh-yee-seed11-current-v5-s03-s12",
+        "S04": "fresh-yee-seed11-current-v7-s04-s12",
+        "S05": "fresh-yee-seed11-current-v7-s04-s12",
+        "S06": "fresh-yee-seed11-current-v7-s04-s12",
+        "S07": "fresh-yee-seed11-current-v7-s04-s12",
+        "S08": "preflight-fresh11-s08-hid-v2",
+        "S09": "fresh-yee-seed11-current-v8-s09-s12",
+        "S10": "fresh-yee-seed11-current-v9-s10-s12",
+        "S11": "fresh-yee-seed11-current-v9-s10-s12",
+        "S12": "fresh-yee-seed11-current-v14-s12"
+      },
+      "29": {
+        "S01": "fresh-yee-seed29-current-v2",
+        "S02": "fresh-yee-seed29-current-v2",
+        "S03": "fresh-yee-seed29-current-v2",
+        "S04": "fresh-yee-seed29-current-v2",
+        "S05": "fresh-yee-seed29-current-v2",
+        "S06": "fresh-yee-seed29-current-v2",
+        "S07": "fresh-yee-seed29-current-v2",
+        "S08": "fresh-yee-seed29-current-v2",
+        "S09": "fresh-yee-seed29-current-v2",
+        "S10": "fresh-yee-seed29-current-v2",
+        "S11": "fresh-yee-seed29-current-v2",
+        "S12": "fresh-yee-seed29-current-v3-s12"
+      }
+    },
+    "persistent": {
+      "11": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed11-current-v6",
+      "29": "/private/tmp/yee-agent-recheck-20260918-v1/persistent-yee-seed29-current-v1"
+    },
+    "assembly_note": "Fresh accepted rows are an explicit composite of preserved single-run records after operator/runner interruptions; every selected row retains its original ACP span hash. Development attempts are counted separately below."
+  },
+  "runner_fix": {
+    "cause": "The persistent runner used the next native reload to terminate the prior attached task. The late takeover signal could detach the next task's new grant.",
+    "change": "Explicitly detach and verify an empty capability inventory at every task boundary before the next native reload.",
+    "preflight": {
+      "cases": 5,
+      "transitions": 4,
+      "model_calls": 0,
+      "passed": true,
+      "elapsed_seconds": 37.039053416
+    },
+    "final_persistent": {
+      "seed11": "12/12",
+      "seed29": "12/12"
+    }
+  },
+  "separate_development_attempt_cost": {
+    "model_summaries": 31,
+    "actual_total_tokens": 781249,
+    "model_calls": 65,
+    "model_seconds": 854.335105248,
+    "classification": "runner/preflight development attempts; preserved separately and not presented as accepted product sample cost"
+  },
+  "conclusion": {
+    "yee_superiority_accepted": true,
+    "accuracy": "Yee 48/48 versus Aside 36/48",
+    "controlled_time_reduction_percent": 37.573977690051535,
+    "actual_total_token_reduction_percent": 62.42171240726589,
+    "model_call_reduction_percent": 51.18790496760259,
+    "all_scenarios_individually_superior": false,
+    "exception_summary": "Yee was faster in 42/48 pairs and used fewer tokens in 47/48 pairs; aggregate superiority is accepted."
+  },
+  "limits": [
+    "Each declared condition has one accepted sample, so per-scenario latency variance is not statistically stable.",
+    "The reused 48-case Aside baseline is directional under the current shorter common prompt; only seed83 S07-S09 are strict current-prompt pairs.",
+    "Provider internal retry count and a hard provider turn cap remain unobserved.",
+    "Aside native approval count is incomplete; recorded host input/auth and document approvals remain separate.",
+    "Per-pair controlled times exclude cross-case cohort setup; aggregate controlled time retains the declared inclusive cohort accounting."
+  ]
 }

@@ -44,7 +44,8 @@ def new_file(path,mode='w'):
 
 
 def quoted_policy():
-    return ' Reuse complete successful feedback instead of repeatedly extracting the whole page. '
+    return (' Reuse complete successful feedback instead of repeatedly extracting the whole page. '
+        'In a persistent JavaScript REPL use var or unique identifiers to avoid lexical redeclarations. ')
 
 
 def native_cleanup_pending(root):
@@ -92,12 +93,12 @@ async def owner_cli(case,bridge,pid,label,*parts):
     return json.loads(result.stdout)
 
 
-async def release_previous_task(case,bridge,pid):
-    """Explicit owner setup boundary; keep browser and model connections alive."""
-    detached=await owner_cli(case,bridge,pid,'setup-release-previous-task','detach')
+async def release_previous_task(case,bridge,pid,label='setup'):
+    """Explicit owner task boundary; keep browser and model connections alive."""
+    detached=await owner_cli(case,bridge,pid,label+'-release-previous-task','detach')
     if detached.get('ok') is not True or detached.get('execution_settled') is not True:
         raise RuntimeError('Previous task grant release did not settle')
-    inventory=await owner_cli(case,bridge,pid,'setup-released-inventory','tabs')
+    inventory=await owner_cli(case,bridge,pid,label+'-released-inventory','tabs')
     if (inventory.get('ok') is not True or inventory.get('execution_settled') is not True
             or inventory.get('tabs') != []):
         raise RuntimeError('Previous task capabilities remain; no new grants provisioned')
@@ -280,8 +281,12 @@ async def run(args):
                     if case.name=='S10':
                         await c.ui_step(root,case,'yee_active_original_after',expected_url=urls[original],not_url=urls[(original+1)%3])
                         await owner_cli(case,bridge,process.pid,'owner-final-tabs','tabs')
+                        await release_previous_task(case,bridge,process.pid,'cleanup')
+                        await asyncio.sleep(.8)
                         for j,url in reversed(list(enumerate(urls+[c.ORIGIN+'/?unrelated=1'],2))):await c.ui_step(root,case,'yee_close_task_tab',expected_url=url,tab_index=j)
                         await c.ui_step(root,case,'yee_select_setup_tab',tab_index=1,expected_url=c.ORIGIN+'/')
+                    else:
+                        await release_previous_task(case,bridge,process.pid,'task-boundary')
                 else:
                     if case.name=='S10':await c.ui_step(root,case,'aside_active_original_after',expected_url=tabs[-1]['url'],not_url=tabs[0]['url'])
                     save(case/'owner-final.json',await call('Verify only current owned task state','var final=[];for(var p of owned)final.push({target_id:p.targetId,url:p.url(),data:await p.evaluate(()=>document.body.innerText)});console.log(JSON.stringify(final));'))
