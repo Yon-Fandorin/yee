@@ -100,9 +100,15 @@
     },
     {
       "path": "docs/agent-browser-validation/results.md",
-      "sha256": "c2995ebcd6f155c9d3c886edc23dd26d35883ccbe2b894b1d21f926bc0a57b87",
-      "bytes": 6222,
+      "sha256": "cb9cd2c9963f433a55352326606ff3ddc28abf5cc4fc8648f7ebdd826612d1a0",
+      "bytes": 6401,
       "role": "human-readable current result"
+    },
+    {
+      "path": ".local-build/agent-validation/native-prompt-20260921/approval-light.png",
+      "sha256": "0475ae5ce858cd1df8d1b03a32ed6fbc6c145b1f1e9b166f0692719fd1985195",
+      "bytes": 113637,
+      "role": "actual Yee native child dialog, light basic approval"
     },
     {
       "path": ".local-build/agent-validation/recheck-20260918-v1/verification/final-current-recheck.json",
