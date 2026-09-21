@@ -94,14 +94,14 @@
   "current_source_records": [
     {
       "path": "docs/agent-browser-validation/comparison.json",
-      "sha256": "17cfd9a7b77cbbecbab6901876a0c5e25c33180e1f0a054f39ff95dba83760b9",
-      "bytes": 77537,
+      "sha256": "977ee5a3280d4a7e90f4aa17d65ea81f5d4a8907d4e6d170c80e148e2533d215",
+      "bytes": 77708,
       "role": "authoritative machine-readable 48-pair comparison"
     },
     {
       "path": "docs/agent-browser-validation/results.md",
-      "sha256": "183552fe25deae518fddabb33a4aa5ab0a1c23b07fa338b3f6317983a130240a",
-      "bytes": 6909,
+      "sha256": "55b76273cfdc323a076c099ef012c6e63201b0d0a04249c18460b046b25cbc72",
+      "bytes": 7894,
       "role": "human-readable current result"
     },
     {
