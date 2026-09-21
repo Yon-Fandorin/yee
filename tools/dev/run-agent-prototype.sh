@@ -7,24 +7,31 @@ source "$SCRIPT_DIR/common.zsh"
 # claim the page viewport has that size; verify the returned viewport metadata.
 typeset -a launch_window_args
 launch_window_args=()
-if (( $# > 0 )); then
-  if (( $# != 1 )) || [[ "$1" != --window-size=* ]]; then
-    print -u2 "Usage: zsh tools/dev/run-agent-prototype.sh [--window-size=WIDTH,HEIGHT]"
+window_size_seen=0
+dark_mode_seen=0
+for arg in "$@"; do
+  if [[ "$arg" == --window-size=* ]] && (( ! window_size_seen )); then
+    window_size_seen=1
+    window_pair="${arg#--window-size=}"
+    if [[ ! "$window_pair" =~ '^[0-9]{3,4},[0-9]{3,4}$' ]]; then
+      print -u2 "Window dimensions must be integers from 300 to 4000."
+      exit 2
+    fi
+    window_width="${window_pair%,*}"
+    window_height="${window_pair#*,}"
+    if (( window_width < 300 || window_width > 4000 || window_height < 300 || window_height > 4000 )); then
+      print -u2 "Window dimensions must be integers from 300 to 4000."
+      exit 2
+    fi
+    launch_window_args+=("--window-size=$window_pair")
+  elif [[ "$arg" == --force-dark-mode ]] && (( ! dark_mode_seen )); then
+    dark_mode_seen=1
+    launch_window_args+=(--force-dark-mode)
+  else
+    print -u2 "Usage: zsh tools/dev/run-agent-prototype.sh [--window-size=WIDTH,HEIGHT] [--force-dark-mode]"
     exit 2
   fi
-  window_pair="${1#--window-size=}"
-  if [[ ! "$window_pair" =~ '^[0-9]{3,4},[0-9]{3,4}$' ]]; then
-    print -u2 "Window dimensions must be integers from 300 to 4000."
-    exit 2
-  fi
-  window_width="${window_pair%,*}"
-  window_height="${window_pair#*,}"
-  if (( window_width < 300 || window_width > 4000 || window_height < 300 || window_height > 4000 )); then
-    print -u2 "Window dimensions must be integers from 300 to 4000."
-    exit 2
-  fi
-  launch_window_args=("--window-size=$window_pair")
-fi
+done
 # Fail before quitting Yee or allocating a profile when UI validation is blocked.
 /usr/bin/swift -module-cache-path "$LOCAL_BUILD_ROOT/swift-module-cache" \
   "$SCRIPT_DIR/check-ui-session.swift"

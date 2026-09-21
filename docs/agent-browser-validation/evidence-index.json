@@ -100,15 +100,39 @@
     },
     {
       "path": "docs/agent-browser-validation/results.md",
-      "sha256": "cb9cd2c9963f433a55352326606ff3ddc28abf5cc4fc8648f7ebdd826612d1a0",
-      "bytes": 6401,
+      "sha256": "183552fe25deae518fddabb33a4aa5ab0a1c23b07fa338b3f6317983a130240a",
+      "bytes": 6909,
       "role": "human-readable current result"
     },
     {
-      "path": ".local-build/agent-validation/native-prompt-20260921/approval-light.png",
+      "path": "docs/agent-browser-validation/native-prompt/approval-light.png",
       "sha256": "0475ae5ce858cd1df8d1b03a32ed6fbc6c145b1f1e9b166f0692719fd1985195",
       "bytes": 113637,
       "role": "actual Yee native child dialog, light basic approval"
+    },
+    {
+      "path": "docs/agent-browser-validation/native-prompt/approval-force-dark.png",
+      "sha256": "6a471194a5c71f9f8c81949ae0050009785e6ea43801a3124664d39a5ab35edc",
+      "bytes": 114671,
+      "role": "actual Yee native child dialog, force-dark basic approval"
+    },
+    {
+      "path": "docs/agent-browser-validation/native-prompt/approval-long.png",
+      "sha256": "16ffd64e767f7201e4408e782be05d7b1ae923f4737572f29bf6365aa14a2ec1",
+      "bytes": 181210,
+      "role": "actual Yee native child dialog, long navigation approval"
+    },
+    {
+      "path": "docs/agent-browser-validation/native-prompt/question-dark.png",
+      "sha256": "67695477d49bb24a62609cf3f86dbd2bb7c700f7769c737ab93d5f01feebb9bf",
+      "bytes": 116103,
+      "role": "actual Yee native child dialog, force-dark question input"
+    },
+    {
+      "path": "docs/agent-browser-validation/native-prompt/escape-receipt.json",
+      "sha256": "b1c635de56cba1644958f74a5ae104c5e352c2de22cc8565c744c513b9385e04",
+      "bytes": 151,
+      "role": "actual Yee native Escape cancellation receipt"
     },
     {
       "path": ".local-build/agent-validation/recheck-20260918-v1/verification/final-current-recheck.json",
@@ -253,10 +277,11 @@
     "python_compile": "passed",
     "persistent_task_boundary_unit_tests": "4/4 passed",
     "agent_browser_contract_tests": "45/45 passed with --no-build",
+    "native_prompt_tests": "10/10 passed, including Escape key cancellation",
     "comparison_invariants": "passed: 48 Yee accepts, 36 Aside accepts, 42 faster, 47 lower-token, 46 fewer-call pairs",
     "JSON_parse": "passed",
     "broken_local_markdown_links": 0,
-    "chromium_build": "not run; only Python developer tooling and documentation changed"
+    "chromium_build": "incremental agent_bridge_prompt_unittests target built with 3 jobs; Yee app binary unchanged"
   },
   "development_attempt_cost": {
     "model_summaries": 31,
@@ -265,9 +290,7 @@
     "model_seconds": 854.335105248,
     "classification": "runner/preflight development attempts; preserved separately and not presented as accepted product sample cost"
   },
-  "remaining_work": [
-    "Native approval card pixel capture for light/dark, long request, question input, keyboard cancel and accessibility states"
-  ],
+  "remaining_work": [],
   "limits": [
     "Each declared condition has one accepted sample, so per-scenario latency variance is not statistically stable.",
     "The reused 48-case Aside baseline is directional under the current shorter common prompt; only seed83 S07-S09 are strict current-prompt pairs.",
@@ -276,5 +299,5 @@
     "Per-pair controlled times exclude cross-case cohort setup; aggregate controlled time retains the declared inclusive cohort accounting."
   ],
   "active_job": null,
-  "new_chromium_build_for_this_document_update": false
+  "new_chromium_build_for_this_document_update": true
 }

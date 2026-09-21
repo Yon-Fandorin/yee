@@ -5,13 +5,9 @@
 
 ## 다음 우선순위
 
-1. [Native 자식 창 캡처 도구](../tools/dev/capture-yee-native-prompt.swift)로
-   light 기본 승인 카드의 실제 배치와 텍스트·버튼에 잘림이 없음을 확인했다. dark, 긴
-   요청, 질문 입력, 키보드 취소와 접근성은 계속 확인한다. 현재 Computer Use는
-   자식 모달 대신 부모 Yee 창만 선택하므로 해당 조작을 통과로 기록하지 않는다.
-2. 다음 구조 변경이 생기면 fresh composite 대신 각 조건을 중단 없는 단일 cohort로
+1. 다음 구조 변경이 생기면 fresh composite 대신 각 조건을 중단 없는 단일 cohort로
    다시 수집한다. 현재 48/48 결론을 반복 실행만으로 갱신하지 않는다.
-3. fresh seed11 S05에서 확인된 불필요한 탭 목록 조회와 분리된 wait/scroll 패턴이
+2. fresh seed11 S05에서 확인된 불필요한 탭 목록 조회와 분리된 wait/scroll 패턴이
    실제 사용에서 반복되는지 관찰한다. 새 증거 없이 특정 시나리오용 프롬프트를
    추가하지 않는다.
 

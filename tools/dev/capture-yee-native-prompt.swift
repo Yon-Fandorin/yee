@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 // Capture the separate native Agent dialog without changing the foreground app.
-// Usage: capture-yee-native-prompt PID OUTPUT.png
+// Usage: capture-yee-native-prompt PID OUTPUT.png [--ax]
 
 import AppKit
+import ApplicationServices
 import ScreenCaptureKit
 
 @main
@@ -21,7 +22,9 @@ struct CaptureYeeNativePrompt {
 
   @MainActor private static func capture() async throws {
     _ = NSApplication.shared
-    guard CommandLine.arguments.count == 3,
+    guard
+      CommandLine.arguments.count == 3
+        || (CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--ax"),
       let pid = Int32(CommandLine.arguments[1]),
       pid > 0
     else {
@@ -44,6 +47,9 @@ struct CaptureYeeNativePrompt {
     guard matches.count == 1, let window = matches.first else {
       throw CaptureError.windowCount(matches.count)
     }
+    let accessibility =
+      CommandLine.arguments.count == 4
+      ? try accessibilityJSON(pid: pid) : nil
 
     let filter = SCContentFilter(desktopIndependentWindow: window)
     let configuration = SCStreamConfiguration()
@@ -65,6 +71,58 @@ struct CaptureYeeNativePrompt {
     print(
       "captured Yee Agent window \(window.windowID) (\(configuration.width)x\(configuration.height)) to \(output.path)"
     )
+    if let accessibility {
+      print(accessibility)
+    }
+  }
+
+  private static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+    var value: CFTypeRef?
+    return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success
+      ? value : nil
+  }
+
+  private static func string(_ element: AXUIElement, _ name: String) -> String {
+    attribute(element, name) as? String ?? ""
+  }
+
+  private static func accessibilityJSON(pid: Int32) throws -> String {
+    guard AXIsProcessTrusted() else { throw CaptureError.accessibilityUnavailable }
+    let app = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(app, 5)
+    var windowsValue: CFTypeRef?
+    let windowsError = AXUIElementCopyAttributeValue(
+      app, kAXWindowsAttribute as CFString, &windowsValue)
+    guard windowsError == .success else {
+      throw CaptureError.accessibilityQueryFailed(windowsError.rawValue)
+    }
+    let windows = windowsValue as? [AXUIElement] ?? []
+    let matches = windows.filter { string($0, kAXTitleAttribute) == "Yee Agent" }
+    guard matches.count == 1, let dialog = matches.first else {
+      throw CaptureError.accessibilityWindowCount(matches.count)
+    }
+
+    var pending = [dialog]
+    var elements: [[String: Any]] = []
+    while let element = pending.popLast() {
+      guard elements.count < 200 else { throw CaptureError.accessibilityTreeTooLarge }
+      let role = string(element, kAXRoleAttribute)
+      if ["AXStaticText", "AXButton", "AXTextField"].contains(role) {
+        elements.append([
+          "role": role,
+          "title": string(element, kAXTitleAttribute),
+          "description": string(element, kAXDescriptionAttribute),
+          "value": role == "AXTextField" ? "" : string(element, kAXValueAttribute),
+          "enabled": attribute(element, kAXEnabledAttribute) as? Bool ?? false,
+          "focused": attribute(element, kAXFocusedAttribute) as? Bool ?? false,
+        ])
+      }
+      pending += attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
+    }
+    let json = try JSONSerialization.data(
+      withJSONObject: ["window": "Yee Agent", "elements": elements],
+      options: [.sortedKeys])
+    return String(decoding: json, as: UTF8.self)
   }
 }
 
@@ -75,11 +133,15 @@ enum CaptureError: Error, CustomStringConvertible {
   case windowCount(Int)
   case invalidWindowSize
   case encodingFailed
+  case accessibilityUnavailable
+  case accessibilityQueryFailed(Int32)
+  case accessibilityWindowCount(Int)
+  case accessibilityTreeTooLarge
 
   var description: String {
     switch self {
     case .invalidArguments:
-      return "usage: capture-yee-native-prompt PID OUTPUT.png"
+      return "usage: capture-yee-native-prompt PID OUTPUT.png [--ax]"
     case .notYee:
       return "PID does not belong to a running Yee app"
     case .outputExists:
@@ -90,6 +152,14 @@ enum CaptureError: Error, CustomStringConvertible {
       return "Yee Agent window has invalid capture dimensions"
     case .encodingFailed:
       return "failed to encode captured window as PNG"
+    case .accessibilityUnavailable:
+      return "macOS accessibility permission is unavailable"
+    case .accessibilityQueryFailed(let code):
+      return "failed to read Yee accessibility windows (AX error \(code))"
+    case .accessibilityWindowCount(let count):
+      return "expected exactly one accessible Yee Agent window; found \(count)"
+    case .accessibilityTreeTooLarge:
+      return "Yee Agent accessibility tree exceeded 200 nodes"
     }
   }
 }

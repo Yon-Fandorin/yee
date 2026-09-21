@@ -15,6 +15,8 @@
 #include "base/test/bind.h"
 #include "chrome/browser/ui/views/yee/brand.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/events/test/event_generator.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/scroll_view.h"
@@ -106,6 +108,25 @@ TEST_F(AgentBridgePromptTest, CloseNowRepliesDeniedOnce) {
   EXPECT_EQ(callback_count, 1);
   EXPECT_FALSE(accepted);
   EXPECT_TRUE(answer.empty());
+}
+
+TEST_F(AgentBridgePromptTest, EscapeRepliesDeniedOnce) {
+  int callback_count = 0;
+  bool accepted = true;
+  Widget* prompt = ShowAgentBridgePrompt(
+      owner_view(), u"Approve this action?", true,
+      base::BindLambdaForTesting([&](bool did_accept, std::string) {
+        ++callback_count;
+        accepted = did_accept;
+      }));
+
+  ASSERT_TRUE(prompt);
+  ui::test::EventGenerator generator(GetContext(), prompt->GetNativeWindow());
+  generator.PressKey(ui::VKEY_ESCAPE, 0);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(callback_count, 1);
+  EXPECT_FALSE(accepted);
 }
 
 TEST_F(AgentBridgePromptTest, AcceptDialogRepliesAcceptedOnce) {
