@@ -205,6 +205,17 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
 
+콘텐츠 차단과 Site Controls는 다음 명령으로 확인한다.
+
+- `test-site-controls.sh`: 사이트별 토글·저장·창과 탭 수명·worker/cache 통합 검사
+- `test-youtube-live.sh off|on`: 실제 YouTube의 본편 재생 검사와 광고 전달 관측
+
+두 명령은 기본으로 필요한 native 테스트 프로그램을 빌드하며,
+`--no-build`로 이미 빌드한 프로그램을 사용할 수 있다. 실행 전에 개발 Yee를
+정상 종료한다. YouTube 검사는 외부 네트워크를 사용하고, 플레이어 오류·멈춤과
+최소 본편 재생 시간을 검사한다. 관측 시간·영상 선택·탐색 옵션과 광고 검증의
+범위는 [콘텐츠 차단 checkpoint](../../docs/content-blocking-checkpoint.md#40초대-재생-오류)에 있다.
+
 Header와 Sidebar의 세부 검증은 [Header 안내](../../docs/header/README.md)와
 [Sidebar 안내](../../docs/sidebar/README.md)를 따른다. C++ UI 테스트 명령은 기본으로
 필요한 프로그램을 빌드하며 일부 단계는 실제 창을 열거나 기존 개발 브라우저를 정상 종료한다.

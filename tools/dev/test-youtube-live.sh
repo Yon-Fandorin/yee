@@ -13,9 +13,9 @@ fi
 require_depot_tools
 require_chromium_src
 if [[ "${2:-}" != "--no-build" ]]; then
-  require_free_gib 10 "the opt-in YouTube observation"
+  require_free_gib 10 "the opt-in YouTube playback gate"
   sync_yee_ui_sources
-  build_regression_targets "YouTube live observation" \
+  build_regression_targets "YouTube live playback" \
     chrome/browser/ui/views/yee:site_controls_browsertests
 fi
 gracefully_quit_yee
@@ -38,6 +38,7 @@ fi
   --test-launcher-timeout=2100000 \
   "--yee-live-youtube-mode=$MODE" \
   "--yee-live-youtube-seconds=${YEE_LIVE_YOUTUBE_SECONDS:-180}" \
+  "--yee-live-youtube-min-content-seconds=${YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS:-60}" \
   "--yee-live-youtube-report=$REPORT_DIR/$REPORT_NAME.json" \
   "${EXPERIMENT_ARGS[@]}"
-print "Live delivery evidence: $REPORT_DIR/$REPORT_NAME.json (inspect control ads before claiming coverage)."
+print "Playback gate passed. Live delivery evidence: $REPORT_DIR/$REPORT_NAME.json (inspect control ads before claiming coverage)."

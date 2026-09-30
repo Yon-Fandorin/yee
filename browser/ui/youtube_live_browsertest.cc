@@ -14,6 +14,7 @@
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/dns/mock_host_resolver.h"
@@ -21,10 +22,17 @@
 namespace yee {
 namespace {
 
-// This opt-in experiment records live delivery. An absent control ad is
-// inconclusive, rather than a passing ad-blocking assertion.
+// This opt-in test gates playback and records live ad delivery. An absent
+// control ad is inconclusive, rather than a passing ad-blocking assertion.
 class YouTubeLiveBrowserTest : public InProcessBrowserTest {
  public:
+  void SetUpInProcessBrowserTestFixture() override {
+    // EvalJs uses the frame's test IPC, not the legacy DOM controller. Do not
+    // expose that unused test-only object to a real site's scripts.
+    base::CommandLine::ForCurrentProcess()->RemoveSwitch(
+        switches::kDomAutomationController);
+  }
+
   void SetUpOnMainThread() override { host_resolver()->AllowDirectLookup("*"); }
 };
 
@@ -46,8 +54,17 @@ IN_PROC_BROWSER_TEST_F(YouTubeLiveBrowserTest, DISABLED_MidrollObservation) {
   if (!seconds_arg.empty()) {
     ASSERT_TRUE(base::StringToInt(seconds_arg, &seconds));
   }
-  ASSERT_GE(seconds, 60);
+  ASSERT_GE(seconds, 90);
   ASSERT_LE(seconds, 600);
+  int minimum_content_seconds = 60;
+  const std::string minimum_content_arg =
+      command_line->GetSwitchValueASCII("yee-live-youtube-min-content-seconds");
+  if (!minimum_content_arg.empty()) {
+    ASSERT_TRUE(
+        base::StringToInt(minimum_content_arg, &minimum_content_seconds));
+  }
+  ASSERT_GE(minimum_content_seconds, 60);
+  ASSERT_LT(minimum_content_seconds, seconds);
   const auto report_path =
       command_line->GetSwitchValuePath("yee-live-youtube-report");
   ASSERT_FALSE(report_path.empty());
@@ -74,6 +91,8 @@ IN_PROC_BROWSER_TEST_F(YouTubeLiveBrowserTest, DISABLED_MidrollObservation) {
         const result = {videoId: wanted, startedAt: new Date().toISOString(),
           samples: 0, contentSeconds: 0, preRoll: false, midRoll: false,
           adAudioDecoded: false, contentAudioDecoded: false,
+          environment: {webdriver: navigator.webdriver,
+            domAutomationController: 'domAutomationController' in window},
           seeks: [], events: [], done: false};
         window.__yeeLiveObservation = result;
         let previousTime = null, previousAudio = null, lastSignature = '',
@@ -161,10 +180,20 @@ IN_PROC_BROWSER_TEST_F(YouTubeLiveBrowserTest, DISABLED_MidrollObservation) {
             .ExtractString();
     auto observation = base::JSONReader::Read(result, base::JSON_PARSE_RFC);
     ASSERT_TRUE(observation && observation->is_dict());
+    const auto& playback = observation->GetDict();
+    const base::Value* playback_error = playback.Find("error");
+    EXPECT_TRUE(playback_error && playback_error->is_none()) << video_id;
+    EXPECT_FALSE(playback.FindBool("stalled").value_or(true)) << video_id;
+    EXPECT_GE(playback.FindDouble("contentSeconds").value_or(0),
+              minimum_content_seconds)
+        << video_id;
+    const auto* last = playback.FindDict("last");
+    EXPECT_TRUE(last && !last->FindBool("paused").value_or(true)) << video_id;
     observations.Append(std::move(*observation));
     base::DictValue report;
     report.Set("protection", enabled);
     report.Set("secondsPerVideo", seconds);
+    report.Set("minimumContentSeconds", minimum_content_seconds);
     report.Set("seek", seek);
     report.Set("observations", observations.Clone());
     base::ScopedAllowBlockingForTesting allow_report_write;
