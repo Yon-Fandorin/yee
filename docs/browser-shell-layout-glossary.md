@@ -121,6 +121,9 @@ Tab과 Agent Control은 인접한 Sidebar Header에 남는다.
 | **Agent Control** | Agent 상태를 간결하게 표시하고 상세 화면을 여는 버튼 | Yee agent `ToolbarButton` |
 | **Navigation Controls** | 현재 Tab의 탐색 기록과 로딩을 제어하는 버튼 묶음 | Back, Forward, Reload/Stop |
 | **Omnibox** | URL, 검색, 페이지 정보가 결합된 주소 입력 영역 | `LocationBarView`, Omnibox model |
+| **Site Identity** | Omnibox leading 영역에서 현재 문서의 보안·출처를 나타내고 Site Controls의 Page info를 여는 action | `LocationIconView` |
+| **Protection Action** | Omnibox trailing 영역에서 현재 사이트의 차단 상태와 차단 수를 나타내고 Site Controls의 Protection을 여는 shield action | Yee `SiteControlsButton` |
+| **Site Controls** | Protection과 Page info를 두 탭으로 제공하는 Yee 소유 native panel | Yee `SiteControlsBubble` |
 | **Extension Dock** | 표시가 허용된 확장 프로그램 action의 고정 영역 | extensions toolbar container |
 | **Toolbar Actions** | 공유, 다운로드, 메뉴처럼 페이지나 브라우저에 적용되는 후행 action | page/browser actions |
 

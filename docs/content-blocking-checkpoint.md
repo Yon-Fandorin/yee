@@ -6,9 +6,11 @@
 따른다. 중간 조사·수정 보고서는 이 문서에 필요한 결론만 합치고 제거했다.
 
 상태: 엔진·요청·페이지 연결, 전체 앱 빌드와 오프라인 회귀 검증, 실제 Yee의
-document-start 자동 주입 fixture는 통과했다. 실제 YouTube 대조군에서 프리롤 영상
-두 개를 재현했고, 차단 켠 앱에서는 프리롤 없이 본 영상이 시작됐다. 중간 광고,
-광고 음성, 영상 전체의 정상 재생은 아직 검증되지 않았다.
+document-start 자동 주입 fixture는 통과했다. 실제 YouTube 대조군에서 여러 영상을
+이동한 뒤 프리롤을 재현했고, 차단 켠 앱의 같은 탐색에서는 본 영상이 바로 시작됐다.
+장시간 영상의 여러 중간 지점과 30분 50초 전체 재생에서도 YouTube 광고 전환이나
+재생 중단은 없었다. 광고 음성과 동일 영상에서 중간 광고가 실제 전달되는 대조군은
+아직 검증되지 않았다.
 
 ## 반복 검토에서 유지한 원칙
 
@@ -51,10 +53,29 @@ Chromium의 `components/yee_content_blocking/`, `chrome/browser/yee_content_bloc
 `chrome/renderer/yee_content_blocking/`, `third_party/rust/yee_adblock/`로 동기화한다.
 installer는 owned mirror에서 삭제된 파일도 제거하며 original/generated 경로는 보존한다.
 
-Chromium originals에는 content client 호출, GN dependency와 Yee isolated world ID만
-추가했다. 기존 `0001`에 전체 변경을 재생성했다. `TabStripModel`, Omnibox와 Sidebar
-구조, Agent/MCP 실행 코드에는 차단 정책을 넣지 않았다. Yee의 페이지 필터링 world와
-MCP의 `CHROME_INTERNAL` world는 분리했다.
+Chromium originals에는 content client 호출, profile service 등록, renderer 설정 전달,
+Location Bar host와 GN dependency, Yee isolated world ID만 추가했다. 제품 UI와 사이트
+예외 정책은 Yee 소스에 둔다. 기존 `0001`에 전체 변경을 재생성했다. `TabStripModel`,
+Omnibox model과 Sidebar 구조, Agent/MCP 실행 코드에는 차단 정책을 넣지 않았다. Yee의
+페이지 필터링 world와 MCP의 `CHROME_INTERNAL` world는 분리했다.
+
+## 사이트 컨트롤
+
+일반 Yee 창의 주소창 오른쪽 shield는 Yee 소유 native Site Controls를 **Protection**
+탭으로 연다. 왼쪽 site identity는 같은 패널의 **Page info** 탭을 연다. Page info는
+현재 `WebContents`의 Chromium 보안 상태와 표시 URL을 읽고 해당 사이트 설정 화면으로
+이동하는 action을 제공하지만 Chromium Page Info bubble 자체를 제품 UI로 사용하지
+않는다. 분할 화면에서도 Location Bar가 전달한 실제 `WebContents`를 기준으로 한다.
+
+Protection 토글은 프로필 pref에 정확한 hostname 예외를 저장한다. UI thread의 service는
+같은 설정을 thread-safe snapshot으로 browser 요청 필터에 제공하고, navigation commit
+때 최상위 URL로 줄인 content-setting rule을 renderer에 전달한다. 토글 직후 현재 탭을
+reload하므로 network와 document-start 경로가 같은 예외 상태로 시작한다. shield badge는
+현재 primary page에서 network 단계가 실제 차단한 요청 수만 표시하고 page 전환 시
+초기화한다. 같은 사이트를 표시하는 다른 창의 shield도 pref 변경을 즉시 반영한다.
+기존 탭과 shared/service worker의 요청 factory는 유지하면서 요청마다 최신 snapshot을
+읽는다. 생성 시점의 프로필 예외 때문에 proxy를 생략하지 않으며, prerender와 BFCache의
+비표시 frame에서 보고한 차단은 현재 페이지 badge에 더하지 않는다.
 
 ## 요청 처리
 
@@ -79,8 +100,8 @@ host의 fetch를 허용하는 것을 확인한다.
 사이트 예외는 알려진 HTTP(S) top origin을 기준으로 한다. worker 등의 top metadata가
 opaque이고 initiator는 HTTP(S)이면 initiator로 판단한다. 둘 다 opaque이거나 internal
 문맥이면 적용하지 않는다. 알려진 web top origin에서 시작한 internal/opaque initiator는
-해당 top origin을 매칭 출처로 사용한다. 복수 client의 shared/service worker 및
-partition별 예외의 정확한 전달은 실제 통합 검증이 남아 있다.
+해당 top origin을 매칭 출처로 사용한다. 워커는 frame에 연결되지 않은 요청까지 임의의
+탭 badge에 귀속시키지 않는다. 서로 다른 storage partition의 상세 검증은 남아 있다.
 
 ## 문서 처리
 
@@ -107,7 +128,7 @@ CSS는 문서별 dedup과 64 KiB chunk/전체 4 MiB 제한을 적용하며 변�
 유지하면서 추가 enforce 정책으로 연결한다.
 기본 번들을 두 프로세스에 동일하게 포함하므로 document-start의 async Mojo 조회나
 download 대기가 없다. 초기화·dynamic CSS·iframe·CSP는 실앱 fixture에서 확인했다.
-BFCache 복원은 별도 실앱 확인이 남았다. callback 자체는 다른 문서의 준비 결과를 기다리지 않는다.
+callback 자체는 다른 문서의 준비 결과를 기다리지 않는다.
 
 ## 데이터와 배포 고지
 
@@ -167,11 +188,47 @@ Known player container는 arbitrary enumeration보다 먼저 처리하고, 기�
 본 영상을 시작했다. 디버깅 옵션이 없는 일반 Yee UI에서는 본 영상이 1분 38초까지
 연속 재생됐고, 8분 35초와 17분 10초로 이동한 뒤에도 정상 재생됐다.
 
+추가 수동 검증에서는 대조군의 첫 영상 뒤 `LDOuqa0H4UA`로 이동했을 때 COS의
+`스폰서`, `2/2`, 15초 광고 UI가 노출됐다. 새 차단 프로필의 같은 순서에서는 해당
+영상의 16분 31초 본편이 바로 재생됐고, 이어서 두 개의 다른 영상으로 이동해도
+프리롤이 나타나지 않았다. 29분 59초 영상 `uq14seOjILU`의 12분 59초, 16분 23초,
+18분 44초, 23분 52초, 28분 7초에서도 본편 제목·전체 길이·챕터가 유지됐으며
+스폰서 또는 광고 플레이어 UI가 나타나지 않았다. 별도의 새 프로필에서는 YouTube
+내부 링크로 세 번 이동한 뒤 30분 50초 본편이 41초까지 연속 재생됐다.
+
+이번 수정본의 일반 프로필에서도 `5EzB_2Qcakw` 본편이 2분 30초까지 진행됐고,
+같은 창의 Protection 패널에서 활성 상태와 31건 차단 표시를 확인했다.
+
+최종 전체 재생 검증은 원격 디버깅 없이 새 비로그인 차단 프로필에서 진행했다.
+30분 50초 영상 `mfmdXPT7nAM`을 시작부터 종료 화면까지 재생하며 1,950초 동안
+Yee 창 888장을 약 2초 간격으로 기록했고 캡처 실패는 없었다. 본편 중 화면 변화가
+매우 낮게 이어진 최장 구간은 6.6초였으며 영상 속 정적인 제품 측정 화면임을 확인했다.
+플레이어 영역 OCR에서 광고 관련 표식이 잡힌 것은 29분대 후반 단일 구간의 20장뿐이었다.
+이는 같은 본편 화면·제목을 유지한 채 제작자가 삽입한 Best Buy 협찬 구간에 표시된
+`AD` 워터마크였고, YouTube의 스폰서·광고 건너뛰기·광고주 UI는 아니었다. 본편은
+종료 화면까지 도달한 뒤 다음 추천 영상으로 전환됐다.
+
 임시 프로필과 원격 디버깅을 사용한 자동화에서는 Yee, Chrome, Brave가 모두
-42~44초 부근에서 같은 재생 오류를 보였다. 일반 Yee와 Brave에서는 재현되지 않아
-제품 회귀로 판정하지 않았고 자동화 환경 전용 복구도 제품 코드에 넣지 않았다.
-라이브 YouTube 결과는 광고 전달, 계정과 A/B 상태에 따라 달라질 수
-있으므로 중간 광고, 광고 음성 및 영상 전체 재생은 계속 별도 수용 항목으로 둔다.
+42~44초 부근에서 같은 재생 오류를 보였다. 후속 native 브라우저 실험에서도 원격
+디버깅 없이 오류가 재현됐다. 따라서 원격 디버깅만을 원인으로 확정하지 않는다.
+일반 Yee와 Brave의 기존 수동 재생에서는 재현되지 않았으며, 자동화 환경 전용 복구는
+제품 코드에 넣지 않았다.
+
+후속 실험은 `5EzB_2Qcakw`, `uq14seOjILU`, `mfmdXPT7nAM`을 같은 순서로 열고
+각각 최대 180초 동안 관측했다. 차단 끔의 두 번째 영상에는 프리롤과 증가하는 광고
+오디오 디코딩 수치가 나타났고, 차단 켬의 세 영상에서는 광고 전환이 없었다.
+본편 오디오 디코딩은 양쪽에서 확인됐다. 탐색 없이 첫 영상을 최대 90초 관측한
+추가 대조도 양쪽 모두 43~44초에 오류가 났다. 탐색 대조는 본편 약 40초 뒤 중간
+지점으로 이동하므로 이 오류 환경에서는 중간 광고 비교를 완수하지 못했다.
+디코딩 수치는 실제 출력 음성을 청취·녹음한 증거가 아니다. 동일 영상에서 실제
+중간 광고가 전달되는 대조군과 광고 출력 음성은 계속 별도 수용 항목으로 둔다.
+
+재실행 도구는 `tools/dev/test-youtube-live.sh off|on`이다. 기본 실행은 세 영상의
+연속 재생이며 `YEE_LIVE_YOUTUBE_SEEK=1`로 중간 탐색을 추가할 수 있다.
+`YEE_LIVE_YOUTUBE_SECONDS`는 영상별 60~600초, `YEE_LIVE_YOUTUBE_VIDEO`는 위 세 ID
+중 하나만 선택한다. opt-in native test는 일반 Site Controls gate에서 제외하며,
+결과 JSON은 `.local-build/youtube-live/`에 둔다. 테스트가 정상 종료됐다는 사실이나
+대조군에 광고가 없었다는 사실을 광고 차단 성공으로 취급하지 않는다.
 
 ### 체감 성능
 
@@ -195,7 +252,8 @@ Known player container는 arbitrary enumeration보다 먼저 처리하고, 기�
 `--disable-features=YeeContentBlocking`으로 전체 기능을 비활성화할 수 있다.
 `--yee-content-blocking-disabled-sites=example.com,www.example.org`는 정확한 top-level
 host 예외이며 대소문자는 구분하지 않고 renderer child에도 전달한다. ASCII/punycode
-host 입력을 사용하는 임시 CLI 제어다. UI·영구 프로필 설정은 아직 만들지 않았다.
+host 입력을 사용하는 임시 CLI 제어다. 제품 UI의 사이트별 예외는 위의 Site Controls에서
+프로필 pref에 저장하며, CLI 설정은 개발용 override로 유지한다.
 
 이번 consumer는 차단 결과, 일반 CSS와 generic class/id, 준비된 scriptlet,
 지원하는 대체 응답·URL 변환·removeparam을 연결한다. 엔진이 파싱할 수 있는 모든
@@ -203,14 +261,39 @@ host 입력을 사용하는 임시 CLI 제어다. UI·영구 프로필 설정은
 CSP response directive는 위의 document/subdocument 응답 경로에 연결했다.
 WebSocket/WebTransport 연결에는 Yee interceptor가 없다. `about:blank/srcdoc` 문서의
 cosmetic 처리는 frame의 상속 HTTP(S) origin으로 연결했으며 실제 fixture 탭에서 확인했다.
-HTTP(S) factory를 거치지 않는 service worker/cache
-응답, inherited/opaque 문맥과 prefetch/prerender의 상세 범위는 별도 통합 검증이 남았다.
+HTTP 캐시 응답은 요청 proxy를 통과한다. 반면 Service Worker가 CacheStorage에서 직접
+돌려주는 응답은 HTTP(S) factory를 거치지 않아 network 규칙으로 차단되지 않는다.
+이는 native fixture에서 확인한 경계이며, 차단 성공으로 집계하지 않는다.
+inherited/opaque 문맥과 speculative loading의 모든 조합을 검증한 상태는 아니다.
 일반 CSS와 document MutationObserver는 shadow root 내부를 관찰하거나 관통하지 않는다.
 쿠키 격리·fingerprinting·CNAME 방어까지 포함한 Shields 전체 구현은 아니다.
 
 ## 검증 기록
 
-- native core/settings/style/data 42개와 Mojo factory 47개, 총 **89개 통과**.
+- native core/settings/style/data 42개와 Mojo factory/profile service 50개, 총 **92개 통과**.
+- Site Controls 통합의 전체 앱 빌드와 Browser Surface fast gate **40/40** 통과.
+  새 Yee의 로컬 fixture에서 Protection 패널·9건 차단 badge와 site identity의 Page info
+  진입을 확인했다. 첫 inline script 이전 주입과 요청 차단·광고 요소 숨김을 확인했고,
+  서버에 차단 대상 요청이 도착하지 않았다. 가로 TabbedPane의 지원되지 않는 style로
+  패널 진입 시 종료되던 오류는 지원되는 icon style로 수정해 새 앱에서 재확인했다.
+  종료 중 toolbar가 이미 삭제된 `WebContents`를 참조하던 별도 크래시는 버튼이 탭의
+  삭제를 관찰하고 참조·구독을 해제하도록 수정했다. 새 Yee의 실제 종료 후 해당
+  프로세스의 추가 크래시 보고서가 생성되지 않았다.
+- `./tools/dev/test-site-controls.sh`의 집중 브라우저 통합 테스트 **20/20** 통과.
+  native 토글을 눌러 reload 뒤 network 차단과 document-start 주입·광고 요소 숨김이
+  함께 켜지고 꺼지는지 확인했다. PRE test와 후속 프로세스로 hostname 예외의
+  재시작 유지, Page info 탭 전환·Site settings 이동, 탭 삭제 뒤 버튼 갱신,
+  패널이 열린 창의 종료도 확인했다. 30회 탭 전환, 분할 화면의 정확한 pane,
+  다중 창의 hostname 예외·badge 갱신, 시크릿 예외의 일반 프로필 격리도 통과했다.
+  UI 도구의 팝업 클릭·화면 캡처 오류로 막혔던 후속 동작은 이 native 브라우저
+  테스트로 검증했다.
+- 같은 gate에서 dedicated worker, 두 client를 연결한 shared/service worker의
+  차단 끔→켬→끔 전환, HTTP 캐시와 link prefetch의 예외, prerender의 예외·activation과
+  현재 page badge 분리, BFCache의 같은 frame·문서 상태 복원을 검증했다.
+  끈 상태에서 생성한 factory가 다시 켠 설정을 적용하지 않던 오류와 prerender 요청이
+  primary page badge에 섞이던 오류를 재현하고 수정한 뒤 전체 gate를 다시 통과했다.
+  20개에는 Service Worker의 직접 캐시 응답이 network 필터 밖이라는 경계를 확인하는
+  테스트도 포함되며, 해당 응답의 광고 차단이 구현됐다는 의미는 아니다.
 - tooling **13개 통과**. 공개 source archive 129개 파일과 배포 파일을 byte 단위로 확인하고,
   vendored manifest 입력이 모두 Git에 포함되는지 검사했다.
 - 실제 엔진 출력의 Chrome fixture **1,239개 assertion**, 기존 Web API/CSS/MP4 fixture
@@ -223,8 +306,13 @@ HTTP(S) factory를 거치지 않는 service worker/cache
   요청 차단, 정상 응답, cosmetic, iframe, CSP와 예외를 검증했다.
 - 실제 YouTube 비로그인 영상에서 차단 끔·켬의 광고 데이터 차이를 확인했다.
   추가 탐색의 MrBeast 영상에서 대조군의 15초·30초 프리롤 두 개와 차단 켠 앱의
-  광고 없는 본 영상 시작을 확인했다. 중간 광고·광고 음성·영상 전체 재생은 검증하지 않았다.
-- owned 입력 167개와 원본 116개 hash, Chromium whitespace와 `0001` reverse apply 검증 통과.
+  광고 없는 본 영상 시작을 확인했다. 후속 재검증에서도 대조군의 두 번째 영상에서
+  15초 `2/2` 스폰서 광고가 나타났고 차단 켠 같은 탐색에서는 본편이 바로 시작됐다.
+  장시간 영상의 다섯 지점과 별도 영상의 41초 연속 재생에서도 광고 전환이나 중단은
+  없었다. 이어서 30분 50초 본편 전체를 약 2초 간격의 888개 창 프레임으로 확인했고,
+  YouTube 광고 UI나 재생 중단 없이 종료 화면에 도달했다. 동일 영상의 중간 광고
+  대조군과 광고 음성은 검증하지 않았다.
+- owned mirror의 원본 byte 일치, Chromium whitespace와 `0001` reverse apply 검증 통과.
 
 세부 대조군과 배포 파일 수는
 [현재 패키지 설계](content-blocking-private-core-filter-data.md)에 둔다.

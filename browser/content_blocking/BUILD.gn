@@ -1,16 +1,34 @@
 import("//testing/test.gni")
 
 source_set("browser") {
-  public = [ "filtering_url_loader_factory.h" ]
-  sources = [ "filtering_url_loader_factory.cc" ]
+  public = [
+    "content_blocking_service.h",
+    "content_blocking_service_factory.h",
+    "content_blocking_tab_helper.h",
+    "filtering_url_loader_factory.h",
+  ]
+  sources = [
+    "content_blocking_service.cc",
+    "content_blocking_service_factory.cc",
+    "content_blocking_tab_helper.cc",
+    "filtering_url_loader_factory.cc",
+  ]
   public_deps = [
     "//components/yee_content_blocking:core",
     "//components/yee_content_blocking:notices",
+    "//content/public/browser",
     "//services/network/public/cpp",
     "//url",
   ]
   deps = [
     "//base",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//components/content_settings/core/browser",
+    "//components/content_settings/core/common",
+    "//components/keyed_service/core",
+    "//components/pref_registry",
+    "//components/prefs",
     "//content/public/common",
     "//mojo/public/cpp/bindings",
     "//mojo/public/cpp/system",
@@ -20,11 +38,15 @@ source_set("browser") {
 }
 
 test("yee_filtering_factory_unittests") {
-  sources = [ "filtering_url_loader_factory_unittest.cc" ]
+  sources = [
+    "content_blocking_service_unittest.cc",
+    "filtering_url_loader_factory_unittest.cc",
+  ]
   deps = [
     ":browser",
     "//base/test:run_all_unittests",
     "//base/test:test_support",
+    "//components/prefs:test_support",
     "//mojo/core/embedder",
     "//net/traffic_annotation:test_support",
     "//services/network:test_support",

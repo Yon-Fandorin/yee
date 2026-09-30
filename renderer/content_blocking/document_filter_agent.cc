@@ -8,6 +8,7 @@
 #include "base/values.h"
 #include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/renderer/yee_content_blocking/scripts.h"
+#include "components/content_settings/renderer/content_settings_agent_impl.h"
 #include "components/yee_content_blocking/engine.h"
 #include "components/yee_content_blocking/settings.h"
 #include "content/public/renderer/render_frame.h"
@@ -55,6 +56,30 @@ std::optional<std::vector<std::string>> ReadStrings(
   }
   return result;
 }
+
+bool EnabledForFrame(blink::WebLocalFrame* frame) {
+  if (!frame)
+    return false;
+  const GURL site = url::Origin(frame->Top()->GetSecurityOrigin()).GetURL();
+  if (!EnabledForSite(site))
+    return false;
+  content::RenderFrame* render_frame =
+      content::RenderFrame::FromWebFrame(frame);
+  auto* settings_agent =
+      content_settings::ContentSettingsAgentImpl::Get(render_frame);
+  if (!settings_agent)
+    return true;
+  RendererContentSettingRules* rules =
+      settings_agent->GetRendererContentSettingRules();
+  if (!rules || rules->yee_content_blocking_rules.empty())
+    return true;
+  for (const ContentSettingPatternSource& rule :
+       rules->yee_content_blocking_rules) {
+    if (rule.secondary_pattern.Matches(site))
+      return rule.GetContentSetting() != CONTENT_SETTING_BLOCK;
+  }
+  return true;
+}
 }  // namespace
 void DocumentFilterAgent::ApplyGeneric(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -64,8 +89,7 @@ void DocumentFilterAgent::ApplyGeneric(
   // Derive the live frame from the executing context. No retained frame pointer
   // can survive document/frame destruction through a JavaScript closure.
   auto* frame = blink::WebLocalFrame::FrameForContext(context);
-  if (!frame ||
-      !EnabledForSite(url::Origin(frame->Top()->GetSecurityOrigin()).GetURL()))
+  if (!EnabledForFrame(frame))
     return;
   auto classes = ReadStrings(context, args[0], 256);
   auto ids = ReadStrings(context, args[1], 256);
@@ -166,8 +190,7 @@ void DocumentFilterAgent::Apply() {
   GURL url(frame->GetDocument().Url());
   if (url.IsAboutBlank() || url.IsAboutSrcdoc())
     url = url::Origin(frame->GetSecurityOrigin()).GetURL();
-  if (!url.SchemeIsHTTPOrHTTPS() ||
-      !EnabledForSite(url::Origin(frame->Top()->GetSecurityOrigin()).GetURL()))
+  if (!url.SchemeIsHTTPOrHTTPS() || !EnabledForFrame(frame))
     return;
   InitializeIsolatedWorld();
   auto* isolate = frame->GetAgentGroupScheduler()->Isolate();

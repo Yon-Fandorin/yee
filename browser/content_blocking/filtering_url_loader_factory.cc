@@ -10,8 +10,16 @@
 #include "base/task/thread_pool.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/yee_content_blocking/content_blocking_service.h"
+#include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
+#include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
 #include "components/yee_content_blocking/engine.h"
 #include "components/yee_content_blocking/settings.h"
+#include "content/public/browser/browser_context.h"
+#include "content/public/browser/page.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/web_contents.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "mojo/public/cpp/system/data_pipe_producer.h"
@@ -38,6 +46,9 @@ struct FactoryContext {
   url::Origin initiator;
   GURL top_site;
   FactoryPurpose purpose;
+  scoped_refptr<ContentBlockingSettingsSnapshot> settings;
+  content::GlobalRenderFrameHostId frame_id;
+  scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner;
 };
 
 std::string_view RequestType(const network::ResourceRequest& request) {
@@ -305,7 +316,8 @@ class FilteringRequest final : public network::mojom::URLLoader,
     if (!url.SchemeIsHTTPOrHTTPS())
       return {};
     const auto [site, source] = PolicyContext(url);
-    if (!EnabledForSite(site))
+    if (context_.settings ? !context_.settings->EnabledForSite(site)
+                          : !EnabledForSite(site))
       return {};
     return BundledEngineForCurrentSequence().Evaluate(
         url.spec(), source.spec(), RequestType(request_), method);
@@ -326,6 +338,7 @@ class FilteringRequest final : public network::mojom::URLLoader,
     return target;
   }
   void CompleteDecision(const NetworkDecision& decision) {
+    ReportBlockedRequest();
     if (decision.replacement.empty()) {
       CompleteBlocked();
       return;
@@ -403,7 +416,8 @@ class FilteringRequest final : public network::mojom::URLLoader,
         !head.parsed_headers)
       return;
     const auto [site, source] = PolicyContext(request_.url);
-    if (!EnabledForSite(site))
+    if (context_.settings ? !context_.settings->EnabledForSite(site)
+                          : !EnabledForSite(site))
       return;
     const auto directives = BundledEngineForCurrentSequence().CspDirectives(
         request_.url.spec(), source.spec(), type, request_.method);
@@ -423,7 +437,32 @@ class FilteringRequest final : public network::mojom::URLLoader,
       head.parsed_headers->content_security_policy.push_back(std::move(policy));
   }
   void CompleteBlocked() {
+    ReportBlockedRequest();
     CompleteError(net::ERR_BLOCKED_BY_CLIENT);
+  }
+  void ReportBlockedRequest() {
+    if (reported_blocked_request_ || !context_.frame_id ||
+        !context_.ui_task_runner) {
+      return;
+    }
+    reported_blocked_request_ = true;
+    context_.ui_task_runner->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](content::GlobalRenderFrameHostId frame_id) {
+              content::RenderFrameHost* frame =
+                  content::RenderFrameHost::FromID(frame_id);
+              if (!frame || !frame->GetPage().IsPrimary())
+                return;
+              content::WebContents* contents =
+                  content::WebContents::FromRenderFrameHost(frame);
+              if (!contents)
+                return;
+              ContentBlockingTabHelper::CreateForWebContents(contents);
+              ContentBlockingTabHelper::FromWebContents(contents)
+                  ->RecordBlockedRequest();
+            },
+            context_.frame_id));
   }
   void CompleteError(int error) {
     client_->OnComplete(network::URLLoaderCompletionStatus(error));
@@ -451,6 +490,7 @@ class FilteringRequest final : public network::mojom::URLLoader,
   std::optional<std::pair<net::RequestPriority, int32_t>> priority_;
   bool pending_rewrite_ = false;
   bool awaiting_redirect_ = false;
+  bool reported_blocked_request_ = false;
   std::unique_ptr<mojo::DataPipeProducer> producer_;
 };
 
@@ -498,7 +538,9 @@ scoped_refptr<base::SingleThreadTaskRunner> MatchingRunner() {
 void MaybeAppendFilteringFactory(network::URLLoaderFactoryBuilder& builder,
                                  const url::Origin& initiator,
                                  const url::Origin& top_site,
-                                 FactoryPurpose purpose) {
+                                 FactoryPurpose purpose,
+                                 content::BrowserContext* browser_context,
+                                 content::GlobalRenderFrameHostId frame_id) {
   // A known web top-level origin owns site exceptions. Opaque factory metadata
   // may still have a web initiator (workers); never invent a web context for
   // browser-owned or entirely opaque traffic.
@@ -509,9 +551,20 @@ void MaybeAppendFilteringFactory(network::URLLoaderFactoryBuilder& builder,
           : (top_site.opaque() ? initiator_url : top_site.GetURL());
   // Navigation factories are browser-trusted and deliberately carry opaque
   // metadata. Their HTTP/top-site policy is evaluated when each request starts.
+  scoped_refptr<ContentBlockingSettingsSnapshot> settings;
+  if (browser_context) {
+    Profile* profile = Profile::FromBrowserContext(browser_context);
+    if (auto* service = ContentBlockingServiceFactory::GetForProfile(profile))
+      settings = service->settings_snapshot();
+  }
+  // Only immutable process overrides may omit a subresource proxy. Profile
+  // exceptions can change while existing tabs and shared/service workers keep
+  // their factories alive; each request reads the current settings snapshot.
   if (!base::FeatureList::IsEnabled(kYeeContentBlocking) ||
       (purpose == FactoryPurpose::kSubresource && !EnabledForSite(site)))
     return;
+  scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner =
+      base::SingleThreadTaskRunner::GetCurrentDefault();
   auto [receiver, remote] = builder.Append();
   MatchingRunner()->PostTask(
       FROM_HERE,
@@ -523,6 +576,7 @@ void MaybeAppendFilteringFactory(network::URLLoaderFactoryBuilder& builder,
                 std::move(receiver), std::move(remote), std::move(context));
           },
           std::move(receiver), std::move(remote),
-          FactoryContext{initiator, site, purpose}));
+          FactoryContext{initiator, site, purpose, std::move(settings),
+                         frame_id, std::move(ui_task_runner)}));
 }
 }  // namespace yee::content_blocking

@@ -121,6 +121,7 @@ source_set("yee_ui") {
     "page_viewport_hosts.h",
     "sidebar_footer.h",
     "sidebar_sections.h",
+    "site_controls.h",
     "split_pane_controls.h",
     "vertical_group_color_mark.h",
     "vertical_tab_text_view.h",
@@ -138,6 +139,7 @@ source_set("yee_ui") {
     "page_viewport_hosts.cc",
     "sidebar_footer.cc",
     "sidebar_sections.cc",
+    "site_controls.cc",
     "split_pane_controls.cc",
     "vertical_group_color_mark.cc",
     "vertical_tab_text_view.cc",
@@ -152,6 +154,7 @@ source_set("yee_ui") {
     ":multi_contents_geometry",
     ":page_viewport_geometry",
     ":page_viewport_migration",
+    "//content/public/browser",
     "//ui/gfx/animation",
     "//ui/views",
   ]
@@ -161,15 +164,20 @@ source_set("yee_ui") {
     "//base/version_info",
     "//cc/paint",
     "//chrome/app/vector_icons",
+    "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/controls",
+    "//chrome/browser/ui/views/location_bar",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/toolbar",
+    "//chrome/browser/yee_content_blocking:browser",
+    "//components/security_state/content",
+    "//components/security_state/core",
     "//components/tabs:public",
+    "//components/url_formatter",
     "//components/vector_icons",
     "//components/viz/common",
-    "//content/public/browser",
     "//net",
     "//skia",
     "//ui/base",
@@ -178,5 +186,38 @@ source_set("yee_ui") {
     "//ui/compositor_extra",
     "//ui/gfx",
     "//ui/gfx/animation",
+  ]
+}
+
+# Keep Site Controls lifecycle and renderer-policy checks independent of the
+# full browser_tests/interactive_ui_tests source lists.
+test("site_controls_browsertests") {
+  sources = [
+    "site_controls_browsertest.cc",
+    "youtube_live_browsertest.cc",
+  ]
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  deps = [
+    ":yee_ui",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/yee_content_blocking:browser",
+    "//chrome/renderer",
+    "//chrome/test:browser_tests_runner",
+    "//chrome/test:test_support",
+    "//chrome/test:test_support_ui",
+    "//components/prefs",
+    "//components/split_tabs",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/views:test_support",
+  ]
+  data_deps = [
+    "//chrome:browser_tests_pak",
+    "//chrome:packed_resources",
+    "//ui/resources:ui_test_pak_data",
   ]
 }

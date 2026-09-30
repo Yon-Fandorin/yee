@@ -15,6 +15,7 @@ source_set("renderer") {
     ":scripts",
     "//base",
     "//chrome/common",
+    "//components/content_settings/renderer",
     "//gin",
   ]
   public_deps = [
