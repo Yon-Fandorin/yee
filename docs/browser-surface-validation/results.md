@@ -48,21 +48,15 @@ WindowServer에는 화면의 CGWindow가 있었지만 Computer Use가 로컬 Chr
 | 1152×768, 호스트 이전 Contents와 오른쪽 pane의 오른쪽 도킹 DevTools | `f18-host-migration-split-devtools-real-app.jpeg` | 안정된 열림·닫힘 픽셀 통과: 중첩 Contents와 직접 DevTools 분기가 소유 pane만 분할했다. DevTools를 닫으면 충돌·경계 이탈 없이 Contents가 pane 전체로 복원됨 |
 | 768×875, 두 개발 브라우저 창의 WebUI Omnibox popup과 반복 활성화 전환 | `macos-real-app-omnibox-multi-window-visibility-20260903.jpeg` | F26 수정 후 통과: popup 열기·비활성화 시 닫기·창 복귀 후 입력 재개 확인했다. 네 차례 창 전환에서 응답을 유지하고 로그에 fatal·`ValidatePopupState`가 없으며 새 macOS 충돌 보고서가 발생하지 않음 |
 
-초기 전체 화면 전환 캡처는 타이밍 자료로 보존한다. 안정된 결과 판단에는 후속
-최종 프레임과 종료·재진입 왕복 캡처가 필요했다.
+전체 화면 결과는 위의 최종 재현 프레임과 종료·재진입 왕복 캡처를 기준으로 판단했다.
 
 ## 보존한 진단 자료
 
-- `sidebar-collapse-animation-contact-sheet.png`,
-  `sidebar-expand-animation-contact-sheet.png`: 수정 전 타이밍·탐색 보조 자료
-  실제 실패 근거는 겹침이 나타나는 중간 프레임이다.
-- `sidebar-expand-animation-fixed-contact-sheet.png`,
-  `sidebar-expand-animation-fixed-transition-contact-sheet.png`: 비교용 중간 해석 자료
-  수용 근거는 네이티브 타임스탬프 contact sheet와 위의 세 프레임이다.
-- `split-expanded-fullscreen.jpeg`, `split-expanded-fullscreen-final.jpeg`:
-  초기·대체 타이밍 프레임이다. 결과 판단에는 위에서 인용한 재현·왕복 캡처를 사용한다.
-- `split-expanded-picker-infobar.jpeg`: 재현을 위한 InfoBar 선택기 진단 상태
-  통과 근거로 사용하지 않는다.
+- Sidebar 수정 전 녹화와 Toolbar 겹침 중간 프레임은 F23 실패 근거다.
+  수정 후 녹화, 네이티브 타임스탬프 contact sheet와 세 중간 프레임은 수정 결과의 근거다.
+- 최소 폭 Find Bar의 수정 전 LTR·RTL 캡처와 수정 후 캡처는 F10 회귀 비교 근거다.
+- 전체 화면의 최종 재현·왕복 캡처는 안정된 상태의 근거다.
+  중복 contact sheet, 초기 타이밍 캡처와 InfoBar 선택기 캡처는 정리했다.
 
 ## 당시 자동 회귀 검증
 
