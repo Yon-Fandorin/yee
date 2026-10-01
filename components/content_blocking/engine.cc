@@ -6,6 +6,7 @@
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/sequence_checker.h"
+#include "base/trace_event/trace_event.h"
 #include "components/yee_content_blocking/bundled_rules.h"
 #include "components/yee_content_blocking/filter_data.h"
 #include "components/yee_content_blocking/rust/src/lib.rs.h"
@@ -30,17 +31,29 @@ std::vector<std::string> Strings(const rust::Vec<rust::String>& strings) {
     result.emplace_back(s.data(), s.size());
   return result;
 }
+rust::Box<FilterEngine> CreateFilterEngine(
+    std::string_view filters, std::string_view resources,
+    std::string_view trusted_filters, std::string_view community_resources,
+    std::string_view compiled_filters = {}) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.CreateEngine");
+  return new_engine(Str(filters), Str(resources), Str(trusted_filters),
+                    Str(community_resources),
+                    rust::Slice<const uint8_t>(
+                        reinterpret_cast<const uint8_t*>(compiled_filters.data()),
+                        compiled_filters.size()));
+}
 }  // namespace
 
 struct Engine::Impl {
   Impl(std::string_view filters, std::string_view resources,
-       std::string_view trusted_filters, std::string_view community_resources)
-      : engine(new_engine(Str(filters), Str(resources), Str(trusted_filters),
-                          Str(community_resources))) {
+       std::string_view trusted_filters, std::string_view community_resources,
+       std::string_view compiled_filters)
+      : engine(CreateFilterEngine(filters, resources, trusted_filters,
+                                  community_resources, compiled_filters)) {
     if (!engine->resources_valid() && !community_resources.empty()) {
       LOG(ERROR) << "Yee community resources conflict with engine resources; "
                     "using bundled baseline";
-      engine = new_engine(Str(filters), Str(resources), Str(""), Str(""));
+      engine = CreateFilterEngine(filters, resources, "", "");
     }
     CHECK(engine->resources_valid());
   }
@@ -50,9 +63,10 @@ struct Engine::Impl {
 
 Engine::Engine(std::string_view filters, std::string_view resources,
                std::string_view trusted_filters,
-               std::string_view community_resources)
+               std::string_view community_resources,
+               std::string_view compiled_filters)
     : impl_(std::make_unique<Impl>(filters, resources, trusted_filters,
-                                  community_resources)) {}
+                                  community_resources, compiled_filters)) {}
 Engine::~Engine() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(impl_->sequence_checker);
 }
@@ -69,6 +83,7 @@ NetworkDecision Engine::Evaluate(std::string_view url,
                                   std::string_view source,
                                   std::string_view type,
                                   std::string_view method) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.MatchRequest");
   DCHECK_CALLED_ON_VALID_SEQUENCE(impl_->sequence_checker);
   auto result = impl_->engine->evaluate(Str(url), Str(source), Str(type), Str(method));
   return {result.blocked,
@@ -77,6 +92,7 @@ NetworkDecision Engine::Evaluate(std::string_view url,
 }
 
 PageRules Engine::RulesForPage(std::string_view url) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.RulesForPage");
   DCHECK_CALLED_ON_VALID_SEQUENCE(impl_->sequence_checker);
   auto rules = impl_->engine->document_rules(Str(url));
   std::string script;
@@ -96,6 +112,7 @@ std::string Engine::CspDirectives(std::string_view url,
                                   std::string_view source,
                                   std::string_view type,
                                   std::string_view method) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.CspDirectives");
   DCHECK_CALLED_ON_VALID_SEQUENCE(impl_->sequence_checker);
   const auto directives = impl_->engine->csp_directives(Str(url), Str(source),
                                                         Str(type), Str(method));
@@ -106,21 +123,28 @@ std::vector<std::string> Engine::GenericSelectors(
     const std::vector<std::string>& classes,
     const std::vector<std::string>& ids,
     const std::vector<std::string>& exceptions) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.GenericSelectors");
   DCHECK_CALLED_ON_VALID_SEQUENCE(impl_->sequence_checker);
   return Strings(impl_->engine->generic_selectors(
       RustStrings(classes), RustStrings(ids), RustStrings(exceptions)));
 }
 
-Engine& BundledEngineForCurrentSequence() {
-  // Browser factories share one dedicated sequence; renderer frames share
-  // their main thread. Never transfer an upstream single-thread engine.
-  thread_local base::NoDestructor<Engine> engine(
+std::unique_ptr<Engine> CreateBundledEngine() {
+  return std::make_unique<Engine>(
       TestRulesEnabled()
           ? std::string(kBundledFilters) + "\n" + std::string(kTestFilters)
           : std::string(kBundledFilters),
       TestRulesEnabled() ? kTestResources : kBundledResources,
-      CommunityFilterData().filters, CommunityFilterData().resources);
-  return *engine;
+      CommunityFilterData().filters, CommunityFilterData().resources,
+      TestRulesEnabled() ? std::string_view()
+                         : std::string_view(CommunityFilterData().compiled_filters));
+}
+Engine& BundledEngineForCurrentSequence() {
+  // Browser request matching uses one dedicated sequence. Never transfer an
+  // upstream single-thread engine; renderer document queries own a worker.
+  thread_local base::NoDestructor<std::unique_ptr<Engine>> engine(
+      CreateBundledEngine());
+  return **engine;
 }
 std::string_view BundleGeneration() {
   static const base::NoDestructor<std::string> generation(

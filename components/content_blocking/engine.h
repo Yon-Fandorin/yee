@@ -28,7 +28,8 @@ class Engine {
   Engine(std::string_view filters,
          std::string_view resources = {},
          std::string_view trusted_filters = {},
-         std::string_view community_resources = {});
+         std::string_view community_resources = {},
+         std::string_view compiled_filters = {});
   ~Engine();
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
@@ -55,6 +56,7 @@ class Engine {
   std::unique_ptr<Impl> impl_;
 };
 
+std::unique_ptr<Engine> CreateBundledEngine();
 Engine& BundledEngineForCurrentSequence();
 std::string_view BundleGeneration();
 

@@ -14,8 +14,13 @@ function enqueue(root, subtree = true) {
   else rescan = true;
   schedule();
 }
+let inFlight = false;
+globalThis.__yeeGenericComplete = () => {
+  inFlight = false;
+  if (work.length || rescan) schedule();
+};
 function schedule() {
-  if (scheduled) return;
+  if (scheduled || inFlight) return;
   scheduled = true;
   if (typeof requestIdleCallback === 'function') requestIdleCallback(flush, {timeout: 100});
   else setTimeout(flush, 25);
@@ -44,7 +49,10 @@ function flush() {
       if (bounded(name) && !seenClasses.has(name)) { seenClasses.add(name); classes.push(name); }
     } else item.element = null;
   }
-  if (classes.length || ids.length) __yeeApplyGeneric(classes, ids, exceptions);
+  // One worker batch per document. Mutations stay in the bounded queue while
+  // it is pending, then resume after the native reply applies its selectors.
+  if (classes.length || ids.length)
+    inFlight = __yeeApplyGeneric(classes, ids, exceptions) === true;
   if (seenClasses.size > 10000) seenClasses.clear();
   if (seenIds.size > 10000) seenIds.clear();
   if (!work.length && rescan) {

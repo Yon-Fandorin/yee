@@ -2,6 +2,9 @@
 
 브라우저와 렌더러가 함께 사용하는 코드를 둔다.
 현재 `content_blocking/`에 차단 엔진, 설정, 필터 데이터와 라이선스 안내 생성 코드가 있다.
+`tasks/worker_owned.h`는 `base::SequenceBound`의 객체를 factory로 작업 sequence에서
+생성·소유·실행하는 공통 어댑터다. 전용 스레드 선택과 작업 priority·shutdown 정책은
+consumer가 정하며, DOM이나 제품별 동기 대기 규칙은 공통 어댑터에 포함하지 않는다.
 
 | 파일·디렉터리 | 역할 |
 | --- | --- |
@@ -16,6 +19,7 @@
 네트워크 요청과 페이지 처리의 연결은
 [`browser/`](../browser/README.md), [`renderer/`](../renderer/README.md)가 담당한다.
 
-`content_blocking/`은 Chromium의 `components/yee_content_blocking/`에 복사된다.
+`content_blocking/`은 Chromium의 `components/yee_content_blocking/`,
+`tasks/`는 `components/yee_tasks/`에 복사된다.
 경로는 [`build/overlay.json`](../build/overlay.json)에서 관리하며 이 README는 복사하지 않는다.
 지원 기능과 남은 테스트는 [콘텐츠 차단 checkpoint](../docs/content-blocking-checkpoint.md)에 있다.

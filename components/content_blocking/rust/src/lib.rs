@@ -22,7 +22,7 @@ mod ffi {
 
     extern "Rust" {
         type FilterEngine;
-        fn new_engine(filters: &str, resources: &str, trusted_filters: &str, community_resources: &str) -> Box<FilterEngine>;
+        fn new_engine(filters: &str, resources: &str, trusted_filters: &str, community_resources: &str, compiled_filters: &[u8]) -> Box<FilterEngine>;
         fn community_resources_valid(resources: &str, bundled: &str) -> bool;
         fn resources_valid(self: &FilterEngine) -> bool;
         fn check(self: &FilterEngine, url: &str, source: &str, kind: &str, method: &str) -> bool;
@@ -48,16 +48,19 @@ pub struct FilterEngine(Engine, bool);
 
 // Original scriptlets are external JavaScript resources, not Rust dependencies.
 // Only the separately supplied community list receives uBO trusted permission.
-pub fn new_engine(filters: &str, resources: &str, trusted_filters: &str, community_resources: &str) -> Box<FilterEngine> {
-    let mut set = adblock::lists::FilterSet::new(false);
-    set.add_filter_list(filters.to_owned(), ParseOptions::default());
-    if !trusted_filters.is_empty() {
-        set.add_filter_list(trusted_filters.to_owned(), ParseOptions {
-            permissions: PermissionMask::from_bits(1),
-            ..ParseOptions::default()
-        });
+pub fn new_engine(filters: &str, resources: &str, trusted_filters: &str, community_resources: &str, compiled_filters: &[u8]) -> Box<FilterEngine> {
+    let mut engine = Engine::default();
+    if compiled_filters.is_empty() || engine.deserialize(compiled_filters).is_err() {
+        let mut set = adblock::lists::FilterSet::new(false);
+        set.add_filter_list(filters.to_owned(), ParseOptions::default());
+        if !trusted_filters.is_empty() {
+            set.add_filter_list(trusted_filters.to_owned(), ParseOptions {
+                permissions: PermissionMask::from_bits(1),
+                ..ParseOptions::default()
+            });
+        }
+        engine = Engine::new_with_filter_set(set);
     }
-    let mut engine = Engine::new_with_filter_set(set);
     let storage = resource_storage(resources, community_resources);
     let valid = storage.is_some();
     if let Some(storage) = storage { engine.use_resource_storage(storage); }

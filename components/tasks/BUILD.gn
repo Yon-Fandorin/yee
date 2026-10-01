@@ -1,0 +1,15 @@
+source_set("tasks") {
+  public = [ "worker_owned.h" ]
+  sources = public
+  public_deps = [ "//base" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "worker_owned_unittest.cc" ]
+  deps = [
+    ":tasks",
+    "//base/test:test_support",
+    "//testing/gtest",
+  ]
+}

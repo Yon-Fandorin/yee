@@ -31,6 +31,7 @@ yee/
 │   └── content_blocking/             브라우저 프로세스 연결
 ├── renderer/content_blocking/        렌더러 연결·주입 스크립트
 ├── components/content_blocking/      공용 콘텐츠 차단 기능
+├── components/tasks/                 작업 sequence의 객체 생성·소유 어댑터
 ├── third_party/yee_adblock/           vendored Rust 의존성·라이선스·검증 manifest
 ├── patches/                          Chromium 원본 변경: 0001·0002·0003
 ├── branding/
@@ -71,6 +72,7 @@ yee/
 | `browser/content_blocking/` | `chrome/browser/yee_content_blocking/` |
 | `renderer/content_blocking/` | `chrome/renderer/yee_content_blocking/` |
 | `components/content_blocking/` | `components/yee_content_blocking/` |
+| `components/tasks/` | `components/yee_tasks/` |
 | `third_party/yee_adblock/` | `third_party/rust/yee_adblock/` |
 
 소스의 내용, Chromium include 경로, GN label은 유지한다. 새 소유 디렉토리는

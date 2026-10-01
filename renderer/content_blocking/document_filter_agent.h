@@ -15,6 +15,7 @@ class DocumentFilterAgent
  public:
   explicit DocumentFilterAgent(content::RenderFrame* frame);
   ~DocumentFilterAgent() override;
+  static void PrepareEngine();
   // Initial creation needs frame lifetime; normal document-start also guards
   // document replacement before Chromium continues its extension callbacks.
   static bool ApplyAtDocumentStart(content::RenderFrame* frame,
@@ -25,6 +26,7 @@ class DocumentFilterAgent
  private:
   void Apply();
   void InsertSelectors(const std::vector<std::string>& selectors);
+  void InsertGenericSelectors(std::vector<std::string> selectors);
   static void ApplyGeneric(const v8::FunctionCallbackInfo<v8::Value>& args);
   bool applied_ = false;
   SelectorStyles styles_;

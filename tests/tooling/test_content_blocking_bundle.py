@@ -77,20 +77,31 @@ class CommunityPack(unittest.TestCase):
             data = root / "data"
             shutil.copytree(COMMUNITY, data)
             (data / "private-integration.cc").write_text("PRIVATE_SENTINEL_DO_NOT_PUBLISH")
-            first = root / "first"
-            PACK.build(data, first)
-            extracted = root / "extracted"
-            with tarfile.open(first / PACK.ARCHIVE) as archive:
-                names = archive.getnames()
-                self.assertEqual(len(names), 129)
-                self.assertFalse(any(name.endswith((".cc", ".h", ".rs")) for name in names))
-                self.assertTrue(all("PRIVATE_SENTINEL_DO_NOT_PUBLISH" not in archive.extractfile(name).read().decode(errors="replace") for name in names))
-                archive.extractall(extracted, filter="data")
-            second = root / "second"
-            subprocess.run([sys.executable, str(extracted / "build_filter_pack.py"),
-                            str(extracted / "data"), str(second)], check=True)
-            for name in [PACK.RULES, PACK.RESOURCES, PACK.MANIFEST, PACK.NOTICES, PACK.ARCHIVE]:
-                self.assertEqual((first / name).read_bytes(), (second / name).read_bytes(), name)
+            bundled = root / "bundled-filters.txt"
+            generation = root / "bundled-generation.txt"
+            bundled.write_text("||baseline.test^\n")
+            generation.write_text("opaque-bundle-generation")
+            for include_cache_inputs in [False, True]:
+                with self.subTest(cache_inputs=include_cache_inputs):
+                    case = root / ("cache" if include_cache_inputs else "text")
+                    first, extracted, second = case / "first", case / "extracted", case / "second"
+                    PACK.build(data, first,
+                               bundled_filters=bundled if include_cache_inputs else None,
+                               bundled_generation=generation if include_cache_inputs else None)
+                    with tarfile.open(first / PACK.ARCHIVE) as archive:
+                        names = archive.getnames()
+                        self.assertEqual(len(names), 133 if include_cache_inputs else 131)
+                        self.assertFalse(any(name.endswith((".cc", ".h", ".rs")) and
+                                             name != "compile_filters.rs" for name in names))
+                        self.assertTrue(all("PRIVATE_SENTINEL_DO_NOT_PUBLISH" not in archive.extractfile(name).read().decode(errors="replace") for name in names))
+                        archive.extractall(extracted, filter="data")
+                    if include_cache_inputs:
+                        self.assertEqual((extracted / "data/bundled-filters.txt").read_bytes(), bundled.read_bytes())
+                        self.assertEqual((extracted / "data/bundled-generation.txt").read_bytes(), generation.read_bytes())
+                    subprocess.run([sys.executable, str(extracted / "build_filter_pack.py"),
+                                    str(extracted / "data"), str(second)], check=True)
+                    for name in [PACK.RULES, PACK.RESOURCES, PACK.MANIFEST, PACK.NOTICES, PACK.ARCHIVE]:
+                        self.assertEqual((first / name).read_bytes(), (second / name).read_bytes(), name)
 
     def test_modified_original_is_rejected_until_manifest_is_updated(self):
         with tempfile.TemporaryDirectory() as temp:

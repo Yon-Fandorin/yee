@@ -16,16 +16,20 @@
   const describe = Object.getOwnPropertyDescriptor, define = Object.defineProperty;
   const playerKeys = ['playerResponse', 'ytInitialPlayerResponse', 'player', 'response'];
   const fields = new WeakMap();
+  const guardedObjects = new WeakSet();
   const xhrTexts = new WeakMap();
   const noAd = () => undefined, dropAd = () => {};
   function guardAd(object, key) {
     try {
       const descriptor = describe(object, key);
-      if (descriptor?.get === noAd && descriptor?.set === dropAd) return;
-      if (!descriptor || descriptor.configurable)
+      if (descriptor?.get === noAd && descriptor?.set === dropAd && !descriptor.configurable) return true;
+      if (!descriptor || descriptor.configurable) {
         define(object, key, {configurable: false, enumerable: false,
           get: noAd, set: dropAd});
+        return true;
+      }
     } catch {} // Frozen/page-defined objects retain their original semantics.
+    return false;
   }
   function clean(value, retainGuards = true) {
     if (!value || typeof value !== 'object') return value;
@@ -45,29 +49,39 @@
               if (shortsAd(dataProperty(entries, String(index)))) entries.splice(index, 1);
           }
         } catch {}
-        for (const key of adKeys) {
-          try {
-            if (retainGuards) guardAd(object, key);
-            else if (describe(object, key)?.configurable) delete object[key];
-          } catch {}
+        // Installed guards are non-configurable. Reuse that fact while still
+        // traversing data: new children and containers must be sanitized.
+        if (retainGuards) {
+          if (!guardedObjects.has(object)) {
+            let guarded = true;
+            for (const key of adKeys) if (!guardAd(object, key)) guarded = false;
+            if (guarded) guardedObjects.add(object);
+          }
+        } else {
+          for (const key of adKeys) {
+            try {if (describe(object, key)?.configurable) delete object[key];} catch {}
+          }
         }
         // Known player containers are independent of a wide content sibling.
+        let objectFields = fields.get(object);
         for (const key of playerKeys) {
           if (--budget <= 0) break;
           try {
-            let tracked = fields.get(object)?.get(key);
-            const descriptor = describe(object, key);
-            if (!descriptor && (key !== 'playerResponse' || !retainGuards)) continue;
-            if (tracked && descriptor?.get !== tracked.get) tracked = null;
-            if (!tracked && (!descriptor || 'value' in descriptor)) {
+            let tracked = objectFields?.get(key);
+            if (!tracked) {
+              const descriptor = describe(object, key);
+              if (!descriptor && (key !== 'playerResponse' || !retainGuards)) continue;
+              if (descriptor && !('value' in descriptor)) continue;
               tracked = {value: descriptor?.value};
               if (retainGuards && (!descriptor || (descriptor.configurable && descriptor.writable))) {
                 tracked.get = () => tracked.value;
                 define(object, key, {configurable: false, enumerable: descriptor?.enumerable ?? false,
                   get: tracked.get,
                   set: next => {tracked.value = clean(next);}});
-                if (!fields.has(object)) fields.set(object, new Map());
-                fields.get(object).set(key, tracked);
+                if (!objectFields) fields.set(object, objectFields = new Map());
+                // Only non-configurable accessors are stored; ordinary data fields
+                // keep their descriptor checks on subsequent reads.
+                objectFields.set(key, tracked);
               }
             }
             if (tracked?.value && typeof tracked.value === 'object')
@@ -76,7 +90,8 @@
         }
         // Finish known player containers before enumerating this object's
         // arbitrary siblings, which could consume the entire visit budget.
-        pending.push({value: object, enumerate: true});
+        entry.enumerate = true;
+        pending.push(entry);
         continue;
       }
       try {

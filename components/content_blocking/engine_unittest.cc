@@ -228,6 +228,17 @@ TEST(ContentBlockingEngine, ProductionPlaybackResourceAndAdOnlyRules) {
   EXPECT_TRUE(engine.ShouldBlock("https://www.youtube.com/youtubei/v1/log_event", "https://www.youtube.com/", "xmlhttprequest"));
   EXPECT_FALSE(engine.ShouldBlock("https://www.youtube.com/youtubei/v1/player", "https://www.youtube.com/", "xmlhttprequest"));
 }
+TEST(ContentBlockingEngine, InvalidCompiledEngineFallsBackToText) {
+  Engine engine("||tracker.test^\npage.test##.ad\n", "", "", "",
+                "invalid binary cache");
+  EXPECT_TRUE(engine.ShouldBlock("https://tracker.test/ad", "https://page.test/",
+                                "script"));
+  EXPECT_FALSE(engine.ShouldBlock("https://normal.test/app", "https://page.test/",
+                                 "script"));
+  const auto rules = engine.RulesForPage("https://page.test/");
+  EXPECT_NE(std::find(rules.selectors.begin(), rules.selectors.end(), ".ad"),
+            rules.selectors.end());
+}
 TEST(ContentBlockingEngine, ProductionBundleExcludesTestRules) {
   auto& engine = BundledEngineForCurrentSequence();
   EXPECT_FALSE(engine.ShouldBlock("https://yee-block.test/ad.js",

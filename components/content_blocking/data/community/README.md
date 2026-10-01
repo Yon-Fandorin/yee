@@ -37,3 +37,27 @@ Checksums ensure pack consistency; they are not cryptographic signatures. This
 startup option selects trusted executable JavaScript, so use trusted local packs.
 Keep original attribution, provide the modified source and mark your changes
 when redistributing, as required by the data license.
+
+## Optional compiled filter cache
+
+The browser build also provides `YeeCompiledFilters.dat` and
+`YeeCompiledFilterManifest.json`. This cache uses adblock-rust 0.13.3's binary
+format; JavaScript and redirect resources remain in the external JSON package.
+The standalone BSD tools `compile_filters.rs` and `compile_filter_snapshot.py`
+are included, with their ABP inputs in `data/bundled-filters.txt` and the opaque
+bundle identifier in `data/bundled-generation.txt`.
+
+Compile `compile_filters.rs` as a standalone Rust executable with the pinned
+`adblock = "=0.13.3"` dependency, then regenerate the cache with:
+
+```sh
+python3 compile_filter_snapshot.py PATH_TO_COMPILER data/bundled-filters.txt \
+  data/bundled-generation.txt OUTPUT_DIRECTORY/YeeCommunityFilters.txt \
+  OUTPUT_DIRECTORY/YeeCommunityFilterManifest.json \
+  OUTPUT_DIRECTORY/YeeCompiledFilters.dat OUTPUT_DIRECTORY/YeeCompiledFilterManifest.json
+```
+
+Original engine/dependency sources accompany the separate
+`YeeContentBlockingSources.tar.xz` archive. The cache's hash and both rule
+generations are checked at startup. Modified filter packs can omit it: an
+absent, stale, invalid-format or corrupt cache falls back to text parsing.

@@ -21772,7 +21772,7 @@ index 94d46c0511..4612f1ee9d 100644
      "//base/allocator:buildflags",
      "//build:chromeos_buildflags",
 diff --git a/chrome/renderer/chrome_content_renderer_client.cc b/chrome/renderer/chrome_content_renderer_client.cc
-index 1cfb0d2c21..2dfcca549e 100644
+index 1cfb0d2c21..d7430f0547 100644
 --- a/chrome/renderer/chrome_content_renderer_client.cc
 +++ b/chrome/renderer/chrome_content_renderer_client.cc
 @@ -4,6 +4,8 @@
@@ -21784,7 +21784,16 @@ index 1cfb0d2c21..2dfcca549e 100644
  #include <functional>
  #include <memory>
  #include <optional>
-@@ -616,6 +618,7 @@ void ChromeContentRendererClient::ExposeInterfacesToBrowser(
+@@ -393,6 +395,8 @@ void ChromeContentRendererClient::RenderThreadStarted() {
+                           base::Unretained(v8::Isolate::GetCurrent())));
+ 
+   const bool is_extension = IsStandaloneContentExtensionProcess();
++  if (!is_extension && !IsTopChromeWebUiProcess())
++    yee::content_blocking::DocumentFilterAgent::PrepareEngine();
+ 
+   if (is_extension) {
+     // The process name was set to "Renderer" in RendererMain(). Update it to
+@@ -616,6 +620,7 @@ void ChromeContentRendererClient::ExposeInterfacesToBrowser(
  
  void ChromeContentRendererClient::RenderFrameCreated(
      content::RenderFrame* render_frame) {
@@ -21792,24 +21801,31 @@ index 1cfb0d2c21..2dfcca549e 100644
    ChromeRenderFrameObserver* render_frame_observer =
        new ChromeRenderFrameObserver(render_frame, web_cache_impl_.get());
    service_manager::BinderRegistry* registry = render_frame_observer->registry();
-@@ -1409,8 +1412,16 @@ ChromeContentRendererClient::CreateSpeechRecognitionClient(
+@@ -1409,8 +1414,23 @@ ChromeContentRendererClient::CreateSpeechRecognitionClient(
  }
  #endif  // BUILDFLAG(ENABLE_SPEECH_SERVICE)
  
 +bool ChromeContentRendererClient::RunScriptsAtInitialEmptyDocument(
 +    content::RenderFrame* render_frame) {
++  base::ScopedAllowBaseSyncPrimitivesOutsideBlockingScope allow_local_rules;
 +  return yee::content_blocking::DocumentFilterAgent::ApplyAtDocumentStart(
 +      render_frame, /*initial_empty_document=*/true);
 +}
 +
  void ChromeContentRendererClient::RunScriptsAtDocumentStart(
      content::RenderFrame* render_frame) {
-+  if (!yee::content_blocking::DocumentFilterAgent::ApplyAtDocumentStart(render_frame))
++  bool frame_alive;
++  {
++    base::ScopedAllowBaseSyncPrimitivesOutsideBlockingScope allow_local_rules;
++    frame_alive =
++        yee::content_blocking::DocumentFilterAgent::ApplyAtDocumentStart(render_frame);
++  }
++  if (!frame_alive)
 +    return;
  #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
    extensions::ExtensionsRendererClient::Get()->RunScriptsAtDocumentStart(
        render_frame);
-@@ -1656,4 +1667,3 @@ void ChromeContentRendererClient::AppendContentSecurityPolicy(
+@@ -1656,4 +1676,3 @@ void ChromeContentRendererClient::AppendContentSecurityPolicy(
                    network::mojom::ContentSecurityPolicySource::kHTTP});
  #endif
  }

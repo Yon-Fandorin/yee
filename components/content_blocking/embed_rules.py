@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from preprocess_filters import preprocess
 
-easylist, easyprivacy, filters, resources, test_filters, test_resources, sources, runtime, output = map(Path, sys.argv[1:])
+easylist, easyprivacy, filters, resources, test_filters, test_resources, sources, runtime, output, *compiled_inputs = map(Path, sys.argv[1:])
 for entry in json.loads(sources.read_text()):
     path = sources.parent / entry["file"]
     if hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
@@ -25,3 +25,7 @@ for name, text in zip(["kBundledFilters", "kBundledResources", "kTestFilters", "
 header += [f'inline constexpr char kBundleGeneration[] = "{generation}";', "}"]
 output.parent.mkdir(parents=True, exist_ok=True)
 output.write_text("\n".join(header) + "\n")
+if compiled_inputs:
+    filters_output, generation_output = compiled_inputs
+    filters_output.write_text(texts[0])
+    generation_output.write_text(generation)

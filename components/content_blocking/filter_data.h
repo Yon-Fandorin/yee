@@ -17,6 +17,8 @@ struct FilterDataSnapshot {
   std::string filters;
   std::string resources;
   std::string generation;
+  // Optional binary cache, bound to this pack and the current bundled rules.
+  std::string compiled_filters;
 };
 
 // Fixed-path, external filters and JavaScript resources. The manifest checksum

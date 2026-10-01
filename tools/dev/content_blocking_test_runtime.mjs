@@ -21,12 +21,14 @@ export async function connectCDP(url, Socket = globalThis.WebSocket, timeout = 1
   let next = 0;
   let closed = false;
   const pending = new Map();
+  const listeners = new Map();
   const disconnected = () => {
     closed = true;
     for (const request of pending.values()) {
       clearTimeout(request.timer); request.reject(new Error('CDP disconnected'));
     }
     pending.clear();
+    listeners.clear();
   };
   socket.addEventListener('close', disconnected);
   socket.addEventListener('error', disconnected);
@@ -34,12 +36,22 @@ export async function connectCDP(url, Socket = globalThis.WebSocket, timeout = 1
     let message;
     try {message = JSON.parse(event.data);} catch {disconnected(); socket.close(); return;}
     if (!message || typeof message !== 'object') {disconnected(); socket.close(); return;}
+    if (typeof message.method === 'string') {
+      for (const listener of listeners.get(message.method) ?? []) listener(message.params ?? {});
+      return;
+    }
     const request = pending.get(message.id);
     if (!request) return;
     pending.delete(message.id); clearTimeout(request.timer);
     message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result);
   });
   return {
+    on(method, listener) {
+      if (!listeners.has(method)) listeners.set(method, new Set());
+      const subscribers = listeners.get(method);
+      subscribers.add(listener);
+      return () => {subscribers.delete(listener); if (!subscribers.size) listeners.delete(method);};
+    },
     call(method, params = {}) {
       if (closed || socket.readyState !== Socket.OPEN) return Promise.reject(new Error('CDP disconnected'));
       const id = ++next;

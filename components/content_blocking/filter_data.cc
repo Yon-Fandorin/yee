@@ -11,6 +11,7 @@
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/trace_event/trace_event.h"
 #include "crypto/hash.h"
 #include "components/yee_content_blocking/bundled_rules.h"
 #include "components/yee_content_blocking/rust/src/lib.rs.h"
@@ -23,6 +24,7 @@ constexpr char kResources[] = "YeeCommunityResources.json";
 constexpr size_t kMaxManifestBytes = 128 * 1024;
 constexpr size_t kMaxRulesBytes = 16 * 1024 * 1024;
 constexpr size_t kMaxResourcesBytes = 16 * 1024 * 1024;
+constexpr size_t kMaxCompiledBytes = 64 * 1024 * 1024;
 struct StartupData {
   bool initialized = false;
   FilterDataSnapshot snapshot;
@@ -34,6 +36,7 @@ StartupData& Data() {
 }  // namespace
 
 FilterDataSnapshot ReadCommunityFilterData(const base::FilePath& directory) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.ReadFilterData");
   FilterDataSnapshot snapshot;
   if (directory.empty())
     return snapshot;
@@ -86,6 +89,32 @@ FilterDataSnapshot ReadCommunityFilterData(const base::FilePath& directory) {
       crypto::hash::Sha256(*checksum + "\n" + *resource_checksum));
   snapshot.filters = std::move(rules);
   snapshot.resources = std::move(resources);
+  // An absent, stale or corrupt cache must not invalidate editable filter data.
+  // Deserialize also verifies the upstream binary format before using it.
+  std::string compiled_manifest;
+  if (base::ReadFileToStringWithMaxSize(
+          directory.AppendASCII("YeeCompiledFilterManifest.json"),
+          &compiled_manifest, kMaxManifestBytes)) {
+    const auto cache = base::JSONReader::ReadDict(compiled_manifest,
+                                                base::JSON_PARSE_RFC);
+    if (cache && cache->FindInt("schema_version") == 1 &&
+        cache->FindString("engine_file") &&
+        *cache->FindString("engine_file") == "YeeCompiledFilters.dat" &&
+        cache->FindString("bundled_generation") &&
+        *cache->FindString("bundled_generation") == kBundleGeneration &&
+        cache->FindString("community_generation") &&
+        *cache->FindString("community_generation") == snapshot.generation) {
+      const auto* cache_checksum = cache->FindString("engine_sha256");
+      std::string compiled;
+      if (cache_checksum && cache_checksum->size() == 64 &&
+          base::ReadFileToStringWithMaxSize(
+              directory.AppendASCII("YeeCompiledFilters.dat"), &compiled,
+              kMaxCompiledBytes) &&
+          base::HexEncodeLower(crypto::hash::Sha256(compiled)) == *cache_checksum) {
+        snapshot.compiled_filters = std::move(compiled);
+      }
+    }
+  }
   return snapshot;
 }
 

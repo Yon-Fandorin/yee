@@ -35,6 +35,10 @@
       "destination": "components/yee_content_blocking"
     },
     {
+      "source": "components/tasks",
+      "destination": "components/yee_tasks"
+    },
+    {
       "source": "third_party/yee_adblock",
       "destination": "third_party/rust/yee_adblock"
     }

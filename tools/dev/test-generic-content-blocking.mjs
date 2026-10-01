@@ -8,9 +8,9 @@ const source = await fs.readFile(new URL('../../renderer/content_blocking/generi
 function element(classes = [], id = '', children = []) {
   return {nodeType: 1, classList: classes, id, children, isConnected: true};
 }
-function harness(root) {
+function harness(root, asynchronous = false) {
   const idle = [], batches = [];
-  let observer, scans = 0;
+  let observer, scans = 0, pending = 0;
   const document = {documentElement: root, createTreeWalker(node) {
     ++scans;
     const descendants = [];
@@ -27,9 +27,16 @@ function harness(root) {
       assert.deepEqual(Array.from(exceptions), ['.excepted']);
       for (const name of [...classes, ...ids]) assert.ok(Buffer.byteLength(name) <= 512);
       batches.push({classes: Array.from(classes), ids: Array.from(ids)});
+      if (asynchronous) {
+        assert.equal(pending, 0, 'Only one worker batch may be pending');
+        ++pending;
+        return true;
+      }
     }});
   vm.runInContext(source, context);
-  return {document, batches, scans: () => scans, mutate: records => observer(records), drain() {
+  return {document, batches, scans: () => scans, pending: () => pending,
+    complete() {assert.equal(pending, 1); --pending; context.__yeeGenericComplete();},
+    mutate: records => observer(records), drain() {
     let remaining = 10000;
     while (idle.length) {assert.ok(remaining-- > 0, 'Queue must make progress'); idle.shift()();}
   }};
@@ -65,4 +72,25 @@ noRoot.document.documentElement = element(['late-root']);
 noRoot.mutate([{type: 'childList', addedNodes: [noRoot.document.documentElement]}]);
 noRoot.drain();
 assert.ok(noRoot.batches.some(batch => batch.classes.includes('late-root')));
-console.log('Generic collector: queue overflow, large class lists, UTF-8 limits, attribute-only work and late document root passed.');
+const asyncRoot = element([], '', [element(Array.from({length: 700}, (_, i) => `async-${i}`))]);
+const asynchronous = harness(asyncRoot, true);
+asynchronous.drain();
+assert.equal(asynchronous.batches.length, 1);
+assert.equal(asynchronous.pending(), 1);
+const duringReply = Array.from({length: 600}, (_, i) => element([`late-${i}`], `late-id-${i}`));
+asyncRoot.children.push(...duringReply);
+asynchronous.mutate([{type: 'childList', addedNodes: duringReply}]);
+asynchronous.drain();
+assert.equal(asynchronous.batches.length, 1, 'Mutations wait for the active native reply');
+let replies = 100;
+while (asynchronous.pending()) {
+  assert.ok(replies-- > 0, 'Replies must drain the queued mutations');
+  asynchronous.complete(); asynchronous.drain();
+}
+const asyncClasses = new Set(asynchronous.batches.flatMap(batch => batch.classes));
+const asyncIds = new Set(asynchronous.batches.flatMap(batch => batch.ids));
+for (let i = 0; i < 700; ++i) assert.ok(asyncClasses.has(`async-${i}`));
+for (let i = 0; i < 600; ++i) {
+  assert.ok(asyncClasses.has(`late-${i}`)); assert.ok(asyncIds.has(`late-id-${i}`));
+}
+console.log('Generic collector: queue bounds, class lists, UTF-8, attributes, late root and one asynchronous worker batch with mutation recovery passed.');

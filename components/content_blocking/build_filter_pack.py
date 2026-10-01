@@ -71,7 +71,8 @@ def supported(line, redirects, scriptlets=()):
     return None
 
 
-def build(root, output, node_executable="node"):
+def build(root, output, node_executable="node", bundled_filters=None,
+          bundled_generation=None):
     root, output = Path(root), Path(output)
     source_manifest = root / "sources.json"
     metadata = json.loads(source_manifest.read_text())
@@ -91,6 +92,13 @@ def build(root, output, node_executable="node"):
             raise ValueError("Duplicate resource source file")
         assets[name] = original(root, entry["file"], entry["sha256"])
     assets["data/package.json"] = (root / "package.json").read_bytes()
+    # Only ABP data and an opaque generation identifier accompany the optional
+    # cache compiler. No native adapter or private JavaScript is included.
+    for name, source in [("bundled-filters.txt", bundled_filters),
+                         ("bundled-generation.txt", bundled_generation)]:
+        path = Path(source) if source else root / name
+        if source or path.is_file():
+            assets["data/" + name] = path.read_bytes()
     tool_root = Path(__file__).resolve().parent
     # Chromium's node.py is a locator/runner whose CLI discards stdout. Locate
     # its platform-specific binary, then capture the compiler's JSON directly.
@@ -173,7 +181,8 @@ def build(root, output, node_executable="node"):
               "source_archive": ARCHIVE, "notices_file": NOTICES,
               "notices_sha256": digest(notice), "sources": metadata["sources"]}
     assets["selection-report.json"] = (json.dumps(report, indent=2) + "\n").encode()
-    for name in ["build_filter_pack.py", "preprocess_filters.py", "build_scriptlet_resources.mjs", "scriptlet_runtime.js"]:
+    for name in ["build_filter_pack.py", "preprocess_filters.py", "build_scriptlet_resources.mjs", "scriptlet_runtime.js",
+                 "compile_filters.rs", "compile_filter_snapshot.py"]:
         assets[name] = (tool_root / name).read_bytes()
     # These two files are intentionally public. Never scan product directories.
     assets["LICENSE-builder"] = (root / "LICENSE-builder").read_bytes()

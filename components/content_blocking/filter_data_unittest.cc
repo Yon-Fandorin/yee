@@ -39,6 +39,20 @@ class CommunityFilterDataTest : public testing::Test {
             base::HexEncodeLower(crypto::hash::Sha256(resources)) + "\"}"));
   }
   FilterDataSnapshot Read() { return ReadCommunityFilterData(directory_.GetPath()); }
+  void WriteCache(std::string_view data, std::string_view generation,
+                  std::string_view bundled = kBundleGeneration) {
+    ASSERT_TRUE(base::WriteFile(
+        directory_.GetPath().AppendASCII("YeeCompiledFilters.dat"), data));
+    base::DictValue manifest;
+    manifest.Set("schema_version", 1);
+    manifest.Set("engine_file", "YeeCompiledFilters.dat");
+    manifest.Set("engine_sha256", base::HexEncodeLower(crypto::hash::Sha256(data)));
+    manifest.Set("bundled_generation", bundled);
+    manifest.Set("community_generation", generation);
+    ASSERT_TRUE(base::WriteFile(
+        directory_.GetPath().AppendASCII("YeeCompiledFilterManifest.json"),
+        base::WriteJson(manifest).value()));
+  }
   base::ScopedTempDir directory_;
 };
 TEST_F(CommunityFilterDataTest, MissingAndRelativeDirectoriesHaveNoRules) {
@@ -139,6 +153,82 @@ TEST_F(CommunityFilterDataTest, ResourcesContributeToGeneration) {
 TEST_F(CommunityFilterDataTest, OversizedResourcesAreRejected) {
   WritePack("||tracker.test^\n", std::string(16 * 1024 * 1024 + 1, ' '));
   EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
+}
+TEST_F(CommunityFilterDataTest, CacheCannotOutliveEitherRuleGeneration) {
+  WritePack("||tracker.test^\n");
+  const auto first = Read();
+  WriteCache("binary", first.generation);
+  EXPECT_EQ(Read().compiled_filters, "binary");
+  WritePack("||replacement.test^\n");
+  EXPECT_EQ(Read().status, FilterDataStatus::kLoaded);
+  EXPECT_TRUE(Read().compiled_filters.empty());
+  WriteCache("binary", Read().generation, "previous bundled rules");
+  EXPECT_EQ(Read().status, FilterDataStatus::kLoaded);
+  EXPECT_TRUE(Read().compiled_filters.empty());
+}
+TEST_F(CommunityFilterDataTest, CorruptCacheKeepsEditableFilterData) {
+  WritePack("||tracker.test^\n");
+  WriteCache("binary", Read().generation);
+  ASSERT_TRUE(base::WriteFile(
+      directory_.GetPath().AppendASCII("YeeCompiledFilters.dat"), "tampered"));
+  const auto data = Read();
+  EXPECT_EQ(data.status, FilterDataStatus::kLoaded);
+  EXPECT_EQ(data.filters, "||tracker.test^\n");
+  EXPECT_TRUE(data.compiled_filters.empty());
+}
+TEST(CommunityFilterProductionData, CompiledCacheMatchesTextEngine) {
+  base::FilePath directory;
+  ASSERT_TRUE(base::PathService::Get(base::DIR_EXE, &directory));
+  const auto data = ReadCommunityFilterData(
+      directory.AppendASCII("community-filter-test-data"));
+  ASSERT_EQ(data.status, FilterDataStatus::kLoaded);
+  ASSERT_FALSE(data.compiled_filters.empty());
+  Engine text(kBundledFilters, kBundledResources, data.filters, data.resources);
+  Engine cached(kBundledFilters, kBundledResources, data.filters, data.resources,
+                data.compiled_filters);
+  for (const auto* url : {
+           "https://r1.googlevideo.com/initplayback?source=yt_ads&oad=1",
+           "https://r1.googlevideo.com/initplayback?source=youtube",
+           "https://www.youtube.com/youtubei/v1/player",
+           "https://www.youtube.com/youtubei/v1/log_event",
+           "https://googleads.g.doubleclick.net/pagead/id",
+           "https://www.google.com/complete/search?client=youtube"}) {
+    SCOPED_TRACE(url);
+    const auto expected = text.Evaluate(url, "https://www.youtube.com/",
+                                        "xmlhttprequest");
+    const auto actual = cached.Evaluate(url, "https://www.youtube.com/",
+                                        "xmlhttprequest");
+    EXPECT_EQ(actual.blocked, expected.blocked);
+    EXPECT_EQ(actual.replacement, expected.replacement);
+    EXPECT_EQ(actual.rewritten_url, expected.rewritten_url);
+  }
+  for (const auto* url : {"https://www.youtube.com/", "https://funnyand.com/"}) {
+    auto expected = text.RulesForPage(url), actual = cached.RulesForPage(url);
+    std::ranges::sort(expected.selectors);
+    std::ranges::sort(actual.selectors);
+    std::ranges::sort(expected.exceptions);
+    std::ranges::sort(actual.exceptions);
+    EXPECT_EQ(actual.selectors, expected.selectors);
+    EXPECT_EQ(actual.exceptions, expected.exceptions);
+    EXPECT_EQ(actual.generic_hide, expected.generic_hide);
+    for (const auto* function : {"setConstant(", "trustedJsonEditXhrRequest(",
+                                 "serverContract"}) {
+      EXPECT_EQ(actual.script.find(function) != std::string::npos,
+                expected.script.find(function) != std::string::npos);
+    }
+  }
+  auto generic = text.GenericSelectors({"ad", "adsbox"}, {"ad-banner"}, {});
+  auto cached_generic = cached.GenericSelectors({"ad", "adsbox"}, {"ad-banner"}, {});
+  std::ranges::sort(generic);
+  std::ranges::sort(cached_generic);
+  EXPECT_EQ(cached_generic, generic);
+  auto corrupt = data.compiled_filters;
+  corrupt[0] ^= 1;
+  Engine fallback(kBundledFilters, kBundledResources, data.filters, data.resources,
+                  corrupt);
+  EXPECT_TRUE(fallback.ShouldBlock(
+      "https://r1.googlevideo.com/initplayback?source=yt_ads&oad=1",
+      "https://www.youtube.com/", "xmlhttprequest"));
 }
 TEST(CommunityFilterProductionData, PackExtendsEngineAndPreservesNormalPlayback) {
   base::FilePath executable_directory;

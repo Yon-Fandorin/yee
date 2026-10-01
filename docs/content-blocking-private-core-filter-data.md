@@ -1,10 +1,8 @@
 # 비공개 Yee 본체와 공개 필터·scriptlet 패키지
 
-2026-09-13 사용자는 본체를 공개하지 않는 방향을 선택했고, 이후 원본 scriptlet의
-누락을 지적했다. 앞선 데이터 전용 checkpoint에서 원본 호출을 모두 제외한 제한을
-해제했다. 공개 자료에는 원본 필터·JavaScript·라이선스와 의도적으로 공개하는
-변환 도구·실행 템플릿을 넣는다. Yee 본체, Rust 연결, renderer, 자체 YouTube
-구현은 이 소스 아카이브에 넣지 않는다.
+Yee 본체는 비공개로 유지한다. 공개 자료에는 원본 필터·JavaScript·라이선스와
+독립 데이터 생성 도구·실행 템플릿을 넣는다. Yee 본체, Rust adapter, renderer,
+자체 YouTube 구현은 이 소스 아카이브에 넣지 않는다.
 
 ## 라이선스와 프로그램 경계
 
@@ -52,16 +50,27 @@ binding을 통한 결합을 구분한다. 이는 본체 비공개를 목표로 �
 | `YeeCommunityFilterNotices.txt` | 출처·버전·라이선스 전문·재현 명령 |
 | `YeeCommunityFilterSources.tar.xz` | 명시한 원본·라이선스·공개 도구·실행 템플릿·선택 보고서 |
 
+브라우저 빌드는 `YeeCompiledFilters.dat`와 `YeeCompiledFilterManifest.json`도
+추가한다. adblock-rust 0.13.3으로 같은 기본·trusted 규칙을 미리 컴파일한 선택적
+캐시다. JavaScript·redirect 리소스는 계속 외부 JSON에서 읽는다. 바이너리는
+별도 데이터 파일이며 C++ header에 넣지 않는다. 기본 bundle과 커뮤니티 pack의
+generation·SHA-256이 일치해야 사용하고, upstream의 binary format 검증도 거친다.
+없거나 오래됐거나 손상됐으면 텍스트 파싱으로 돌아가므로 수정 pack에 필수는 아니다.
+
 Node는 원본 모듈의 등록 목록을 import하여 `fn.toString()`을 직렬화한다. 원본 함수
 내용이나 의존성 연결을 Yee 함수로 대체하지 않는다. redirect 매핑도 원본 export를
 사용한다. upstream adblock-rust/Brave와 같이 parameterized redirect를 제외하고,
 Brave가 명시적으로 제외한 `google-ima-dai.js`도 제외한다.
 
-아카이브는 129개 파일의 명시적 whitelist로 만든다. 폴더 전체를 탐색해 추가하지 않는다.
+아카이브는 명시적 whitelist로 만든다. 폴더 전체를 탐색해 추가하지 않는다.
 독립 작성한 `build_filter_pack.py`, `preprocess_filters.py`,
 `build_scriptlet_resources.mjs`, `scriptlet_runtime.js`는 의도적으로 BSD로 제공한다.
 Python 3과 Node.js 22 이상으로 압축을 푼 자료만 사용해 다섯 배포 파일을 동일하게
 재생성할 수 있다. npm 설치·네트워크·Yee 본체 소스는 필요 없다.
+선택적 캐시를 재현할 공개 BSD `compile_filters.rs`·`compile_filter_snapshot.py`와
+ABP 입력·불투명한 bundle generation도 포함한다. Rust 컴파일러에는 고정한
+adblock-rust 의존성이 필요하며 원본 engine/dependency 소스는 별도 MPL 소스
+아카이브에 있다. 비공개 Rust 연결과 renderer 코드는 포함하지 않는다.
 
 ## 로딩·권한·실행
 
@@ -112,8 +121,8 @@ child에 전달되며 재시작으로 적용한다. 이 경로는 **신뢰하는
 
 ## 지원 수치와 한계
 
-선택된 텍스트 규칙은 30,571개, 2,970,098 bytes다. 원본 scriptlet 호출 10,179개를 더 이상
-일괄 제외하지 않는다. 리소스는 uBO 152 + redirect 45 + Brave 17 = 214개,
+선택된 텍스트 규칙은 30,571개, 2,970,098 bytes이며 원본 scriptlet 호출 10,179개를
+포함한다. 리소스는 uBO 152 + redirect 45 + Brave 17 = 214개,
 1,029,481 bytes다. 현재 compiler의 없는 scriptlet 이름 제외는 0개다.
 extended/procedural/action cosmetic 1,429개, 미지원 redirect 호출 1개,
 response/URL 변환 35개는 계속 제외한다.
@@ -124,11 +133,8 @@ response/URL 변환 35개는 계속 제외한다.
 원본 JS의 JSONPath 편집은 자체 parse/stringify 계약을 유지하므로 임의의 tagged 요청
 편집 전후 JSON 숫자 표기까지 lossless라고 주장하지 않는다. 실제 Yee 자동 주입 fixture는
 통과했고, 라이브 YouTube에서 프리롤 영상 차단과 30분 50초 본편 전체 재생을 관찰했다.
-전체 재생의 약 2초 간격 기록에는 YouTube 광고 UI나 재생 중단이 없었다. 동일 영상에서
-중간 광고가 실제 전달되는 대조군과 광고 출력 음성은 아직 검증하지 않았다.
-후속 native 대조의 40초대 오류는 실제 페이지에 노출된 DOM 테스트 인터페이스와
-스트림 인증 거절로 좁혔고, YouTube 전용 fixture에서 불필요한 인터페이스를 제거했다.
-재생 회귀 gate와 중간 광고 검증의 범위는
+관측 범위의 시작·중간 광고 대조와 재생 회귀는 완료했다. 실제 수치, 테스트 환경의
+40초대 오류 원인과 재생 gate는
 [현재 checkpoint](content-blocking-checkpoint.md#40초대-재생-오류)에 있다.
 
 ## 검증
@@ -137,14 +143,21 @@ Brave 테스트에서 유지할 설계 원칙과 보강 범위는
 [현재 checkpoint](content-blocking-checkpoint.md#반복-검토에서-유지한-원칙)에 정리했다.
 최종 실행 결과:
 
-- tooling **13개 통과**. 공개 아카이브 129개 파일만 추출해 다섯 배포 파일을 byte 단위로
-  동일하게 재생성했고, vendored manifest 입력이 모두 Git에 포함되는지 검사했다.
-  비공개 sentinel·C++·Rust·자체 YouTube 코드가 포함되지 않는다.
-- native core/settings/style/data **42개**와 Mojo factory **47개**, 총 **89개 통과**.
+- tooling **13개 통과**. 기본 공개 아카이브 131개 파일로 다섯 배포 파일의 byte 단위
+  재현과 vendored manifest의 Git 포함을 검사했다. 실제 앱에 배포된 ABP cache 입력
+  포함 133개 파일 아카이브도 추출한 자료만으로 다섯 파일을 동일하게 재생성했다.
+  비공개 sentinel·C++·Rust adapter·자체 YouTube 코드는 제외한다. 공개 Rust 파일은
+  명시적으로 포함한 독립 데이터 compiler `compile_filters.rs` 하나다.
+- native core/settings/style/data/공통 worker **51개**와 Mojo factory/profile service **50개**, 총 **101개 통과**.
   원본 generated script, trusted 권한·예외, redirect 별칭 우선순위, 잘못된 리소스의
   전체 거부와 canonical 충돌·과도한 의존성 깊이 거부를 확인했다. 복합 permission mask,
   dependency 권한, 이름 대소문자, 전체 scriptlet 예외, 목록 간 예외·CSP와 원본 redirect
   45개·모든 별칭의 바이트, UTF-8·바이너리·빈 본문의 실제 Mojo 응답도 확인했다.
+  실제 컴파일 캐시와 텍스트 엔진의 출력 일치, generation 변경·checksum 오류의
+  cache 거부와 binary format 오류의 텍스트 복구도 확인했다. renderer worker의 엔진
+  생성·재사용, generic 예외·응답 sequence와 삭제된 수신자의 응답 취소도 통과했다.
+  다른 객체를 사용하는 공통 worker의 FIFO 실행·작업 스레드 해제와 이동 가능한
+  입력·결과도 검증했다.
 - 실제 Rust 엔진이 생성한 프로그램을 임시 Chrome의 독립 frame에서 실행하는
   **1,239개 Chromium fixture assertion 통과**. 원본 set-constant·JSON prune·trusted
   JSONPath 요청 편집, 원본 serverContract의 기존 DOM 노드 변환과 변환 결과의 실행,
@@ -156,8 +169,10 @@ Brave 테스트에서 유지할 설계 원칙과 보강 범위는
   실제 YouTube 서버 계약·영상 재생 증명이 아니다.
 - 기존 YouTube lossless JSON **71 cases**, 확장 protocol/playback **248 assertions 통과**.
 - `tools/dev/build.sh` 전체 chrome target **빌드 성공**. macOS 실제 앱 bundle에서
-  다섯 별도 자료의 byte·hash, GPL 원문·공개 도구 아카이브와 기존 MPL 자료를 확인했다.
-- owned 차단 입력 **167개**가 적용 Chromium과 일치하고, 원본 **116개**의 hash가 일치한다.
+  다섯 원본 자료와 두 cache 자료의 byte·hash, GPL 원문·공개 도구 아카이브와 기존
+  MPL 자료를 확인했다. 첫 엔진 로딩의 비용과 Brave 대조는
+  [현재 checkpoint](content-blocking-checkpoint.md#첫-문서의-필터-엔진-로딩과-brave-대조)에 있다.
+- owned 차단 입력이 적용 Chromium과 byte 단위로 일치하고, community 원본 **116개**의 hash가 일치한다.
   filter_data/core GN header dependency check, Chromium whitespace, `0001` reverse apply,
   patch를 제외한 repository whitespace check를 통과했다.
 

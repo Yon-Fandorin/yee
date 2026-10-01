@@ -216,6 +216,78 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 최소 본편 재생 시간을 검사한다. 관측 시간·영상 선택·탐색 옵션과 광고 검증의
 범위는 [콘텐츠 차단 checkpoint](../../docs/content-blocking-checkpoint.md#40초대-재생-오류)에 있다.
 
+초기 로딩·스크롤·영상 전환을 비교하려면 저장소 루트에서
+`node tools/dev/observe-youtube-live.mjs perf`를 실행한다.
+새 광고 노출 문제나 관련 변경의 회귀 대조가 필요하면 `ads`를 명시한다.
+`all`은 광고·출력 수집과 성능 비교를 함께 실행한다.
+이 도구는 macOS의 실제 앱과 격리 프로필을 사용한다. `ads`,
+`perf`, `smoke`로 단계만 선택할 수 있다. `smoke-on`은 차단 켠 앱의 재생·출력
+오디오를 짧게 확인한다. 마지막 인자는 재생·광고 관측 초수다
+(`ads`/`all` 기본 600초, 영상별 상한 1,200초). 실행 전에 `common.zsh`의
+`gracefully_quit_yee`로 개발 Yee를 정상 종료해야 한다. 앱 출력 오디오 helper는
+Xcode 도구로 자동 빌드하며, 정확한 브라우저 PID의 자식 오디오 프로세스만
+Core Audio tap에 포함한다. 마이크는 사용하지 않는다. 광고 구간의 PCM은 최대
+90초만 보존하고 전체 출력은 초별 RMS로 집계한다. 측정 결과는
+`.local-build/youtube-review/`에 둔다. OS의 오디오 캡처 권한이 없거나 출력이
+잡히지 않은 경우에는 음성 검증 통과로 취급하지 않는다.
+
+차단 끔 대조군은 한 세션·프로필에서 영상을 순서대로 이동한다.
+`YEE_LIVE_YOUTUBE_VIDEOS`에 쉼표로 구분한 공개 영상 ID를 지정할 수 있다.
+`YEE_LIVE_YOUTUBE_WARMUP_SECONDS`는 마지막 영상 전의 관측 시간을 줄인다
+(10초 이상, 마지막 인자 이하). 로그인된 사용자의 프로필은 사용하지 않는다.
+이미 광고를 관측한 프로필을 대조에 유지하려면 `YEE_LIVE_YOUTUBE_PROFILE`에
+`.local-build/youtube-review/` 아래 생성된 `profile-*` 경로를 지정한다.
+
+이 도구는 명시적 로컬 디버깅 포트를 사용하며 `navigator.webdriver`와 DOM
+controller가 모두 false인지 확인한다. 광고 대조군에서 중간 광고를 관측한 경우
+같은 영상·프로필의 차단 켬을 관측해 해당 본편 위치를 넘었는지와 실제 출력을
+비교한다. 끔에서 광고와 출력이 있고 켬에서 광고 없이 해당 위치를 넘으면 관측한
+범위의 대조를 완료한다. 대조군에 광고가 없으면 미확보로 남긴다.
+성능 단계는 콘텐츠 viewport를 실제 페이지에서 1,000×720으로
+맞추고 숨겨진 창의 측정을 거부한다. 실행 순서를 번갈아
+Chrome·Yee 차단 끔·Yee 차단 켬을 각각 세 번 측정한다. FCP/LCP는 새 문서의
+값이며, 입력에 의한 검색 결과 스크롤과 영상 이동은 별도의 rAF 간격으로 기록한다.
+영상 이동의 DOM·video-ready 시각과 선택한 영상 ID도 보존한다.
+첫 측정에서 고른 영상 ID를 후속 전환에도 사용한다.
+`YEE_LIVE_PERFORMANCE_VIDEO`로 검색 결과에 있는 동일 영상 ID를 지정할 수도 있다.
+실제 화면에 표시된 compositor 프레임이나 INP로 해석하지 않는다. 비교한
+Chromium 버전 차이와 네트워크·광고 전달 변동도 함께 확인해야 한다.
+환경 진단에는 `YEE_LIVE_PERFORMANCE_GROUPS=chrome-off`와
+`YEE_LIVE_PERFORMANCE_ROUNDS=1`처럼 조건·횟수를 줄일 수 있다.
+설치된 Brave를 비교하려면 그룹에 `brave-on`을 지정한다. 격리 프로필에서
+읽기 전용 `brave://adblock-internals` 정보로 실제 필터 목록 로딩과 debug mode
+비활성화를 확인한 뒤 측정한다. 목록 로딩 대기는 최대 90초이며, 필터 출처·개수도
+결과에 남긴다. Brave 기본 Shields와 Yee의 필터·정책이 동일하다는 뜻은 아니다.
+`YEE_LIVE_PERFORMANCE_CPU_PROFILE=1`은 초기 로딩과 영상 전환의 V8 CPU
+프로파일 및 함수별 표본 시간 요약을 추가한다. 프로파일의 script URL에서 query와
+fragment를 제거하고 `*.cpuprofile.gz`로 압축해 보존한다. CPU 수집을 켠 회차는
+기본 로딩 비교 표본과 따로 해석한다.
+이 프로파일은 브라우저 프로세스의 네트워크 차단 비용이나 compositor 작업을
+측정하지 않는다.
+`YEE_LIVE_PERFORMANCE_TRACE=1`은 초기 로딩 20초·스크롤·영상 전환 10초의 Chromium
+trace를 추가한다. 필터 데이터 읽기·엔진 생성·문서 규칙 적용·worker 결과 대기·요청 매칭의 네이티브
+구간과 페이지 렌더링을 함께 기록한다. 결과는 `*.trace.json.gz`이며, 이벤트 인자는
+스레드·프로세스 이름과 지정한 frame/input enum·숫자·boolean만 남기고 제거한다.
+`node tools/dev/test-performance-trace.mjs`로 URL·소스와 임의 인자의 제거를 검사한다.
+스크롤 trace의 `yee-review-scroll-start/end` mark는 해당 renderer와 구간을 식별한다.
+시작·초기 로딩·종료 시 process CPU와 RSS도 수집한다. RSS에는 공유 페이지가
+중복 포함될 수 있으므로 물리 메모리 사용량으로 해석하지 않는다.
+trace를 켠 회차도 일반 로딩 표본과
+별도로 해석한다. renderer의 사전 준비가 trace 시작 전에 끝나면 해당 엔진 생성은
+기록되지 않으므로, 생성 이벤트가 없다는 사실을 전체 CPU 비용 제거로 해석하지 않는다.
+다른 창의 가림 때문에 정상 측정이 불가능하면
+`YEE_LIVE_PERFORMANCE_IGNORE_OCCLUSION=1`을 명시할 수 있다. 이 경우 성능
+조건 모두에 Chromium의 `--disable-backgrounding-occluded-windows` 테스트 옵션을
+적용하고 결과를 `test-occlusion-override`로 표시한다. 광고 관측에는 적용하지 않는다.
+이 결과는 일반 창 상태의 실제 화면 애니메이션 검증을 대체하지 않는다.
+
+완료된 관측 자료는 결론·조건·표본 수·한계를 checkpoint에 반영한 뒤 정리한다.
+다음 분석에 필요한 trace만 남기고, 완료된 격리 프로필·브라우저 로그·원시 오디오·
+CPU 프로파일·수집 helper 캐시는 제거할 수 있다. 요약에 제거한 원본의 식별자를
+보존할 때는 원본 보존 여부도 명시한다. 사용자 프로필과 Chromium 빌드 캐시는
+정리 대상에 포함하지 않는다. 현재 남은 성능 작업은
+[checkpoint](../../docs/content-blocking-checkpoint.md#남은-성능-작업)에 둔다.
+
 Header와 Sidebar의 세부 검증은 [Header 안내](../../docs/header/README.md)와
 [Sidebar 안내](../../docs/sidebar/README.md)를 따른다. C++ UI 테스트 명령은 기본으로
 필요한 프로그램을 빌드하며 일부 단계는 실제 창을 열거나 기존 개발 브라우저를 정상 종료한다.

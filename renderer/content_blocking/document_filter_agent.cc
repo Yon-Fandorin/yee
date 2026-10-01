@@ -4,12 +4,14 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "base/functional/bind.h"
 #include "base/json/json_writer.h"
+#include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/renderer/yee_content_blocking/scripts.h"
 #include "components/content_settings/renderer/content_settings_agent_impl.h"
-#include "components/yee_content_blocking/engine.h"
+#include "components/yee_content_blocking/document_engine.h"
 #include "components/yee_content_blocking/settings.h"
 #include "content/public/renderer/render_frame.h"
 #include "gin/converter.h"
@@ -83,6 +85,7 @@ bool EnabledForFrame(blink::WebLocalFrame* frame) {
 }  // namespace
 void DocumentFilterAgent::ApplyGeneric(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
+  args.GetReturnValue().Set(false);
   if (args.Length() != 3)
     return;
   auto context = args.GetIsolate()->GetCurrentContext();
@@ -99,13 +102,34 @@ void DocumentFilterAgent::ApplyGeneric(
   if (!classes || !ids || !exceptions)
     return;
   auto* agent = Get(content::RenderFrame::FromWebFrame(frame));
-  if (agent && agent->applied_)
-    agent->InsertSelectors(BundledEngineForCurrentSequence().GenericSelectors(
-        *classes, *ids, *exceptions));
+  if (agent && agent->applied_) {
+    RendererDocumentEngine().GenericSelectors(
+        std::move(*classes), std::move(*ids), std::move(*exceptions),
+        base::BindOnce(&DocumentFilterAgent::InsertGenericSelectors,
+                       agent->weak_factory_.GetWeakPtr()));
+    args.GetReturnValue().Set(true);
+  }
+}
+
+void DocumentFilterAgent::InsertGenericSelectors(
+    std::vector<std::string> selectors) {
+  // Document replacement cancels the reply. Recheck site settings as they
+  // may have changed while this batch was on the worker.
+  auto alive = weak_factory_.GetWeakPtr();
+  if (applied_ && EnabledForFrame(render_frame()->GetWebFrame()))
+    InsertSelectors(selectors);
+  if (!alive)
+    return;
+  render_frame()->GetWebFrame()->ExecuteScriptInIsolatedWorld(
+      ISOLATED_WORLD_ID_YEE_CONTENT_BLOCKING,
+      blink::WebScriptSource(blink::WebString::FromUtf8(
+          "globalThis.__yeeGenericComplete?.()")),
+      blink::BackForwardCacheAware::kAllow);
 }
 
 void DocumentFilterAgent::InsertSelectors(
     const std::vector<std::string>& selectors) {
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.InsertSelectors");
   base::ListValue candidates;
   size_t bytes = 0;
   for (const auto& selector : selectors) {
@@ -162,6 +186,10 @@ void DocumentFilterAgent::InsertSelectors(
 DocumentFilterAgent::DocumentFilterAgent(content::RenderFrame* frame)
     : RenderFrameObserver(frame), RenderFrameObserverTracker(frame) {}
 DocumentFilterAgent::~DocumentFilterAgent() = default;
+void DocumentFilterAgent::PrepareEngine() {
+  if (base::FeatureList::IsEnabled(kYeeContentBlocking))
+    (void)RendererDocumentEngine();
+}
 void DocumentFilterAgent::DidCreateNewDocument() {
   weak_factory_.InvalidateWeakPtrs();
   applied_ = false;
@@ -192,11 +220,12 @@ void DocumentFilterAgent::Apply() {
     url = url::Origin(frame->GetSecurityOrigin()).GetURL();
   if (!url.SchemeIsHTTPOrHTTPS() || !EnabledForFrame(frame))
     return;
+  TRACE_EVENT0("loading", "Yee.ContentBlocking.ApplyDocumentRules");
   InitializeIsolatedWorld();
   auto* isolate = frame->GetAgentGroupScheduler()->Isolate();
   v8::Isolate::Scope isolate_scope(isolate);
   v8::HandleScope handle_scope(isolate);
-  auto rules = BundledEngineForCurrentSequence().RulesForPage(url.spec());
+  auto rules = RendererDocumentEngine().RulesForPage(url.spec());
   auto alive = weak_factory_.GetWeakPtr();
   InsertSelectors(rules.selectors);
   if (!alive)

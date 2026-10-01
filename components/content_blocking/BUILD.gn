@@ -1,4 +1,5 @@
 import("//build/rust/rust_static_library.gni")
+import("//build/rust/rust_executable.gni")
 import("//testing/test.gni")
 import("//third_party/rust/yee_adblock/sources.gni")
 import("community_scriptlet_sources.gni")
@@ -28,17 +29,58 @@ action("bundled_rules") {
     "data/sources.json",
     "scriptlet_runtime.js",
   ]
-  outputs = [ "$target_gen_dir/bundled_rules.h" ]
+  outputs = [
+    "$target_gen_dir/bundled_rules.h",
+    "$target_gen_dir/bundled_filters.txt",
+    "$target_gen_dir/bundled_generation.txt",
+  ]
   args = rebase_path(inputs + outputs, root_build_dir)
   inputs += [ "preprocess_filters.py" ]
 }
 
+rust_executable("yee_compile_filters") {
+  crate_root = "compile_filters.rs"
+  sources = [ "compile_filters.rs" ]
+  deps = [ "//third_party/rust/yee_adblock/adblock_0_13_3:lib" ]
+}
+
+action("compiled_filter_data") {
+  script = "compile_filter_snapshot.py"
+  deps = [
+    ":bundled_rules",
+    ":community_filter_data",
+    ":yee_compile_filters($host_toolchain)",
+  ]
+  compiler = get_label_info(":yee_compile_filters($host_toolchain)", "root_out_dir") +
+             "/yee_compile_filters"
+  if (host_os == "win") {
+    compiler += ".exe"
+  }
+  inputs = [
+    compiler,
+    "$target_gen_dir/bundled_filters.txt",
+    "$target_gen_dir/bundled_generation.txt",
+    "$target_gen_dir/community/YeeCommunityFilters.txt",
+    "$target_gen_dir/community/YeeCommunityFilterManifest.json",
+  ]
+  outputs = [
+    "$target_gen_dir/community/YeeCompiledFilters.dat",
+    "$target_gen_dir/community/YeeCompiledFilterManifest.json",
+  ]
+  args = rebase_path(inputs + outputs, root_build_dir)
+}
+
 action("community_filter_data") {
   script = "build_filter_pack.py"
+  deps = [ ":bundled_rules" ]
   inputs = [
     "preprocess_filters.py",
+    "compile_filters.rs",
+    "compile_filter_snapshot.py",
     "build_scriptlet_resources.mjs",
     "scriptlet_runtime.js",
+    "$target_gen_dir/bundled_filters.txt",
+    "$target_gen_dir/bundled_generation.txt",
     "data/community/package.json",
     "//third_party/node/node.py",
     "data/community/scriptlet-sources.json",
@@ -74,6 +116,8 @@ action("community_filter_data") {
                        "data/community",
                        "$target_gen_dir/community",
                        "//third_party/node/node.py",
+                       "$target_gen_dir/bundled_filters.txt",
+                       "$target_gen_dir/bundled_generation.txt",
                      ],
                      root_build_dir)
 }
@@ -91,11 +135,13 @@ source_set("filter_data") {
 
 source_set("core") {
   public = [
+    "document_engine.h",
     "engine.h",
     "selector_styles.h",
     "settings.h",
   ]
   sources = [
+    "document_engine.cc",
     "engine.cc",
     "selector_styles.cc",
     "settings.cc",
@@ -103,6 +149,7 @@ source_set("core") {
   deps = [
     ":bundled_rules",
     ":rust_bridge",
+    "//components/yee_tasks:tasks",
     "//crypto",
   ]
   public_deps = [
@@ -141,20 +188,24 @@ action("package_notices") {
 if (is_mac) {
   bundle_data("notices") {
     sources = get_target_outputs(":package_notices") +
-              get_target_outputs(":community_filter_data")
+              get_target_outputs(":community_filter_data") +
+              get_target_outputs(":compiled_filter_data")
     outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
     public_deps = [
       ":community_filter_data",
+      ":compiled_filter_data",
       ":package_notices",
     ]
   }
 } else {
   copy("notices") {
     sources = get_target_outputs(":package_notices") +
-              get_target_outputs(":community_filter_data")
+              get_target_outputs(":community_filter_data") +
+              get_target_outputs(":compiled_filter_data")
     outputs = [ "$root_out_dir/{{source_file_part}}" ]
     public_deps = [
       ":community_filter_data",
+      ":compiled_filter_data",
       ":package_notices",
     ]
   }
@@ -162,13 +213,18 @@ if (is_mac) {
 
 copy("community_filter_test_data") {
   testonly = true
-  sources = get_target_outputs(":community_filter_data")
+  sources = get_target_outputs(":community_filter_data") +
+            get_target_outputs(":compiled_filter_data")
   outputs = [ "$root_out_dir/community-filter-test-data/{{source_file_part}}" ]
-  deps = [ ":community_filter_data" ]
+  deps = [
+    ":community_filter_data",
+    ":compiled_filter_data",
+  ]
 }
 
 test("yee_content_blocking_unittests") {
   sources = [
+    "document_engine_unittest.cc",
     "engine_unittest.cc",
     "filter_data_unittest.cc",
     "selector_styles_unittest.cc",
@@ -179,6 +235,7 @@ test("yee_content_blocking_unittests") {
     ":core",
     "//base/test:run_all_unittests",
     "//base/test:test_support",
+    "//components/yee_tasks:unit_tests",
     "//crypto",
     "//testing/gtest",
   ]

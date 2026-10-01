@@ -51,6 +51,15 @@ const connected = await connectCDP('fixture', FakeSocket, 100);
 const response = connected.call('Page.fixture');
 FakeSocket.last.dispatchEvent(new MessageEvent('message', {data: JSON.stringify({id: 1, result: {value: 42}})}));
 assert.deepEqual(await response, {value: 42});
+const events = [];
+const unsubscribe = connected.on('Tracing.tracingComplete', params => events.push(params));
+FakeSocket.last.dispatchEvent(new MessageEvent('message', {
+  data: JSON.stringify({method: 'Tracing.tracingComplete', params: {stream: 'trace-stream'}})}));
+assert.deepEqual(events, [{stream: 'trace-stream'}], 'Unsolicited trace completion is delivered');
+unsubscribe();
+FakeSocket.last.dispatchEvent(new MessageEvent('message', {
+  data: JSON.stringify({method: 'Tracing.tracingComplete', params: {stream: 'unused'}})}));
+assert.equal(events.length, 1, 'Removed trace listeners do not receive events');
 connected.close();
 const malformed = await connectCDP('fixture', FakeSocket, 100);
 const malformedRequest = malformed.call('Page.fixture');
