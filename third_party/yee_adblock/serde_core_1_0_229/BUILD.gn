@@ -49,6 +49,7 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/serde_core_1_0_229/README.md",
   ]
   features = [
+    "alloc",
     "rc",
     "result",
     "std",

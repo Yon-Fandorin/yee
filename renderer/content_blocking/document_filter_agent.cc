@@ -3,9 +3,11 @@
 #include "chrome/renderer/yee_content_blocking/document_filter_agent.h"
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
+#include "base/strings/string_util.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "chrome/common/chrome_isolated_world_ids.h"
@@ -111,6 +113,44 @@ void DocumentFilterAgent::ApplyGeneric(
   }
 }
 
+void DocumentFilterAgent::ProceduralEnabled(
+    const v8::FunctionCallbackInfo<v8::Value>& args) {
+  auto* frame = blink::WebLocalFrame::FrameForContext(
+      args.GetIsolate()->GetCurrentContext());
+  args.GetReturnValue().Set(EnabledForFrame(frame));
+}
+
+void DocumentFilterAgent::InsertProceduralStyle(
+    const v8::FunctionCallbackInfo<v8::Value>& args) {
+  args.GetReturnValue().Set(false);
+  if (args.Length() != 2 || !args[0]->IsString() || !args[1]->IsString())
+    return;
+  auto* frame = blink::WebLocalFrame::FrameForContext(
+      args.GetIsolate()->GetCurrentContext());
+  if (!EnabledForFrame(frame))
+    return;
+  auto* agent = Get(content::RenderFrame::FromWebFrame(frame));
+  if (!agent || !agent->applied_)
+    return;
+  const std::string marker = gin::V8ToString(args.GetIsolate(), args[0]);
+  const std::string declarations = gin::V8ToString(args.GetIsolate(), args[1]);
+  // The private isolated-world runtime validates a single CSS declaration
+  // block, then tags matching nodes. Native user-origin CSS keeps page styles
+  // from overriding the result. Bound its per-document sheet storage.
+  if (!base::StartsWith(marker, "data-yee-cb-") || marker.size() > 96 ||
+      !base::ContainsOnlyChars(std::string_view(marker).substr(12),
+                              "0123456789abcdef-") ||
+      declarations.empty() || declarations.size() > 32 * 1024 ||
+      agent->procedural_style_keys_.size() >= 1024 ||
+      agent->procedural_style_bytes_ + declarations.size() > 256 * 1024)
+    return;
+  const std::string css = "[" + marker + "]{" + declarations + "}";
+  agent->procedural_style_keys_.push_back(frame->GetDocument().InsertStyleSheet(
+      blink::WebString::FromUtf8(css), nullptr, blink::WebCssOrigin::kUser));
+  agent->procedural_style_bytes_ += declarations.size();
+  args.GetReturnValue().Set(true);
+}
+
 void DocumentFilterAgent::InsertGenericSelectors(
     std::vector<std::string> selectors) {
   // Document replacement cancels the reply. Recheck site settings as they
@@ -195,6 +235,8 @@ void DocumentFilterAgent::DidCreateNewDocument() {
   applied_ = false;
   styles_.Reset();
   style_keys_.clear();
+  procedural_style_keys_.clear();
+  procedural_style_bytes_ = 0;
   InitializeIsolatedWorld();
 }
 void DocumentFilterAgent::OnDestruct() {
@@ -248,7 +290,7 @@ void DocumentFilterAgent::Apply() {
     if (!alive)
       return;
   }
-  if (!rules.generic_hide)
+  if (!rules.generic_hide && rules.procedural_actions.empty())
     return;
   frame->ExecuteScriptInIsolatedWorld(
       ISOLATED_WORLD_ID_YEE_CONTENT_BLOCKING,
@@ -265,13 +307,33 @@ void DocumentFilterAgent::Apply() {
         isolate, context->GetMicrotaskQueue(),
         v8::MicrotasksScope::kDoNotRunMicrotasks);
     v8::Context::Scope scope(context);
-    auto name = gin::StringToV8(isolate, "__yeeApplyGeneric");
-    v8::Local<v8::Function> function;
-    if (!v8::Function::New(context, ApplyGeneric).ToLocal(&function))
-      return;
-    if (!context->Global()->Set(context, name, function).FromMaybe(false))
+    for (const auto& binding : {
+             std::pair{"__yeeApplyGeneric", ApplyGeneric},
+             std::pair{"__yeeInsertProceduralStyle", InsertProceduralStyle},
+             std::pair{"__yeeProceduralEnabled", ProceduralEnabled}}) {
+      v8::Local<v8::Function> function;
+      if (!v8::Function::New(context, binding.second).ToLocal(&function) ||
+          !context->Global()->Set(context, gin::StringToV8(isolate, binding.first),
+                                 function).FromMaybe(false))
+        return;
+    }
+  }
+  if (!rules.procedural_actions.empty()) {
+    base::ListValue actions;
+    for (const auto& action : rules.procedural_actions)
+      actions.Append(action);
+    const std::string script = "(() => { const proceduralActions = " +
+        base::WriteJson(actions).value_or("[]") + ";" +
+        kProceduralCosmeticScript + "})();";
+    frame->ExecuteScriptInIsolatedWorld(
+        ISOLATED_WORLD_ID_YEE_CONTENT_BLOCKING,
+        blink::WebScriptSource(blink::WebString::FromUtf8(script)),
+        blink::BackForwardCacheAware::kAllow);
+    if (!alive)
       return;
   }
+  if (!rules.generic_hide)
+    return;
   base::ListValue exceptions;
   for (const auto& selector : rules.exceptions)
     exceptions.Append(selector);

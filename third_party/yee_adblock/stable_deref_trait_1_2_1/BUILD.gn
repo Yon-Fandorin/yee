@@ -29,6 +29,11 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/stable_deref_trait_1_2_1/LICENSE-MIT",
     "//third_party/rust/yee_adblock/stable_deref_trait_1_2_1/README.md",
   ]
+  features = [
+    "alloc",
+    "default",
+    "std",
+  ]
   deps = [
   ]
   build_deps = [

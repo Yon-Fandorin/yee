@@ -12,6 +12,8 @@ namespace yee::content_blocking {
 
 struct PageRules {
   std::vector<std::string> selectors;
+  // Upstream JSON operators, interpreted only in Yee's isolated world.
+  std::vector<std::string> procedural_actions;
   std::vector<std::string> exceptions;
   std::string script;
   bool generic_hide = false;

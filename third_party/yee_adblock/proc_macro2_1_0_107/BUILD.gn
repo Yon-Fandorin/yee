@@ -57,6 +57,7 @@ cargo_crate("lib") {
   features = [
     "default",
     "proc-macro",
+    "span-locations",
   ]
   deps = [
     "//third_party/rust/yee_adblock/unicode_ident_1_0_24:lib",

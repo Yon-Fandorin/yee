@@ -129,6 +129,7 @@ cargo_crate("lib") {
     "default",
     "derive",
     "extra-traits",
+    "full",
     "parsing",
     "printing",
     "proc-macro",

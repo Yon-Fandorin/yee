@@ -28,9 +28,13 @@ class DocumentFilterAgent
   void InsertSelectors(const std::vector<std::string>& selectors);
   void InsertGenericSelectors(std::vector<std::string> selectors);
   static void ApplyGeneric(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void InsertProceduralStyle(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void ProceduralEnabled(const v8::FunctionCallbackInfo<v8::Value>& args);
   bool applied_ = false;
   SelectorStyles styles_;
   std::vector<blink::WebStyleSheetKey> style_keys_;
+  std::vector<blink::WebStyleSheetKey> procedural_style_keys_;
+  size_t procedural_style_bytes_ = 0;
   base::WeakPtrFactory<DocumentFilterAgent> weak_factory_{this};
   // Document replacement cancels old work, but does not destroy the frame.
   base::WeakPtrFactory<DocumentFilterAgent> lifetime_factory_{this};

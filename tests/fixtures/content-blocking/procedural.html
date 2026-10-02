@@ -1,0 +1,130 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee procedural cosmetic regression</title>
+<style>
+  .before-ad::before, .after-ad::after { content: "Sponsored"; }
+</style>
+<div id="text" class="text-ad" style="display:block!important">Advertisement</div>
+<div id="normal" class="text-ad">Normal article</div>
+<div id="regex" class="regex-ad">SPONSORED content</div>
+<div id="quoted" class="quoted-ad">BUY THIS PRODUCT</div>
+<div id="ancestor"><span class="ancestor-label">Advertisement</span></div>
+<div id="closest" class="closest-card"><div><span class="closest-label">Ad</span></div></div>
+<div id="attribute" class="attribute-ad" data-sponsored="yes">Attribute ad</div>
+<div id="regex-attribute" class="regex-attribute" data-ad-random="true">Attribute ad</div>
+<div id="css" class="css-ad" style="color:rgb(255,0,0)">CSS ad</div>
+<div id="display" class="yee-procedural-display" style="display:block">Display ad</div>
+<div id="conditional-style" class="conditional-style" style="color:red">Conditional style</div>
+<div id="before" class="before-ad">Before ad</div>
+<div id="after" class="after-ad">After ad</div>
+<div id="long" class="long-ad">Long advertisement</div>
+<div id="short" class="long-ad">Short</div>
+<div id="xpath-card" class="xpath-card"><span id="xpath" class="xpath-target">XPath ad</span><span id="xpath-keep">Article</span></div>
+<div id="descendant-card" class="descendant-card">Advertisement<span id="descendant" class="descendant-target">Ad</span></div>
+<span class="sibling-label">Advertisement</span><div id="sibling" class="sibling-target">Sibling ad</div>
+<div id="suffix" class="suffix-ad chosen">Advertisement</div>
+<div id="suffix-keep" class="suffix-ad">Advertisement</div>
+<div id="path" class="path-ad">Route ad</div>
+<div id="styled" class="style-action" style="color:red!important">Style action</div>
+<div id="removed" class="remove-action">Remove action</div>
+<div id="attribute-action" class="attribute-action" data-ad="yes">Remove attribute</div>
+<div id="class-action" class="class-action advertising">Remove class</div>
+<div id="exception" class="exception-ad">Advertisement</div>
+<pre id="result">pending</pre>
+<script>
+(async () => {
+  const mode = new URL(location.href).searchParams.get('mode') ?? 'on';
+  const results = {mode, installation: 'native document-start rules and isolated-world executor', assertions: []};
+  const byId = id => document.getElementById(id);
+  const hidden = id => getComputedStyle(byId(id)).display === 'none';
+  const check = (condition, name) => {
+    if (!condition) throw Error(name);
+    results.assertions.push(name);
+  };
+  const wait = async (predicate, name) => {
+    const deadline = performance.now() + 8000;
+    while (!predicate()) {
+      if (performance.now() > deadline) throw Error(name);
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    check(true, name);
+  };
+  check(window.__yeeInsertProceduralStyle === undefined && window.__yeeProceduralEnabled === undefined,
+    'native callbacks stay outside the page world');
+  if (mode !== 'on') {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    for (const id of ['text', 'regex', 'quoted', 'ancestor', 'attribute', 'css', 'display', 'xpath', 'suffix'])
+      check(!hidden(id), mode + ' leaves visible: ' + id);
+    check(!!byId('removed') && byId('attribute-action').hasAttribute('data-ad') &&
+      byId('class-action').classList.contains('advertising'), mode + ' skips destructive actions');
+    check(getComputedStyle(byId('styled')).color === 'rgb(255, 0, 0)', mode + ' skips style action');
+    check(getComputedStyle(byId('conditional-style')).color === 'rgb(255, 0, 0)', mode + ' skips conditional style action');
+  } else {
+    for (const id of ['text', 'regex', 'quoted', 'ancestor', 'closest', 'attribute', 'regex-attribute',
+                      'css', 'display', 'before', 'after', 'long', 'xpath', 'descendant', 'sibling', 'suffix'])
+      await wait(() => hidden(id), 'native operator hides: ' + id);
+    for (const id of ['normal', 'short', 'xpath-keep', 'xpath-card', 'descendant-card', 'suffix-keep', 'exception', 'path'])
+      check(!hidden(id), 'nonmatching or excepted content stays visible: ' + id);
+    await wait(() => !byId('removed'), 'remove action deletes matching node');
+    await wait(() => !byId('attribute-action').hasAttribute('data-ad'), 'remove-attr action');
+    await wait(() => !byId('class-action').classList.contains('advertising'), 'remove-class action');
+    await wait(() => getComputedStyle(byId('styled')).color === 'rgb(0, 128, 0)', 'style action uses user-origin priority');
+    await wait(() => getComputedStyle(byId('conditional-style')).color === 'rgb(0, 128, 0)', 'CSS condition can change its own style property');
+    byId('text').firstChild.data = 'Normal article';
+    await wait(() => !hidden('text'), 'characterData mutation releases previous hide');
+    byId('normal').textContent = 'Advertisement';
+    await wait(() => hidden('normal'), 'existing node text becomes advertising');
+    byId('attribute').setAttribute('data-sponsored', 'no');
+    await wait(() => !hidden('attribute'), 'attribute change releases previous hide');
+    byId('attribute').setAttribute('data-sponsored', 'yes');
+    await wait(() => hidden('attribute'), 'attribute change applies rule again');
+    check(hidden('display') && getComputedStyle(byId('conditional-style')).color === 'rgb(0, 128, 0)',
+      'CSS conditions remain stable across unrelated mutations');
+    byId('display').style.display = 'inline';
+    await wait(() => !hidden('display'), 'CSS condition releases hide when page display changes');
+    byId('conditional-style').style.color = 'blue';
+    await wait(() => getComputedStyle(byId('conditional-style')).color === 'rgb(0, 0, 255)',
+      'CSS condition releases style when original page property changes');
+    const mark = byId('attribute').getAttributeNames().find(name => name.startsWith('data-yee-cb-'));
+    check(!!mark, 'native hide has an isolated-runtime marker');
+    byId('attribute').removeAttribute(mark);
+    await wait(() => hidden('attribute'), 'page removal of a hide marker is repaired');
+    byId('ancestor').querySelector('span').textContent = 'Article';
+    await wait(() => !hidden('ancestor'), 'ancestor hide is released after child text changes');
+    const late = document.createElement('div'); late.id = 'late'; late.className = 'text-ad';
+    late.textContent = 'Advertisement'; document.body.append(late);
+    await wait(() => hidden('late'), 'dynamically added element is filtered');
+    history.pushState({}, '', '/procedure-route?mode=on');
+    await wait(() => hidden('path'), 'SPA route transition applies path condition');
+    history.pushState({}, '', '/fixture?mode=on');
+    await wait(() => !hidden('path'), 'SPA route transition releases path condition');
+    const frame = document.createElement('iframe');
+    frame.src = '/no-generic?frame=1'; document.body.append(frame);
+    await new Promise(resolve => frame.onload = resolve);
+    await wait(() => frame.contentWindow.getComputedStyle(frame.contentDocument.getElementById('frame-ad')).display === 'none',
+      'procedural rules apply independently in an iframe with generichide disabled');
+    const bulk = document.createElement('section'); bulk.id = 'bulk';
+    for (let index = 0; index < 1500; ++index) {
+      const node = document.createElement('div'); node.className = 'text-ad';
+      node.textContent = index % 2 ? 'Article' : 'Advertisement'; bulk.append(node);
+    }
+    document.body.append(bulk);
+    await wait(() => [...bulk.children].every((node, index) =>
+      (getComputedStyle(node).display === 'none') === (index % 2 === 0)),
+      'resumable batches finish beyond one work budget without hiding normal rows');
+    bulk.remove();
+  }
+  byId('result').textContent = JSON.stringify(results);
+})().catch(error => {
+  const diagnostics = ['display', 'conditional-style'].map(id => {
+    const node = document.getElementById(id);
+    const markers = node.getAttributeNames().filter(name => name.startsWith('data-yee-cb-'));
+    const before = {display: getComputedStyle(node).display, color: getComputedStyle(node).color};
+    for (const marker of markers) node.removeAttribute(marker);
+    const unmarked = {display: getComputedStyle(node).display, color: getComputedStyle(node).color};
+    for (const marker of markers) node.setAttribute(marker, '');
+    return {id, html: node.outerHTML, before, unmarked};
+  });
+  document.getElementById('result').textContent = JSON.stringify({error: error.stack, diagnostics});
+});
+</script>

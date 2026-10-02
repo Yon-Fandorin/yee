@@ -55,6 +55,7 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/serde_1_0_229/crates-io.md",
   ]
   features = [
+    "alloc",
     "default",
     "derive",
     "rc",

@@ -205,9 +205,14 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
 
+### 콘텐츠 차단 검증
+
 콘텐츠 차단과 Site Controls는 다음 명령으로 확인한다.
 
 - `test-site-controls.sh`: 사이트별 토글·저장·창과 탭 수명·worker/cache 통합 검사
+- `python3 tools/dev/test-procedural-content-blocking.py`: 새 실제 Yee의 로컬 HTTP 탭에서
+  native procedural/action 주입·동적 조건 적용과 해제·SPA·iframe·분할 작업을 검사한다.
+  켬·끔·프로필 사이트 예외를 각각 격리 프로필로 확인하며 라이브 광고 관측은 하지 않는다.
 - `test-youtube-live.sh off|on`: 실제 YouTube의 본편 재생 검사와 광고 전달 관측
 - `python3 tools/dev/test-content-blocking-browser-fixture.py --yee`:
   새 실제 Yee의 파일 탭에서 body reader·clone·다른 realm과 오류 처리, CSS와
@@ -221,6 +226,12 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 정상 종료한다. YouTube 검사는 외부 네트워크를 사용하고, 플레이어 오류·멈춤과
 최소 본편 재생 시간을 검사한다. 관측 시간·영상 선택·탐색 옵션과 광고 검증의
 범위는 [콘텐츠 차단 checkpoint](../../docs/content-blocking-checkpoint.md#40초대-재생-오류)에 있다.
+
+`test-youtube-live.sh`의 기본 영상은 `5EzB_2Qcakw`, `uq14seOjILU`, `mfmdXPT7nAM`이다.
+`YEE_LIVE_YOUTUBE_VIDEO`로 이 중 하나를 선택하고 `YEE_LIVE_YOUTUBE_SECONDS`로
+영상별 상한 90~600초를 지정한다. `YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS`는
+광고·탐색 이동을 제외한 최소 본편 시간이며 기본 60초다. `YEE_LIVE_YOUTUBE_SEEK=1`은
+40초·80초 뒤 중간 탐색을 추가한다. opt-in 결과는 `.local-build/youtube-live/`에 생성한다.
 
 초기 로딩·스크롤·영상 전환을 비교하려면 저장소 루트에서
 `node tools/dev/observe-youtube-live.mjs perf`를 실행한다.
@@ -305,11 +316,12 @@ trace를 켠 회차도 일반 로딩 표본과
 적용하고 결과를 `test-occlusion-override`로 표시한다. 광고 관측에는 적용하지 않는다.
 이 결과는 일반 창 상태의 실제 화면 애니메이션 검증을 대체하지 않는다.
 
-완료된 관측 자료는 결론·조건·표본 수·한계를 checkpoint에 반영한 뒤 정리한다.
-다음 분석에 필요한 trace만 남기고, 완료된 격리 프로필·브라우저 로그·원시 오디오·
-CPU 프로파일·수집 helper 캐시는 제거할 수 있다. 요약에 제거한 원본의 식별자를
-보존할 때는 원본 보존 여부도 명시한다. 사용자 프로필과 Chromium 빌드 캐시는
-정리 대상에 포함하지 않는다. 현재 남은 성능 작업은
+완료된 관측의 결론·조건·표본 수·한계는 checkpoint에 모은다. 현재 체크포인트는
+`.local-build/youtube-review/completed-checkpoint.json`과 최신 Web API·native·procedural fixture
+결과만 보존한다. 중간 요약·trace·CPU profile·오디오 수집 helper·이전 로그는 정리했다.
+새 분석의 원시 자료는 필요한 검토가 끝날 때 정리하고, 제거한 원본 ID를 요약에
+남기면 원본 보존 여부도 명시한다. 사용자 프로필과 Chromium 빌드 캐시는 유지한다.
+현재 필수 잔여 작업과 선택적인 성능 후보는
 [checkpoint](../../docs/content-blocking-checkpoint.md#남은-성능-작업)에 둔다.
 
 Header와 Sidebar의 세부 검증은 [Header 안내](../../docs/header/README.md)와

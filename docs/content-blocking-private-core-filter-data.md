@@ -52,7 +52,8 @@ binding을 통한 결합을 구분한다. 이는 본체 비공개를 목표로 �
 
 브라우저 빌드는 `YeeCompiledFilters.dat`와 `YeeCompiledFilterManifest.json`도
 추가한다. adblock-rust 0.13.3으로 같은 기본·trusted 규칙을 미리 컴파일한 선택적
-캐시다. JavaScript·redirect 리소스는 계속 외부 JSON에서 읽는다. 바이너리는
+캐시다. compiler와 browser 엔진 모두 `css-validation` feature를 사용한다.
+JavaScript·redirect 리소스는 계속 외부 JSON에서 읽는다. 바이너리는
 별도 데이터 파일이며 C++ header에 넣지 않는다. 기본 bundle과 커뮤니티 pack의
 generation·SHA-256이 일치해야 사용하고, upstream의 binary format 검증도 거친다.
 없거나 오래됐거나 손상됐으면 텍스트 파싱으로 돌아가므로 수정 pack에 필수는 아니다.
@@ -125,11 +126,12 @@ child에 전달되며 재시작으로 적용한다. 이 경로는 **신뢰하는
 
 ## 지원 수치와 한계
 
-선택된 텍스트 규칙은 30,571개, 2,970,098 bytes이며 원본 scriptlet 호출 10,179개를
+선택된 텍스트 규칙은 31,837개, 3,080,811 bytes이며 원본 scriptlet 호출 10,179개를
 포함한다. 리소스는 uBO 152 + redirect 45 + Brave 17 = 214개,
 1,029,481 bytes다. 현재 compiler의 없는 scriptlet 이름 제외는 0개다.
-extended/procedural/action cosmetic 1,429개, 미지원 redirect 호출 1개,
-response/URL 변환 35개는 계속 제외한다.
+HTML filtering·임의 JavaScript cosmetic 163개, 미지원 redirect 호출 1개,
+response/URL 변환 35개는 계속 제외한다. procedural/action 규칙은 선택 단계에서
+일괄 제외하지 않고 validating engine과 isolated-world consumer로 전달한다.
 
 선택된 텍스트 규칙 수는 engine이 모두 해석·적용했다는 통계가 아니다. 미지원 option,
 일부 regex removeparam·새 인자 문법 등은 upstream engine 단계에서 거부할 수 있다.
@@ -145,41 +147,21 @@ response/URL 변환 35개는 계속 제외한다.
 
 Brave 테스트에서 유지할 설계 원칙과 보강 범위는
 [현재 checkpoint](content-blocking-checkpoint.md#반복-검토에서-유지한-원칙)에 정리했다.
-최종 실행 결과:
+패키지와 실행 경계의 완료 근거:
 
-- tooling **13개 통과**. 기본 공개 아카이브 131개 파일로 다섯 배포 파일의 byte 단위
-  재현과 vendored manifest의 Git 포함을 검사했다. 실제 앱에 배포된 ABP cache 입력
-  포함 133개 파일 아카이브도 추출한 자료만으로 다섯 파일을 동일하게 재생성했다.
-  비공개 sentinel·C++·Rust adapter·자체 YouTube 코드는 제외한다. 공개 Rust 파일은
-  명시적으로 포함한 독립 데이터 compiler `compile_filters.rs` 하나다.
-- native core/settings/style/data/공통 worker **51개**와 Mojo factory/profile service **50개**, 총 **101개 통과**.
-  원본 generated script, trusted 권한·예외, redirect 별칭 우선순위, 잘못된 리소스의
-  전체 거부와 canonical 충돌·과도한 의존성 깊이 거부를 확인했다. 복합 permission mask,
-  dependency 권한, 이름 대소문자, 전체 scriptlet 예외, 목록 간 예외·CSP와 원본 redirect
-  45개·모든 별칭의 출력도 확인했다. blank MP4의 지원 코덱 대체를 확인하고
-  나머지는 원본 bytes를 보존한다. UTF-8·바이너리·빈 본문의 실제 Mojo 응답도 확인했다.
-  실제 컴파일 캐시와 텍스트 엔진의 출력 일치, generation 변경·checksum 오류의
-  cache 거부와 binary format 오류의 텍스트 복구도 확인했다. renderer worker의 엔진
-  생성·재사용, generic 예외·응답 sequence와 삭제된 수신자의 응답 취소도 통과했다.
-  다른 객체를 사용하는 공통 worker의 FIFO 실행·작업 스레드 해제와 이동 가능한
-  입력·결과도 검증했다.
-- 실제 Rust 엔진이 생성한 프로그램을 임시 Chrome의 독립 frame에서 실행하는
-  **1,239개 Chromium fixture assertion 통과**. 원본 set-constant·JSON prune·trusted
-  JSONPath 요청 편집, 원본 serverContract의 기존 DOM 노드 변환과 변환 결과의 실행,
-  로딩 중 parser가 추가한 serverContract 노드의 observer 변환과 종료, 실제 엔진이 생성한
-  공유 상태 계약의 실행, WWW/Mobile/Music/TV/Kids/nocookie 원본 + Yee 조합을 확인했다.
-  6개 host × 6개 endpoint × 6개 Body reader의 광고 제거·정상 내용·메타데이터·큰 정수와
-  이스케이프 보존·bodyUsed·두 번째 읽기 거부·unmatched 응답을 확인했다.
-  기존 실제 Web API/CSS/MP4 fixture **25개도 통과**했다. 이는 실제 Yee document-start callback이나
-  실제 YouTube 서버 계약·영상 재생 증명이 아니다.
-- 기존 YouTube lossless JSON **71 cases**, 확장 protocol/playback **248 assertions 통과**.
-- `tools/dev/build.sh` 전체 chrome target **빌드 성공**. macOS 실제 앱 bundle에서
-  다섯 원본 자료와 두 cache 자료의 byte·hash, GPL 원문·공개 도구 아카이브와 기존
-  MPL 자료를 확인했다. 첫 엔진 로딩의 비용과 Brave 대조는
-  [현재 checkpoint](content-blocking-checkpoint.md#첫-문서의-필터-엔진-로딩과-brave-대조)에 있다.
-- owned 차단 입력이 적용 Chromium과 byte 단위로 일치하고, community 원본 **116개**의 hash가 일치한다.
-  filter_data/core GN header dependency check, Chromium whitespace, `0001` reverse apply,
-  patch를 제외한 repository whitespace check를 통과했다.
+- tooling 13개로 기본 공개 아카이브 131개 파일과 다섯 배포 파일의 byte 단위
+  재현을 확인했다. 실제 앱의 ABP cache 입력을 포함한 133개 파일 아카이브도
+  추출한 자료만으로 같은 다섯 파일을 재생성했다. 비공개 adapter·renderer는 제외한다.
+- native 검증은 trusted 권한·dependency 권한·예외·이름 대소문자·canonical 충돌·
+  과도한 의존성 깊이·잘못된 pack 전체 거부를 포함한다. 45개 redirect와 모든
+  별칭의 출력 중 blank MP4에만 VP9 본문을 사용하고 나머지 원본 bytes를 유지한다.
+- 실제 컴파일 캐시와 텍스트 엔진의 출력 일치, generation·checksum 거부와
+  binary format 오류의 텍스트 복구를 확인했다.
+- macOS 전체 앱에서 다섯 원본 자료와 두 cache 자료의 byte·hash,
+  GPL 원문·공개 도구 아카이브와 MPL 자료를 확인했다. community 원본 116개와
+  owned mirror의 byte·hash, GN header dependency와 patch 검증도 통과했다.
 
-실제 앱을 확인할 때는 모든 Yee를 정상 종료하고 새 빌드를 실행한 뒤 별도 임시
-프로필을 사용한다. 로컬 `.local-build` 로그는 현재 판정의 영구 근거로 간주하지 않는다.
+실행 fixture의 현재 수치와 성능 결론은
+[현재 checkpoint](content-blocking-checkpoint.md#검증-기록)에 모은다.
+실제 앱 검증은 모든 Yee를 정상 종료한 뒤 새 앱과 별도 프로필로 수행한다.
+로컬 `.local-build` 로그를 현재 판정의 영구 근거로 간주하지 않는다.

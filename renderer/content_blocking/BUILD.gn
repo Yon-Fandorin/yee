@@ -4,6 +4,7 @@ action("scripts") {
     "generic_cosmetic.js",
     "youtube.js",
     "selector_validation.js",
+    "procedural_cosmetic.js",
   ]
   outputs = [ "$target_gen_dir/scripts.h" ]
   args = rebase_path(inputs + outputs, root_build_dir)

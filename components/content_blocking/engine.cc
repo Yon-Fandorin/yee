@@ -103,7 +103,8 @@ PageRules Engine::RulesForPage(std::string_view url) {
     CHECK_NE(offset, std::string::npos);
     script.replace(offset, marker.size(), rules.script.data(), rules.script.size());
   }
-  return {Strings(rules.selectors), Strings(rules.exceptions),
+  return {Strings(rules.selectors), Strings(rules.procedural_actions),
+          Strings(rules.exceptions),
           std::move(script),
           rules.generic_hide};
 }

@@ -21,3 +21,28 @@ yee-fixture.test##+js(yee-fixture.js)
 ||yee-utf8.test^$redirect=yee-utf8.html
 ||yee-binary.test^$redirect=yee-binary.png
 ||yee-zero.test^$redirect=yee-zero.txt
+yee-procedural.test##.text-ad:has-text(Advertisement)
+yee-procedural.test##.regex-ad:has-text(/sponsored/i)
+yee-procedural.test##.quoted-ad:has-text("BUY THIS PRODUCT")
+yee-procedural.test##.ancestor-label:has-text(Advertisement):upward(1)
+yee-procedural.test##.closest-label:has-text(Ad):upward(.closest-card)
+yee-procedural.test##.attribute-ad:matches-attr(data-sponsored="yes")
+yee-procedural.test##.regex-attribute:matches-attr(/data-ad/=/(yes|true)/)
+yee-procedural.test##.css-ad:matches-css(color: rgb(255, 0, 0))
+yee-procedural.test##.yee-procedural-display:matches-css(display: block)
+yee-procedural.test##.conditional-style:matches-css(color: rgb(255, 0, 0)):style(color: rgb(0, 128, 0) !important)
+yee-procedural.test##.before-ad:matches-css-before(content: "Sponsored")
+yee-procedural.test##.after-ad:matches-css-after(content: "Sponsored")
+yee-procedural.test##.long-ad:min-text-length(10)
+yee-procedural.test##.xpath-card:xpath(.//span[@class="xpath-target"])
+yee-procedural.test##.descendant-card:has-text(Advertisement) > .descendant-target
+yee-procedural.test##.sibling-label:has-text(Advertisement) + .sibling-target
+yee-procedural.test##.suffix-ad:has-text(Advertisement).chosen
+yee-procedural.test##.path-ad:matches-path(/procedure-route/)
+yee-procedural.test##.style-action:style(color: rgb(0, 128, 0) !important)
+yee-procedural.test##.remove-action:remove()
+yee-procedural.test##.attribute-action:remove-attr(data-ad)
+yee-procedural.test##.class-action:remove-class(advertising)
+yee-procedural.test##.exception-ad:has-text(Advertisement)
+yee-procedural.test#@#.exception-ad:has-text(Advertisement)
+@@||yee-procedural.test/no-generic^$generichide

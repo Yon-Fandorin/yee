@@ -34,6 +34,10 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/rustc_hash_2_1_3/LICENSE-MIT",
     "//third_party/rust/yee_adblock/rustc_hash_2_1_3/README.md",
   ]
+  features = [
+    "default",
+    "std",
+  ]
   deps = [
   ]
   build_deps = [

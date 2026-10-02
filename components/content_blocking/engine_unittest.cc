@@ -6,6 +6,7 @@
 
 #include "base/base64.h"
 #include "base/json/json_writer.h"
+#include "base/json/json_reader.h"
 #include "base/values.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -31,6 +32,48 @@ base::DictValue MakeResource(std::string_view name, std::string_view source,
   return resource;
 }
 }  // namespace
+
+TEST(ContentBlockingEngine, ProceduralOperatorsAndActionsReachRenderer) {
+  Engine engine("page.test##.label:has-text(Advertisement):upward(1)\n"
+                "page.test##.styled:style(color: red !important)\n"
+                "page.test##.removed:remove()\n"
+                "page.test#?#.conditional:matches-attr(data-ad=\"yes\")\n");
+  const auto rules = engine.RulesForPage("https://page.test/");
+  ASSERT_EQ(rules.procedural_actions.size(), 4u);
+  bool chained = false, style = false, remove = false, attribute = false;
+  for (const auto& action : rules.procedural_actions) {
+    auto parsed = base::JSONReader::ReadDict(action, base::JSON_PARSE_RFC);
+    ASSERT_TRUE(parsed);
+    const auto* selectors = parsed->FindList("selector");
+    ASSERT_TRUE(selectors);
+    ASSERT_FALSE(selectors->empty());
+    if (selectors->size() == 3) {
+      EXPECT_EQ(*(*selectors)[1].GetDict().FindString("type"), "has-text");
+      EXPECT_EQ(*(*selectors)[2].GetDict().FindString("type"), "upward");
+      chained = true;
+    }
+    if (const auto* type = parsed->FindStringByDottedPath("action.type")) {
+      style |= *type == "style";
+      remove |= *type == "remove";
+    }
+    attribute |= selectors->size() == 2 &&
+        *(*selectors)[1].GetDict().FindString("type") == "matches-attr";
+  }
+  EXPECT_TRUE(chained && style && remove && attribute);
+  EXPECT_TRUE(rules.selectors.empty());
+  EXPECT_TRUE(engine.RulesForPage("https://other.test/").procedural_actions.empty());
+}
+
+TEST(ContentBlockingEngine, ProceduralExceptionsAndUnsupportedSyntaxFailClosed) {
+  Engine engine("page.test##.ad:has-text(Advertisement)\n"
+                "page.test##.kept:remove()\n"
+                "##div:has-text(Advertisement)\n"
+                "page.test##.partial:has-text(Advertisement):contains(bad)\n"
+                "page.test##.unsafe:style(background: url(https://ads.test/))\n", "",
+                "page.test#@#.ad:has-text(Advertisement)\n"
+                "page.test#@#.kept:remove()\n");
+  EXPECT_TRUE(engine.RulesForPage("https://page.test/").procedural_actions.empty());
+}
 
 // Contracts exercised by Brave's AdBlockService browser tests, at Yee's
 // unchanged Rust engine boundary. Renderer lifecycle is a separate app gate.

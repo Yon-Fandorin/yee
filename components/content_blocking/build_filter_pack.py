@@ -55,12 +55,12 @@ def supported(line, redirects, scriptlets=()):
             return None  # Entire-site scriptlet exception.
         name = name if name.endswith(".js") else name + ".js"
         return None if name in scriptlets else "unsupported_scriptlet"
-    if any(marker in line for marker in ["#?#", "#@?#", "#$#", "#@$#",
-                                         "#%#", "#@%#", "##^", "#@#^"]):
+    # HTML filtering and arbitrary JS injection have no renderer executor.
+    # Procedural/action cosmetics pass through to adblock-rust's validating
+    # parser; unsupported operators are rejected there rather than executed.
+    if any(marker in line for marker in ["#%#", "#@%#", "##^", "#@#^"]):
         return "extended_cosmetic"
     if "##" in line or "#@#" in line:
-        if re.search(r":(?:has-text|contains|matches-[\w-]+|remove(?:-attr|-class)?|style|xpath|upward|watch-attr)\(", line):
-            return "extended_cosmetic"
         return None
     if re.search(r"(?:\$|,)(?:replace|urltransform|uritransform)=", line):
         return "unsupported_network"

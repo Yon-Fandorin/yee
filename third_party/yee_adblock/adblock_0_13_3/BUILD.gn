@@ -83,9 +83,12 @@ cargo_crate("lib") {
   ]
   features = [
     "addr",
+    "css-validation",
+    "cssparser",
     "default",
     "embedded-domain-resolver",
     "full-regex-handling",
+    "selectors",
     "single-thread",
   ]
   deps = [
@@ -93,6 +96,7 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/arrayvec_0_7_8:lib",
     "//third_party/rust/yee_adblock/base64_0_22_1:lib",
     "//third_party/rust/yee_adblock/bitflags_2_13_2:lib",
+    "//third_party/rust/yee_adblock/cssparser_0_35_0:lib",
     "//third_party/rust/yee_adblock/flatbuffers_25_12_19:lib",
     "//third_party/rust/yee_adblock/idna_1_1_0:lib",
     "//third_party/rust/yee_adblock/itertools_0_14_0:lib",
@@ -102,6 +106,7 @@ cargo_crate("lib") {
     "//third_party/rust/yee_adblock/regex_1_13_1:lib",
     "//third_party/rust/yee_adblock/rustc_hash_2_1_3:lib",
     "//third_party/rust/yee_adblock/seahash_4_1_0:lib",
+    "//third_party/rust/yee_adblock/selectors_0_32_0:lib",
     "//third_party/rust/yee_adblock/serde_1_0_229:lib",
     "//third_party/rust/yee_adblock/serde_json_1_0_151:lib",
     "//third_party/rust/yee_adblock/thiserror_1_0_69:lib",

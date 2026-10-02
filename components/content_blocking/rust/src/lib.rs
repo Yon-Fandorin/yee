@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 mod ffi {
     struct DocumentRules {
         selectors: Vec<String>,
+        procedural_actions: Vec<String>,
         exceptions: Vec<String>,
         script: String,
         generic_hide: bool,
@@ -154,6 +155,7 @@ impl FilterEngine {
         let rules = self.0.url_cosmetic_resources(url);
         ffi::DocumentRules {
             selectors: rules.hide_selectors.into_iter().collect(),
+            procedural_actions: rules.procedural_actions.into_iter().collect(),
             exceptions: rules.exceptions.into_iter().collect(),
             script: rules.injected_script,
             generic_hide: !rules.generichide,

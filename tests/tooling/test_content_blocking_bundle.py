@@ -139,7 +139,10 @@ class CommunityPack(unittest.TestCase):
         self.assertEqual(PACK.supported("site.test##+js(rpnt, script, arbitrary-code)", redirects), "unsupported_scriptlet")
         self.assertIsNone(PACK.supported("site.test##+js(rpnt, script, source)", redirects, {"rpnt.js"}))
         self.assertIsNone(PACK.supported("site.test#@#+js()", redirects))
-        self.assertEqual(PACK.supported("site.test##div:remove()", redirects), "extended_cosmetic")
+        self.assertIsNone(PACK.supported("site.test##div:remove()", redirects))
+        self.assertIsNone(PACK.supported("site.test##span:has-text(Advertisement):upward(1)", redirects))
+        self.assertIsNone(PACK.supported("site.test#?#.ad:matches-css(display: block)", redirects))
+        self.assertEqual(PACK.supported("site.test##^script:has-text(advert)", redirects), "extended_cosmetic")
         self.assertIsNone(PACK.supported("site.test##div:has(.ad)", redirects))
         self.assertEqual(PACK.supported("||site.test^$replace=/one/two/", redirects), "unsupported_network")
 

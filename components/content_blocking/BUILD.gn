@@ -170,6 +170,7 @@ action("package_notices") {
     "data/third-party-licenses/sources.json",
     "data/third-party-licenses/flatbuffers-25.12.19.txt",
     "data/third-party-licenses/seahash-4.1.0.txt",
+    "data/third-party-licenses/selectors-0.32.0.txt",
     "data/easylist.txt",
     "data/easyprivacy.txt",
   ]
