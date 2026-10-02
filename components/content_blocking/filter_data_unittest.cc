@@ -112,9 +112,12 @@ TEST_F(CommunityFilterDataTest, OversizedFilesAreRejected) {
 TEST_F(CommunityFilterDataTest, InvalidResourcesRejectFiltersToo) {
   for (const auto* resources : {"not json", "{}",
       R"([{"name":"x.js","kind":{"mime":"application/javascript"},"content":"invalid!"}])",
+      R"([{"name":"noop-1s.mp4","kind":{"mime":"video/mp4"},"content":"invalid!"}])",
+      R"([{"name":"noop-1s.mp4","kind":{"mime":"application/javascript"},"content":""}])",
       R"([{"name":"x.js","aliases":["x.js"],"kind":{"mime":"application/javascript"},"content":""}])",
       R"([{"name":"x.js","kind":{"mime":"application/javascript"},"content":"","dependencies":["missing.fn"]}])",
       R"([{"name":"x.js","kind":{"mime":"application/javascript"},"content":"","dependencies":["x.js"]}])"}) {
+    SCOPED_TRACE(resources);
     WritePack("||tracker.test^\n", resources);
     const auto snapshot = Read();
     EXPECT_EQ(snapshot.status, FilterDataStatus::kInvalid);
@@ -303,13 +306,22 @@ TEST(CommunityFilterProductionData, TrustedPermissionsAndScriptletExceptions) {
   EXPECT_TRUE(redirect.blocked);
   EXPECT_EQ(redirect.replacement.find("data:application/javascript;base64,"), 0u);
 }
-TEST(CommunityFilterProductionData, EveryOriginalRedirectAndAliasPreservesBytes) {
+TEST(CommunityFilterProductionData, RedirectsPreserveBytesAndUseSupportedBlankMp4) {
   base::FilePath directory;
   ASSERT_TRUE(base::PathService::Get(base::DIR_EXE, &directory));
   const auto data = ReadCommunityFilterData(directory.AppendASCII("community-filter-test-data"));
   ASSERT_EQ(data.status, FilterDataStatus::kLoaded);
   const auto resources = base::JSONReader::ReadList(data.resources, base::JSON_PARSE_RFC);
   ASSERT_TRUE(resources);
+  const auto bundled = base::JSONReader::ReadList(kBundledResources, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(bundled);
+  const std::string* blank_mp4 = nullptr;
+  for (const auto& value : *bundled) {
+    const auto& resource = value.GetDict();
+    if (resource.FindString("name") && *resource.FindString("name") == "yee-blank.mp4")
+      blank_mp4 = resource.FindString("content");
+  }
+  ASSERT_TRUE(blank_mp4);
   std::string filters;
   std::vector<std::pair<std::string, std::string>> expected;
   size_t redirect_count = 0;
@@ -324,6 +336,11 @@ TEST(CommunityFilterProductionData, EveryOriginalRedirectAndAliasPreservesBytes)
     ASSERT_TRUE(name && kind && content);
     const auto* mime = kind->FindString("mime");
     ASSERT_TRUE(mime);
+    if (*name == "noop-1s.mp4") {
+      EXPECT_EQ(*mime, "video/mp4");
+      EXPECT_NE(*content, *blank_mp4);
+      content = blank_mp4;
+    }
     std::vector<std::string> identifiers{*name};
     if (const auto* aliases = resource.FindList("aliases")) {
       for (const auto& alias : *aliases) identifiers.push_back(alias.GetString());

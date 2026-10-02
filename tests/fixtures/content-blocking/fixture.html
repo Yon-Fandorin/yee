@@ -20,6 +20,22 @@ window.results = {beforeFirstInline: !!window.__yeeFilterFixture};
   freshBlank.remove();
   const replacement = await fetch(`http://yee-redirect.test:${port}/ad.js`);
   results.replacementBody = await replacement.text();
+  results.replacementVideo = null;
+  if (results.beforeFirstInline) {
+    const video = document.createElement('video'); video.muted = true;
+    document.body.append(video);
+    results.replacementVideo = await new Promise(resolve => {
+      const finish = error => {clearTimeout(timer); resolve({error, ended: video.ended,
+        duration: video.duration, width: video.videoWidth, height: video.videoHeight,
+        decodedFrames: video.getVideoPlaybackQuality().totalVideoFrames});};
+      const timer = setTimeout(() => finish('timeout'), 8000);
+      video.onended = () => finish(null);
+      video.onerror = () => finish(`decode:${video.error?.code}`);
+      video.src = `http://yee-video.test:${port}/ad.mp4`;
+      video.play().catch(error => finish(error.name));
+    });
+    video.remove();
+  }
   const cleaned = await fetch(`http://yee-query.test:${port}/resource?tracking=1&keep=2`);
   results.cleanedURL = cleaned.url;
   results.cleanedRedirected = cleaned.redirected;

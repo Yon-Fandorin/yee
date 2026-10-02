@@ -164,7 +164,7 @@ TEST_F(FilteringFactoryTest, RedirectResourceProducesBodyWithoutNetworkRequest) 
   EXPECT_EQ(body, "/* Yee empty replacement. */");
   EXPECT_EQ(terminal_.total_requests(), 0u);
 }
-TEST_F(FilteringFactoryTest, LegacyRewriteAliasProducesPlayableResource) {
+TEST_F(FilteringFactoryTest, LegacyRewriteAliasDeliversVp9BlankMp4) {
   Connect();
   Start("https://yee-video.test/ad.mp4");
   client_.RunUntilComplete();
@@ -173,8 +173,10 @@ TEST_F(FilteringFactoryTest, LegacyRewriteAliasProducesPlayableResource) {
   EXPECT_EQ(client_.response_head()->mime_type, "video/mp4");
   std::string body;
   ASSERT_TRUE(mojo::BlockingCopyToString(client_.response_body_release(), &body));
-  EXPECT_EQ(body.size(), 1831u);
+  EXPECT_EQ(body.size(), 837u);
   EXPECT_EQ(body.substr(4, 4), "ftyp");
+  EXPECT_NE(body.find("vp09"), std::string::npos);
+  EXPECT_EQ(body.find("avc1"), std::string::npos);
   EXPECT_EQ(terminal_.total_requests(), 0u);
 }
 // Brave's stub-response tests require the resource MIME to take precedence

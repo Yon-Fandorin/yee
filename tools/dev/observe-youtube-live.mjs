@@ -11,8 +11,20 @@ import http from 'node:http';
 import {gzip} from 'node:zlib';
 import {connectCDP, closeOwnedBrowser, pause, requireShutdown} from './content_blocking_test_runtime.mjs';
 import {sanitizeTraceEvent} from './performance_trace.mjs';
+import {classifyProfileScript, summarizeCPUWindow} from './performance_cpu.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const ownedCPUSources = {
+  'yee-youtube': (await fs.readFile(path.join(root,'renderer/content_blocking/youtube.js'),'utf8')).trim(),
+  'yee-generic': (await fs.readFile(path.join(root,'renderer/content_blocking/generic_cosmetic.js'),'utf8')).trim(),
+  'yee-selectors': (await fs.readFile(path.join(root,'renderer/content_blocking/selector_validation.js'),'utf8')).trim(),
+  'yee-scriptlets': (await fs.readFile(path.join(root,'components/content_blocking/scriptlet_runtime.js'),'utf8'))
+    .split('/* YEE_SCRIPTLET_PROGRAM */')[0].trim(),
+  // Exact runtime prefix in installed Brave 1.95.104's scriptlet_constants.cc
+  // (brave-core b395074596c663e344272cde7f7d7bd3d496e7e9). Other Brave scripts
+  // stay unresolved unless their source is identified separately.
+  'brave-scriptlets': 'const scriptletGlobals = (() => {\n    const forwardedMapMethods = ["has", "get", "set"];',
+};
 let interrupted;
 for(const signal of ['SIGINT','SIGTERM']) process.once(signal,()=>{interrupted=signal;});
 function checkInterrupted(){if(interrupted)throw new Error(`Observation cancelled by ${interrupted}`);}
@@ -33,6 +45,8 @@ assert.ok(['0','1'].includes(process.env.YEE_LIVE_PERFORMANCE_IGNORE_OCCLUSION??
 const ignorePerformanceOcclusion=process.env.YEE_LIVE_PERFORMANCE_IGNORE_OCCLUSION==='1';
 assert.ok(['0','1'].includes(process.env.YEE_LIVE_PERFORMANCE_CPU_PROFILE??'0'));
 const profilePerformanceCPU=process.env.YEE_LIVE_PERFORMANCE_CPU_PROFILE==='1';
+assert.ok(['0','1'].includes(process.env.YEE_LIVE_PERFORMANCE_SKIP_SCROLL??'0'));
+const skipPerformanceScroll=process.env.YEE_LIVE_PERFORMANCE_SKIP_SCROLL==='1';
 assert.ok(['0','1'].includes(process.env.YEE_LIVE_PERFORMANCE_TRACE??'0'));
 const tracePerformance=process.env.YEE_LIVE_PERFORMANCE_TRACE==='1';
 const performanceVideo=process.env.YEE_LIVE_PERFORMANCE_VIDEO??null;
@@ -76,7 +90,9 @@ const report = {schema: 'yee.youtube-real-site-review.v1', plan, startedAt: new 
   seconds, warmupSeconds, videos, performanceRounds, performanceGroups,
   performanceCondition:ignorePerformanceOcclusion?'test-occlusion-override':'native-visible',
   cpuProfiling:profilePerformanceCPU,
+  scrollMeasurement:!skipPerformanceScroll,
   nativeTracing:tracePerformance,
+  nativeTraceWindowMs:tracePerformance?5000:null,
   performanceVideo,
   cases: [], limitations: ['Ad delivery is probabilistic.',
     'Remote debugging is enabled equally for measured browsers; no DOM automation controller.',
@@ -84,6 +100,7 @@ const report = {schema: 'yee.youtube-real-site-review.v1', plan, startedAt: new 
 
 // Paint metrics are document metrics; SPA transitions have separately named timings.
 function installMetrics() {
+  performance.setResourceTimingBufferSize(1000);
   if (window === top) performance.mark('yee-review-document-start');
   const state = window.__yeeReview = {started: performance.now(), fcp: null, lcp: null,
     cls: 0, longTasks: [], frames: [],
@@ -121,8 +138,29 @@ async function evaluate(cdp, expression, awaitPromise = false) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description??response.exceptionDetails.text);
   return response.result.value;
 }
-async function captureCPUProfile(session, phase) {
+async function captureCPUProfile(session, phase, windows = {}) {
   const {profile}=await session.cdp.call('Profiler.stop');
+  // Identify anonymous injected scripts by exact owned source, not function names.
+  // Read source only after stopping the measured phase, and do not write it out.
+  const scripts=session.scriptOwners;
+  const ids=new Set(profile.nodes.map(node=>node.callFrame.scriptId));
+  let resolvedBytes=0, attempted=0;
+  for(const scriptId of ids) {
+    if(scripts.has(scriptId)||scriptId==='0')continue;
+    const parsed=session.parsedScripts.get(scriptId);
+    const url=parsed?.url||profile.nodes.find(node=>node.callFrame.scriptId===scriptId)?.callFrame.url||'';
+    let owner=/^https?:/.test(url)?'page':'unresolved';
+    if(!/\.m?js(?:[?#]|$)/.test(url)&&attempted<256&&resolvedBytes<32*1024*1024&&
+        (!parsed?.length||parsed.length<=2*1024*1024)) {
+      ++attempted;
+      try {
+        const {scriptSource}=await session.cdp.call('Debugger.getScriptSource',{scriptId});
+        resolvedBytes+=Buffer.byteLength(scriptSource);
+        owner=classifyProfileScript(scriptSource,url,ownedCPUSources);
+      } catch {} // Collected scripts can disappear; keep unresolved attribution.
+    }
+    scripts.set(scriptId,{owner});
+  }
   // Keep public script paths; discard query strings, fragments, and inline URLs.
   for(const node of profile.nodes) {
     try {
@@ -130,31 +168,46 @@ async function captureCPUProfile(session, phase) {
       node.callFrame.url=['http:','https:'].includes(url.protocol)?url.origin+url.pathname:'(inline)';
     } catch {node.callFrame.url='';}
   }
-  const nodes=new Map(profile.nodes.map(n=>[n.id,n])),parents=new Map(),totals=new Map();
-  for(const node of profile.nodes)for(const child of node.children??[])parents.set(child,node.id);
-  const key=node=>JSON.stringify([node.callFrame.functionName,node.callFrame.url,node.callFrame.lineNumber]);
-  const add=(id,field,ms)=>{
-    const node=nodes.get(id);if(!node)return;
-    const row=totals.get(key(node))??{function:node.callFrame.functionName,url:node.callFrame.url,
-      line:node.callFrame.lineNumber+1,selfMs:0,inclusiveMs:0};
-    row[field]+=ms;totals.set(key(node),row);
-  };
-  for(let i=0;i<(profile.samples?.length??0);i++) {
-    const id=profile.samples[i],ms=(profile.timeDeltas?.[i]??0)/1000;
-    add(id,'selfMs',ms);
-    const visited=new Set();
-    for(let current=id;current!==undefined;current=parents.get(current)) {
-      const node=nodes.get(current);if(!node)break;
-      if(!visited.has(key(node))){add(current,'inclusiveMs',ms);visited.add(key(node));}
-    }
-  }
-  const rows=[...totals.values()].filter(r=>!['(root)','(idle)','(program)'].includes(r.function));
   const file=`${phase}.cpuprofile.gz`;
   await fs.writeFile(path.join(session.directory,file),await promisify(gzip)(JSON.stringify(profile)));
+  await fs.writeFile(path.join(session.directory,`${phase}.cpu-owners.json`),
+    JSON.stringify({sourceOwners:Object.fromEntries(scripts),windows}));
+  const total=summarizeCPUWindow(profile,scripts,profile.startTime,profile.endTime);
+  const slices=Object.fromEntries(Object.entries(windows).map(([name,range])=>
+    [name,summarizeCPUWindow(profile,scripts,range.startUs,range.endUs)]));
   return {file:path.relative(output,path.join(session.directory,file)),samplingIntervalMicroseconds:1000,
     durationMs:(profile.endTime-profile.startTime)/1000,samples:profile.samples?.length??0,
-    topSelf:[...rows].sort((a,b)=>b.selfMs-a.selfMs).slice(0,25),
-    topInclusive:[...rows].sort((a,b)=>b.inclusiveMs-a.inclusiveMs).slice(0,25)};
+    ...total,windows:slices,sourceOwners:Object.fromEntries(scripts)};
+}
+const resourceTimings = `performance.getEntriesByType('resource').slice(0,1000).map(e=>({
+  url:(()=>{try{const u=new URL(e.name);return ['http:','https:'].includes(u.protocol)?u.origin+u.pathname:'(non-http)'}catch{return '(non-http)'}})(),
+  type:e.initiatorType,start:e.startTime,duration:e.duration,request:e.requestStart,
+  response:e.responseStart,end:e.responseEnd,transferBytes:e.transferSize,decodedBytes:e.decodedBodySize}))`;
+async function startNetworkTimings(session) {
+  const records=[],active=new Map();session.networkTimings=records;
+  session.cdp.on('Network.requestWillBeSent',event=>{
+    if(records.length>=2000)return;
+    let url;try{const parsed=new URL(event.request.url);url=parsed.origin+parsed.pathname}catch{return;}
+    if(!/^https?:/.test(url))return;
+    const record={url,type:event.type,startUs:event.timestamp*1e6};
+    records.push(record);active.set(event.requestId,record);
+  });
+  session.cdp.on('Network.responseReceived',event=>{
+    const record=active.get(event.requestId);if(!record)return;
+    Object.assign(record,{responseUs:event.timestamp*1e6,status:event.response.status,
+      mime:event.response.mimeType,diskCache:!!event.response.fromDiskCache,
+      serviceWorker:!!event.response.fromServiceWorker});
+  });
+  session.cdp.on('Network.loadingFinished',event=>{
+    const record=active.get(event.requestId);if(!record)return;
+    Object.assign(record,{endUs:event.timestamp*1e6,encodedBytes:event.encodedDataLength});
+    active.delete(event.requestId);
+  });
+  session.cdp.on('Network.loadingFailed',event=>{
+    const record=active.get(event.requestId);if(!record)return;
+    Object.assign(record,{endUs:event.timestamp*1e6,failed:true});active.delete(event.requestId);
+  });
+  await session.cdp.call('Network.enable');
 }
 async function startPerformanceTrace(session) {
   await session.browserCDP.call('Tracing.start', {transferMode:'ReturnAsStream',streamFormat:'json',
@@ -467,24 +520,41 @@ async function observePerformance(browserName, mode, ordinal) {
     observation.windowStart=(await session.browserCDP.call('Browser.getWindowBounds',{windowId:session.windowId})).bounds;
     if(tracePerformance)await startPerformanceTrace(session);
     if(profilePerformanceCPU) {
+      await startNetworkTimings(session);
+      session.parsedScripts=new Map();session.scriptOwners=new Map();
+      session.cdp.on('Debugger.scriptParsed',event=>session.parsedScripts.set(event.scriptId,
+        {url:event.url,length:event.length}));
+      await session.cdp.call('Debugger.enable');
       await session.cdp.call('Profiler.enable');
       await session.cdp.call('Profiler.setSamplingInterval',{interval:1000});
       await session.cdp.call('Profiler.start');
     }
     await session.cdp.call('Page.navigate',{url:'https://www.youtube.com/results?search_query=veritasium'});
-    await pause(20000);
+    if(tracePerformance) {
+      await pause(5000);
+      observation.coldTrace=await capturePerformanceTrace(session,'cold');
+      await pause(15000);
+    } else await pause(20000);
     checkInterrupted();
-    if(profilePerformanceCPU)observation.coldCPU=await captureCPUProfile(session,'cold');
-    if(tracePerformance)observation.coldTrace=await capturePerformanceTrace(session,'cold');
     observation.cold = await evaluate(session.cdp, `({...window.__yeeReview,
       navigation:performance.getEntriesByType('navigation')[0]?.toJSON(),
       elements:document.getElementsByTagName('*').length,
       videos:document.querySelectorAll('ytd-video-renderer').length,
       viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio,outerWidth,outerHeight},
       visibilityState:document.visibilityState,hasFocus:document.hasFocus(),
+      ${profilePerformanceCPU?`resourceTimings:${resourceTimings},`:''}
       resources:performance.getEntriesByType('resource').reduce((out,e)=>{
         const k=e.initiatorType||'other';const s=out[k]??={count:0,transferBytes:0,decodedBytes:0};
         s.count++;s.transferBytes+=e.transferSize;s.decodedBytes+=e.decodedBodySize;return out;},{})})`);
+    if(profilePerformanceCPU) {
+      observation.coldMetrics=await session.cdp.call('Performance.getMetrics');
+      const nav=observation.coldMetrics.metrics.find(metric=>metric.name==='NavigationStart').value*1e6;
+      assert.ok(Number.isFinite(observation.cold.fcp),'FCP is required for CPU attribution');
+      const windows={beforeFCP:{startUs:nav,endUs:nav+observation.cold.fcp*1000}};
+      if(Number.isFinite(observation.cold.lcp))windows.beforeLCP={startUs:nav,endUs:nav+observation.cold.lcp*1000};
+      observation.coldCPU=await captureCPUProfile(session,'cold',windows);
+      observation.cold.networkRequests=session.networkTimings.filter(resource=>resource.startUs>=nav);
+    }
     observation.windowCold=(await session.browserCDP.call('Browser.getWindowBounds',{windowId:session.windowId})).bounds;
     assert.deepEqual(observation.cold.environment,{webdriver:false,domAutomationController:false});
     assert.equal(observation.cold.viewport.width,1000,'Matched content width');
@@ -492,31 +562,33 @@ async function observePerformance(browserName, mode, ordinal) {
     assert.ok(observation.cold.visibility.every(v=>v.state==='visible'),'Cold measurement was occluded');
     if(!ignorePerformanceOcclusion)assert.ok(observation.cold.hasFocus,'Native cold window must have focus');
     observation.processCold=await processSnapshot(session);
-    if(tracePerformance)await startPerformanceTrace(session);
-    await evaluate(session.cdp, `(()=>{
-      performance.mark('yee-review-scroll-start');
-      const start=performance.now(),state=window.__yeeScroll={frames:[],longTasks:[],visibility:[],
-        initialY:scrollY,finished:false};let previous;
-      const observer=new PerformanceObserver(list=>state.longTasks.push(...list.getEntries().map(e=>({start:e.startTime-start,duration:e.duration}))));
-      observer.observe({type:'longtask'});
-      const frame=t=>{state.visibility.push(document.visibilityState);
-        if(previous!==undefined)state.frames.push(t-previous);previous=t;
-        if(!state.finished)requestAnimationFrame(frame)};requestAnimationFrame(frame);
-      state.stop=()=>{performance.mark('yee-review-scroll-end');state.finished=true;observer.disconnect();const {stop,...result}=state;
-        return {...result,elapsed:performance.now()-start,finalY:scrollY,visibilityState:document.visibilityState,hasFocus:document.hasFocus()}};
-    })()`);
-    observation.scrollPositions=[];
-    for(const distance of [-600,600,-600,600]) {
-      await session.cdp.call('Input.synthesizeScrollGesture',{x:700,y:350,yDistance:distance,speed:500,gestureSourceType:'mouse'});
-      observation.scrollPositions.push(await evaluate(session.cdp,'scrollY'));
-      await pause(300);
+    if(!skipPerformanceScroll) {
+      if(tracePerformance)await startPerformanceTrace(session);
+      await evaluate(session.cdp, `(()=>{
+        performance.mark('yee-review-scroll-start');
+        const start=performance.now(),state=window.__yeeScroll={frames:[],longTasks:[],visibility:[],
+          initialY:scrollY,finished:false};let previous;
+        const observer=new PerformanceObserver(list=>state.longTasks.push(...list.getEntries().map(e=>({start:e.startTime-start,duration:e.duration}))));
+        observer.observe({type:'longtask'});
+        const frame=t=>{state.visibility.push(document.visibilityState);
+          if(previous!==undefined)state.frames.push(t-previous);previous=t;
+          if(!state.finished)requestAnimationFrame(frame)};requestAnimationFrame(frame);
+        state.stop=()=>{performance.mark('yee-review-scroll-end');state.finished=true;observer.disconnect();const {stop,...result}=state;
+          return {...result,elapsed:performance.now()-start,finalY:scrollY,visibilityState:document.visibilityState,hasFocus:document.hasFocus()}};
+      })()`);
+      observation.scrollPositions=[];
+      for(const distance of [-600,600,-600,600]) {
+        await session.cdp.call('Input.synthesizeScrollGesture',{x:700,y:350,yDistance:distance,speed:500,gestureSourceType:'mouse'});
+        observation.scrollPositions.push(await evaluate(session.cdp,'scrollY'));
+        await pause(300);
+      }
+      observation.scroll=await evaluate(session.cdp,'window.__yeeScroll.stop()');
+      assert.equal(observation.scroll.visibilityState,'visible');
+      if(!ignorePerformanceOcclusion)assert.ok(observation.scroll.hasFocus,'Native scroll window must have focus');
+      assert.ok(observation.scroll.visibility.length>0&&observation.scroll.visibility.every(v=>v==='visible'),'Scroll measurement was occluded');
+      assert.ok(observation.scrollPositions.some(y=>Math.abs(y-observation.scroll.initialY)>100),'Scroll input moved the page');
+      if(tracePerformance)observation.scrollTrace=await capturePerformanceTrace(session,'scroll');
     }
-    observation.scroll=await evaluate(session.cdp,'window.__yeeScroll.stop()');
-    assert.equal(observation.scroll.visibilityState,'visible');
-    if(!ignorePerformanceOcclusion)assert.ok(observation.scroll.hasFocus,'Native scroll window must have focus');
-    assert.ok(observation.scroll.visibility.length>0&&observation.scroll.visibility.every(v=>v==='visible'),'Scroll measurement was occluded');
-    assert.ok(observation.scrollPositions.some(y=>Math.abs(y-observation.scroll.initialY)>100),'Scroll input moved the page');
-    if(tracePerformance)observation.scrollTrace=await capturePerformanceTrace(session,'scroll');
     if(tracePerformance)await startPerformanceTrace(session);
     if(profilePerformanceCPU)await session.cdp.call('Profiler.start');
     await evaluate(session.cdp, `(()=>{
@@ -548,11 +620,24 @@ async function observePerformance(browserName, mode, ordinal) {
           viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio}}};
       link.click();return state.selectedVideoId;
     })()`);
-    await pause(10000);
+    if(tracePerformance) {
+      await pause(5000);
+      observation.transitionTrace=await capturePerformanceTrace(session,'transition');
+      await pause(5000);
+    } else await pause(10000);
     checkInterrupted();
-    if(profilePerformanceCPU)observation.transitionCPU=await captureCPUProfile(session,'transition');
-    if(tracePerformance)observation.transitionTrace=await capturePerformanceTrace(session,'transition');
     observation.transition = await evaluate(session.cdp,'window.__yeeTransition.stop()');
+    if(profilePerformanceCPU) {
+      observation.transition.resourceTimings=(await evaluate(session.cdp,resourceTimings))
+        .filter(resource=>resource.start>=observation.transition.started);
+      const nav=observation.coldMetrics.metrics.find(metric=>metric.name==='NavigationStart').value*1e6;
+      const start=nav+observation.transition.started*1000;
+      const windows={};
+      if(Number.isFinite(observation.transition.watchTitleAt))windows.beforeTitle={
+        startUs:start,endUs:start+observation.transition.watchTitleAt*1000};
+      observation.transitionCPU=await captureCPUProfile(session,'transition',windows);
+      observation.transition.networkRequests=session.networkTimings.filter(resource=>resource.startUs>=start);
+    }
     report.performanceVideo??=observation.transition.selectedVideoId;
     assert.equal(observation.transition.visibilityState,'visible');
     if(!ignorePerformanceOcclusion)assert.ok(observation.transition.hasFocus,'Native transition window must have focus');

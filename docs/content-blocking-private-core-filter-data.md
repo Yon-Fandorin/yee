@@ -86,6 +86,10 @@ MIME, 중복 이름·별칭, canonical 의존성·cycle, 기존 Yee fallback 이
 전 과도한 깊이를 거부한다. 실패하면 규칙과 리소스 모두 거부하고 기존 bundle을 쓴다.
 
 원본 redirect의 별칭이 Yee fallback 별칭보다 우선하며, canonical 충돌은 오류다.
+`noop-1s.mp4`는 현재 Yee 빌드가 지원하지 않는 H.264 원본 대신 독립 생성한
+VP9 MP4 본문을 사용한다. Rust adapter에서 본문만 교체하므로 원본 이름·별칭과
+배포 pack·source archive의 원본 bytes는 유지된다. 생성 방법은
+[대체 미디어 설명](../components/content_blocking/data/README.md)에 둔다.
 엔진별 test 리소스 등과의 추가 충돌도 진단 후 해당 엔진의 기존 bundle로 돌아간다.
 규칙·리소스 hash 모두 bundle generation에 반영한다.
 
@@ -152,7 +156,8 @@ Brave 테스트에서 유지할 설계 원칙과 보강 범위는
   원본 generated script, trusted 권한·예외, redirect 별칭 우선순위, 잘못된 리소스의
   전체 거부와 canonical 충돌·과도한 의존성 깊이 거부를 확인했다. 복합 permission mask,
   dependency 권한, 이름 대소문자, 전체 scriptlet 예외, 목록 간 예외·CSP와 원본 redirect
-  45개·모든 별칭의 바이트, UTF-8·바이너리·빈 본문의 실제 Mojo 응답도 확인했다.
+  45개·모든 별칭의 출력도 확인했다. blank MP4의 지원 코덱 대체를 확인하고
+  나머지는 원본 bytes를 보존한다. UTF-8·바이너리·빈 본문의 실제 Mojo 응답도 확인했다.
   실제 컴파일 캐시와 텍스트 엔진의 출력 일치, generation 변경·checksum 오류의
   cache 거부와 binary format 오류의 텍스트 복구도 확인했다. renderer worker의 엔진
   생성·재사용, generic 예외·응답 sequence와 삭제된 수신자의 응답 취소도 통과했다.

@@ -156,11 +156,14 @@
     }
     return root;
   }
-  function cleanText(text, changes = null) {
-    if (typeof text !== 'string' || text.length > 8 * 1024 * 1024 ||
-        (!changes && !text.includes('ad') && !text.includes('\\'))) return text;
+  function cleanText(text, changes = null, inspection = null) {
+    if (typeof text !== 'string' || text.length > 8 * 1024 * 1024) return text;
+    if (!changes && !text.includes('ad') && !text.includes('\\')) {
+      if (inspection) inspection.complete = true;
+      return text;
+    }
     const prefix = text.match(/^(?:\)\]\}'[, \t]*\r?\n|for\s*\(;;\);|while\s*\(1\);)\s*/)?.[0];
-    if (prefix && !changes) return prefix + cleanText(text.slice(prefix.length));
+    if (prefix && !changes) return prefix + cleanText(text.slice(prefix.length), null, inspection);
     try {
       // Validate without using the decoded numeric values for output. Edits
       // retain original literals, escapes, duplicate keys and unaffected data.
@@ -240,7 +243,10 @@
         }
       }
       value(0);
-      if (!edits.length) return text;
+      if (!edits.length) {
+        if (inspection && !changes) inspection.complete = true;
+        return text;
+      }
       edits.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
       let cursor = 0, result = '';
       for (const [start, end, replacement = ''] of edits) {
@@ -249,7 +255,9 @@
         result += replacement;
         cursor = end;
       }
-      return result + text.slice(cursor);
+      result += text.slice(cursor);
+      if (inspection && !changes) inspection.complete = true;
+      return result;
     } catch {
       // Keep malformed JSON intact. Non-JSON watch/playlist text may contain
       // embedded JSON keys; rename only the targeted property tokens.
@@ -345,8 +353,15 @@
     }}); } catch {}
   const originalFetch = globalThis.fetch;
   const originalClone = Response.prototype.clone, responseMetadata = new WeakMap();
+  const inspectedResponses = new WeakSet();
   function cloneWithMetadata(...args) {
     const result = Reflect.apply(originalClone, this, args);
+    if (inspectedResponses.has(this)) {
+      // Native clone may return another realm's prototype; carry inspection
+      // through subsequent clones even when that prototype has no Yee hook.
+      define(result, 'clone', {configurable: true, writable: true, value: cloneWithMetadata});
+      inspectedResponses.add(result);
+    }
     const metadata = responseMetadata.get(this);
     return metadata ? stampResponse(result, metadata) : result;
   }
@@ -443,12 +458,18 @@
           // Cancel the tee branch without awaiting its peer's consumption.
           const text = await readText(response.clone().body, 8 * 1024 * 1024);
           if (text === null) return response;
-          const result = cleanText(text);
-          if (result === text) return response;
+          const inspection = {complete: false};
+          const result = cleanText(text, null, inspection);
+          if (result === text) {
+            if (inspection.complete) inspectedResponses.add(response);
+            return response;
+          }
           const rewritten = new NativeResponse(result, {status: response.status,
             statusText: response.statusText, headers: response.headers});
-          return stampResponse(rewritten, {url: response.url, type: response.type,
+          stampResponse(rewritten, {url: response.url, type: response.type,
             redirected: response.redirected, ok: response.ok});
+          if (inspection.complete) inspectedResponses.add(rewritten);
+          return rewritten;
         } catch { return response; } // Abort, locked body, decoder/construction failure.
       }}); } catch {}
   }
@@ -478,6 +499,10 @@
       value: async function(...args) {
         const value = await Reflect.apply(original, this, args);
         if (!playerEndpoint(this.url)) return value;
+        // Completed fetch inspection covers this immutable body and its native
+        // clones. Keep native consumption/errors and parsed-object cleanup.
+        // Failed/limited scans and responses outside fetch still use cleanText.
+        if (method === 'text' && inspectedResponses.has(this)) return value;
         // Parsed response objects need removal, not permanent absent-field
         // accessors. Those accessors make original pruners report a change and
         // serialize an already-clean body, losing unrelated JSON bytes.

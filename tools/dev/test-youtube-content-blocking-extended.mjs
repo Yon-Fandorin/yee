@@ -11,7 +11,7 @@ const expected = '{"keep":9007199254740993,"tiny":1.2300e-99,"escaped":"\\u0041"
 let assertions = 0;
 function equal(actual, wanted, reason) {++assertions; assert.equal(actual, wanted, reason);}
 function make({href = 'https://www.youtube.com/watch?v=content', body = raw,
-               finalURL = playerURL, type = 'basic', fetchImpl, extras = {}} = {}) {
+               finalURL = playerURL, type = 'basic', fetchImpl, extras = {}, source = script} = {}) {
   class LocalResponse extends Response {}
   class LocalXHR {
     open(...args) {this.openArgs = args;}
@@ -29,8 +29,88 @@ function make({href = 'https://www.youtube.com/watch?v=content', body = raw,
         Object.defineProperty(response, key, {value});
       return response;
     }), ...extras});
-  vm.runInContext(script, context);
+  vm.runInContext(source, context);
   return {context, calls, LocalXHR};
+}
+
+// Count the lossless scanner in an in-memory diagnostic copy. No timing gate
+// or production hook is needed to prove that consuming clones avoids a rescan.
+const countedSource = script.replace('function cleanText(text, changes = null, inspection = null) {',
+  'function cleanText(text, changes = null, inspection = null) { globalThis.fixtureScans++;');
+assert.notEqual(countedSource, script, 'Diagnostic counter must attach to the scanner');
+for (const body of [raw, expected, '{"content":"plain"}']) {
+  const {context} = make({body, source: countedSource, extras: {fixtureScans: 0}});
+  const response = await context.fetch(playerURL);
+  equal(context.fixtureScans, 1, 'Fetch inspects the body once');
+  equal(response.bodyUsed, false, 'Inspection leaves the returned body unconsumed');
+  const copied = response.clone(), nested = copied.clone();
+  // Node's native clone returns the base Response and drops the fixture's
+  // synthetic URL. Borrow the installed reader with a matching URL to check
+  // propagation through that different native prototype.
+  for (const copy of [copied, nested]) {
+    if (!copy.url) Object.defineProperty(copy, 'url', {value: playerURL});
+    equal(await context.Response.prototype.text.call(copy), body === raw ? expected : body);
+  }
+  equal(await response.text(), body === raw ? expected : body);
+  equal(context.fixtureScans, 1, 'Text consumption and nested clones reuse completed inspection');
+  equal(response.bodyUsed, true);
+  await assert.rejects(response.text.bind(response)); ++assertions;
+  assert.throws(response.clone.bind(response)); ++assertions;
+}
+for (const body of ['{"adSlots":invalid}',
+  '{"adSlots":[],"child":' + '['.repeat(130) + '0' + ']'.repeat(130) + '}']) {
+  const {context} = make({body, source: countedSource, extras: {fixtureScans: 0}});
+  const response = await context.fetch(playerURL);
+  equal(await response.text(), body, 'Malformed and limited inspection retain the original body');
+  equal(context.fixtureScans, 2, 'Incomplete inspection keeps the fallback reader');
+}
+{
+  const body = ' '.repeat(8 * 1024 * 1024) + raw;
+  const {context} = make({body, source: countedSource, extras: {fixtureScans: 0}});
+  equal(await (await context.fetch(playerURL)).text(), body, 'Oversize fallback retains the complete body');
+  equal(context.fixtureScans, 1, 'Size-limited fetch inspection still enters the reader fallback');
+}
+{
+  const body = new Uint8Array([...Buffer.from('{"adSlots":[1],"keep":"'), 0xff, ...Buffer.from('"}')]);
+  const {context} = make({body, source: countedSource, extras: {fixtureScans: 0}});
+  equal(await (await context.fetch(playerURL)).text(), '{"keep":"\uFFFD"}',
+    'Failed fatal inspection preserves native decoding and reader cleanup');
+  equal(context.fixtureScans, 1, 'Decoder failure does not mark a response as inspected');
+}
+{
+  const {context} = make({source: countedSource, extras: {fixtureScans: 0}});
+  const response = new context.Response(raw);
+  Object.defineProperty(response, 'url', {value: playerURL});
+  equal(await response.text(), expected, 'Response outside fetch retains reader filtering');
+  equal(context.fixtureScans, 1);
+}
+{
+  const {context} = make({source: countedSource, extras: {fixtureScans: 0}});
+  const response = await context.fetch(playerURL);
+  equal((await response.json()).adPlacements, undefined, 'Native JSON consumption keeps sanitized data');
+  equal(response.bodyUsed, true);
+  await assert.rejects(response.json.bind(response)); ++assertions;
+  equal(context.fixtureScans, 1);
+}
+{
+  const response = new Response(raw);
+  Object.defineProperty(response, 'url', {value: playerURL});
+  const reader = response.body.getReader();
+  const {context} = make({fetchImpl: async () => response, source: countedSource, extras: {fixtureScans: 0}});
+  equal(await context.fetch(playerURL), response, 'Locked response falls back without replacement');
+  await assert.rejects(() => context.Response.prototype.text.call(response)); ++assertions;
+  equal(context.fixtureScans, 0, 'Locked body keeps native read errors');
+  reader.releaseLock();
+  equal(await context.Response.prototype.text.call(response), expected, 'Released fallback still filters');
+}
+{
+  const error = new Error('fixture stream error');
+  const response = new Response(new ReadableStream({start(controller) {controller.error(error);}}));
+  Object.defineProperty(response, 'url', {value: playerURL});
+  const {context} = make({fetchImpl: async () => response, source: countedSource, extras: {fixtureScans: 0}});
+  equal(await context.fetch(playerURL), response, 'Failed stream retains the original response');
+  await assert.rejects(() => context.Response.prototype.text.call(response), error); ++assertions;
+  equal(context.fixtureScans, 0, 'Stream errors remain native');
 }
 
 for (const api of ['text', 'arrayBuffer', 'blob', 'reader', 'clone', 'json']) {

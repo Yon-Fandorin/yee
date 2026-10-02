@@ -209,8 +209,14 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 
 - `test-site-controls.sh`: 사이트별 토글·저장·창과 탭 수명·worker/cache 통합 검사
 - `test-youtube-live.sh off|on`: 실제 YouTube의 본편 재생 검사와 광고 전달 관측
+- `python3 tools/dev/test-content-blocking-browser-fixture.py --yee`:
+  새 실제 Yee의 파일 탭에서 body reader·clone·다른 realm과 오류 처리, CSS와
+  대체 MP4의 프레임 디코딩·재생 종료를 검사한다. `--response-only`는 응답 검사만 실행한다.
+  빌드 최신 여부를 확인하고 실행 중인 Yee를 정상 종료한 뒤 격리 프로필을 사용한다.
+  저장소 소스를 fixture 탭에 직접 설치하므로 native document-start 자동 주입 증거와
+  구분한다. 기본 실행은 Chrome의 Web API/CSS/media 전체 fixture다.
 
-두 명령은 기본으로 필요한 native 테스트 프로그램을 빌드하며,
+앞의 두 shell 명령은 기본으로 필요한 native 테스트 프로그램을 빌드하며,
 `--no-build`로 이미 빌드한 프로그램을 사용할 수 있다. 실행 전에 개발 Yee를
 정상 종료한다. YouTube 검사는 외부 네트워크를 사용하고, 플레이어 오류·멈춤과
 최소 본편 재생 시간을 검사한다. 관측 시간·영상 선택·탐색 옵션과 광고 검증의
@@ -262,9 +268,27 @@ Chromium 버전 차이와 네트워크·광고 전달 변동도 함께 확인해
 프로파일 및 함수별 표본 시간 요약을 추가한다. 프로파일의 script URL에서 query와
 fragment를 제거하고 `*.cpuprofile.gz`로 압축해 보존한다. CPU 수집을 켠 회차는
 기본 로딩 비교 표본과 따로 해석한다.
+첫 FCP/LCP 이전과 영상 제목 표시 이전 구간도 따로 집계한다. 익명 주입 script는
+Debugger의 소스와 저장소 입력을 대조하며 source text는 저장하지 않는다.
+Brave scriptlet은 설치된 1.95.104의 고정 runtime prefix와 대조한다. 다른 익명
+Brave 코드는 확인 없이 차단 코드로 분류하지 않으며 `unresolved`로 남을 수 있다.
+`*.cpu-owners.json`에는 script 소유 분류와 구간 경계만 보존한다. sample timestamp를
+복원·정렬한 뒤 구간 경계를 자르며, self 분류와 하위 호출 포함 시간을 구분한다.
+정렬 방식은 [DevTools CPUProfileDataModel](https://github.com/ChromeDevTools/devtools-frontend/blob/main/front_end/models/cpu_profile/CPUProfileDataModel.ts)을 참고했다.
+`node tools/dev/test-performance-cpu.mjs`로 소유 분류·경계·중복 집계·시간 순서와
+특수 함수 이름을 검사한다. 주입 래퍼의 시간에는 원래 페이지·native 작업이 포함될
+수 있어 전부 추가 차단 비용으로 해석하지 않는다. cold profile은 새 context 생성
+이후 시작할 수 있다. 제목은 100ms polling으로 감지하므로 물리 paint 시각이 아니다.
+요청 시간은 URL의 query·fragment와 headers/body를 제외하고 수집한다. 페이지가
+resource timing buffer를 비워도 CDP 요청 기록은 유지한다. response event의 전달
+시각을 실제 네트워크 header 도착 시각으로 취급하지 않는다.
+로딩만 분석할 때는 `YEE_LIVE_PERFORMANCE_SKIP_SCROLL=1`로 스크롤을 생략한다.
+로딩·전환 native trace는 각 초기 5초로 제한해 추적 기록의 과다 생성을 막는다.
+그 이후 표시를 분석할 때는 해당 trace의 범위를 확인해야 한다. V8 수집과 표시
+관측은 계속되며 `nativeTraceWindowMs`에 이 trace 제한을 기록한다.
 이 프로파일은 브라우저 프로세스의 네트워크 차단 비용이나 compositor 작업을
 측정하지 않는다.
-`YEE_LIVE_PERFORMANCE_TRACE=1`은 초기 로딩 20초·스크롤·영상 전환 10초의 Chromium
+`YEE_LIVE_PERFORMANCE_TRACE=1`은 초기 로딩·영상 전환의 첫 5초와 스크롤 구간의 Chromium
 trace를 추가한다. 필터 데이터 읽기·엔진 생성·문서 규칙 적용·worker 결과 대기·요청 매칭의 네이티브
 구간과 페이지 렌더링을 함께 기록한다. 결과는 `*.trace.json.gz`이며, 이벤트 인자는
 스레드·프로세스 이름과 지정한 frame/input enum·숫자·boolean만 남기고 제거한다.

@@ -78,6 +78,8 @@ try {
       `http://yee-fixture.test:${server.address().port}/fixture`], {stdio: ['ignore', log.fd, log.fd]});
     let browserCDP;
     let tabCDP;
+    let modePassed = false;
+    let entry;
     try {
       await new Promise((resolve, reject) => {browser.once('spawn', resolve); browser.once('error', reject);});
       let port;
@@ -100,7 +102,7 @@ try {
       assert.ok(tab, 'Actual fixture tab');
       tabCDP = await connectCDP(tab.webSocketDebuggerUrl);
       const evaluation = {expression: `(async () => {
-        for(let i=0;i<100;i++){if(window.results?.done)return window.results;await new Promise(r=>setTimeout(r,100));}
+        for(let i=0;i<200;i++){if(window.results?.done)return window.results;await new Promise(r=>setTimeout(r,100));}
         throw new Error('Fixture timeout: '+JSON.stringify(window.results));
       })()`, awaitPromise: true, returnByValue: true};
       let evaluated;
@@ -114,10 +116,22 @@ try {
       }
       assert.ok(!evaluated.exceptionDetails, JSON.stringify(evaluated.exceptionDetails));
       const result = evaluated.result.value;
+      entry = {mode, profile, profileRetained: true, results: result};
+      evidence.push(entry);
       const protectedMode = mode === 'on';
       assert.equal(result.beforeFirstInline, protectedMode, 'Native scriptlet before first inline script');
       assert.equal(result.initialBlankBeforeReturn, protectedMode, 'Initial blank realm installed before append returns');
       assert.equal(result.replacementBody, protectedMode ? '/* Yee empty replacement. */' : 'unfiltered fixture response');
+      if(protectedMode) {
+        assert.equal(result.replacementVideo.error,null,'Native media replacement decodes');
+        assert.equal(result.replacementVideo.ended,true);
+        assert.equal(result.replacementVideo.duration,1);
+        assert.equal(result.replacementVideo.width,32);
+        assert.equal(result.replacementVideo.height,32);
+        assert.ok(result.replacementVideo.decodedFrames>0,'Native replacement produces decoded frames');
+        assert.equal(requests.filter(request=>request.host.startsWith('yee-video.test:')).length,0,
+          'Replacement media avoids the original advertising request');
+      } else assert.equal(result.replacementVideo,null);
       assert.equal(result.cleanedURL, `http://yee-query.test:${server.address().port}/resource?${protectedMode ? '' : 'tracking=1&'}keep=2`);
       assert.equal(result.cleanedRedirected, protectedMode);
       assert.equal(result.cleanedBody, 'unfiltered fixture response');
@@ -154,18 +168,23 @@ try {
         mode !== 'off', 'Top-level navigation protection uses the destination site');
       const mainHits = requests.filter(request => request.url === '/main-navigation');
       assert.equal(mainHits.length === 0, mode !== 'off', 'Blocked top-level request never reaches the server');
-      evidence.push({mode, profile, results: result, mainNavigation,
+      Object.assign(entry, {mainNavigation,
         blockedServerRequests: blockedHits, pingServerRequests: pingHits, frameServerRequests: frameHits,
         mainServerRequests: mainHits, cspImageServerRequests: cspImageHits});
-      console.log(JSON.stringify(evidence.at(-1)));
+      modePassed = true;
     } finally {
       tabCDP?.close();
       try {
         await closeOwnedBrowser(browser, browserCDP, async pid => {
           await promisify(execFile)(shutdownHelper, [executable, `--pid=${pid}`], {timeout: 20000});
         });
+        if (modePassed) {
+          await fs.rm(profile, {recursive: true, force: true});
+          entry.profileRetained = false;
+        }
       } finally {await log.close();}
     }
+    console.log(JSON.stringify(entry));
   }
   passed = true;
 } catch (error) {

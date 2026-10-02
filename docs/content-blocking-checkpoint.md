@@ -458,16 +458,161 @@ rAF·입력 95백분위의 작은 차이와 입력 중앙값 차이는 이번 �
 추가 미세 최적화의 완료 gate로 두지 않는다. 초기 로딩 지연은 후속 후보로 남긴다.
 전체 상용 브라우저 성능의 동등성을 입증한 결과는 아니다.
 
+### 초기 표시·영상 전환의 함수별 분석
+
+`f428f8f`의 같은 Yee 빌드에서 차단 켬·끔과 Chrome을 각각 한 회 비교했다.
+창이 수집 중 숨겨져 세 조건에 같은 `test-occlusion-override`를 적용했다.
+V8 표본·native trace와 요청 시각을 함께 수집했으며 안정 스크롤은 생략했다.
+이 수치는 위 일반 창의 회차와 합쳐 평균내거나 실제 화면 애니메이션으로
+해석하지 않는다. 광고 전달을 기다리는 검사는 수행하지 않았다.
+
+| 관측 | Chrome 끔 | Yee 끔 | Yee 켬 |
+| --- | --- | --- | --- |
+| FCP / LCP | 1,076 / 1,584ms | 1,152 / 1,632ms | 1,244 / 1,804ms |
+| 영상 제목 표시 | 1,237.5ms | 1,287.9ms | 1,789.9ms |
+| 첫 응답 / 문서 다운로드 종료 | 249.7 / 818.8ms | 233.2 / 841.8ms | 267.3 / 917.2ms |
+| 첫 FCP 전 script 구간 합집합 | 347.70ms | 374.73ms | 399.87ms |
+| 가장 긴 초기 script 실행 | 278.13ms | 300.42ms | 302.44ms |
+
+Yee 켬·끔의 첫 표시 차이는 92ms였다. 켬의 main bundle 다운로드는 끔보다
+약 103ms 늦게 끝났고, 가장 긴 script 실행은 약 84ms 늦게 시작했지만 실행
+길이는 약 2ms 차이였다. CPU 함수는 양쪽 모두 Polymer 초기화·custom element
+생성과 연결 경로가 중심이었다. 켬의 첫 FCP 전 문서 규칙 적용 구간 합집합은
+26.05ms, worker 결과 대기는 2.16ms였다. 첫 표시 지연 전체를 엔진 준비나
+메인 스레드의 장시간 필터 초기화로 설명할 근거는 확보되지 않았다.
+다운로드·페이지 처리 시점의 차이가 함께 관측됐다.
+
+영상 제목은 켬이 끔보다 약 502ms 늦었다. 제목 표시 전 Yee YouTube 코드의
+직접 표본 시간은 86.45ms, 원본 scriptlet은 3.80ms였다. 그중 `cleanText()`의
+하위 호출 포함 시간은 55.84ms, `clean()`은 22.48ms였다. 페이지에는 Polymer
+속성 갱신·DOM 생성과 player 크기 조회가 있었다. 주입 함수의 하위 호출에는
+위임한 페이지·native 작업도 포함되므로 주입 stack 전체 140.92ms를 전부
+추가 차단 비용으로 계산하지 않는다. 함수별 inclusive 값도 서로 겹친다.
+
+코드와 작은 fixture에서 응답 중복 검사를 확인했다. fetch가 player 응답을
+`cleanText()`로 검사한 뒤 `.text()`가 같은 응답을 다시 검사한다. 광고 필드가
+제거된 응답과 처음부터 광고 필드가 없는 escaped JSON 모두 lossless scanner를
+두 번 실행했다. 큰 정수·escape 보존은 유지됐다. 이미 검사한 Response와 clone의
+상태를 재사용하는 후속 개선의 근거가 됐다. 관측한 55.84ms 전체가
+중복 검사이거나 전부 제거 가능한 시간이라는 뜻은 아니다.
+
+이번 비교는 조건별 한 표본이며 시점·Chromium 버전·차단 정책이 다르다.
+main bundle URL의 `am` 인자도 달라 페이지 작업이 완전히 같지 않았다.
+제목 검사는 100ms polling과 메인 스레드 지연을 포함한다. V8 cold profile은
+응답·context 생성 이후 시작하므로 그 이전 네트워크·browser 작업을 포함하지 않는다.
+익명 script는 함수 이름 대신 소유 소스의 일치로 분류했고 source는 메모리에서만
+읽었다. 시간 순서가 뒤섞인 CPU sample은 DevTools처럼 timestamp와 함께 정렬했다.
+요청의 response event가 loadingFinished보다 늦게 전달될 수 있어 이를 실제 header
+도착 시각으로 취급하지 않는다. 남은 비동기·native 구간까지 귀속한 결과는 아니다.
+완료 요약은 `.local-build/youtube-review/loading-attribution-summary.json`에 둔다.
+
+### 같은 로딩 조건의 Brave 추가 조사
+
+설치된 Brave 1.95.104 / Chromium 153.0.8010.53을 격리 프로필에서 한 회
+수집했다. EasyPrivacy 57,344 network / 342 cosmetic, uBlock filters 64,762
+network / 42,704 cosmetic 규칙의 실제 로딩과 debug mode 비활성화를 확인했다.
+위 함수 분석과 같은 1,000×720·DPR 2·`test-occlusion-override` 조건이며,
+같은 검색 페이지에서 `JsBZOcqZerk` 영상으로 전환했다. 광고를 기다리는 검사는
+수행하지 않았다. 이전 Brave 회차와 별개의 표본이다.
+
+| 관측 | Yee 켬 | Brave 기본 Shields |
+| --- | --- | --- |
+| FCP / LCP | 1,244 / 1,804ms | 1,200 / 1,656ms |
+| 영상 제목 표시 | 1,789.9ms | 2,214.1ms |
+| 첫 응답 / 문서 다운로드 종료 | 267.3 / 917.2ms | 234.5 / 924.6ms |
+
+Brave의 첫 표시가 44ms, LCP가 148ms 빨랐지만 영상 제목은 424.2ms 늦었다.
+단일 회차에서 모든 경로가 더 빠르지는 않았다. Brave 제목 표시 전 scriptlet의
+직접 표본 시간은 461.68ms였고 `editObj`가 444.25ms를 차지했다. runtime prefix로
+소스를 확인한 함수이며, 관측한 Proxy 래퍼 chain은 player의 크기·시간 조회 등과
+함께 실행됐다. 이 값은 원래 페이지와 native 호출까지 포함하는 stack 시간
+498.90ms와 구분한다. 다른 익명 Brave 코드는 미확인 분류에 남을 수 있어 전체
+Shields 비용을 완전히 귀속한 결과는 아니다.
+
+같은 고정 commit의 [renderer 처리](https://github.com/brave/brave-core/blob/b395074596c663e344272cde7f7d7bd3d496e7e9/components/cosmetic_filters/renderer/cosmetic_filters_js_handler.cc)를
+확인했다. Brave는 동기·비동기 cosmetic resource 조회를 가지며, `ApplyRules`에서
+scriptlet·procedural action·CSS와 observer bundle을 renderer에 적용한다.
+첫 표시 전 main renderer의 `ApplyRules` 두 호출은 합계 21.70ms, 최대 13.50ms,
+동기 조회 두 호출은 합계 2.91ms였다. 하위 observer·CSS 시간은 적용 시간에
+포함되므로 더해서 계산하지 않는다. 브라우저의 엔진 조회를 비동기 sequence에
+두는 설계와 페이지 메인 스레드의 scriptlet 실행 비용은 별개다.
+
+저장소가 보존한 [Brave uBlock 응답 편집 원본](https://github.com/brave/uBlock/blob/06b48b9dfc183f7dee1e6a9abe7e07a213d406f1/src/js/resources/json-edit.js)은
+요청 조건을 확인한 뒤 fetch 응답 clone을 파싱·편집하는 경로다. 이 함수 자체에는
+Yee의 `Response.prototype.text/json` 전역 재검사 단계가 없다. 다만 다른 scriptlet과
+조합될 수 있고 설치된 component revision과도 다를 수 있어 Brave 전체에서
+중복 처리가 없다고 결론 내리지 않는다. Yee에서 확인한 응답 중복 검사는 아래의
+재사용 변경으로 줄였으며, Brave의 객체 clone/edit 정책을 그대로 복제하지 않는다.
+
+첫 수집은 20초 native trace가 도구의 128MiB 제한을 넘어 실패했다. 브라우저
+크래시는 아니었으며 불완전한 결과는 비교에 사용하지 않았다. 완료 회차는 native
+trace를 로딩·전환 각각 초기 5초로 제한했고 두 표시 시점은 이 구간 안에 있었다.
+V8 수집·관측은 계속됐다. 이전 세 조건은 20초/10초 trace이므로 총 이벤트 수나
+전체 trace 비용을 직접 비교하지 않는다. 조건별 시점·Chromium 버전·필터 revision과
+main bundle의 `am` 인자가 달랐으며 제목 감지의 100ms polling 한계도 유지한다.
+결과는 같은 완료 요약에 추가했고 검증 프로필·로그·실패 자료는 정리했다.
+
+### 응답 본문 검사 결과 재사용
+
+fetch에서 끝까지 검사한 Response를 내부 `WeakSet`에 기록한다. 광고 필드를
+제거한 새 응답과 처음부터 수정이 필요 없었던 응답 모두 `.text()` 소비에서
+lossless scanner를 다시 실행하지 않는다. 원본 문자열이나 파싱한 데이터를
+캐시에 추가로 보관하지 않으며, native clone에는 같은 검사 완료 상태를 전달한다.
+다른 realm의 prototype으로 만들어진 clone도 후속 clone에 상태를 전달한다.
+
+크기·깊이·작업량 제한, malformed JSON, 스트림·decoder 오류로 검사를 끝내지
+못한 응답에는 완료 상태를 기록하지 않는다. 해당 응답과 fetch 밖에서 생성한
+Response는 기존 reader 처리를 유지한다. native 소비를 먼저 수행하므로
+`bodyUsed`, 잠긴 본문, 소비 후 재읽기·clone 오류와 스트림 오류가 유지된다.
+`.json()`의 파싱된 객체 정리도 유지한다. 수정 범위는 완전히 검사한 본문의
+`.text()` 중복 탐색이며, 모든 객체 탐색을 한 번으로 제한하는 변경은 아니다.
+
+메모리에서만 계측한 fixture에서 fetch→text의 scanner 호출이 두 번에서 한 번으로
+줄었고, 원본·clone·중첩 clone을 읽어도 추가 호출이 없었다. 큰 정수·지수 표기·escape
+보존, 검사 실패의 원본 fallback, 잠긴 본문·스트림 오류를 포함한 protocol/playback
+296개 assertion과 기존 lossless JSON 71개 case를 통과했다. 병렬 3개의 전체 앱
+빌드를 완료했고, 새 실제 Yee의 파일 탭에서 Response·CSS·대체 미디어 관련 35개
+Web API 검사를 통과했다. 해당 파일 fixture는 저장소 소스를 탭에 직접 설치하며 native document-start
+자동 주입을 별도로 증명하는 검사는 아니다.
+
+이 변경 뒤 전체 로딩 비교·광고 전달 대조는 반복하지 않는다. 이전 `cleanText()`의
+55.84ms 전체가 절감됐다고 주장하지 않으며, 확인한 개선은 중복 실행의 제거다.
+한 차례 75초 재생 회귀에서는 본편 72.29초·비무음 출력 71초를 확인했고 오류나
+멈춤이 없었다. 도중 창이 숨김 상태로 바뀌어 전면 창의 재생·애니메이션 검증 근거로
+사용하지 않는다. webdriver·DOM automation은 비활성화된 상태였다. 완료 요약만
+남기고 격리 프로필·로그·출력 수집 임시 파일은 정리한다.
+
+### 대체 MP4의 지원 코덱과 리소스 선택
+
+전체 파일 fixture에서 드러난 MP4 디코딩 실패는 H.264 대체 파일과 현재 Yee의
+`USE_PROPRIETARY_CODECS=0` 설정 때문이었다. 기본 `yee-blank.mp4`를 지원되는
+VP9 MP4로 다시 생성했다. 32×32·1초·무음을 유지하며 1,831바이트에서 837바이트로
+줄었다. 파일 탭에서 metadata 로딩뿐 아니라 프레임 디코딩과 재생 종료를 확인했다.
+
+실제 필터 엔진에서는 커뮤니티 리소스의 원본 별칭이 우선하므로 기본 파일만 바꾸면
+`abp-resource:blank-mp4`가 여전히 H.264 `noop-1s.mp4`를 선택했다. Rust adapter에서
+이 리소스의 이름·별칭·MIME을 유지하고 Yee의 VP9 본문을 전달한다. 변경 전 원본
+입력도 검증하여 잘못된 base64나 MIME을 가진 pack은 계속 전체 거부한다.
+나머지 redirect 본문과 별칭 우선순위, vendored 원본과 재현 가능한 배포 pack은 유지한다.
+생성 방법과 선택 정책은 [대체 미디어 설명](../components/content_blocking/data/README.md)에 둔다.
+
+새 실제 Yee의 HTTP fixture에서 차단 끔·켬·사이트 예외 세 모드를 통과했다.
+켬에서는 실제 `abp-resource:blank-mp4` 차단 경로로 32×32·1초 영상의 프레임을
+디코딩하고 재생 종료에 도달했으며, 원래 광고 URL은 테스트 서버에 도달하지 않았다.
+완료 회차의 격리 프로필은 정상 종료 후 runner가 제거하고 요약 결과만 남긴다.
+
 ### 남은 성능 작업
 
 | 순서 | 남은 지점 | 다음 판단 기준 |
 | --- | --- | --- |
-| 1 | 초기 화면 표시와 영상 전환의 script 처리·네트워크 지연 | 일반 창에서 FCP 전 script scope 485 / 390ms를 확인했다. 함수별로 Yee 주입과 페이지 작업을 분리한 뒤 수정할 부분을 결정한다. |
+| 1 | 영상 전환의 남은 비동기·native 처리 | 약 502ms 차이 전체를 확인된 탐색 함수 시간으로 설명하지 않는다. 실제 변경에 필요할 때 요청 시작 경로·응답 소비·재생 복구와 UI 갱신의 연결을 좁혀 확인한다. |
 | 2 | renderer별 엔진 계산·메모리와 준비 전 탐색의 대기 | 사전 준비가 늦는 경우와 여러 renderer의 누적 비용을 확인한 뒤 공유 범위·결과 전달을 판단한다. |
 
 재생·광고 대조는 관측 범위에서 완료했다. 새 관련 변경에는 필요한 집중 회귀를
 적용하며, 과거 광고 재전달을 기다리는 관측을 남은 작업으로 두지 않는다.
 후보 경로를 먼저 검토하고 실제 변경의 판단에 필요한 범위만 수집한다.
+초기 표시·전환의 현재 단일 회차 비교와 작은 스크롤 차이는 수용하며,
+위 후보를 성능 검수의 필수 완료 gate로 두지 않는다.
 
 ## 제어와 현재 한계
 
@@ -523,12 +668,16 @@ inherited/opaque 문맥과 speculative loading의 모든 조합을 검증한 상
   파일을 byte 단위로 동일하게 재생성했다. 비공개 adapter와 renderer는 제외한다.
 - 실제 엔진 출력의 Chrome fixture **1,239개 assertion**, 기존 Web API/CSS/MP4 fixture
   **25개 assertion** 통과. 이는 실제 Yee 자동 주입이나 YouTube 재생 증거가 아니다.
-- YouTube lossless JSON **71개 case**, protocol/playback **248개 assertion** 통과.
+- YouTube lossless JSON **71개 case**, protocol/playback **296개 assertion** 통과.
+- 응답 검사 재사용과 VP9 대체 파일 적용 후 새 실제 Yee의 파일 탭에서 Response·CSS·media
+  **35개 assertion** 통과. 프레임 디코딩·재생 종료를 확인했다. 파일 fixture의 직접 설치이며
+  native 자동 주입 증거와 구분한다.
 - `tools/dev/build.sh` 전체 chrome target과 macOS 앱 bundle 검증 통과.
 - 실제 YouTube 스크롤 안정 구간에서 Yee 차단 끔·켬과 Chrome 모두 95백분위
   약 9ms, 16ms 초과 프레임과 long task 0개를 확인했다.
 - 실제 Yee fixture의 차단 끔·켬·사이트 예외 3개 모드 통과. document-start,
-  요청 차단, 정상 응답, cosmetic, iframe, CSP와 예외를 검증했다.
+  요청 차단, 정상 응답, cosmetic, iframe, CSP와 예외를 검증했다. VP9 수정 후
+  실제 차단 경로의 대체 MP4 프레임 디코딩·재생 종료와 원래 요청의 미전달도 확인했다.
 - 실제 YouTube 비로그인 영상의 같은 영상·프로필 대조는 끔의 중간 광고와 실제
   출력 58초, 켬의 광고 없는 약 20분 본편을 확인했다. 이후 반복 처리 최적화는
   새 앱의 단일 100초, 컴파일 캐시와 renderer worker 적용은 각각 단일 75초 재생 회귀를 통과했다.
@@ -543,5 +692,6 @@ inherited/opaque 문맥과 speculative loading의 모든 조합을 검증한 상
 실행 전 모든 Yee의 graceful shutdown이 필요하다. runner는 각 launch 전에 실행 중인
 stable bundle ID와 실제 executable inventory로 제품 browser process가 없는지 검사한다.
 CDP 준비 전/연결 실패 시 자신이 launch한 child PID에만 AppKit 정상 종료를 요청한다.
+각 모드의 검증과 정상 종료가 성공하면 격리 프로필을 제거한다. 실패 모드는 진단 자료를 유지한다.
 이 gate는 실제 Yee 앱에서 세 모드 모두 통과했다. 라이브 YouTube의 광고 노출과
 성능은 네트워크·계정 상태에 영향을 받으므로 위의 수동 통합 결과와 별도로 판단한다.

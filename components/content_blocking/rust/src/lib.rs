@@ -77,11 +77,23 @@ fn resource_storage(bundled: &str, community: &str) -> Option<InMemoryResourceSt
         else { serde_json::from_str(text).ok() }
     };
     let mut resources = parse(community)?;
+    let bundled = parse(bundled)?;
+    // uBO's blank MP4 uses H.264, which Yee's Chromium codec configuration
+    // cannot decode. Keep its canonical name and aliases, but deliver Yee's
+    // independently generated VP9 payload through those same redirects.
+    if let Some(blank) = bundled.iter().find(|r| r.name == "yee-blank.mp4") {
+        for resource in resources.iter_mut().filter(|r| r.name == "noop-1s.mp4") {
+            // Substitution must not conceal an invalid input pack.
+            if resource.kind != blank.kind { return None; }
+            InMemoryResourceStorage::default().add_resource(resource.clone()).ok()?;
+            resource.content.clone_from(&blank.content);
+        }
+    }
     let community_identifiers: HashSet<String> = resources.iter()
         .flat_map(|r| std::iter::once(&r.name).chain(r.aliases.iter())).cloned().collect();
     // Original redirect aliases take precedence over Yee's fallback aliases.
     // Canonical-name conflicts remain an error, as do duplicates within a pack.
-    for mut resource in parse(bundled)? {
+    for mut resource in bundled {
         resource.aliases.retain(|name| !community_identifiers.contains(name));
         resources.push(resource);
     }
