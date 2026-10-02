@@ -22,6 +22,8 @@ mod ffi {
     }
 
     extern "Rust" {
+        fn baseline_rules_valid(rules: &str) -> bool;
+        fn compile_baseline_rules(rules: &str, trusted_rules: &str) -> Vec<u8>;
         type FilterEngine;
         fn new_engine(filters: &str, resources: &str, trusted_filters: &str, community_resources: &str, compiled_filters: &[u8]) -> Box<FilterEngine>;
         fn community_resources_valid(resources: &str, bundled: &str) -> bool;
@@ -46,6 +48,30 @@ mod ffi {
 }
 
 pub struct FilterEngine(Engine, bool);
+
+fn baseline_rules_valid(rules: &str) -> bool {
+    let mut total = 0usize;
+    let mut valid = 0usize;
+    for line in rules.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('!') || line.starts_with('[') { continue; }
+        total += 1;
+        if adblock::lists::parse_filter(line, false, ParseOptions::default()).is_ok() {
+            valid += 1;
+        }
+    }
+    // Some official syntax may be unsupported. Reject unusable/error documents
+    // without making every future valid list depend on 100% parser coverage.
+    valid > 0 && valid * 100 >= total * 90
+}
+
+fn compile_baseline_rules(rules: &str, trusted_rules: &str) -> Vec<u8> {
+    let mut set = adblock::lists::FilterSet::new(false);
+    set.add_filter_list(rules.to_owned(), ParseOptions::default());
+    set.add_filter_list(trusted_rules.to_owned(), ParseOptions {
+        permissions: PermissionMask::from_bits(1), ..ParseOptions::default()
+    });
+    Engine::new_with_filter_set(set).serialize()
+}
 
 // Original scriptlets are external JavaScript resources, not Rust dependencies.
 // Only the separately supplied community list receives uBO trusted permission.

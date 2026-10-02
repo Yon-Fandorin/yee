@@ -123,8 +123,14 @@ action("community_filter_data") {
 }
 
 source_set("filter_data") {
-  public = [ "filter_data.h" ]
-  sources = [ "filter_data.cc" ]
+  public = [
+    "baseline_list_store.h",
+    "filter_data.h",
+  ]
+  sources = [
+    "baseline_list_store.cc",
+    "filter_data.cc",
+  ]
   deps = [
     ":bundled_rules",
     ":rust_bridge",
@@ -226,6 +232,7 @@ copy("community_filter_test_data") {
 test("yee_content_blocking_unittests") {
   sources = [
     "document_engine_unittest.cc",
+    "baseline_list_store_unittest.cc",
     "engine_unittest.cc",
     "filter_data_unittest.cc",
     "selector_styles_unittest.cc",

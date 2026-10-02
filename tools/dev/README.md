@@ -213,6 +213,9 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `python3 tools/dev/test-procedural-content-blocking.py`: 새 실제 Yee의 로컬 HTTP 탭에서
   native procedural/action 주입·동적 조건 적용과 해제·SPA·iframe·분할 작업을 검사한다.
   켬·끔·프로필 사이트 예외를 각각 격리 프로필로 확인하며 라이브 광고 관측은 하지 않는다.
+- `python3 tools/dev/test-baseline-filter-updates.py`: 새 실제 Yee에서 갱신 generation의
+  browser·renderer 일치, 원문/상태 손상 복구, 내장 기본본 fallback과 늦게 생긴
+  cross-site renderer의 실행 generation 고정을 로컬 HTTP로 확인한다.
 - `test-youtube-live.sh off|on`: 실제 YouTube의 본편 재생 검사와 광고 전달 관측
 - `python3 tools/dev/test-content-blocking-browser-fixture.py --yee`:
   새 실제 Yee의 파일 탭에서 body reader·clone·다른 realm과 오류 처리, CSS와

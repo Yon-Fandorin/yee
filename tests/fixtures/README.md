@@ -9,6 +9,7 @@
 | `scenarios/` | 비교 실험 시나리오와 준비된 프롬프트 |
 | `content-blocking/fixture.html` | 요청·응답·CSS 차단 |
 | `content-blocking/procedural.html` | native 고급 필터의 조건·동작·동적 DOM 회귀 |
+| `content-blocking/updated-lists.html` | 갱신 목록·손상 복구·browser/renderer generation 고정 |
 
 서버가 필요한 페이지는 해당 테스트 도구로 실행한다.
 파일을 열어 본 것만으로 자동 테스트가 끝난 것은 아니다.

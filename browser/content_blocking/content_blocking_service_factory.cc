@@ -26,8 +26,13 @@ ContentBlockingService* ContentBlockingServiceFactory::GetForProfile(
   if (!profile) {
     return nullptr;
   }
-  return static_cast<ContentBlockingService*>(
+  auto* service = static_cast<ContentBlockingService*>(
       GetInstance()->GetServiceForBrowserContext(profile, true));
+  // A different profile may have owned the coordinator when this service was
+  // created. Reclaim it on use after that profile has closed.
+  if (service && profile->IsRegularProfile() && !profile->IsGuestSession())
+    service->StartBaselineListUpdates();
+  return service;
 }
 
 // static
@@ -40,8 +45,11 @@ std::unique_ptr<KeyedService>
 ContentBlockingServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   Profile* profile = Profile::FromBrowserContext(context);
-  return std::make_unique<ContentBlockingService>(profile->GetPrefs(),
-                                                  profile->IsOffTheRecord());
+  auto service = std::make_unique<ContentBlockingService>(
+      profile->GetPrefs(), profile->IsOffTheRecord());
+  if (profile->IsRegularProfile() && !profile->IsGuestSession())
+    service->StartBaselineListUpdates();
+  return service;
 }
 
 void ContentBlockingServiceFactory::RegisterProfilePrefs(

@@ -1,0 +1,62 @@
+// Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
+#ifndef CHROME_BROWSER_YEE_CONTENT_BLOCKING_BASELINE_LIST_UPDATER_H_
+#define CHROME_BROWSER_YEE_CONTENT_BLOCKING_BASELINE_LIST_UPDATER_H_
+
+#include <array>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "base/files/file_path.h"
+#include "base/functional/callback.h"
+#include "base/memory/scoped_refptr.h"
+#include "base/memory/weak_ptr.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
+
+namespace network {
+class SharedURLLoaderFactory;
+class SimpleURLLoader;
+}  // namespace network
+namespace yee::content_blocking {
+// One browser process coordinator, owned by a regular profile. System network
+// requests omit cookies. Disk IO/validation never execute on the UI thread.
+class BaselineListUpdater {
+ public:
+  BaselineListUpdater(
+      base::FilePath directory,
+      scoped_refptr<network::SharedURLLoaderFactory> factory,
+      std::string running_generation,
+      base::Time checked_at,
+      scoped_refptr<base::SequencedTaskRunner> worker = nullptr);
+  ~BaselineListUpdater();
+  BaselineListUpdater(const BaselineListUpdater&) = delete;
+  BaselineListUpdater& operator=(const BaselineListUpdater&) = delete;
+  static std::unique_ptr<BaselineListUpdater> MaybeCreate();
+  static void SetNetworkFactoryProvider(
+      base::RepeatingCallback<scoped_refptr<network::SharedURLLoaderFactory>()>
+          provider);
+  void Start();
+  bool update_in_flight() const { return in_flight_; }
+
+ private:
+  void RefreshAndStart();
+  void Refreshed(base::Time checked_at);
+  void Download(size_t index);
+  void Downloaded(size_t index, std::optional<std::string> body);
+  void Completed(bool installed);
+
+  const base::FilePath directory_;
+  const scoped_refptr<network::SharedURLLoaderFactory> factory_;
+  const std::string running_generation_;
+  base::Time checked_at_;
+  const scoped_refptr<base::SequencedTaskRunner> worker_;
+  base::OneShotTimer timer_;
+  std::unique_ptr<network::SimpleURLLoader> loader_;
+  std::array<std::string, 2> originals_;
+  bool in_flight_ = false;
+  base::WeakPtrFactory<BaselineListUpdater> weak_factory_{this};
+};
+}  // namespace yee::content_blocking
+#endif

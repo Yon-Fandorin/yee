@@ -7,6 +7,7 @@
 #include "base/no_destructor.h"
 #include "base/sequence_checker.h"
 #include "base/trace_event/trace_event.h"
+#include "components/yee_content_blocking/baseline_list_store.h"
 #include "components/yee_content_blocking/bundled_rules.h"
 #include "components/yee_content_blocking/filter_data.h"
 #include "components/yee_content_blocking/rust/src/lib.rs.h"
@@ -131,14 +132,22 @@ std::vector<std::string> Engine::GenericSelectors(
 }
 
 std::unique_ptr<Engine> CreateBundledEngine() {
+  const auto& baseline = BaselineLists();
+  const auto& community = CommunityFilterData();
+  auto filters = baseline.generation.empty()
+                     ? std::string(kBundledFilters)
+                     : baseline.filters + "\n" + std::string(kOwnedFilters);
+  std::string_view compiled = baseline.generation.empty()
+                                  ? community.compiled_filters
+                                  : baseline.compiled_filters;
+  if (TestRulesEnabled()) {
+    filters += "\n" + std::string(kTestFilters);
+    compiled = {};
+  }
   return std::make_unique<Engine>(
-      TestRulesEnabled()
-          ? std::string(kBundledFilters) + "\n" + std::string(kTestFilters)
-          : std::string(kBundledFilters),
+      filters,
       TestRulesEnabled() ? kTestResources : kBundledResources,
-      CommunityFilterData().filters, CommunityFilterData().resources,
-      TestRulesEnabled() ? std::string_view()
-                         : std::string_view(CommunityFilterData().compiled_filters));
+      community.filters, community.resources, compiled);
 }
 Engine& BundledEngineForCurrentSequence() {
   // Browser request matching uses one dedicated sequence. Never transfer an
@@ -149,11 +158,13 @@ Engine& BundledEngineForCurrentSequence() {
 }
 std::string_view BundleGeneration() {
   static const base::NoDestructor<std::string> generation(
-      CommunityFilterData().generation.empty()
+      CommunityFilterData().generation.empty() &&
+              BaselineLists().generation.empty()
           ? std::string(kBundleGeneration)
-          : base::HexEncodeLower(crypto::hash::Sha256(
-                std::string(kBundleGeneration) + "\n" +
-                CommunityFilterData().generation)));
+          : base::HexEncodeLower(
+                crypto::hash::Sha256(std::string(kBundleGeneration) + "\n" +
+                                     CommunityFilterData().generation + "\n" +
+                                     BaselineLists().generation)));
   return *generation;
 }
 }  // namespace yee::content_blocking

@@ -5,6 +5,7 @@
 #define CHROME_BROWSER_YEE_CONTENT_BLOCKING_CONTENT_BLOCKING_SERVICE_H_
 
 #include <string>
+#include <memory>
 #include <vector>
 
 #include "base/callback_list.h"
@@ -23,6 +24,7 @@ class PrefRegistrySyncable;
 }
 
 namespace yee::content_blocking {
+class BaselineListUpdater;
 
 inline constexpr char kDisabledSitesPref[] =
     "yee.content_blocking.disabled_sites";
@@ -70,6 +72,7 @@ class ContentBlockingService : public KeyedService {
   // Sent with Chromium's per-navigation renderer settings. Host-specific rules
   // precede the default rule so the renderer can use the first matching value.
   ContentSettingsForOneType GetRendererRules() const;
+  void StartBaselineListUpdates();
 
  private:
   std::vector<std::string> ReadDisabledHosts() const;
@@ -80,6 +83,7 @@ class ContentBlockingService : public KeyedService {
   PrefChangeRegistrar pref_change_registrar_;
   const scoped_refptr<ContentBlockingSettingsSnapshot> settings_snapshot_;
   base::RepeatingClosureList changed_callbacks_;
+  std::unique_ptr<BaselineListUpdater> list_updater_;
 };
 
 }  // namespace yee::content_blocking

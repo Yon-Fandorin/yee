@@ -198,9 +198,50 @@ macOS 전체 빌드 후 실제 `Yee.app/Contents/Frameworks/Yee Framework.framew
 Windows 빌드는 아직 검증하지 않았다. 현재 개발 빌드의 `chrome://credits`는 Chromium
 sample이므로 외부 배포 전 사용자에게 보이는 고지/source 접근 안내를 추가 확인해야 한다.
 
-현재 목록 갱신은 원본·hash를 다시 고정해 앱을 빌드하는 방식이다. 런타임 updater,
-사용자 구독과 이전 generation 복구는 아직 추가하지 않았다. 미지원 조건을 임의로
-삭제해 더 넓은 차단 규칙을 만드는 별도 변환기는 없다.
+기본 EasyList·EasyPrivacy의 런타임 갱신은 아래 목록 관리 경로로 연결했다.
+커뮤니티 규칙·scriptlet 묶음은 원본·hash를 고정한 앱 빌드로 관리한다.
+사용자 구독은 아직 추가하지 않았다. 미지원 조건을 임의로 삭제해 더 넓은
+차단 규칙을 만드는 별도 변환기는 없다.
+
+### 기본 목록 자동 갱신과 복구
+
+공식 `easylist-downloads.adblockplus.org`의 EasyList·EasyPrivacy 두 목록을 순차
+다운로드한다. 일반 프로필의 차단 service가 브라우저당 하나의 coordinator를 소유한다.
+시크릿·guest service는 갱신을 시작하지 않으며, `YeeContentBlocking` feature 끔과
+`--disable-background-networking`도 시작을 막는다. Chromium 시작 코드가 system
+network factory를 주입하며 profile의 쿠키·인증 정보는 보내지 않는다. redirect를
+따라가지 않고 HTTP 200 전체 응답만 받으며 요청당 30초·목록당 16 MiB로 제한한다.
+
+첫 프로필 시작 30초 후 최신 저장 시각을 worker에서 다시 확인한다. 정상 확인 뒤
+하루 간격, 실패 뒤 6시간 간격으로 재시도한다. UTF-8·ABP header·각 목록의 Title,
+조건 분기의 구조와 엔진에서 실제 파싱되는 규칙의 비율을 확인한다. 최소 한 규칙과
+90% 이상의 파싱 성공을 요구하되 지원하지 않는 문법을 임의로 단순화하지 않는다.
+조건표는 빌드용 `preprocess_filters.py`에서 생성해 런타임과 같은 판단을 사용한다.
+unresolved include와 잘못된 조건 분기는 해당 갱신 전체를 거부한다.
+
+원문·출처·hash·확인 시각·라이선스 정보를 user-data 디렉터리의
+`YeeContentBlockingLists/generations/<hash>/`에 보관한다. 두 목록이 모두 검증되고
+저장된 뒤에만 `state.json`을 원자적으로 교체한다. current 손상 시 previous를,
+상태 파일 손상 시 별도 정상 pointer를 읽고, 모두 사용할 수 없으면 내장 기본본을 쓴다.
+같은 본문을 다시 받아도 이전 정상본은 유지하며 확인 시각만 갱신한다.
+보관 대상은 current·previous·현재 실행에 고정한 generation이다.
+
+선택은 다음 브라우저 실행 때 적용한다. browser가 시작 때 검증한 원문 선택·컴파일
+캐시를 읽기 전용 공유 메모리에 고정하고, Chromium의 기존 child handle 전달로
+renderer에 보낸다. renderer는 profile 파일을 읽지 않으므로 macOS 샌드박스의
+접근 권한을 넓힐 필요가 없다. Yee snapshot 전달은 두 목록의 16 MiB 제한과
+64 MiB compiled cache·제한된 metadata를 합친 크기 상한을 명시한다.
+Chromium의 다른 handle 전달과 unsafe region은 기존 8 MiB 상한을 사용한다.
+generation 인자도 대조한다. 실행 중 다운로드나
+저장소 교체가 있어도 새 renderer는 같은 시작 snapshot을 사용한다. Linux zygote는
+fork 후 전달된 handle을 읽도록 연결했으며 실제 앱 검증 플랫폼은 macOS다.
+Yee 독립 규칙과 고정 커뮤니티 규칙·리소스는 함께
+유지한다. 갱신본의 조건 선택·검증·엔진 컴파일·파일 저장은 전용 worker sequence에서
+수행한다. optional compiled cache는 기본 번들·커뮤니티 generation·자체 hash를
+확인하며, 없거나 손상되거나 오래됐으면 검증한 원문을 파싱한다.
+
+현재 범위는 공식 두 목록과 다음 실행 시 적용이다. 커뮤니티 묶음의 자동 배포 주소,
+사용자 구독·목록 설정 UI와 실행 중 전체 generation 전환은 후속 범위다.
 
 ## YouTube 모듈
 
@@ -371,14 +412,13 @@ VP9 MP4로 다시 생성했다. 32×32·1초·무음을 유지하며 1,831바이
 
 ## 다음 기능 범위
 
-다음 구현은 목록 관리를 우선한다. 기본 필터 자동 갱신과 이전 정상본 유지·복구를
-먼저 연결하고, 사용자 구독과 설정 UI를 이어서 추가한다. 현재 데이터는 시작 시점의
-불변 snapshot이므로 브라우저·renderer가 같은 generation을 사용하도록 적용 경계를
-정해야 한다. 다운로드만 추가하는 것으로 갱신 구현을 완료했다고 판단하지 않는다.
+기본 두 목록의 자동 갱신·검증·정상본 복구와 다음 실행 시 동일 generation 적용을
+연결했다. 이후에는 사용자 구독과 설정 UI를 추가한다. 커뮤니티 묶음 갱신은 Yee용
+검증 패키지의 배포 주소와 고정 리소스의 권한 경계를 먼저 정해야 한다.
 
 | 범위 | 순서와 현재 남은 부분 |
 | --- | --- |
-| 목록 관리 | 다음 작업. 자동 갱신·검증·이전 정상본 복구 후 사용자 구독. 현재는 원본·hash를 고정한 재빌드 방식이다. |
+| 목록 관리 | 공식 두 목록의 자동 갱신·복구 구현. 다음 범위는 사용자 구독·설정 UI와 커뮤니티 패키지 배포다. |
 | 필터 호환성 | 엔진이 제공하는 procedural/action 연결은 완료. nested procedural·추가 operator 등 엔진의 미지원 문법은 이후 후보다. |
 | 외부 배포 | 나중 단계. 사용자에게 보이는 고지·source 접근 안내와 Windows 빌드 검증. 현재 검증 범위는 macOS 개발 앱이다. |
 
@@ -414,11 +454,13 @@ inherited/opaque 문맥과 speculative loading의 모든 조합을 검증한 상
 
 | 검증 | 완료 결과 |
 | --- | --- |
-| native core/settings/style/data/공통 worker + Mojo factory/profile service | 53 + 50, 총 103개. procedural JSON·예외/미지원 문법 거부, 캐시 복구·권한·별칭·작업 sequence·VP9 응답 전달 포함 |
+| native core/settings/style/data/공통 worker + Mojo factory/profile service | 67 + 55, 총 122개. 갱신 검증·원자적 저장·복구·캐시·공유 메모리의 큰 snapshot 전달·다운로드·부분 응답 거부·재시도, procedural JSON·예외/미지원 문법, 권한·별칭·작업 sequence·VP9 응답 전달 포함 |
 | YouTube lossless JSON / protocol·playback | 71개 case / 296개 assertion. 원문 보존·완료 검사 재사용·fallback·body lifecycle 포함 |
 | 새 실제 Yee 파일 탭의 Web API·CSS·media | 35개 assertion. fixture 소스 직접 설치이며 native 자동 주입 증거와 구분 |
 | 새 실제 Yee HTTP fixture | 끔·켬·사이트 예외 3개 모드. 첫 inline script 이전 주입·요청·CSS·iframe·CSP·MP4 디코딩·재생 종료·원래 요청 미전달 |
 | 새 실제 Yee procedural HTTP fixture | 켬 45 + 끔 13 + 사이트 예외 13, 총 71개 assertion. native 조건·동작·예외·동적 적용/해제·자기 CSS 조건 안정성·SPA·iframe·1,500개 요소의 작업 재개 |
+| 새 실제 Yee 기본 목록 갱신 HTTP fixture | 4개 모드 × (본 탭 8 + 늦은 cross-site renderer 6), 총 56개 assertion. 갱신본·원문/상태 손상 복구·내장본 대체·실행 중 저장소 변경 후 동일 snapshot 적용 |
+| 실제 공식 목록의 자동 다운로드·새 프로세스 적용 | 일반 실행 프로필에서 두 원문과 compiled cache 저장·hash 확인. test rules 없이 11.3 MiB snapshot을 새 renderer에 전달하고 CSS·정상 콘텐츠·광고 원 요청 미도달 3개 assertion 확인 |
 | Site Controls browser 통합 | 20개. native 토글·저장·다중 창·분할·시크릿·worker/cache·prerender·BFCache 포함 |
 | Browser Surface fast gate | 40개. Site Controls 통합 시 적용 |
 | 커뮤니티 패키지 tooling | 13개. 원본 배포 파일·공개 아카이브 재현과 hash 검사 |
@@ -434,8 +476,14 @@ procedural fixture는 `python3 tools/dev/test-procedural-content-blocking.py`로
 각 모드에서 새 앱과 임시 프로필을 사용하고, 정상 종료 후 임시 프로필을 제거한다.
 실패 시 오류·DOM·computed-style 진단을 출력한다. EasyList와 충돌하지 않는 전용
 조건 검증 요소를 사용하며 외부 광고 전달을 기다리지 않는다.
+기본 목록 갱신 fixture는 `python3 tools/dev/test-baseline-filter-updates.py`다.
+가짜 목록은 격리 임시 프로필에만 저장하고 HTTP 요청은 로컬 서버로 보낸다.
+각 모드에서 시작 snapshot과 browser·renderer 차단 결과를 확인한 뒤 다음 상태를
+발행하고 실행 중인 원문도 손상시켜 새 cross-site renderer가 같은 snapshot을 받는지
+확인한다. 실제 파일 접근 권한은 넓히지 않는다. 광고 대체 응답은 원 요청의 서버
+미도달도 확인한다. 성공·실패 모두 앱을 정상 종료하고 임시 프로필을 제거한다.
 
 완료된 로컬 결과는 `.local-build/youtube-review/completed-checkpoint.json`과 최신
-Web API·native·procedural fixture JSON만 유지한다. 중간 요약·원시 trace·CPU profile·오디오
+Web API·native·procedural·기본 목록 갱신 fixture JSON만 유지한다. 중간 요약·원시 trace·CPU profile·오디오
 수집 helper·이전 빌드 로그는 정리했다. 이 로컬 기록의 존재는 새 코드의 검증을
 대신하지 않는다.

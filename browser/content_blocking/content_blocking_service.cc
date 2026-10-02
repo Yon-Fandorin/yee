@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license in LICENSE.
 
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
+#include "chrome/browser/yee_content_blocking/baseline_list_updater.h"
 
 #include <algorithm>
 #include <string_view>
@@ -77,6 +78,10 @@ ContentBlockingService::ContentBlockingService(PrefService* prefs,
 }
 
 ContentBlockingService::~ContentBlockingService() = default;
+void ContentBlockingService::StartBaselineListUpdates() {
+  if (!off_the_record_ && !list_updater_)
+    list_updater_ = BaselineListUpdater::MaybeCreate();
+}
 
 // static
 void ContentBlockingService::RegisterProfilePrefs(

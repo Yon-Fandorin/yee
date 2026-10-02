@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Yee updated baseline regression</title>
+<div id="a" class="yee-update-a">First generation advertisement</div>
+<div id="b" class="yee-update-b">Second generation advertisement</div>
+<div id="normal">Normal article</div>
+<pre id="result">pending</pre>
+<script>
+(async () => {
+  const url = new URL(location.href), expected = url.searchParams.get('expected');
+  const checks = [];
+  let lateRenderer;
+  const check = (condition, name) => { if (!condition) throw Error(name); checks.push(name); };
+  const hidden = id => getComputedStyle(document.getElementById(id)).display === 'none';
+  const blocked = async host => {
+    // A native replacement is also suppression, and can resolve successfully.
+    try {
+      const response = await fetch(`http://${host}:${url.port}/asset`);
+      return await response.text() !== 'allowed resource';
+    }
+    catch { return true; }
+  };
+  const deadline = performance.now() + 8000;
+  while (expected !== 'none' && !hidden(expected)) {
+    if (performance.now() > deadline) throw Error('updated cosmetic rule timeout');
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  check(hidden('a') === (expected === 'a'), 'renderer selects A consistently');
+  check(hidden('b') === (expected === 'b'), 'renderer selects B consistently');
+  check(!hidden('normal'), 'normal content remains visible');
+  check(await blocked('yee-update-a.test') === (expected === 'a'), 'browser selects A consistently');
+  check(await blocked('yee-update-b.test') === (expected === 'b'), 'browser selects B consistently');
+  const adSuppressed = await blocked('doubleclick.net');
+  const counts = await (await fetch('/request-count')).json();
+  check(adSuppressed && counts.adRequests === 0,
+    'fixed blocking rules suppress the original ad request');
+  if (!url.searchParams.has('frame')) {
+    check(window.__yeeFilterFixture === true, 'community/test scriptlet resources remain connected');
+    await fetch('/publish-next');
+    const completed = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(Error('late renderer timeout')), 8000);
+      addEventListener('message', event => {
+        if (event.origin === `http://yee-late-update.test:${url.port}`) {
+          clearTimeout(timer); resolve(event.data);
+        }
+      });
+    });
+    const frame = document.createElement('iframe');
+    frame.src = `http://yee-late-update.test:${url.port}/fixture?expected=${expected}&frame=1`;
+    document.body.append(frame);
+    const child = await completed;
+    lateRenderer = child;
+    check(!child.error && child.assertions.length === 6,
+      'late cross-site renderer keeps running generation after next-start state changes');
+  }
+  const result = {expected, assertions: checks, lateRenderer};
+  if (url.searchParams.has('frame')) parent.postMessage(result, '*');
+  else document.getElementById('result').textContent = JSON.stringify(result);
+})().catch(error => {
+  const result = {error: error.stack, fixtureScriptlet: window.__yeeFilterFixture,
+    nodes: ['a', 'b'].map(id => ({html: document.getElementById(id).outerHTML,
+      display: getComputedStyle(document.getElementById(id)).display}))};
+  if (new URL(location.href).searchParams.has('frame')) parent.postMessage(result, '*');
+  document.getElementById('result').textContent = JSON.stringify(result);
+});
+</script>

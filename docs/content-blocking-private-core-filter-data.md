@@ -76,9 +76,18 @@ adblock-rust 의존성이 필요하며 원본 engine/dependency 소스는 별도
 ## 로딩·권한·실행
 
 ChromeMainDelegate::PreSandboxStartup에서 browser·renderer·Linux zygote의
-불변 snapshot을 읽는다. sandbox 이후 파일 IO가 없고, zygote 자식은 snapshot을
+불변 snapshot을 읽는다. 이 pack은 sandbox 이후 다시 읽지 않으며, zygote 자식은 snapshot을
 상속한다. GPU·utility에는 로드하지 않는다. 기본 경로는 macOS framework Resources,
 그 외 desktop은 실행 파일 assets 디렉터리다.
+
+고정 community pack과 별개로 공식 EasyList·EasyPrivacy는 런타임에 갱신한다.
+두 목록의 원문·출처·hash·확인 시각·기존 라이선스와 attribution을 별도 generation에
+보관하고, 다음 실행 때 browser가 선택한 같은 generation을 읽기 전용 공유 메모리로
+renderer에 전달한다. renderer의 profile 파일 접근은 필요 없다.
+Yee 독립 규칙과 고정 community 리소스·권한은 유지한다. 갱신본은 worker에서
+검증·컴파일·저장하며, 손상된 새 본문은 previous나 내장 기본본으로 복구한다.
+런타임 파일은 현재 앱의 고정 source archive를 바꾸지 않는다. 자세한 적용 경계와
+검증은 [자동 갱신과 복구](content-blocking-checkpoint.md#기본-목록-자동-갱신과-복구)를 따른다.
 
 manifest는 최대 128 KiB, 규칙·리소스는 각각 16 MiB로 제한한다. 고정 파일명,
 UTF-8·SHA-256·JSON 구조를 확인한다. Rust의 실제 resource storage로 base64,

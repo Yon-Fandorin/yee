@@ -1,10 +1,11 @@
 // Copyright 2026 The Yee Authors
 // Use of this source code is governed by a BSD-style license in LICENSE.
 #include "components/yee_content_blocking/settings.h"
-#include "components/yee_content_blocking/filter_data.h"
 #include "base/command_line.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "components/yee_content_blocking/baseline_list_store.h"
+#include "components/yee_content_blocking/filter_data.h"
 
 namespace yee::content_blocking {
 BASE_FEATURE(kYeeContentBlocking,
@@ -33,8 +34,9 @@ bool TestRulesEnabled() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(kTestRules);
 }
 void CopySettingsToChild(base::CommandLine* child) {
-  constexpr const char* switches[] = {kDisabledSites, kTestRules,
-                                    kCommunityFilterDirectorySwitch};
+  constexpr const char* switches[] = {
+      kDisabledSites, kTestRules, kCommunityFilterDirectorySwitch,
+      kBaselineListDirectorySwitch, kBaselineListGenerationSwitch};
   child->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(), switches);
 }
 }  // namespace yee::content_blocking
