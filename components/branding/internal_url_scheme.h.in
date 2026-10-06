@@ -1,0 +1,9 @@
+// Generated from branding/brand.json through Chromium's BRANDING input.
+#ifndef COMPONENTS_YEE_BRANDING_INTERNAL_URL_SCHEME_H_
+#define COMPONENTS_YEE_BRANDING_INTERNAL_URL_SCHEME_H_
+
+namespace yee::branding {
+inline constexpr char kInternalURLScheme[] = "@PRODUCT_INTERNAL_URL_SCHEME@";
+}  // namespace yee::branding
+
+#endif  // COMPONENTS_YEE_BRANDING_INTERNAL_URL_SCHEME_H_

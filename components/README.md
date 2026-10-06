@@ -2,6 +2,8 @@
 
 브라우저와 렌더러가 함께 사용하는 코드를 둔다.
 현재 `content_blocking/`에 차단 엔진, 설정, 필터 데이터와 라이선스 안내 생성 코드가 있다.
+`branding/internal_urls.*`는 브랜드 설정에서 생성한 내부 URL 접두어와
+Chromium WebUI의 실제 주소 사이를 변환한다.
 `tasks/worker_owned.h`는 `base::SequenceBound`의 객체를 factory로 작업 sequence에서
 생성·소유·실행하는 공통 어댑터다. 전용 스레드 선택과 작업 priority·shutdown 정책은
 consumer가 정하며, DOM이나 제품별 동기 대기 규칙은 공통 어댑터에 포함하지 않는다.
@@ -20,6 +22,6 @@ consumer가 정하며, DOM이나 제품별 동기 대기 규칙은 공통 어댑
 [`browser/`](../browser/README.md), [`renderer/`](../renderer/README.md)가 담당한다.
 
 `content_blocking/`은 Chromium의 `components/yee_content_blocking/`,
-`tasks/`는 `components/yee_tasks/`에 복사된다.
+`tasks/`는 `components/yee_tasks/`, `branding/`은 `components/yee_branding/`에 복사된다.
 경로는 [`build/overlay.json`](../build/overlay.json)에서 관리하며 이 README는 복사하지 않는다.
 지원 기능과 남은 테스트는 [콘텐츠 차단 checkpoint](../docs/content-blocking-checkpoint.md)에 있다.

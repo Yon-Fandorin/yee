@@ -15,6 +15,23 @@ REPO_ROOT = OVERLAY_ROOT.parents[1]
 CONFIG_PATH = REPO_ROOT / "branding/brand.json"
 BRANDING_MARKER = "OVERLAY_BRANDING_MANAGED=1"
 LEGACY_BRANDING_MARKER = "# Product names are managed by the Yee overlay brand installer."
+RESERVED_SCHEMES = frozenset({
+    "about", "android-app", "blob", "chrome", "cid", "content", "data",
+    "devtools", "dom-distiller", "externalfile", "file", "filesystem",
+    "ftp", "http", "https", "intent", "isolated-app", "javascript", "mailto",
+    "shell", "sms", "tel", "urn", "view-source", "webcal", "ws", "wss",
+})
+
+
+def internal_url_scheme(short_name, configured=None):
+    scheme = short_name.lower() if configured is None else configured
+    if (not isinstance(scheme, str)
+            or not re.fullmatch(r"[a-z][a-z0-9+.-]*", scheme)
+            or scheme in RESERVED_SCHEMES or scheme.startswith("chrome-")):
+        raise ValueError("internal_url_scheme must be a lowercase ASCII URL scheme "
+                         "that does not conflict with a built-in protocol; set it "
+                         "explicitly when short_name cannot be used as a scheme")
+    return scheme
 
 
 @dataclass(frozen=True)
@@ -23,6 +40,7 @@ class Brand:
     short_name: str
     logo_source: Path
     logo_crop_size: int
+    internal_url_scheme: str
     provisional: bool = True
 
     @property
@@ -41,6 +59,7 @@ class Brand:
             "logo_source": str(self.logo_source),
             "logo_crop_size": self.logo_crop_size,
             "provisional": self.provisional,
+            "internal_url_scheme": self.internal_url_scheme,
         }
 
 
@@ -48,7 +67,7 @@ def load_brand(config_path=CONFIG_PATH, repo_root=REPO_ROOT, *, validate_assets=
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise ValueError("brand.json must contain an object")
-    if set(config) - {"name", "short_name", "logo_source", "logo_crop_size", "provisional"}:
+    if set(config) - {"name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme"}:
         raise ValueError("brand.json contains an unknown field")
     name = config.get("name")
     short_name = config.get("short_name", name)
@@ -72,7 +91,10 @@ def load_brand(config_path=CONFIG_PATH, repo_root=REPO_ROOT, *, validate_assets=
     crop_size = config.get("logo_crop_size")
     if type(crop_size) is not int or crop_size <= 0:
         raise ValueError("logo_crop_size must be a positive integer")
-    return Brand(name, short_name, logo_source, crop_size, provisional)
+    if "internal_url_scheme" in config and not isinstance(config["internal_url_scheme"], str):
+        raise ValueError("internal_url_scheme must be a string")
+    scheme = internal_url_scheme(short_name, config.get("internal_url_scheme"))
+    return Brand(name, short_name, logo_source, crop_size, scheme, provisional)
 
 
 def product_parts(brand):
@@ -110,6 +132,15 @@ def branding_plan(chromium_src, brand, check_only=False):
         text, count = re.subn(pattern, lambda _: key + "=" + value, text)
         if count != 1:
             raise ValueError(f"BRANDING must contain exactly one {key}")
+    scheme_key = "PRODUCT_INTERNAL_URL_SCHEME"
+    pattern = rf"(?m)^{scheme_key}=[^\r\n]*"
+    matches = re.findall(pattern, text)
+    if len(matches) > 1:
+        raise ValueError(f"BRANDING must contain at most one {scheme_key}")
+    if matches:
+        text = re.sub(pattern, scheme_key + "=" + brand.internal_url_scheme, text)
+    else:
+        text = text.rstrip("\r\n") + "\n" + scheme_key + "=" + brand.internal_url_scheme + "\n"
     return {branding_path: text, **{
         app_dir / filename: text
         for filename, text in product_parts(brand).items()
@@ -141,7 +172,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     show = commands.add_parser("show", help="read the validated brand configuration")
-    show.add_argument("--get", choices=("name", "short_name", "logo_source", "logo_crop_size", "provisional"))
+    show.add_argument("--get", choices=("name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme"))
     show.add_argument("--format", choices=("json", "lines"), default="json")
     install = commands.add_parser("install", help="install branding inputs; does not build")
     install.add_argument("chromium_src", type=Path)
@@ -149,7 +180,7 @@ def main():
     args = parser.parse_args()
     try:
         brand = load_brand(validate_assets=not (
-            args.command == "show" and args.get in ("name", "short_name", "provisional")))
+            args.command == "show" and args.get in ("name", "short_name", "provisional", "internal_url_scheme")))
         if args.command == "install":
             if not args.chromium_src.is_absolute():
                 raise ValueError("Chromium src path must be absolute")

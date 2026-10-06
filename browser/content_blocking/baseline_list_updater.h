@@ -6,7 +6,9 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
+#include "base/callback_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
@@ -20,6 +22,16 @@ class SharedURLLoaderFactory;
 class SimpleURLLoader;
 }  // namespace network
 namespace yee::content_blocking {
+struct BaselineListUpdateStatus {
+  bool available = false;
+  bool in_flight = false;
+  bool downloaded = false;
+  bool running_downloaded = false;
+  bool pending_restart = false;
+  bool recovered = false;
+  base::Time checked_at;
+};
+
 // One browser process coordinator, owned by a regular profile. System network
 // requests omit cookies. Disk IO/validation never execute on the UI thread.
 class BaselineListUpdater {
@@ -38,6 +50,14 @@ class BaselineListUpdater {
       base::RepeatingCallback<scoped_refptr<network::SharedURLLoaderFactory>()>
           provider);
   void Start();
+  // Joins an existing download or checks immediately, bypassing the daily
+  // timer.
+  void CheckNow(base::OnceCallback<void(bool)> callback);
+  static bool RequestUpdate(base::OnceCallback<void(bool)> callback);
+  static void GetStatus(
+      base::OnceCallback<void(BaselineListUpdateStatus)> callback);
+  static base::CallbackListSubscription AddChangedCallback(
+      base::RepeatingClosure callback);
   bool update_in_flight() const { return in_flight_; }
 
  private:
@@ -56,6 +76,7 @@ class BaselineListUpdater {
   std::unique_ptr<network::SimpleURLLoader> loader_;
   std::array<std::string, 2> originals_;
   bool in_flight_ = false;
+  std::vector<base::OnceCallback<void(bool)>> completion_callbacks_;
   base::WeakPtrFactory<BaselineListUpdater> weak_factory_{this};
 };
 }  // namespace yee::content_blocking

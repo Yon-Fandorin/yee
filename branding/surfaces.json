@@ -535,7 +535,7 @@
     },
     {
       "id": "internal-url-input-and-normalization",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -552,6 +552,10 @@
         {
           "scope": "chromium",
           "path": "content/browser/renderer_host/navigation_controller_impl.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/profiles/profile_io_data.cc"
         }
       ],
       "symbols": [
@@ -560,16 +564,17 @@
         "RewriteUrlForNavigation"
       ],
       "configuration_roles": [
+        "short_name",
         "internal_url_scheme",
         "legacy_aliases",
         "canonical_virtual_url_policy"
       ],
-      "notes": "Do not derive scheme from display name. Browser handler rewrites real URL while virtual initially retains original input.",
+      "notes": "Configured scheme defaults to lowercase short_name and can be explicitly overridden in brand.json. The registered scheme is classified as URL input; browser-initiated navigation and about rewrite use canonical chrome URLs. Renderer-initiated navigation retains existing WebUI access checks.",
       "runtime_verification": "not_verified"
     },
     {
       "id": "internal-url-display-copy-drag-and-compact-address",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -595,12 +600,12 @@
         "internal_url_scheme",
         "canonical_virtual_url_policy"
       ],
-      "notes": "Display formatting does not automatically change hyperlink clipboard or drag data. Compact resting origin currently only handles HTTP(S).",
+      "notes": "Native omnibox formatting, full address copy and address drag use the generated brand helper. Internal pages fall back to the full formatted URL in compact presentation. In-page link text and bookmark editing strings remain separate consumers.",
       "runtime_verification": "not_verified"
     },
     {
       "id": "internal-url-bookmark-session-and-non-navigation",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -631,7 +636,7 @@
         "canonical_virtual_url_policy",
         "legacy_aliases"
       ],
-      "notes": "Bookmark stores visible URL; session stores virtual URL; quit/restart precede LoadURL; internal PageInfo CHECK assumes Chrome scheme.",
+      "notes": "Bookmark, session virtual URL and original-request URL use canonical WebUI addresses. Non-navigation commands and PageInfo canonicalize the configured alias before existing handling. Stored canonical addresses survive changes to the brand scheme.",
       "runtime_verification": "not_verified"
     },
     {

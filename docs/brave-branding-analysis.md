@@ -143,12 +143,13 @@ scheme Wiki에는 renderer 등록·권한·history 등 추가 점검 지점도 �
 [현재 scheme 브라우저 테스트](https://github.com/brave/brave-core/blob/6dde018a8c9a571045e671f1d8d526edfafa4290/browser/brave_scheme_load_browsertest.cc),
 [공식 scheme 문서](https://github.com/brave/brave-browser/wiki/Adding-a-protocol-scheme-to-Brave).
 
-**현재 프로젝트 적용안:** 표시 이름과 독립적인 `internal_url_scheme` 설정을
-URL 구현 시 추가한다. 설정에서 공통 helper와 상수를 생성하고 Chromium에는
-입력·rewrite·포매팅·복사 연결만 둔다. 읽기 전용 split-pane 주소도 같은 표시
-helper를 사용한다. 기존 문서의 virtual URL 보존은 검토 후보이며, 이번에 확인한
-Brave의 포매팅·복사 방식도 함께 비교한다. 저장 URL·북마크·session restore와
-메뉴·WebUI 내부 링크, 권한 검사는 별도 수용 기준으로 검증해야 한다.
+**현재 프로젝트 연결:** 사용자의 브랜드 변경 요구에 따라 기본 접두어는
+`short_name`의 소문자 값을 사용한다. URL 문법에 맞지 않는 이름은 같은 설정의
+`internal_url_scheme`으로 지정한다. 설정에서 공통 helper와 상수를 생성하고
+Chromium에는 입력·rewrite·포매팅·복사·드래그와 저장 경로 연결을 둔다.
+실제 WebUI origin과 북마크·세션 저장 주소는 Chromium 형식을 유지해 다음
+브랜드 빌드에서도 내부 페이지를 복원한다. 메뉴·WebUI 본문 링크·북마크 편집
+문자열은 별도 소비 경로를 확인해야 한다.
 
 ## 현재 프로젝트 반영 상태
 
@@ -158,7 +159,7 @@ Brave의 포매팅·복사 방식도 함께 비교한다. 저장 URL·북마크�
 | 완료 | 탭 접근성 안내와 Agent 포인터·질문 제목이 공통 제품명 accessor를 사용하며, 긴 이름에 맞춰 포인터 폭을 계산한다. |
 | 남음 | Chromium 문장·Helper·OS 권한 안내와 XTB를 함께 생성하는 변환 단계를 만든다. |
 | 남음 | 필수 아이콘·배율·WebUI 리소스 적용 목록과 모든 빌드 진입점의 동기화를 맞춘다. |
-| 남음 | 설정으로 생성한 브랜드 URL 별칭을 입력·표시·복사·보안 경계와 함께 연결한다. |
+| 연결 | 브랜드 설정의 URL 별칭을 입력·표시·복사·드래그와 저장 경로에 연결했다. WebUI 본문 링크와 북마크 편집 문자열은 남아 있다. |
 | 남음 | 독립 OS 식별자와 기존 데이터 이전을 별도 checkpoint에서 적용한다. |
 
 Brave의 `BRANDING`·문자열 규칙·scheme·설치 상수에도 브랜드 값이 직접 들어간다.

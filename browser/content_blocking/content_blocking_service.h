@@ -62,6 +62,7 @@ class ContentBlockingService : public KeyedService {
 
   bool EnabledForSite(const GURL& site) const;
   void SetEnabledForSite(const GURL& site, bool enabled);
+  std::vector<std::string> DisabledHosts() const;
   base::CallbackListSubscription AddChangedCallback(
       base::RepeatingClosure callback);
 

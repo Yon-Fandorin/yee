@@ -10,6 +10,7 @@ Brave의 제품명·번역·아이콘·설치 식별자·내부 URL 연결 분�
 ```json
 {
   "name": "New Brand",
+  "short_name": "NewBrand",
   "provisional": true,
   "logo_source": "assets/brand/yee-logo-v8c-dino-nubs.png",
   "logo_crop_size": 820
@@ -23,6 +24,13 @@ CLI 안내의 제품명이 같은 설정을 따른다.
 네이티브 UI는 `yee::branding::ProductName()`을 사용하고, 이름 없는 공통 안내는
 브라우저를 가리키는 중립적인 문구를 쓴다.
 짧은 이름이 따로 필요하면 선택 필드 `short_name`을 추가한다. 생략하면 `name`이다.
+내부 URL 접두어는 기본적으로 `short_name`의 소문자 값이다. 예를 들어 `Yee`는
+`yee://settings`, `NewBrand`는 `newbrand://settings`를 사용한다. 이름 변경 뒤
+빌드하면 URL 접두어도 같은 설정을 따른다. 공백이나 한글이 포함된 이름처럼
+URL scheme으로 사용할 수 없는 이름은 `internal_url_scheme`에 영문 접두어를
+명시한다. 이 값도 같은 브랜드 설정에서 관리하며 코드에 고정하지 않는다.
+접두어는 소문자 ASCII 문자로 시작하고 영문·숫자·`+`·`.`·`-`만 포함할 수 있다.
+`http`, `chrome`, `file` 등 기존 브라우저 프로토콜과 충돌하는 값은 거부한다.
 `logo_source`는 저장소 내부의 상대 경로이며, `logo_crop_size`는 기존 로고의
 가운데 crop 크기다. 새 로고를 넣으면 그 이미지에 맞게 지정한다.
 `provisional`은 이름 확정 여부만 나타낸다. OS 등록이나 저장소 이전을
@@ -68,7 +76,8 @@ part 연결, 작은따옴표가 포함된 제품명의 macOS 서명 Python templ
 `BRANDING`은 Chromium의 실제 `version.py`가
 모든 줄을 `KEY=VALUE`로 읽으므로 주석을 표식으로 쓰지 않는다.
 설치 스크립트는 `BRANDING`의
-네 `PRODUCT_*` 필드와 생성된 두 `.grdp`만 관리하며, 같은 설정을 재적용하면
+네 제품명 `PRODUCT_*` 필드, `PRODUCT_INTERNAL_URL_SCHEME`과 생성된 두 `.grdp`를
+관리하며, 같은 설정을 재적용하면
 파일의 수정 시간을 유지한다. 과거 고정 `Yee` 패치가 적용된 체크아웃에서도
 새 `0002` 연결을 적용할 수 있다. 이전 overlay의 주석 표식도 이전한다.
 `regenerate-shell-patch.py`는 `0002`의 모든 소유 경로를 `0001`에서 제외해
@@ -94,23 +103,30 @@ Bundle ID·Keychain 이름·기본 profile 경로와 Windows install-mode identi
 등록한 소비 경로 외에도 GRD의 재귀 part와 네이티브 UI 고정 이름 후보를 찾는다.
 이 검사는 후보 목록이며 모든 문구를 전역 치환하라는 지시가 아니다.
 
-## 브랜드 내부 URL 제안
+## 브랜드 내부 URL
 
 `chrome://`를 사용자에게 브랜드 주소로 보여주는 방향을 권한다. Edge는
 [`edge://settings/help`](https://learn.microsoft.com/en-us/troubleshoot/microsoft-edge/security/troubleshoot-sign-in-issues)를,
 Vivaldi는 [`vivaldi://settings`](https://help.vivaldi.com/de/desktop-de/werkzeuge/einstellungen/)를
-공식 안내에 사용한다. 이번 설정 작업은 URL 동작을 변경하지 않는다.
+공식 안내에 사용한다. Yee는 현재 브랜드 설정에서 생성한 URL 접두어를 사용한다.
 
-현재 Chromium 코드 구조에서는 브랜드 scheme의 입력을 기존 WebUI URL로
-정규화하고, navigation entry의 virtual URL에 브랜드 주소를 보존하는 접근을
-먼저 검토할 수 있다.
+`components/branding/internal_urls.*`가 입력 주소와 표시 주소를 변환한다.
+Chromium에는 scheme 등록·Omnibox 입력 분류·navigation 정규화·주소 포매팅·복사·
+드래그·북마크와 세션 저장 연결을 둔다. 실제 WebUI 주소와 origin은 `chrome://`
+형식을 사용하며, 사용자에게 보여주고 복사하는 주소는 현재 브랜드를 따른다.
+브라우저에서 시작한 이동은 navigation 이전에 정규화하고, renderer에서 시작한
+이동에는 기존 WebUI 접근 검사를 적용한다. 북마크와 세션의 저장 주소도 정규화해
+다음 빌드에서 브랜드가 바뀌어도 같은 내부 페이지를 복원한다.
+브라우저 실행 경로로 전달된 외부 주소는 먼저 기존 Chromium 주소로
+정규화해 같은 launch 검사를 적용한다. 주소창에서 열 수 있는 내부 페이지라도
+외부 실행 인자로 열 수 있는지는 Chromium의 별도 허용 범위에 따른다.
 
 Brave의 현재 소스는 브랜드 scheme을 Chrome scheme으로 정규화하고,
 LocationBarModelDelegate의 주소 포매팅과 Omnibox 복사 처리를 별도로 연결한다.
-virtual URL 보존과 이 방식을 함께 비교한다. 구체적인 소스 근거는
+구체적인 소스 근거는
 [Brave 내부 URL 분석](brave-branding-analysis.md#5-brave는-입력정규화표시복사를-연결한다)을 참고한다.
 
-실제 구현 전 아래 경로를 한 checkpoint로 다룬다.
+추가 내부 페이지와 표시 경로를 연결할 때 아래 기준을 유지한다.
 
 - 입력·자동완성·메뉴·내부 링크에서 브랜드 scheme으로 이동
 - 브랜드 scheme 등록과 legacy `chrome://` 입력의 정규화
@@ -119,9 +135,16 @@ virtual URL 보존과 이 방식을 함께 비교한다. 구체적인 소스 근
 - 기존 `chrome://` 주소와 저장된 bookmark/session의 호환성
 - Yee split pane의 읽기 전용 주소 표시와 native Omnibox가 같은 주소를 사용하는지
 
-scheme은 표시 이름에서 자동으로 만들지 않고 별도의 안정된 설정으로 둔다.
-이름에 공백이나 비 ASCII 문자가 있을 수 있고, 저장된 내부 주소의 이전은
-일반 제품명 변경과 다른 문제다. scheme 설정은 실제 URL 연결을 구현할 때 추가한다.
+기본 접두어는 브랜드 이름을 따르고, `internal_url_scheme`은 이름이 URL 문법에
+맞지 않거나 별도 접두어가 필요할 때 사용한다. `chrome-untrusted://`,
+`chrome-search://`와 리소스 import 주소는 기존 권한과 origin을 유지한다.
+WebUI 본문의 고정 링크 문구와 북마크 편집 화면 등 모든 표시 문자열의 브랜드
+전환은 별도 소비 경로를 확인한 뒤 연결한다.
+
+`브랜드://settings`는 Yee 설정으로, `브랜드://chromium-settings`는 기존
+Chromium 설정으로 연결한다. `chrome://settings` 입력은 기존 설정을 유지하며
+주소창에는 브랜드의 `chromium-settings` 경로로 표시한다. 화면과 디자인 근거는
+[Yee 설정](settings.md)에 둔다.
 
 ## 빌드 없는 검증
 

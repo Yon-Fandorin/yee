@@ -7,7 +7,7 @@ function Get-YeeBrandConfig {
     $repoRoot = $script:ProductBrandRepoRoot
     $config = Get-Content -LiteralPath $script:ProductBrandConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($property in $config.PSObject.Properties.Name) {
-        if ($property -notin @('name', 'short_name', 'logo_source', 'logo_crop_size', 'provisional')) {
+        if ($property -notin @('name', 'short_name', 'logo_source', 'logo_crop_size', 'provisional', 'internal_url_scheme')) {
             throw "brand.json contains an unknown field: $property"
         }
     }
@@ -23,6 +23,15 @@ function Get-YeeBrandConfig {
     }
     $provisional = if ($config.PSObject.Properties['provisional']) { $config.provisional } else { $true }
     if ($provisional -isnot [bool]) { throw 'provisional must be a boolean.' }
+    $scheme = if ($config.PSObject.Properties['internal_url_scheme']) { $config.internal_url_scheme } else { $shortName.ToLowerInvariant() }
+    $reservedSchemes = @('about', 'android-app', 'blob', 'chrome', 'cid', 'content', 'data',
+        'devtools', 'dom-distiller', 'externalfile', 'file', 'filesystem',
+        'ftp', 'http', 'https', 'intent', 'isolated-app', 'javascript', 'mailto',
+        'shell', 'sms', 'tel', 'urn', 'view-source', 'webcal', 'ws', 'wss')
+    if ($scheme -isnot [string] -or $scheme -cnotmatch '^[a-z][a-z0-9+.-]*$' -or
+        $scheme -in $reservedSchemes -or $scheme.StartsWith('chrome-')) {
+        throw 'internal_url_scheme must be a lowercase ASCII URL scheme that does not conflict with a built-in protocol; set it explicitly when short_name cannot be used as a scheme.'
+    }
     if ($config.logo_source -isnot [string] -or [string]::IsNullOrWhiteSpace($config.logo_source) -or
         [System.IO.Path]::IsPathRooted($config.logo_source)) {
         throw 'logo_source must be a repository-relative file path.'
@@ -43,5 +52,6 @@ function Get-YeeBrandConfig {
         LogoSource = $logoSource
         LogoCropSize = $config.logo_crop_size
         Provisional = $provisional
+        InternalUrlScheme = $scheme
     }
 }

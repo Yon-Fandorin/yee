@@ -1,8 +1,11 @@
 // Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
 #include "chrome/browser/yee_content_blocking/baseline_list_updater.h"
+
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/test/bind.h"
 #include "base/test/task_environment.h"
+#include "base/test/test_future.h"
 #include "components/yee_content_blocking/baseline_list_store.h"
 #include "mojo/core/embedder/embedder.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -109,6 +112,50 @@ TEST_F(BaselineListUpdaterTest,
                                              kList);
   tasks_.RunUntilIdle();
   EXPECT_TRUE(ReadBaselineListStore(path_).generation.empty());
+}
+
+TEST_F(BaselineListUpdaterTest,
+       ManualCheckBypassesScheduleAndJoinsInFlightPair) {
+  auto updater = Create(base::Time::Now());
+  std::vector<bool> states;
+  auto subscription =
+      BaselineListUpdater::AddChangedCallback(base::BindLambdaForTesting(
+          [&]() { states.push_back(updater->update_in_flight()); }));
+  updater->Start();
+  EXPECT_EQ(0u, factory_.total_requests());
+  base::test::TestFuture<bool> first;
+  base::test::TestFuture<bool> second;
+  updater->CheckNow(first.GetCallback());
+  updater->CheckNow(second.GetCallback());
+  tasks_.RunUntilIdle();
+  ASSERT_EQ(1, factory_.NumPending());
+  factory_.SimulateResponseForPendingRequest(std::string(kBaselineListURLs[0]),
+                                             kList);
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(first.IsReady());
+  factory_.SimulateResponseForPendingRequest(std::string(kBaselineListURLs[1]),
+                                             kPrivacy);
+  tasks_.RunUntilIdle();
+  EXPECT_TRUE(first.Get());
+  EXPECT_TRUE(second.Get());
+  EXPECT_EQ(2u, factory_.total_requests());
+  EXPECT_EQ((std::vector<bool>{true, false}), states);
+}
+
+TEST_F(BaselineListUpdaterTest, ManualCheckReportsFailureAndOwnerShutdown) {
+  factory_.AddResponse(std::string(kBaselineListURLs[0]), "error",
+                       net::HTTP_INTERNAL_SERVER_ERROR);
+  auto updater = Create();
+  base::test::TestFuture<bool> failed;
+  updater->CheckNow(failed.GetCallback());
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(failed.Get());
+  factory_.ClearResponses();
+  base::test::TestFuture<bool> closed;
+  updater->CheckNow(closed.GetCallback());
+  tasks_.RunUntilIdle();
+  updater.reset();
+  EXPECT_FALSE(closed.Get());
 }
 }  // namespace
 }  // namespace yee::content_blocking

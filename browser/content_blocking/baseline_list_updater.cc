@@ -24,6 +24,10 @@ base::WeakPtr<BaselineListUpdater>& Coordinator() {
   static base::NoDestructor<base::WeakPtr<BaselineListUpdater>> value;
   return *value;
 }
+base::RepeatingClosureList& StatusCallbacks() {
+  static base::NoDestructor<base::RepeatingClosureList> callbacks;
+  return *callbacks;
+}
 base::RepeatingCallback<scoped_refptr<network::SharedURLLoaderFactory>()>&
 NetworkFactoryProvider() {
   static base::NoDestructor<
@@ -56,7 +60,63 @@ BaselineListUpdater::BaselineListUpdater(
                   : base::ThreadPool::CreateSequencedTaskRunner(
                         {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
                          base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})) {}
-BaselineListUpdater::~BaselineListUpdater() = default;
+BaselineListUpdater::~BaselineListUpdater() {
+  weak_factory_.InvalidateWeakPtrs();
+  StatusCallbacks().Notify();
+  for (auto& callback : completion_callbacks_) {
+    std::move(callback).Run(false);
+  }
+}
+
+base::CallbackListSubscription BaselineListUpdater::AddChangedCallback(
+    base::RepeatingClosure callback) {
+  return StatusCallbacks().Add(std::move(callback));
+}
+
+void BaselineListUpdater::CheckNow(base::OnceCallback<void(bool)> callback) {
+  completion_callbacks_.push_back(std::move(callback));
+  if (in_flight_) {
+    return;
+  }
+  timer_.Stop();
+  checked_at_ = {};
+  Start();
+}
+
+bool BaselineListUpdater::RequestUpdate(
+    base::OnceCallback<void(bool)> callback) {
+  if (!Coordinator()) {
+    return false;
+  }
+  Coordinator()->CheckNow(std::move(callback));
+  return true;
+}
+
+void BaselineListUpdater::GetStatus(
+    base::OnceCallback<void(BaselineListUpdateStatus)> callback) {
+  const auto directory =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          kBaselineListDirectorySwitch);
+  BaselineListUpdateStatus status;
+  status.running_downloaded = !BaselineLists().generation.empty();
+  status.available = !!Coordinator();
+  status.in_flight = Coordinator() && Coordinator()->update_in_flight();
+  StoreWorker()->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::FilePath directory, std::string running_generation,
+             BaselineListUpdateStatus status) {
+            const auto saved = ReadBaselineListStore(directory);
+            status.downloaded = !saved.generation.empty();
+            status.pending_restart =
+                status.downloaded && saved.generation != running_generation;
+            status.recovered = saved.recovered;
+            status.checked_at = saved.checked_at;
+            return status;
+          },
+          directory, BaselineLists().generation, status),
+      std::move(callback));
+}
 void BaselineListUpdater::SetNetworkFactoryProvider(
     base::RepeatingCallback<scoped_refptr<network::SharedURLLoaderFactory>()>
         provider) {
@@ -117,6 +177,7 @@ void BaselineListUpdater::Start() {
   }
   in_flight_ = true;
   Download(0);
+  StatusCallbacks().Notify();
 }
 void BaselineListUpdater::Download(size_t index) {
   auto request = std::make_unique<network::ResourceRequest>();
@@ -129,7 +190,7 @@ void BaselineListUpdater::Download(size_t index) {
         semantics {
           sender: "Yee content blocking"
           description: "Downloads official EasyList and EasyPrivacy rules. A validated pair is applied on the next browser start; previous working rules remain available."
-          trigger: "Thirty seconds after a regular profile starts, then once daily. Failed updates retry after six hours."
+          trigger: "Thirty seconds after a regular profile starts, then once daily, or when the user checks in Settings. Failed updates retry after six hours."
           data: "No user content, cookies or credentials."
           destination: WEBSITE
         }
@@ -176,5 +237,10 @@ void BaselineListUpdater::Completed(bool installed) {
   timer_.Start(
       FROM_HERE, installed ? kUpdateInterval : base::Hours(6),
       base::BindOnce(&BaselineListUpdater::Start, weak_factory_.GetWeakPtr()));
+  auto callbacks = std::move(completion_callbacks_);
+  StatusCallbacks().Notify();
+  for (auto& callback : callbacks) {
+    std::move(callback).Run(installed);
+  }
 }
 }  // namespace yee::content_blocking

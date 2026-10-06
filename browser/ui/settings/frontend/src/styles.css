@@ -1,0 +1,47 @@
+@import 'tailwindcss' source(none);
+@import './lib/styles/theme.css';
+@source './';
+
+@layer base {
+	* {
+		border-color: var(--border);
+	}
+	:root {
+		color-scheme: light dark;
+		-webkit-font-smoothing: antialiased;
+	}
+	body {
+		margin: 0;
+		overflow: hidden;
+		background: var(--background);
+		color: var(--foreground);
+		font-family: var(--font-sans);
+		font-size: 13px;
+		line-height: 1.5;
+	}
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+	button,
+	a,
+	input {
+		-webkit-tap-highlight-color: transparent;
+	}
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 3px;
+	}
+	button:enabled,
+	a {
+		cursor: pointer;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-slot='button'],
+	[data-slot='input'],
+	[data-slot='badge'] {
+		transition: none;
+	}
+}

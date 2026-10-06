@@ -7,11 +7,14 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `brand.json` | 표시 이름, 이름 확정 여부, 로고 경로와 자르기 크기 |
+| `brand.json` | 표시 이름, 내부 URL 접두어, 이름 확정 여부, 로고 경로와 자르기 크기 |
 | `surfaces.json` | 브랜딩 대상의 소스 위치, 처리 상태, 보존 이유와 테스트 항목 |
 
 `provisional`은 이름이 아직 확정되지 않았는지 표시한다.
 `short_name`을 생략하면 `name`을 사용한다.
+내부 URL 접두어는 기본적으로 `short_name`의 소문자 값이다. 이름을 바꾸고
+빌드하면 접두어도 바뀐다. URL scheme으로 쓸 수 없는 이름은 선택 필드
+`internal_url_scheme`에 소문자 영문 접두어를 지정한다.
 로고 원본은 [`assets/brand/`](../assets/brand/README.md)에 둔다.
 
 ## 점검 목록의 상태

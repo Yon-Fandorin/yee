@@ -50,7 +50,7 @@ class BrandConfigTest(unittest.TestCase):
 
     def brand(self, name="Orbit & Co", **extra):
         self.config.write_text(json.dumps({"name": name, "logo_source": "assets/brand/logo.png",
-                                          "logo_crop_size": 820, **extra}))
+                                          "logo_crop_size": 820, "internal_url_scheme": "orbit", **extra}))
         return branding.load_brand(self.config, self.repo)
 
     def install(self, brand, check_only=False):
@@ -67,6 +67,36 @@ class BrandConfigTest(unittest.TestCase):
         for key in ("COMPANY_FULLNAME", "COMPANY_SHORTNAME", "COPYRIGHT", "MAC_BUNDLE_ID", "MAC_CREATOR_CODE", "MAC_TEAM_ID"):
             original = next(line for line in UPSTREAM_BRANDING.splitlines() if line.startswith(key + "="))
             self.assertIn(original + "\n", text)
+
+    def test_url_scheme_follows_brand_rename_and_can_be_overridden(self):
+        for name, expected in (("Orbit", "orbit"), ("Nova", "nova")):
+            self.config.write_text(json.dumps({"name": name, "logo_source": "assets/brand/logo.png",
+                                              "logo_crop_size": 820}))
+            brand = branding.load_brand(self.config, self.repo)
+            self.assertEqual(brand.internal_url_scheme, expected)
+            self.install(brand)
+            text = self.branding_path.read_text()
+            self.assertIn(f"PRODUCT_INTERNAL_URL_SCHEME={expected}\n", text)
+            self.assertEqual(text.count("PRODUCT_INTERNAL_URL_SCHEME="), 1)
+        self.assertEqual(self.brand("새 이름", internal_url_scheme="newbrand").internal_url_scheme,
+                         "newbrand")
+
+    def test_url_scheme_rejects_invalid_and_reserved_protocols(self):
+        for scheme in ("", "Orbit", "123brand", "two words", "새이름", "http", "https",
+                       "chrome", "chrome-untrusted", "file", "javascript", "data",
+                       "devtools", "view-source", "x\nINJECT=1", None):
+            with self.subTest(scheme=scheme), self.assertRaises(ValueError):
+                self.brand(internal_url_scheme=scheme)
+        for scheme in ("orbit", "new-brand", "brand.v2", "brand+local"):
+            self.assertEqual(self.brand(internal_url_scheme=scheme).internal_url_scheme, scheme)
+
+    def test_scheme_with_duplicate_branding_input_fails_before_writes(self):
+        self.branding_path.write_text(self.branding_path.read_text()
+            + "PRODUCT_INTERNAL_URL_SCHEME=first\nPRODUCT_INTERNAL_URL_SCHEME=second\n")
+        before = self.branding_path.read_bytes()
+        with self.assertRaises(ValueError):
+            self.install(self.brand())
+        self.assertEqual(self.branding_path.read_bytes(), before)
 
     def test_xml_names_and_untranslated_product_ids(self):
         self.install(self.brand(short_name="Orbit"))
@@ -165,6 +195,21 @@ class BrandConfigTest(unittest.TestCase):
             "-f", str(self.branding_path), "-t", "@PRODUCT_FULLNAME@"],
             text=True, env=env)
         self.assertEqual(output.rstrip("\n"), name)
+
+    @unittest.skipUnless((ROOT / ".local-build/chromium/src/build/util/version.py").is_file(),
+                         "local Chromium version utility is required")
+    def test_actual_generator_updates_cpp_url_scheme_from_brand_input(self):
+        for name in ("Orbit", "Nova"):
+            self.config.write_text(json.dumps({"name": name, "logo_source": "assets/brand/logo.png",
+                                              "logo_crop_size": 820}))
+            self.install(branding.load_brand(self.config, self.repo))
+            output = subprocess.check_output([
+                sys.executable, str(ROOT / ".local-build/chromium/src/build/util/version.py"),
+                "-f", str(self.branding_path),
+                "-i", str(ROOT / "components/branding/internal_url_scheme.h.in")],
+                text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+            self.assertIn(f'kInternalURLScheme[] = "{name.lower()}";', output)
+            self.assertNotIn("@PRODUCT_INTERNAL_URL_SCHEME@", output)
 
 
 if __name__ == "__main__":

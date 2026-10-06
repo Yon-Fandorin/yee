@@ -29,6 +29,9 @@ function Read-BrandingInput {
             throw "BRANDING must contain exactly one $key"
         }
     }
+    if ([regex]::Matches($inputText, '(?m)^PRODUCT_INTERNAL_URL_SCHEME=[^\r\n]*').Count -gt 1) {
+        throw 'BRANDING must contain at most one PRODUCT_INTERNAL_URL_SCHEME.'
+    }
     return $inputText
 }
 $null = Read-BrandingInput
@@ -49,6 +52,15 @@ foreach ($key in $values.Keys) {
     if ([regex]::Matches($text, $pattern).Count -ne 1) { throw "BRANDING must contain exactly one $key" }
     $replacement = $key + '=' + $values[$key]
     $text = [regex]::Replace($text, $pattern, [System.Text.RegularExpressions.MatchEvaluator] { param($match) $replacement })
+}
+$schemePattern = '(?m)^PRODUCT_INTERNAL_URL_SCHEME=[^\r\n]*'
+$schemeMatches = [regex]::Matches($text, $schemePattern).Count
+if ($schemeMatches -gt 1) { throw 'BRANDING must contain at most one PRODUCT_INTERNAL_URL_SCHEME.' }
+$schemeValue = 'PRODUCT_INTERNAL_URL_SCHEME=' + $brand.InternalUrlScheme
+if ($schemeMatches -eq 1) {
+    $text = [regex]::Replace($text, $schemePattern, $schemeValue)
+} else {
+    $text = $text.TrimEnd([char[]]"`r`n") + "`n" + $schemeValue + "`n"
 }
 function New-ProductMessage([string] $Id, [string] $Value) {
     $escaped = [System.Security.SecurityElement]::Escape($Value)

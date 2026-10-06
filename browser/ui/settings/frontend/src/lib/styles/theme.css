@@ -1,0 +1,84 @@
+:root {
+	--radius: 0.5rem;
+	--background: #ffffff;
+	--foreground: #25262a;
+	--card: #fafafa;
+	--card-foreground: #25262a;
+	--primary: #6262ce;
+	--primary-hover: #5858bf;
+	--primary-foreground: #ffffff;
+	--secondary: #f0f0f3;
+	--secondary-foreground: #5f616a;
+	--muted: #f1f1f3;
+	--muted-foreground: #6f7179;
+	--accent: #ebebee;
+	--accent-foreground: #25262a;
+	--destructive: #b54048;
+	--border: #e7e7e9;
+	--input: #dcdce1;
+	--ring: #7373db;
+	--sidebar: #fafafa;
+	--sidebar-foreground: #25262a;
+	--sidebar-accent: #ebebee;
+	--sidebar-accent-foreground: #25262a;
+	--sidebar-border: #e7e7e9;
+	--status: #40815b;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--background: #101011;
+		--foreground: #e9e9ed;
+		--card: #18191b;
+		--card-foreground: #e9e9ed;
+		--primary: #6c68cc;
+		--primary-hover: #625ec1;
+		--primary-foreground: #ffffff;
+		--secondary: #24252a;
+		--secondary-foreground: #c3c3cd;
+		--muted: #202126;
+		--muted-foreground: #9b9ba4;
+		--accent: #24252a;
+		--accent-foreground: #e9e9ed;
+		--destructive: #ee8e94;
+		--border: #2b2c31;
+		--input: #36373e;
+		--ring: #9c98ee;
+		--sidebar: #0b0b0c;
+		--sidebar-foreground: #e9e9ed;
+		--sidebar-accent: #24252a;
+		--sidebar-accent-foreground: #e9e9ed;
+		--sidebar-border: #2b2c31;
+		--status: #74ae87;
+	}
+}
+
+@theme inline {
+	--font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+}

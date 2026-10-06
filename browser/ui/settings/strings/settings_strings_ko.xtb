@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='utf-8'?>
+<translationbundle lang="ko">
+  <translation id="6095444980290943125">설정</translation>
+  <translation id="1479370378418427445">설정 홈</translation>
+  <translation id="1949792669499588660">본문으로 이동</translation>
+  <translation id="7490267615755894055">일반</translation>
+  <translation id="6203637951769994121">광고 및 추적 차단</translation>
+  <translation id="6262759855049923835">고급 설정</translation>
+  <translation id="2463696930976652074">브라우저 환경과 개인정보 보호 설정을 관리하세요.</translation>
+  <translation id="9151681068421308562">브라우징 보호</translation>
+  <translation id="2057646437160978909">광고 및 추적 차단</translation>
+  <translation id="3430812647489322570">필터 업데이트와 사이트별 차단 예외를 관리하세요.</translation>
+  <translation id="3037814881240184497">필터 업데이트와 차단 예외 사이트</translation>
+  <translation id="8409855285911497572">브라우저 설정</translation>
+  <translation id="6481477749947090980">아래 항목은 고급 설정에서 열립니다.</translation>
+  <translation id="5937775024646845428">사이트 권한</translation>
+  <translation id="8459034368379661738">카메라, 마이크, 위치 사용 권한</translation>
+  <translation id="1847241944159024222">개인정보 및 보안</translation>
+  <translation id="1412223401206735569">인터넷 사용 기록과 보안</translation>
+  <translation id="6807776153502104854">모양</translation>
+  <translation id="2990488457307705254">테마와 화면 표시</translation>
+  <translation id="8110830742817670814">이 화면은 시스템의 라이트·다크 모드를 따릅니다.</translation>
+  <translation id="6094984954313876672">다운로드</translation>
+  <translation id="2524519825755556632">파일 저장 위치와 다운로드 설정</translation>
+  <translation id="121765559298954495">차단 켜짐</translation>
+  <translation id="225542894895702447">차단 꺼짐</translation>
+  <translation id="2277672995456893084">차단 상태 확인 중…</translation>
+  <translation id="3154191273280788359">차단 필터</translation>
+  <translation id="7252099524292269974">광고와 추적 요청을 차단하는 필터 목록입니다.</translation>
+  <translation id="6989042599344819995">업데이트 확인</translation>
+  <translation id="4341625865984074699">확인 중…</translation>
+  <translation id="3498253872918206980">광고 요청과 페이지 내 광고</translation>
+  <translation id="5098699485799422004">활동 추적 요청</translation>
+  <translation id="1404818538165197662">기본 제공</translation>
+  <translation id="684722991992683244">업데이트본</translation>
+  <translation id="7207008172890709667">마지막 확인: <ph name="VALUE"/></translation>
+  <translation id="5954755492376497678">브라우저에 포함된 기본 필터를 사용 중입니다.</translation>
+  <translation id="7268015603174929699">새 필터가 준비되었습니다. 브라우저를 다시 시작하면 적용됩니다.</translation>
+  <translation id="7842024191578632536">시크릿·게스트 창에서는 필터를 업데이트할 수 없습니다.</translation>
+  <translation id="2464228675858271292">현재 실행에서는 필터를 업데이트할 수 없습니다.</translation>
+  <translation id="2538334083805830041">차단 예외 사이트</translation>
+  <translation id="2634698060593638593">추가한 사이트에서만 차단이 꺼집니다. www.example.com 같은 하위 도메인은 따로 추가하세요.</translation>
+  <translation id="3193137693843309920">사이트 주소</translation>
+  <translation id="955749282183802914">example.com</translation>
+  <translation id="4295360098184645276">사이트 추가</translation>
+  <translation id="8978260381133177776">주소창의 방패 버튼으로 차단을 끈 사이트도 여기에 표시됩니다.</translation>
+  <translation id="250571607050761296">여기서 바꾼 설정은 현재 시크릿·게스트 세션에만 적용됩니다.</translation>
+  <translation id="2062050145344963835">추가한 사이트가 없습니다</translation>
+  <translation id="2727780118202423468">차단을 끄려는 사이트의 주소를 위에 입력하세요.</translation>
+  <translation id="6920484175279406134">차단 예외 사이트 목록</translation>
+  <translation id="230111505674340710">차단 켜기</translation>
+  <translation id="6870746035555586281"><ph name="VALUE"/> 차단 켜기</translation>
+  <translation id="3329917590954651501">example.com 또는 https://example.com처럼 사이트 주소를 입력하세요.</translation>
+  <translation id="2014097250360482795">이 창에서는 필터를 업데이트할 수 없습니다.</translation>
+  <translation id="6734115820559300286">변경 사항을 저장하지 못했습니다. 다시 시도하세요.</translation>
+  <translation id="5471307425926119077">이 사이트의 차단을 껐습니다. 열려 있는 해당 페이지를 새로고침하세요.</translation>
+  <translation id="6556714683110373832">이 사이트의 차단을 켰습니다. 열려 있는 해당 페이지를 새로고침하세요.</translation>
+  <translation id="564747077622186922">필터 업데이트를 확인하고 있습니다…</translation>
+  <translation id="1736247180480848741">브라우저를 다시 시작하면 새 필터가 적용됩니다.</translation>
+  <translation id="495069707169612748">필터가 최신 상태입니다.</translation>
+  <translation id="5765073876001303786">필터를 업데이트하지 못했습니다. 기존 필터를 사용합니다. 잠시 후 다시 시도하세요.</translation>
+  <translation id="6034379694665802459">설정을 불러오지 못했습니다. 다시 시도하세요.</translation>
+  <translation id="615233787031865153">다시 시도</translation>
+  <translation id="4186938248247582318"><ph name="VALUE"/> — 설정</translation>
+</translationbundle>

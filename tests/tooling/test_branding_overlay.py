@@ -11,6 +11,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -83,6 +84,8 @@ class BrandingOverlayTest(unittest.TestCase):
                   "logo_crop_size": 820}
         if short_name is not None:
             config["short_name"] = short_name
+        if not re.fullmatch(r"[a-z][a-z0-9+.-]*", (short_name or name).lower()):
+            config["internal_url_scheme"] = "orbit"
         (self.repo / "branding/brand.json").write_text(json.dumps(config))
 
     def prepare(self, name):

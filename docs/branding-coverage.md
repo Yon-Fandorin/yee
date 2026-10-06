@@ -128,11 +128,10 @@ clamp하므로 작은 원본에서 결과가 달라질 수 있다.
 
 ## 내부 URL의 추가 경계
 
-Brave의 입력 정규화·표시·복사를 참고할 수 있지만 about handler 한곳에 별칭을
-연결하는 것으로 충분하지 않다. 먼저 실제 navigation URL은 Chromium scheme을
-유지할지, virtual URL에 브랜드 주소를 보존할지, 저장·드래그·복사 결과에 어떤
-주소를 사용할지 정한다. `chrome-untrusted://`, `chrome-search://` 같은 origin은
-제품 표시를 이유로 전역 치환하지 않는다.
+브랜드 설정에서 생성한 접두어를 입력·주소 표시·전체 복사·드래그에 연결했다.
+기본값은 `short_name`의 소문자 값이며 필요하면 `internal_url_scheme`으로
+지정한다. 실제 navigation과 WebUI origin, 북마크·세션 저장은 Chromium 주소를
+사용한다. `chrome-untrusted://`, `chrome-search://` 같은 origin은 유지한다.
 
 | 경계 | 확인한 경로 | 필요한 수용 기준 |
 | --- | --- | --- |
@@ -146,8 +145,10 @@ Brave의 입력 정규화·표시·복사를 참고할 수 있지만 about handl
 | WebUI 권한·origin | scheme 등록, WebUI controller·bindings, origin 포매터·CSP·renderer 접근 검사 | trusted/untrusted 경계를 유지한다. 외부 페이지 iframe·window.open·location 이동과 guest/private 제한을 확인한다. |
 | 읽기 전용 pane 주소 | Yee split-pane 표시와 native Omnibox | 같은 표시 helper와 URL 정책을 사용한다. menu·자동완성·내부 link·bookmark가 동일한 alias로 이동해야 한다. |
 
-이 경계는 모두 **소비 확인 / URL alias 미연결 / runtime 미검증**이다. source-level
-검사만으로 `PageInfo CHECK`나 origin 경계가 안전하다고 완료 처리하지 않는다.
+위 경로에 공통 helper를 연결했으며, macOS 앱 검증은 실제 주소와 표시·복사
+주소를 구분해 확인한다. WebUI 본문의 링크 문구, 북마크 편집 문자열,
+권한 origin의 표시 문자열과 Windows 동작은 추가 소비 경로·검증 대상이다.
+source-level 검사만으로 모든 runtime 경계가 검증됐다고 판정하지 않는다.
 
 ## 처리 순서와 완료 조건
 
@@ -160,8 +161,9 @@ Brave의 입력 정규화·표시·복사를 참고할 수 있지만 about handl
    upstream 원본에서 생성한다. OS Helper·권한·파일 종류 설명도 포함한다.
 4. 자산 manifest를 완성하고 PNG 생성 출력과 별도 원본을 연결한다. ICNS/ICO
    파일 존재 검사만으로 `Assets.car`·벡터·워드마크까지 적용됐다고 판정하지 않는다.
-5. scheme 설정과 실제/virtual URL 정책을 정한 뒤 위의 입력·복사·드래그·저장·
-   명령·PageInfo·권한 경계를 하나의 integration checkpoint로 연결한다.
+5. 브랜드 설정에서 scheme을 생성하고 입력·표시·복사·드래그·저장·명령·
+   PageInfo를 공통 변환 helper에 연결한다. 실제 WebUI origin을 유지하고,
+   추가 표시 경로와 플랫폼별 권한 경계를 integration checkpoint로 검증한다.
 6. 독립 OS/updater identity는 표시 이름과 별도로 적용한다. profile·Keychain·
    설치 등록·PWA·정책·서비스·업데이트의 최초 전환과 복구를 함께 설계한다.
 7. 지원 플랫폼별 실제 앱·패키지·등록 결과를 검사한다. macOS 핵심 앱은 빌드와

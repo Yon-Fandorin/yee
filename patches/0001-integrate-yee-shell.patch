@@ -1,3 +1,140 @@
+diff --git a/base/memory/shared_memory_switch.cc b/base/memory/shared_memory_switch.cc
+index 233e63dcc9..d3d006105e 100644
+--- a/base/memory/shared_memory_switch.cc
++++ b/base/memory/shared_memory_switch.cc
+@@ -70,11 +70,6 @@ namespace {
+ using base::subtle::PlatformSharedMemoryRegion;
+ using base::subtle::ScopedPlatformSharedMemoryHandle;
+ 
+-// The max shared memory size is artificially limited. This serves as a sanity
+-// check when serializing/deserializing the handle info. This value should be
+-// slightly larger than the largest shared memory size used in practice.
+-constexpr size_t kMaxSharedMemorySize = 8 << 20;  // 8 MiB
+-
+ #if BUILDFLAG(IS_FUCHSIA)
+ // Return a scoped platform shared memory handle for |shmem_region|, possibly
+ // with permissions reduced to make the handle read-only.
+@@ -110,7 +105,8 @@ std::string Serialize(HandleType shmem_handle,
+ 
+   CHECK(shmem_token);
+   CHECK_NE(shmem_size, 0u);
+-  CHECK_LE(shmem_size, kMaxSharedMemorySize);
++  CHECK_LE(shmem_size, is_read_only ? shared_memory_switch->maximum_region_size
++                                    : kDefaultSharedMemoryRegionSizeLimit);
+ 
+   // Reserve memory for the serialized value.
+   // handle,method,hi,lo,size = 4 * 64-bit number + 1 char + 4 commas + NUL
+@@ -200,7 +196,8 @@ std::optional<UnguessableToken> DeserializeGUID(std::string_view hi_part,
+ // Deserializes `switch_value` into a PlatformSharedMemoryRegion.
+ expected<PlatformSharedMemoryRegion, SharedMemoryError> Deserialize(
+     std::string_view switch_value,
+-    PlatformSharedMemoryRegion::Mode mode) {
++    PlatformSharedMemoryRegion::Mode mode,
++    size_t maximum_region_size) {
+   std::vector<std::string_view> tokens =
+       SplitStringPiece(switch_value, ",", KEEP_WHITESPACE, SPLIT_WANT_ALL);
+   if (tokens.size() != 5) {
+@@ -302,7 +299,7 @@ expected<PlatformSharedMemoryRegion, SharedMemoryError> Deserialize(
+   if (!StringToUint64(tokens[4], &size)) {
+     return unexpected(SharedMemoryError::kParseInt4Failed);
+   }
+-  if (size == 0 || size > kMaxSharedMemorySize) {
++  if (size == 0 || size > maximum_region_size) {
+     return unexpected(SharedMemoryError::kUnexpectedSize);
+   }
+ 
+@@ -341,8 +338,9 @@ void AddToLaunchParametersImpl(const RegionType& memory_region,
+ SharedMemorySwitch::SharedMemorySwitch(
+     std::string_view switch_name_in,
+     [[maybe_unused]] RendezvousKey rendezvous_key_in,
+-    [[maybe_unused]] DescriptorKey descriptor_key_in)
+-    : switch_name(switch_name_in) {
++    [[maybe_unused]] DescriptorKey descriptor_key_in,
++    size_t maximum_region_size_in)
++    : switch_name(switch_name_in), maximum_region_size(maximum_region_size_in) {
+ #if BUILDFLAG(IS_APPLE)
+   rendezvous_key = rendezvous_key_in;
+ #endif
+@@ -378,7 +376,8 @@ void SharedMemorySwitch::AddToLaunchParameters(
+ expected<UnsafeSharedMemoryRegion, SharedMemoryError>
+ UnsafeSharedMemoryRegionFrom(std::string_view switch_value) {
+   auto platform_handle =
+-      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kUnsafe);
++      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kUnsafe,
++                  kDefaultSharedMemoryRegionSizeLimit);
+   if (!platform_handle.has_value()) {
+     return unexpected(platform_handle.error());
+   }
+@@ -392,9 +391,11 @@ UnsafeSharedMemoryRegionFrom(std::string_view switch_value) {
+ }
+ 
+ expected<ReadOnlySharedMemoryRegion, SharedMemoryError>
+-ReadOnlySharedMemoryRegionFrom(std::string_view switch_value) {
++ReadOnlySharedMemoryRegionFrom(std::string_view switch_value,
++                               size_t maximum_region_size) {
+   auto platform_handle =
+-      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kReadOnly);
++      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kReadOnly,
++                  maximum_region_size);
+   if (!platform_handle.has_value()) {
+     return unexpected(platform_handle.error());
+   }
+diff --git a/base/memory/shared_memory_switch.h b/base/memory/shared_memory_switch.h
+index ad147a2890..871ef88809 100644
+--- a/base/memory/shared_memory_switch.h
++++ b/base/memory/shared_memory_switch.h
+@@ -5,6 +5,7 @@
+ #ifndef BASE_MEMORY_SHARED_MEMORY_SWITCH_H_
+ #define BASE_MEMORY_SHARED_MEMORY_SWITCH_H_
+ 
++#include <cstddef>
+ #include <string_view>
+ 
+ #include "base/base_export.h"
+@@ -34,6 +35,7 @@ class CommandLine;
+ struct LaunchOptions;
+ 
+ namespace shared_memory {
++inline constexpr size_t kDefaultSharedMemoryRegionSizeLimit = 8 << 20;
+ 
+ // Indicates failure modes of deserializing a shared memory switch value.
+ enum class SharedMemoryError {
+@@ -81,9 +83,11 @@ struct BASE_EXPORT SharedMemorySwitch {
+   // key, and descriptor key. The rendezvous key and descriptor key are unused
+   // on platforms that do not use them but are required arguments to allow for a
+   // consistent function interface.
+-  SharedMemorySwitch(std::string_view switch_name_in,
+-                     [[maybe_unused]] RendezvousKey rendezvous_key_in,
+-                     [[maybe_unused]] DescriptorKey descriptor_key_in);
++  SharedMemorySwitch(
++      std::string_view switch_name_in,
++      [[maybe_unused]] RendezvousKey rendezvous_key_in,
++      [[maybe_unused]] DescriptorKey descriptor_key_in,
++      size_t maximum_region_size_in = kDefaultSharedMemoryRegionSizeLimit);
+   ~SharedMemorySwitch();
+ 
+   SharedMemorySwitch(SharedMemorySwitch&&);
+@@ -115,6 +119,9 @@ struct BASE_EXPORT SharedMemorySwitch {
+   // The name of the switch to use to pass the shared memory region to the
+   // child process.
+   std::string_view switch_name;
++  // Embedders may explicitly bound larger read-only startup snapshots. The
++  // receiving process must use the same bound when deserializing its handle.
++  size_t maximum_region_size;
+ 
+ #if BUILDFLAG(IS_APPLE)
+   RendezvousKey rendezvous_key;
+@@ -135,7 +142,9 @@ UnsafeSharedMemoryRegionFrom(std::string_view switch_value);
+ 
+ // Returns an ReadOnlySharedMemoryRegion deserialized from `switch_value`.
+ BASE_EXPORT expected<ReadOnlySharedMemoryRegion, SharedMemoryError>
+-ReadOnlySharedMemoryRegionFrom(std::string_view switch_value);
++ReadOnlySharedMemoryRegionFrom(
++    std::string_view switch_value,
++    size_t maximum_region_size = kDefaultSharedMemoryRegionSizeLimit);
+ 
+ }  // namespace shared_memory
+ }  // namespace base
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
 index 1473c29c47..d13ef6dad8 100644
 --- a/chrome/BUILD.gn
@@ -139,17 +276,56 @@ index ee5eb1bc2e..8c33a2ca1d 100644
    SetupTracing();
  
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index cec54ac41c..04c270c722 100644
+index cec54ac41c..20399fe7cf 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -884,6 +884,7 @@ source_set("core") {
-   }
- 
-   deps = [
+@@ -1100,6 +1100,7 @@ source_set("core") {
+     "//chrome/browser/webauthn",
+     "//chrome/browser/webauthn:chrome_web_authentication_delegate",
+     "//chrome/browser/webid",
 +    "//chrome/browser/yee_content_blocking:browser",
-     ":active_use_util",
-     ":after_startup_task_utils",
-     ":bad_message",
+     "//chrome/common:version_header",
+     "//chrome/services/speech/buildflags",
+     "//components/activity_reporter",
+@@ -1240,6 +1241,7 @@ source_set("core") {
+     "//components/visited_url_ranking/public",
+     "//components/web_resource",
+     "//components/webui/chrome_urls",
++    "//components/yee_branding",
+     "//device/base",
+     "//device/gamepad/public/cpp:switches",
+     "//media/capture:capture_switches",
+diff --git a/chrome/browser/browser_about_handler.cc b/chrome/browser/browser_about_handler.cc
+index 08949a6941..0e6810e730 100644
+--- a/chrome/browser/browser_about_handler.cc
++++ b/chrome/browser/browser_about_handler.cc
+@@ -20,6 +20,7 @@
+ #include "chrome/common/url_constants.h"
+ #include "components/policy/core/browser/url_list/policy_blocklist_service.h"
+ #include "components/policy/core/browser/url_list/url_blocklist_manager.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/common/content_features.h"
+ #include "extensions/buildflags/buildflags.h"
+ 
+@@ -41,6 +42,7 @@ bool IsNonNavigationAboutUrl(const GURL& url) {
+ bool HandleChromeAboutAndChromeSyncRewrite(
+     GURL* url,
+     content::BrowserContext* browser_context) {
++  *url = yee::branding::CanonicalInternalURL(*url);
+   // Check that about: URLs are either
+   // 1) fixed up to chrome: (by url_formatter::FixupURL applied to
+   //    browser-initiated navigations)
+@@ -73,6 +75,10 @@ bool HandleChromeAboutAndChromeSyncRewrite(
+ 
+ bool HandleNonNavigationAboutURL(const GURL& url,
+                                  content::BrowserContext* context) {
++  const GURL canonical_url = yee::branding::CanonicalInternalURL(url);
++  if (canonical_url != url) {
++    return HandleNonNavigationAboutURL(canonical_url, context);
++  }
+   if (!IsNonNavigationAboutUrl(url)) {
+     return false;
+   }
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
 index b72da324da..cb28d556e6 100644
 --- a/chrome/browser/chrome_content_browser_client.cc
@@ -502,10 +678,18 @@ index 90e572fe4e..e89a9c55d5 100644
    SetupInitialPrefs();
    SetUpFieldTrials();
 diff --git a/chrome/browser/profiles/BUILD.gn b/chrome/browser/profiles/BUILD.gn
-index 6be7b43b6a..d26c7f1ab8 100644
+index 6be7b43b6a..fa2b3890ae 100644
 --- a/chrome/browser/profiles/BUILD.gn
 +++ b/chrome/browser/profiles/BUILD.gn
-@@ -857,6 +857,7 @@ source_set("profiles_extra_parts_impl") {
+@@ -551,6 +551,7 @@ source_set("profile_io_data") {
+     "//chrome/common",
+     "//chrome/common:buildflags",
+     "//components/dom_distiller/core",
++    "//components/yee_branding",
+     "//extensions/buildflags",
+     "//net:buildflags",
+     "//url",
+@@ -857,6 +858,7 @@ source_set("profiles_extra_parts_impl") {
      "//chrome/browser/webauthn",
      "//chrome/browser/webdata_services",
      "//chrome/browser/webid",
@@ -533,11 +717,41 @@ index 5a3f77ff47..2c33d269b8 100644
  #if !BUILDFLAG(IS_ANDROID)
    metrics::CriticalUserJourneyServiceFactory::GetInstance();
  #endif  // BUILDFLAG(!IS_ANDROID)
+diff --git a/chrome/browser/profiles/profile_io_data.cc b/chrome/browser/profiles/profile_io_data.cc
+index 080e9b0e43..ccfe0a26d4 100644
+--- a/chrome/browser/profiles/profile_io_data.cc
++++ b/chrome/browser/profiles/profile_io_data.cc
+@@ -12,6 +12,7 @@
+ #include "chrome/common/buildflags.h"
+ #include "chrome/common/url_constants.h"
+ #include "components/dom_distiller/core/url_constants.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "net/net_buildflags.h"
+ #include "url/gurl.h"
+@@ -63,7 +64,8 @@ bool ProfileIOData::IsHandledProtocol(std::string_view scheme) {
+         // BUILDFLAG(IS_CHROMEOS)
+   });
+ 
+-  return kProtocolList.contains(scheme);
++  return kProtocolList.contains(scheme) ||
++         yee::branding::IsInternalURLScheme(scheme);
+ }
+ 
+ // static
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
-index 0b066f56e3..48d3573894 100644
+index 0b066f56e3..bf1f1c3dbd 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -2770,6 +2770,8 @@ static_library("ui") {
+@@ -1437,6 +1437,7 @@ static_library("ui") {
+       "//chrome/browser/ui/window_feature_controller",
+       "//chrome/browser/usb",
+       "//components/privacy_sandbox:features",
++      "//components/yee_branding",
+ 
+       # No reason for this dependencies be out of alphabetical order.
+       "//chrome/browser/content_extraction",
+@@ -2770,6 +2771,8 @@ static_library("ui") {
        "views/frame/layout/browser_view_popup_layout_impl.h",
        "views/frame/layout/browser_view_tabbed_layout_impl.cc",
        "views/frame/layout/browser_view_tabbed_layout_impl.h",
@@ -546,14 +760,14 @@ index 0b066f56e3..48d3573894 100644
        "views/frame/main_background_region_view.cc",
        "views/frame/main_background_region_view.h",
        "views/frame/multi_contents_background_view.cc",
-@@ -3156,6 +3158,7 @@ static_library("ui") {
-       "//chrome/browser/ui/views/user_education:impl",
-       "//chrome/browser/ui/views/web_apps",
+@@ -3158,6 +3161,7 @@ static_library("ui") {
        "//chrome/browser/ui/views/web_apps:launch_dialogs",
-+      "//chrome/browser/ui/views/yee:yee_ui",
        "//chrome/browser/ui/views/webauthn",
        "//chrome/browser/ui/views/webid",
++      "//chrome/browser/ui/views/yee:yee_ui",
        "//chrome/browser/ui/views/zoom",
+       "//chrome/browser/ui/webauthn:impl",
+       "//chrome/browser/ui/webui/app_service_internals",
 diff --git a/chrome/browser/ui/ai_overlay_dialog/ai_overlay_dialog_controller.cc b/chrome/browser/ui/ai_overlay_dialog/ai_overlay_dialog_controller.cc
 index 56d7a2bd9f..468318db75 100644
 --- a/chrome/browser/ui/ai_overlay_dialog/ai_overlay_dialog_controller.cc
@@ -585,6 +799,43 @@ index 56d7a2bd9f..468318db75 100644
    auto* elements = BrowserElementsViews::From(browser_);
    if (!elements) {
      return nullptr;
+diff --git a/chrome/browser/ui/bookmarks/BUILD.gn b/chrome/browser/ui/bookmarks/BUILD.gn
+index 2278294752..30a93cbf51 100644
+--- a/chrome/browser/ui/bookmarks/BUILD.gn
++++ b/chrome/browser/ui/bookmarks/BUILD.gn
+@@ -48,7 +48,10 @@ source_set("bookmarks") {
+ }
+ 
+ source_set("impl") {
+-  public_deps = [ "//chrome/browser:browser_public_dependencies" ]
++  public_deps = [
++    "//chrome/browser:browser_public_dependencies",
++    "//components/yee_branding",
++  ]
+ 
+   sources = [
+     "bookmark_bar_controller.cc",
+diff --git a/chrome/browser/ui/bookmarks/bookmark_utils.cc b/chrome/browser/ui/bookmarks/bookmark_utils.cc
+index ed11adf550..20de0673d6 100644
+--- a/chrome/browser/ui/bookmarks/bookmark_utils.cc
++++ b/chrome/browser/ui/bookmarks/bookmark_utils.cc
+@@ -36,6 +36,7 @@
+ #include "components/url_formatter/url_formatter.h"
+ #include "components/user_prefs/user_prefs.h"
+ #include "components/vector_icons/vector_icons.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/dragdrop/drag_drop_types.h"
+ #include "ui/base/dragdrop/drop_target_event.h"
+@@ -164,7 +165,7 @@ GURL GetURLToBookmark(content::WebContents* web_contents) {
+     return dom_distiller::url_utils::GetOriginalUrlFromDistillerUrl(
+         web_contents->GetVisibleURL());
+   }
+-  return web_contents->GetVisibleURL();
++  return yee::branding::CanonicalInternalURL(web_contents->GetVisibleURL());
+ }
+ 
+ bool GetURLAndTitleToBookmark(content::WebContents* web_contents,
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index 64cda1746d..7b5019cc1c 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
@@ -699,6 +950,28 @@ index 5131a3cc83..4cc798d503 100644
  }
  
  void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
+diff --git a/chrome/browser/ui/chrome_pages.cc b/chrome/browser/ui/chrome_pages.cc
+index b1897340ac..f2dd826422 100644
+--- a/chrome/browser/ui/chrome_pages.cc
++++ b/chrome/browser/ui/chrome_pages.cc
+@@ -63,6 +63,7 @@
+ #include "components/search_engines/search_engines_switches.h"
+ #include "components/signin/public/base/consent_level.h"
+ #include "components/version_info/version_info.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/web_contents.h"
+ #include "extensions/browser/extension_prefs.h"
+ #include "extensions/common/constants.h"
+@@ -463,7 +464,8 @@ bool IsTrustedPopupWindowWithScheme(const BrowserWindowInterface* browser,
+ }
+ 
+ void ShowSettings(BrowserWindowInterface* browser) {
+-  ShowSettingsSubPage(browser, std::string());
++  FocusWebContents(browser);
++  ShowSingletonTabIgnorePathOverwriteNTP(browser, yee::branding::SettingsURL());
+ }
+ 
+ void ShowSettingsSubPage(BrowserWindowInterface* browser,
 diff --git a/chrome/browser/ui/layout_constants.cc b/chrome/browser/ui/layout_constants.cc
 index a8b7ef6800..0b1408fd60 100644
 --- a/chrome/browser/ui/layout_constants.cc
@@ -865,6 +1138,41 @@ index 422ddea0e0..1a1da6d7bb 100644
    // Returns the Browser object this is for. This may be nullptr sometimes;
    // known cases include captive portals on ChromeOS and
    // PresentationReceiverWindowView.
+diff --git a/chrome/browser/ui/navigator/BUILD.gn b/chrome/browser/ui/navigator/BUILD.gn
+index eb3a78a311..54fbc3a864 100644
+--- a/chrome/browser/ui/navigator/BUILD.gn
++++ b/chrome/browser/ui/navigator/BUILD.gn
+@@ -66,6 +66,7 @@ source_set("impl") {
+     "//components/omnibox/browser",
+     "//components/search_engines",
+     "//components/tabs:public",
++    "//components/yee_branding",
+     "//content/public/browser",
+     "//ui/base",
+     "//url",
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index 2facabcbf9..8809cbc967 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -64,6 +64,7 @@
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "components/tabs/public/split_tab_data.h"
+ #include "components/tabs/public/tab_interface.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/browser_url_handler.h"
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/picture_in_picture_window_controller.h"
+@@ -579,6 +580,10 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+   TRACE_EVENT1("navigation", "chrome::Navigate", "disposition",
+                params->disposition);
+   CHECK(params);
++  if (!params->is_renderer_initiated) {
++    // Store canonical URLs so bookmarks and sessions survive a brand rename.
++    params->url = yee::branding::CanonicalInternalURL(params->url);
++  }
+   Browser* source_browser =
+       params->browser ? params->browser->GetBrowserForMigrationOnly() : nullptr;
+   if (source_browser) {
 diff --git a/chrome/browser/ui/omnibox/omnibox_popup_view.h b/chrome/browser/ui/omnibox/omnibox_popup_view.h
 index d1d16b182c..9ee65cdb9e 100644
 --- a/chrome/browser/ui/omnibox/omnibox_popup_view.h
@@ -880,6 +1188,52 @@ index d1d16b182c..9ee65cdb9e 100644
    // Returns true if the popup is currently open.
    virtual bool IsOpen() const = 0;
  
+diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
+index b257bd38c8..ddad365ddd 100644
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -172,6 +172,7 @@ source_set("impl") {
+     "//components/startup_metric_utils",
+     "//components/translate/core/common",
+     "//components/vector_icons",
++    "//components/yee_branding",
+     "//content/public/browser",
+     "//content/public/common",
+     "//google_apis",
+diff --git a/chrome/browser/ui/startup/url_util.cc b/chrome/browser/ui/startup/url_util.cc
+index 2dd42fefa3..fdbe6f5d63 100644
+--- a/chrome/browser/ui/startup/url_util.cc
++++ b/chrome/browser/ui/startup/url_util.cc
+@@ -8,6 +8,7 @@
+ #include "build/build_config.h"
+ #include "chrome/common/url_constants.h"
+ #include "chrome/common/webui_url_constants.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/child_process_security_policy.h"
+ #include "content/public/common/url_constants.h"
+ #include "url/gurl.h"
+@@ -30,6 +31,10 @@ bool IsNestedOrInvalid(const GURL& url) {
+ }  // namespace
+ 
+ bool ValidateLaunchUrlWebSafe(const GURL& url) {
++  const GURL canonical_url = yee::branding::CanonicalInternalURL(url);
++  if (canonical_url != url) {
++    return ValidateLaunchUrlWebSafe(canonical_url);
++  }
+   if (IsNestedOrInvalid(url)) {
+     return false;
+   }
+@@ -40,6 +45,10 @@ bool ValidateLaunchUrlWebSafe(const GURL& url) {
+ }
+ 
+ bool ValidateLaunchUrlWebUnsafe(const GURL& url) {
++  const GURL canonical_url = yee::branding::CanonicalInternalURL(url);
++  if (canonical_url != url) {
++    return ValidateLaunchUrlWebUnsafe(canonical_url);
++  }
+   if (!url.is_valid()) {
+     return false;
+   }
 diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
 index f36f4c8bcb..48d82800ca 100644
 --- a/chrome/browser/ui/tabs/BUILD.gn
@@ -1080,6 +1434,48 @@ index b46ad7ecdf..173e08dc18 100644
  
  // Per-window state for the vertical tab strip.
  struct VerticalTabStripState {
+diff --git a/chrome/browser/ui/toolbar/BUILD.gn b/chrome/browser/ui/toolbar/BUILD.gn
+index 30ec93717c..c9e990b149 100644
+--- a/chrome/browser/ui/toolbar/BUILD.gn
++++ b/chrome/browser/ui/toolbar/BUILD.gn
+@@ -11,7 +11,10 @@ source_set("toolbar") {
+     "chrome_location_bar_model_delegate.cc",
+     "chrome_location_bar_model_delegate.h",
+   ]
+-  public_deps = [ "//components/omnibox/browser:location_bar" ]
++  public_deps = [
++    "//components/omnibox/browser:location_bar",
++    "//components/yee_branding",
++  ]
+   deps = [
+     "//base",
+     "//chrome/browser/autocomplete",
+diff --git a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc b/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
+index 4e23238dea..bee3f7f2ee 100644
+--- a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
++++ b/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
+@@ -31,6 +31,7 @@
+ #include "components/search/ntp_features.h"
+ #include "components/security_interstitials/content/security_interstitial_tab_helper.h"
+ #include "components/security_state/core/security_state.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/ssl_status.h"
+@@ -64,9 +65,10 @@ std::u16string
+ ChromeLocationBarModelDelegate::FormattedStringWithEquivalentMeaning(
+     const GURL& url,
+     const std::u16string& formatted_url) const {
+-  return AutocompleteInput::FormattedStringWithEquivalentMeaning(
+-      url, formatted_url, ChromeAutocompleteSchemeClassifier(GetProfile()),
+-      nullptr);
++  return yee::branding::DisplayInternalURLText(
++      url, AutocompleteInput::FormattedStringWithEquivalentMeaning(
++               url, formatted_url,
++               ChromeAutocompleteSchemeClassifier(GetProfile()), nullptr));
+ }
+ 
+ bool ChromeLocationBarModelDelegate::GetURL(GURL* url) const {
 diff --git a/chrome/browser/ui/views/find_bar_host.cc b/chrome/browser/ui/views/find_bar_host.cc
 index e0748a0202..f72f747909 100644
 --- a/chrome/browser/ui/views/find_bar_host.cc
@@ -13646,8 +14042,20 @@ index ea753618af..1b40cad746 100644
    void SetInteriorMargin(const gfx::Insets& margin);
  
   protected:
+diff --git a/chrome/browser/ui/views/location_bar/BUILD.gn b/chrome/browser/ui/views/location_bar/BUILD.gn
+index d15829cb54..9f22daf65e 100644
+--- a/chrome/browser/ui/views/location_bar/BUILD.gn
++++ b/chrome/browser/ui/views/location_bar/BUILD.gn
+@@ -75,6 +75,7 @@ source_set("impl") {
+     "//chrome/browser:defaults",
+     "//chrome/browser/ui/dialogs",
+     "//chrome/browser/ui/select_file_policy",
++    "//components/yee_branding",
+   ]
+ 
+   if (toolkit_views) {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 07fdd70a0b..c22fa403ce 100644
+index 07fdd70a0b..9f5b3b60fa 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -13670,20 +14078,21 @@ index 07fdd70a0b..c22fa403ce 100644
  #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/browser/ui/views/user_education/browser_help_bubble.h"
-+#include "chrome/browser/ui/views/yee/yee_ui.h"
 +#include "chrome/browser/ui/views/yee/site_controls.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #include "chrome/browser/ui/webui/cr_components/composebox/composebox_handler.h"
  #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
-@@ -116,6 +120,7 @@
+@@ -116,6 +120,8 @@
  #include "components/search_engines/template_url_service.h"
  #include "components/security_state/content/security_state_tab_helper.h"
  #include "components/security_state/core/security_state.h"
 +#include "components/url_formatter/elide_url.h"
++#include "components/yee_branding/internal_urls.h"
  #include "content/public/browser/child_process_security_policy.h"
  #include "content/public/browser/navigation_entry.h"
  #include "content/public/browser/render_widget_host_view.h"
-@@ -142,6 +147,7 @@
+@@ -142,6 +148,7 @@
  #include "ui/events/event.h"
  #include "ui/gfx/animation/slide_animation.h"
  #include "ui/gfx/canvas.h"
@@ -13691,7 +14100,7 @@ index 07fdd70a0b..c22fa403ce 100644
  #include "ui/gfx/geometry/skia_conversions.h"
  #include "ui/gfx/image/image.h"
  #include "ui/gfx/paint_vector_icon.h"
-@@ -173,6 +179,9 @@
+@@ -173,6 +180,9 @@
  
  namespace {
  
@@ -13701,7 +14110,7 @@ index 07fdd70a0b..c22fa403ce 100644
  int IncrementalMinimumWidth(const views::View* view) {
    return (view && view->GetVisible()) ? view->GetMinimumSize().width() : 0;
  }
-@@ -227,9 +236,11 @@ LocationBarView::LocationBarView(Browser* browser,
+@@ -227,9 +237,11 @@ LocationBarView::LocationBarView(Browser* browser,
              return false;
            }
  
@@ -13716,7 +14125,7 @@ index 07fdd70a0b..c22fa403ce 100644
                   !v->GetOmniboxController()->IsPopupOpen();
          }));
      views::FocusRing::Get(this)->SetOutsetFocusRingDisabled(true);
-@@ -424,6 +435,7 @@ void LocationBarView::Init() {
+@@ -424,6 +436,7 @@ void LocationBarView::Init() {
    omnibox_additional_text_view->SetVisible(false);
    omnibox_additional_text_view_ =
        AddChildView(std::move(omnibox_additional_text_view));
@@ -13724,7 +14133,7 @@ index 07fdd70a0b..c22fa403ce 100644
    omnibox_additional_text_view_->SetEnabledColor(kColorOmniboxResultsUrl);
  
    selected_keyword_view_ = AddChildView(std::make_unique<SelectedKeywordView>(
-@@ -461,6 +473,11 @@ void LocationBarView::Init() {
+@@ -461,6 +474,11 @@ void LocationBarView::Init() {
            page_action_items, page_actions::PageActionPropertiesProvider(),
            page_action_params));
  
@@ -13736,7 +14145,7 @@ index 07fdd70a0b..c22fa403ce 100644
    auto clear_all_button = views::CreateVectorImageButton(base::BindRepeating(
        static_cast<void (OmniboxView::*)(const std::u16string&)>(
            &OmniboxView::SetUserText),
-@@ -473,6 +490,8 @@ void LocationBarView::Init() {
+@@ -473,6 +491,8 @@ void LocationBarView::Init() {
    auto ai_mode_hint_label = std::make_unique<views::Label>(
        std::u16string(), CONTEXT_OMNIBOX_PRIMARY, views::style::STYLE_PRIMARY);
    ai_mode_hint_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -13745,7 +14154,7 @@ index 07fdd70a0b..c22fa403ce 100644
    ai_mode_hint_label->SetVisible(false);
    ai_mode_hint_label_ = AddChildView(std::move(ai_mode_hint_label));
  
-@@ -491,7 +510,139 @@ bool LocationBarView::IsInitialized() const {
+@@ -491,7 +511,139 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
  
@@ -13885,7 +14294,7 @@ index 07fdd70a0b..c22fa403ce 100644
    return ComputeBorderRadius(size());
  }
  
-@@ -508,8 +659,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
+@@ -508,8 +660,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
      gfx::Size size,
      SkBlendMode blend_mode,
      bool antialias,
@@ -13897,7 +14306,7 @@ index 07fdd70a0b..c22fa403ce 100644
    auto painter =
        stroke_color == SK_ColorTRANSPARENT
            ? views::Painter::CreateSolidRoundRectPainter(
-@@ -661,7 +813,10 @@ bool LocationBarView::HasFocus() const {
+@@ -661,7 +814,10 @@ bool LocationBarView::HasFocus() const {
  }
  
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -13909,7 +14318,7 @@ index 07fdd70a0b..c22fa403ce 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -688,7 +843,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -688,7 +844,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
  
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -13921,7 +14330,7 @@ index 07fdd70a0b..c22fa403ce 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -840,7 +998,7 @@ void LocationBarView::Layout(PassKey) {
+@@ -840,7 +999,7 @@ void LocationBarView::Layout(PassKey) {
  
    auto add_trailing_decoration = [&](View* view, int intra_item_padding,
                                       int edge_padding) {
@@ -13930,7 +14339,7 @@ index 07fdd70a0b..c22fa403ce 100644
        trailing_decorations.AddDecoration(
            vertical_padding, location_height, /*auto_collapse=*/false,
            /*max_fraction=*/0, intra_item_padding, edge_padding, view);
-@@ -851,6 +1009,9 @@ void LocationBarView::Layout(PassKey) {
+@@ -851,6 +1010,9 @@ void LocationBarView::Layout(PassKey) {
    // location bar, it should be positioned flush against the right edge of the
    // location bar.
    constexpr int kTrailingEdgePaddingForAim = 5;
@@ -13940,7 +14349,7 @@ index 07fdd70a0b..c22fa403ce 100644
    add_trailing_decoration(page_action_container_,
                            /*intra_item_padding=*/0,
                            /*edge_padding=*/
-@@ -964,6 +1125,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -964,6 +1126,10 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -13951,7 +14360,7 @@ index 07fdd70a0b..c22fa403ce 100644
    LayoutSuperclass<View>(this);
  }
  
-@@ -999,6 +1164,10 @@ void LocationBarView::Update(WebContents* contents) {
+@@ -999,6 +1165,10 @@ void LocationBarView::Update(WebContents* contents) {
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
@@ -13962,7 +14371,7 @@ index 07fdd70a0b..c22fa403ce 100644
    location_icon_view_->Update(
        /*suppress_animations=*/contents, GetOmniboxController()->IsPopupOpen());
  
-@@ -1134,6 +1303,14 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
+@@ -1134,6 +1304,14 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
    // fall back to the usual omnibox text color to ensure UI consistency.
    // In either case, all IconLabelBubbleViews situated within the location bar
    // will inherit the selected "surrounding foreground color".
@@ -13977,7 +14386,7 @@ index 07fdd70a0b..c22fa403ce 100644
    const auto color_id = ShouldShowKeywordBubble()
                              ? kColorOmniboxKeywordSeparator
                              : kColorOmniboxActionIcon;
-@@ -1297,6 +1474,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
+@@ -1297,6 +1475,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
  int LocationBarView::GetMinimumTrailingWidth() const {
    int trailing_width = IncrementalMinimumWidth(page_action_container_);
  
@@ -13986,7 +14395,7 @@ index 07fdd70a0b..c22fa403ce 100644
    for (ContentSettingImageView* content_setting_view : content_setting_views_) {
      trailing_width += IncrementalMinimumWidth(content_setting_view);
    }
-@@ -1305,7 +1484,7 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1305,7 +1485,7 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
  
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -13995,7 +14404,7 @@ index 07fdd70a0b..c22fa403ce 100644
    gfx::Rect bounds_without_endcaps(GetLocalBounds());
    bounds_without_endcaps.Inset(gfx::Insets::VH(0, border_radius));
    return bounds_without_endcaps;
-@@ -1319,19 +1498,34 @@ void LocationBarView::RefreshBackground() {
+@@ -1319,19 +1499,34 @@ void LocationBarView::RefreshBackground() {
        GetOmniboxController()->edit_model()->user_input_in_progress();
    const bool high_contrast = GetNativeTheme()->preferred_contrast() ==
                               ui::NativeTheme::PreferredContrast::kMore;
@@ -14032,7 +14441,7 @@ index 07fdd70a0b..c22fa403ce 100644
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1354,18 +1548,67 @@ void LocationBarView::RefreshBackground() {
+@@ -1354,18 +1549,67 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
  
@@ -14104,7 +14513,7 @@ index 07fdd70a0b..c22fa403ce 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1377,6 +1620,77 @@ void LocationBarView::RefreshBackground() {
+@@ -1377,6 +1621,77 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -14182,7 +14591,7 @@ index 07fdd70a0b..c22fa403ce 100644
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1457,7 +1771,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1457,7 +1772,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -14190,7 +14599,7 @@ index 07fdd70a0b..c22fa403ce 100644
    }
  }
  
-@@ -1609,6 +1922,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1609,6 +1923,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -14203,7 +14612,20 @@ index 07fdd70a0b..c22fa403ce 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1670,6 +1989,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1645,9 +1965,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+   favicon::FaviconDriver* favicon_driver =
+       favicon::ContentFaviconDriver::FromWebContents(web_contents);
+   gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
+-  button_drag_utils::SetURLAndDragImage(web_contents->GetVisibleURL(),
+-                                        web_contents->GetTitle(), favicon,
+-                                        nullptr, data);
++  button_drag_utils::SetURLAndDragImage(
++      yee::branding::DisplayInternalURL(web_contents->GetVisibleURL()),
++      web_contents->GetTitle(), favicon, nullptr, data);
+ }
+ 
+ int LocationBarView::GetDragOperationsForView(views::View* sender,
+@@ -1670,6 +1990,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -14214,7 +14636,7 @@ index 07fdd70a0b..c22fa403ce 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -1844,6 +2167,10 @@ void LocationBarView::OnChanged() {
+@@ -1844,6 +2168,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -14225,7 +14647,7 @@ index 07fdd70a0b..c22fa403ce 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2080,9 +2407,25 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2080,9 +2408,25 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -14251,7 +14673,7 @@ index 07fdd70a0b..c22fa403ce 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2099,6 +2442,12 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2099,6 +2443,12 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -14264,7 +14686,7 @@ index 07fdd70a0b..c22fa403ce 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2133,6 +2482,19 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2133,6 +2483,19 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -14284,7 +14706,7 @@ index 07fdd70a0b..c22fa403ce 100644
    if (ShouldShowAddContextButton()) {
      return GetOmniboxController()->edit_model()->GetAddContextIcon(dip_size);
    }
-@@ -2242,7 +2604,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2242,7 +2605,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -15852,6 +16274,39 @@ index 67425044e3..b3272e9b09 100644
    // Reports the chip visibility change state at the beginning of the animation.
    using ChipVisibilityChanged = base::RepeatingCallback<void(PageActionView*)>;
    base::CallbackListSubscription AddChipVisibilityChangedCallback(
+diff --git a/chrome/browser/ui/views/page_info/BUILD.gn b/chrome/browser/ui/views/page_info/BUILD.gn
+index fb9ee97369..25e12dba53 100644
+--- a/chrome/browser/ui/views/page_info/BUILD.gn
++++ b/chrome/browser/ui/views/page_info/BUILD.gn
+@@ -106,6 +106,7 @@ source_set("impl") {
+     "//components/strings:components_branded_strings_grit",
+     "//components/strings:components_strings_grit",
+     "//components/strings:privacy_sandbox_strings_grit",
++    "//components/yee_branding",
+     "//content/public/browser",
+     "//extensions/buildflags",
+     "//ui/base",
+diff --git a/chrome/browser/ui/views/page_info/page_info_bubble_view.cc b/chrome/browser/ui/views/page_info/page_info_bubble_view.cc
+index 0caeff9371..9bbb9e7570 100644
+--- a/chrome/browser/ui/views/page_info/page_info_bubble_view.cc
++++ b/chrome/browser/ui/views/page_info/page_info_bubble_view.cc
+@@ -30,6 +30,7 @@
+ #include "components/strings/grit/components_branded_strings.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "components/strings/grit/privacy_sandbox_strings.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/common/url_constants.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -246,7 +247,7 @@ views::BubbleDialogDelegateView* PageInfoBubbleView::CreatePageInfoBubble(
+ 
+   gfx::NativeView parent_view =
+       platform_util::GetViewForWindow(specification->parent_window());
+-  const GURL& url = specification->url();
++  const GURL url = yee::branding::CanonicalInternalURL(specification->url());
+ 
+   if (ShouldRouteToInternalBubble(url, web_contents)) {
+     return new InternalPageInfoBubbleView(anchor, anchor_rect, parent_view,
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
 index 23b6072245..687001b000 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
@@ -21763,6 +22218,41 @@ index 12d37b4f6c..2cd44061a8 100644
    // The button currently holding the lock to be shown/hidden.
    raw_ptr<glic::GlicButtonInterface> locked_expansion_button_ = nullptr;
    raw_ptr<GlicAndActorButtonsContainer> glic_actor_button_container_ = nullptr;
+diff --git a/chrome/browser/ui/webui/BUILD.gn b/chrome/browser/ui/webui/BUILD.gn
+index 1a9110f7cc..ee9b83bed1 100644
+--- a/chrome/browser/ui/webui/BUILD.gn
++++ b/chrome/browser/ui/webui/BUILD.gn
+@@ -112,6 +112,10 @@ source_set("configs") {
+     "//ui/webui:buildflags",
+   ]
+ 
++  if (!is_android) {
++    deps += [ "//chrome/browser/ui/views/yee/settings" ]
++  }
++
+   if (is_win || is_chromeos) {
+     deps += [ "//chrome/browser/ui/webui/signin:inline_login" ]
+   }
+diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+index 4ca118a4b1..bcf664abaf 100644
+--- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+@@ -82,6 +82,7 @@
+ #include "chrome/browser/actor/ui/actor_overlay_ui.h"
+ #include "chrome/browser/contextual_cueing/internals/contextual_cueing_internals_ui.h"
+ #include "chrome/browser/ui/tabs/tab_group_home/tab_group_home_ui.h"
++#include "chrome/browser/ui/views/yee/settings/settings_ui.h"
+ #include "chrome/browser/ui/webui/content_annotator_internals/content_annotator_internals_ui.h"
+ #include "chrome/browser/ui/webui/webui_toolbar/webui_toolbar_ui.h"
+ #include "chrome/browser/ui/webui_browser/webui_browser_ui.h"
+@@ -382,6 +383,7 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<ReadingListUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SearchEngineChoiceUIConfig>());
+   map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
++  map.AddWebUIConfig(std::make_unique<yee::SettingsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ShoppingInsightsSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SupportToolUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SyncConfirmationUIConfig>());
 diff --git a/chrome/browser/ui/webui/theme_colors_source_manager.cc b/chrome/browser/ui/webui/theme_colors_source_manager.cc
 index 5d8a77b3bc..9ca5413a1a 100644
 --- a/chrome/browser/ui/webui/theme_colors_source_manager.cc
@@ -21798,6 +22288,62 @@ index 5d8a77b3bc..9ca5413a1a 100644
        color_provider = browser_window->GetColorProvider();
      }
  
+diff --git a/chrome/chrome_repack_locales.gni b/chrome/chrome_repack_locales.gni
+index 226c91dd84..b602b2741c 100644
+--- a/chrome/chrome_repack_locales.gni
++++ b/chrome/chrome_repack_locales.gni
+@@ -102,9 +102,14 @@ template("chrome_repack_locales") {
+       compress = true
+     }
+     if (!is_android) {
+-      source_patterns +=
+-          [ "${root_gen_dir}/chrome/browser/indigo/resources/indigo_strings_" ]
+-      deps += [ "//chrome/browser/indigo/resources:indigo_strings" ]
++      source_patterns += [
++        "${root_gen_dir}/chrome/browser/indigo/resources/indigo_strings_",
++        "${root_gen_dir}/chrome/browser/ui/views/yee/settings/settings_strings_",
++      ]
++      deps += [
++        "//chrome/browser/indigo/resources:indigo_strings",
++        "//chrome/browser/ui/views/yee/settings:strings",
++      ]
+     }
+     if (enable_builtin_search_provider_assets && !is_android) {
+       source_patterns += [ "${root_gen_dir}/third_party/search_engines_data/search_engine_descriptions_strings_" ]
+diff --git a/chrome/common/BUILD.gn b/chrome/common/BUILD.gn
+index d90779a833..550d595aef 100644
+--- a/chrome/common/BUILD.gn
++++ b/chrome/common/BUILD.gn
+@@ -243,6 +243,7 @@ static_library("common_lib") {
+     "//components/variations/net",
+     "//components/visitedlink/common",
+     "//components/webui/flags:switches",
++    "//components/yee_branding",
+     "//content/public/common:buildflags",
+     "//google_apis",
+     "//gpu/command_buffer/service",
+diff --git a/chrome/common/chrome_content_client.cc b/chrome/common/chrome_content_client.cc
+index 5df291a122..a7f6c2fbce 100644
+--- a/chrome/common/chrome_content_client.cc
++++ b/chrome/common/chrome_content_client.cc
+@@ -42,6 +42,7 @@
+ #include "components/heap_profiling/in_process/mojom/snapshot_controller.mojom.h"
+ #include "components/services/heap_profiling/public/cpp/profiling_client.h"
+ #include "components/strings/grit/components_strings.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/common/buildflags.h"
+ #include "content/public/common/cdm_info.h"
+ #include "content/public/common/content_constants.h"
+@@ -201,6 +202,9 @@ static const char* const kChromeStandardURLSchemes[] = {
+ };
+ 
+ void ChromeContentClient::AddAdditionalSchemes(Schemes* schemes) {
++  // A product address is a navigation alias; WebUI still loads at chrome:.
++  schemes->standard_schemes.push_back(yee::branding::InternalURLScheme());
++  schemes->secure_schemes.push_back(yee::branding::InternalURLScheme());
+   for (auto* standard_scheme : kChromeStandardURLSchemes)
+     schemes->standard_schemes.push_back(standard_scheme);
+ 
 diff --git a/chrome/common/chrome_isolated_world_ids.h b/chrome/common/chrome_isolated_world_ids.h
 index 846e4777c4..f02589f918 100644
 --- a/chrome/common/chrome_isolated_world_ids.h
@@ -21825,7 +22371,7 @@ index 94d46c0511..4612f1ee9d 100644
      "//base/allocator:buildflags",
      "//build:chromeos_buildflags",
 diff --git a/chrome/renderer/chrome_content_renderer_client.cc b/chrome/renderer/chrome_content_renderer_client.cc
-index 1cfb0d2c21..d7430f0547 100644
+index 1cfb0d2c21..3b0c90ef2c 100644
 --- a/chrome/renderer/chrome_content_renderer_client.cc
 +++ b/chrome/renderer/chrome_content_renderer_client.cc
 @@ -4,6 +4,8 @@
@@ -21878,11 +22424,6 @@ index 1cfb0d2c21..d7430f0547 100644
  #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
    extensions::ExtensionsRendererClient::Get()->RunScriptsAtDocumentStart(
        render_frame);
-@@ -1656,4 +1676,3 @@ void ChromeContentRendererClient::AppendContentSecurityPolicy(
-                   network::mojom::ContentSecurityPolicySource::kHTTP});
- #endif
- }
--
 diff --git a/chrome/renderer/chrome_content_renderer_client.h b/chrome/renderer/chrome_content_renderer_client.h
 index 9ac5dba537..d6f56adf6d 100644
 --- a/chrome/renderer/chrome_content_renderer_client.h
@@ -21981,6 +22522,171 @@ index 06bfcac639..9ca1e73be0 100644
  
    static bool Read(
        content_settings::mojom::RendererContentSettingRulesDataView data,
+diff --git a/components/omnibox/browser/BUILD.gn b/components/omnibox/browser/BUILD.gn
+index 36c65a0b5c..c1c2a950f1 100644
+--- a/components/omnibox/browser/BUILD.gn
++++ b/components/omnibox/browser/BUILD.gn
+@@ -397,6 +397,7 @@ static_library("browser") {
+     "//components/omnibox/resources:omnibox_pedal_synonyms",
+     "//components/saved_tab_groups/public",
+     "//components/security_state/core",
++    "//components/yee_branding",
+     "//third_party/metrics_proto",
+     "//third_party/omnibox_proto",
+     "//third_party/tflite",
+diff --git a/components/omnibox/browser/omnibox_text_util.cc b/components/omnibox/browser/omnibox_text_util.cc
+index 58610fbc03..43b437190c 100644
+--- a/components/omnibox/browser/omnibox_text_util.cc
++++ b/components/omnibox/browser/omnibox_text_util.cc
+@@ -15,6 +15,7 @@
+ #include "components/omnibox/browser/autocomplete_match.h"
+ #include "components/omnibox/browser/location_bar_model_util.h"
+ #include "components/omnibox/browser/omnibox_client.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/common/url_constants.h"
+ #include "third_party/metrics_proto/omnibox_event.pb.h"
+ #include "url/gurl.h"
+@@ -179,6 +180,7 @@ void AdjustTextForCopy(
+       *url_from_text = contextual_tasks_inner_frame_url;
+     }
+ 
++    *url_from_text = yee::branding::DisplayInternalURL(*url_from_text);
+     *text = base::UTF8ToUTF16(url_from_text->spec());
+     return;
+   }
+diff --git a/components/sessions/BUILD.gn b/components/sessions/BUILD.gn
+index ce6660a105..66eb65d69f 100644
+--- a/components/sessions/BUILD.gn
++++ b/components/sessions/BUILD.gn
+@@ -38,6 +38,7 @@ if (use_blink && !(is_ios && target_platform == "iphoneos")) {
+ 
+     public_deps = [
+       ":shared",
++      "//components/yee_branding",
+       "//content/public/browser",
+     ]
+ 
+diff --git a/components/sessions/content/content_serialized_navigation_builder.cc b/components/sessions/content/content_serialized_navigation_builder.cc
+index a19395e462..9b4db83861 100644
+--- a/components/sessions/content/content_serialized_navigation_builder.cc
++++ b/components/sessions/content/content_serialized_navigation_builder.cc
+@@ -13,6 +13,7 @@
+ #include "components/sessions/content/extended_info_handler.h"
+ #include "components/sessions/content/navigation_task_id.h"
+ #include "components/sessions/core/serialized_navigation_entry.h"
++#include "components/yee_branding/internal_urls.h"
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/favicon_status.h"
+ #include "content/public/browser/navigation_controller.h"
+@@ -35,14 +36,16 @@ ContentSerializedNavigationBuilder::FromNavigationEntry(
+   navigation.unique_id_ = entry->GetUniqueID();
+   navigation.referrer_url_ = entry->GetReferrer().url;
+   navigation.referrer_policy_ = static_cast<int>(entry->GetReferrer().policy);
+-  navigation.virtual_url_ = entry->GetVirtualURL();
++  navigation.virtual_url_ =
++      yee::branding::CanonicalInternalURL(entry->GetVirtualURL());
+   navigation.title_ = entry->GetTitle();
+   if (!(serialization_options & SerializationOptions::EXCLUDE_PAGE_STATE))
+     navigation.encoded_page_state_ = entry->GetPageState().ToEncodedData();
+   navigation.transition_type_ = entry->GetTransitionType();
+   navigation.has_post_data_ = entry->GetHasPostData();
+   navigation.post_id_ = entry->GetPostID();
+-  navigation.original_request_url_ = entry->GetOriginalRequestURL();
++  navigation.original_request_url_ =
++      yee::branding::CanonicalInternalURL(entry->GetOriginalRequestURL());
+   navigation.is_overriding_user_agent_ = entry->GetIsOverridingUserAgent();
+   navigation.timestamp_ = entry->GetTimestamp();
+   navigation.is_restored_ = entry->IsRestored();
+diff --git a/content/browser/child_process_launcher_helper.cc b/content/browser/child_process_launcher_helper.cc
+index 34a9ba1470..4cc5ee7055 100644
+--- a/content/browser/child_process_launcher_helper.cc
++++ b/content/browser/child_process_launcher_helper.cc
+@@ -47,6 +47,18 @@
+ #endif
+ 
+ namespace content {
++namespace {
++ChildProcessSharedMemoryProvider& SharedMemoryProvider() {
++  static base::NoDestructor<ChildProcessSharedMemoryProvider> provider;
++  return *provider;
++}
++}  // namespace
++
++void SetChildProcessSharedMemoryProvider(
++    ChildProcessSharedMemoryProvider provider) {
++  SharedMemoryProvider() = std::move(provider);
++}
++
+ namespace internal {
+ 
+ namespace {
+@@ -343,6 +355,20 @@ void ChildProcessLauncherHelper::LaunchOnLauncherThread() {
+   PassPseudonymizationSaltSharedMemoryHandle(*command_line(), options_ptr,
+                                              files_to_register.get());
+ 
++  if (SharedMemoryProvider()) {
++    for (auto& memory : SharedMemoryProvider().Run(*command_line())) {
++      if (!memory.region.IsValid())
++        continue;
++      base::shared_memory::SharedMemorySwitch memory_switch(
++          memory.switch_name, memory.rendezvous_key, memory.descriptor_key,
++          memory.maximum_region_size);
++      memory_switch.AddToLaunchParameters(memory.region, command_line(),
++                                          options_ptr);
++      TransferSharedMemorySwitchDescriptor(memory_switch,
++                                           files_to_register.get());
++    }
++  }
++
+   auto track = GetChildProcessTracingTrack(child_process_id());
+   command_line_->AppendSwitchASCII(switches::kTraceProcessTrackUuid,
+                                    base::NumberToString(track.uuid));
+diff --git a/content/public/browser/child_process_launcher_utils.h b/content/public/browser/child_process_launcher_utils.h
+index 5effd41cea..ccb7017d1a 100644
+--- a/content/public/browser/child_process_launcher_utils.h
++++ b/content/public/browser/child_process_launcher_utils.h
+@@ -5,14 +5,40 @@
+ #ifndef CONTENT_PUBLIC_BROWSER_CHILD_PROCESS_LAUNCHER_UTILS_H_
+ #define CONTENT_PUBLIC_BROWSER_CHILD_PROCESS_LAUNCHER_UTILS_H_
+ 
++#include <cstdint>
++#include <string>
++#include <vector>
++
++#include "base/functional/callback.h"
++#include "base/memory/read_only_shared_memory_region.h"
+ #include "content/common/content_export.h"
+ 
+ namespace base {
++class CommandLine;
+ class SingleThreadTaskRunner;
+-}
++}  // namespace base
+ 
+ namespace content {
+ 
++// An embedder-owned, read-only startup snapshot passed using the platform's
++// existing child-process handle transport. Descriptor keys must be outside the
++// content-reserved range and rendezvous keys must be unique.
++struct ChildProcessSharedMemoryRegion {
++  std::string switch_name;
++  uint32_t rendezvous_key;
++  uint32_t descriptor_key;
++  size_t maximum_region_size;
++  base::ReadOnlySharedMemoryRegion region;
++};
++using ChildProcessSharedMemoryProvider =
++    base::RepeatingCallback<std::vector<ChildProcessSharedMemoryRegion>(
++        const base::CommandLine&)>;
++
++// Register before browser threads start. The provider runs on the process
++// launcher thread and must not access UI-thread state.
++CONTENT_EXPORT void SetChildProcessSharedMemoryProvider(
++    ChildProcessSharedMemoryProvider provider);
++
+ // The caller must take a reference to the returned TaskRunner pointer if it
+ // wants to use the pointer directly.
+ CONTENT_EXPORT base::SingleThreadTaskRunner* GetProcessLauncherTaskRunner();
 diff --git a/content/public/renderer/content_renderer_client.cc b/content/public/renderer/content_renderer_client.cc
 index f8c54bfbe3..2f2470d845 100644
 --- a/content/public/renderer/content_renderer_client.cc
@@ -23235,230 +23941,3 @@ index 0000000000..f5df0f7c69
 +
 +}  // namespace
 +}  // namespace browser_view_layout
-diff --git a/content/public/browser/child_process_launcher_utils.h b/content/public/browser/child_process_launcher_utils.h
-index 5effd41cea..ccb7017d1a 100644
---- a/content/public/browser/child_process_launcher_utils.h
-+++ b/content/public/browser/child_process_launcher_utils.h
-@@ -5,14 +5,40 @@
- #ifndef CONTENT_PUBLIC_BROWSER_CHILD_PROCESS_LAUNCHER_UTILS_H_
- #define CONTENT_PUBLIC_BROWSER_CHILD_PROCESS_LAUNCHER_UTILS_H_
- 
-+#include <cstdint>
-+#include <string>
-+#include <vector>
-+
-+#include "base/functional/callback.h"
-+#include "base/memory/read_only_shared_memory_region.h"
- #include "content/common/content_export.h"
- 
- namespace base {
-+class CommandLine;
- class SingleThreadTaskRunner;
--}
-+}  // namespace base
- 
- namespace content {
- 
-+// An embedder-owned, read-only startup snapshot passed using the platform's
-+// existing child-process handle transport. Descriptor keys must be outside the
-+// content-reserved range and rendezvous keys must be unique.
-+struct ChildProcessSharedMemoryRegion {
-+  std::string switch_name;
-+  uint32_t rendezvous_key;
-+  uint32_t descriptor_key;
-+  size_t maximum_region_size;
-+  base::ReadOnlySharedMemoryRegion region;
-+};
-+using ChildProcessSharedMemoryProvider =
-+    base::RepeatingCallback<std::vector<ChildProcessSharedMemoryRegion>(
-+        const base::CommandLine&)>;
-+
-+// Register before browser threads start. The provider runs on the process
-+// launcher thread and must not access UI-thread state.
-+CONTENT_EXPORT void SetChildProcessSharedMemoryProvider(
-+    ChildProcessSharedMemoryProvider provider);
-+
- // The caller must take a reference to the returned TaskRunner pointer if it
- // wants to use the pointer directly.
- CONTENT_EXPORT base::SingleThreadTaskRunner* GetProcessLauncherTaskRunner();
-diff --git a/content/browser/child_process_launcher_helper.cc b/content/browser/child_process_launcher_helper.cc
-index 34a9ba1470..4cc5ee7055 100644
---- a/content/browser/child_process_launcher_helper.cc
-+++ b/content/browser/child_process_launcher_helper.cc
-@@ -47,6 +47,18 @@
- #endif
- 
- namespace content {
-+namespace {
-+ChildProcessSharedMemoryProvider& SharedMemoryProvider() {
-+  static base::NoDestructor<ChildProcessSharedMemoryProvider> provider;
-+  return *provider;
-+}
-+}  // namespace
-+
-+void SetChildProcessSharedMemoryProvider(
-+    ChildProcessSharedMemoryProvider provider) {
-+  SharedMemoryProvider() = std::move(provider);
-+}
-+
- namespace internal {
- 
- namespace {
-@@ -343,6 +355,20 @@ void ChildProcessLauncherHelper::LaunchOnLauncherThread() {
-   PassPseudonymizationSaltSharedMemoryHandle(*command_line(), options_ptr,
-                                              files_to_register.get());
- 
-+  if (SharedMemoryProvider()) {
-+    for (auto& memory : SharedMemoryProvider().Run(*command_line())) {
-+      if (!memory.region.IsValid())
-+        continue;
-+      base::shared_memory::SharedMemorySwitch memory_switch(
-+          memory.switch_name, memory.rendezvous_key, memory.descriptor_key,
-+          memory.maximum_region_size);
-+      memory_switch.AddToLaunchParameters(memory.region, command_line(),
-+                                          options_ptr);
-+      TransferSharedMemorySwitchDescriptor(memory_switch,
-+                                           files_to_register.get());
-+    }
-+  }
-+
-   auto track = GetChildProcessTracingTrack(child_process_id());
-   command_line_->AppendSwitchASCII(switches::kTraceProcessTrackUuid,
-                                    base::NumberToString(track.uuid));
-diff --git a/base/memory/shared_memory_switch.h b/base/memory/shared_memory_switch.h
-index ad147a2890..871ef88809 100644
---- a/base/memory/shared_memory_switch.h
-+++ b/base/memory/shared_memory_switch.h
-@@ -5,6 +5,7 @@
- #ifndef BASE_MEMORY_SHARED_MEMORY_SWITCH_H_
- #define BASE_MEMORY_SHARED_MEMORY_SWITCH_H_
- 
-+#include <cstddef>
- #include <string_view>
- 
- #include "base/base_export.h"
-@@ -34,6 +35,7 @@ class CommandLine;
- struct LaunchOptions;
- 
- namespace shared_memory {
-+inline constexpr size_t kDefaultSharedMemoryRegionSizeLimit = 8 << 20;
- 
- // Indicates failure modes of deserializing a shared memory switch value.
- enum class SharedMemoryError {
-@@ -81,9 +83,11 @@ struct BASE_EXPORT SharedMemorySwitch {
-   // key, and descriptor key. The rendezvous key and descriptor key are unused
-   // on platforms that do not use them but are required arguments to allow for a
-   // consistent function interface.
--  SharedMemorySwitch(std::string_view switch_name_in,
--                     [[maybe_unused]] RendezvousKey rendezvous_key_in,
--                     [[maybe_unused]] DescriptorKey descriptor_key_in);
-+  SharedMemorySwitch(
-+      std::string_view switch_name_in,
-+      [[maybe_unused]] RendezvousKey rendezvous_key_in,
-+      [[maybe_unused]] DescriptorKey descriptor_key_in,
-+      size_t maximum_region_size_in = kDefaultSharedMemoryRegionSizeLimit);
-   ~SharedMemorySwitch();
- 
-   SharedMemorySwitch(SharedMemorySwitch&&);
-@@ -115,6 +119,9 @@ struct BASE_EXPORT SharedMemorySwitch {
-   // The name of the switch to use to pass the shared memory region to the
-   // child process.
-   std::string_view switch_name;
-+  // Embedders may explicitly bound larger read-only startup snapshots. The
-+  // receiving process must use the same bound when deserializing its handle.
-+  size_t maximum_region_size;
- 
- #if BUILDFLAG(IS_APPLE)
-   RendezvousKey rendezvous_key;
-@@ -135,7 +142,9 @@ UnsafeSharedMemoryRegionFrom(std::string_view switch_value);
- 
- // Returns an ReadOnlySharedMemoryRegion deserialized from `switch_value`.
- BASE_EXPORT expected<ReadOnlySharedMemoryRegion, SharedMemoryError>
--ReadOnlySharedMemoryRegionFrom(std::string_view switch_value);
-+ReadOnlySharedMemoryRegionFrom(
-+    std::string_view switch_value,
-+    size_t maximum_region_size = kDefaultSharedMemoryRegionSizeLimit);
- 
- }  // namespace shared_memory
- }  // namespace base
-diff --git a/base/memory/shared_memory_switch.cc b/base/memory/shared_memory_switch.cc
-index 233e63dcc9..d3d006105e 100644
---- a/base/memory/shared_memory_switch.cc
-+++ b/base/memory/shared_memory_switch.cc
-@@ -70,11 +70,6 @@ namespace {
- using base::subtle::PlatformSharedMemoryRegion;
- using base::subtle::ScopedPlatformSharedMemoryHandle;
- 
--// The max shared memory size is artificially limited. This serves as a sanity
--// check when serializing/deserializing the handle info. This value should be
--// slightly larger than the largest shared memory size used in practice.
--constexpr size_t kMaxSharedMemorySize = 8 << 20;  // 8 MiB
--
- #if BUILDFLAG(IS_FUCHSIA)
- // Return a scoped platform shared memory handle for |shmem_region|, possibly
- // with permissions reduced to make the handle read-only.
-@@ -110,7 +105,8 @@ std::string Serialize(HandleType shmem_handle,
- 
-   CHECK(shmem_token);
-   CHECK_NE(shmem_size, 0u);
--  CHECK_LE(shmem_size, kMaxSharedMemorySize);
-+  CHECK_LE(shmem_size, is_read_only ? shared_memory_switch->maximum_region_size
-+                                    : kDefaultSharedMemoryRegionSizeLimit);
- 
-   // Reserve memory for the serialized value.
-   // handle,method,hi,lo,size = 4 * 64-bit number + 1 char + 4 commas + NUL
-@@ -200,7 +196,8 @@ std::optional<UnguessableToken> DeserializeGUID(std::string_view hi_part,
- // Deserializes `switch_value` into a PlatformSharedMemoryRegion.
- expected<PlatformSharedMemoryRegion, SharedMemoryError> Deserialize(
-     std::string_view switch_value,
--    PlatformSharedMemoryRegion::Mode mode) {
-+    PlatformSharedMemoryRegion::Mode mode,
-+    size_t maximum_region_size) {
-   std::vector<std::string_view> tokens =
-       SplitStringPiece(switch_value, ",", KEEP_WHITESPACE, SPLIT_WANT_ALL);
-   if (tokens.size() != 5) {
-@@ -302,7 +299,7 @@ expected<PlatformSharedMemoryRegion, SharedMemoryError> Deserialize(
-   if (!StringToUint64(tokens[4], &size)) {
-     return unexpected(SharedMemoryError::kParseInt4Failed);
-   }
--  if (size == 0 || size > kMaxSharedMemorySize) {
-+  if (size == 0 || size > maximum_region_size) {
-     return unexpected(SharedMemoryError::kUnexpectedSize);
-   }
- 
-@@ -341,8 +338,9 @@ void AddToLaunchParametersImpl(const RegionType& memory_region,
- SharedMemorySwitch::SharedMemorySwitch(
-     std::string_view switch_name_in,
-     [[maybe_unused]] RendezvousKey rendezvous_key_in,
--    [[maybe_unused]] DescriptorKey descriptor_key_in)
--    : switch_name(switch_name_in) {
-+    [[maybe_unused]] DescriptorKey descriptor_key_in,
-+    size_t maximum_region_size_in)
-+    : switch_name(switch_name_in), maximum_region_size(maximum_region_size_in) {
- #if BUILDFLAG(IS_APPLE)
-   rendezvous_key = rendezvous_key_in;
- #endif
-@@ -378,7 +376,8 @@ void SharedMemorySwitch::AddToLaunchParameters(
- expected<UnsafeSharedMemoryRegion, SharedMemoryError>
- UnsafeSharedMemoryRegionFrom(std::string_view switch_value) {
-   auto platform_handle =
--      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kUnsafe);
-+      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kUnsafe,
-+                  kDefaultSharedMemoryRegionSizeLimit);
-   if (!platform_handle.has_value()) {
-     return unexpected(platform_handle.error());
-   }
-@@ -392,9 +391,11 @@ UnsafeSharedMemoryRegionFrom(std::string_view switch_value) {
- }
- 
- expected<ReadOnlySharedMemoryRegion, SharedMemoryError>
--ReadOnlySharedMemoryRegionFrom(std::string_view switch_value) {
-+ReadOnlySharedMemoryRegionFrom(std::string_view switch_value,
-+                               size_t maximum_region_size) {
-   auto platform_handle =
--      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kReadOnly);
-+      Deserialize(switch_value, PlatformSharedMemoryRegion::Mode::kReadOnly,
-+                  maximum_region_size);
-   if (!platform_handle.has_value()) {
-     return unexpected(platform_handle.error());
-   }

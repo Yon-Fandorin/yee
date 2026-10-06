@@ -189,10 +189,11 @@ source_set("yee_ui") {
   ]
 }
 
-# Keep Site Controls lifecycle and renderer-policy checks independent of the
+# Keep Site Controls, internal URL and renderer-policy checks independent of the
 # full browser_tests/interactive_ui_tests source lists.
 test("site_controls_browsertests") {
   sources = [
+    "internal_urls_browsertest.cc",
     "site_controls_browsertest.cc",
     "youtube_live_browsertest.cc",
   ]
@@ -202,14 +203,23 @@ test("site_controls_browsertests") {
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
+    "//chrome/browser/autocomplete",
+    "//chrome/browser/profiles:profile_io_data",
+    "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui/bookmarks",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/startup",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/yee_content_blocking:browser",
     "//chrome/renderer",
     "//chrome/test:browser_tests_runner",
     "//chrome/test:test_support",
     "//chrome/test:test_support_ui",
+    "//components/omnibox/browser",
     "//components/prefs",
+    "//components/sessions",
     "//components/split_tabs",
+    "//components/yee_branding",
     "//content/test:test_support",
     "//net:test_support",
     "//testing/gtest",

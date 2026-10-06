@@ -30,7 +30,8 @@ class DevelopmentToolsTest(unittest.TestCase):
         (self.repo / 'logo.png').write_bytes(b'asset fixture; never rendered')
         (self.repo / 'branding').mkdir()
         (self.repo / 'branding/brand.json').write_text(json.dumps({
-            'name': 'Orbit Preview', 'logo_source': 'logo.png', 'logo_crop_size': 820}))
+            'name': 'Orbit Preview', 'internal_url_scheme': 'orbit',
+            'logo_source': 'logo.png', 'logo_crop_size': 820}))
         self.local = self.repo / 'local build'
         self.src = self.local / 'chromium/src'
         self.out = self.src / 'out/YeePilot'

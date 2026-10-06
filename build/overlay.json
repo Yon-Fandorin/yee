@@ -35,6 +35,10 @@
       "destination": "components/yee_content_blocking"
     },
     {
+      "source": "components/branding",
+      "destination": "components/yee_branding"
+    },
+    {
       "source": "components/tasks",
       "destination": "components/yee_tasks"
     },

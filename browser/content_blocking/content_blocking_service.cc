@@ -93,6 +93,10 @@ bool ContentBlockingService::EnabledForSite(const GURL& site) const {
   return settings_snapshot_->EnabledForSite(site);
 }
 
+std::vector<std::string> ContentBlockingService::DisabledHosts() const {
+  return ReadDisabledHosts();
+}
+
 base::CallbackListSubscription ContentBlockingService::AddChangedCallback(
     base::RepeatingClosure callback) {
   return changed_callbacks_.Add(std::move(callback));
