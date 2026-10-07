@@ -1,10 +1,12 @@
 <script lang="ts">
 	import SettingsPageHeader from '#lib/components/SettingsPageHeader.svelte';
+	import SettingsNotice from '#lib/components/SettingsNotice.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { t } from '#lib/i18n.ts';
 	import { useSettings } from '#lib/settings.svelte.ts';
 	import FilterLists from './components/FilterLists.svelte';
 	import SiteExceptions from './components/SiteExceptions.svelte';
+	import BlockedDomains from './components/BlockedDomains.svelte';
 	const model = useSettings();
 </script>
 
@@ -29,7 +31,12 @@
 		)}</Badge
 	>
 
+	{#if model.state?.privateProfile}<SettingsNotice
+			id="private-note"
+			message={t('privateNote')}
+		/>{/if}
 	<FilterLists />
+	<BlockedDomains />
 	<SiteExceptions />
 </section>
 

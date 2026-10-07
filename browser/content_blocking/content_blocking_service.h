@@ -4,14 +4,17 @@
 #ifndef CHROME_BROWSER_YEE_CONTENT_BLOCKING_CONTENT_BLOCKING_SERVICE_H_
 #define CHROME_BROWSER_YEE_CONTENT_BLOCKING_CONTENT_BLOCKING_SERVICE_H_
 
-#include <string>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/synchronization/lock.h"
+#include "chrome/browser/yee_content_blocking/blocked_domains.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/prefs/pref_change_registrar.h"
@@ -28,6 +31,8 @@ class BaselineListUpdater;
 
 inline constexpr char kDisabledSitesPref[] =
     "yee.content_blocking.disabled_sites";
+inline constexpr char kBlockedDomainsPref[] =
+    "yee.content_blocking.blocked_domains";
 
 // Thread-safe policy snapshot used by URLLoaderFactory proxies after they move
 // to their matching sequence. Profile and PrefService pointers never cross the
@@ -39,6 +44,8 @@ class ContentBlockingSettingsSnapshot
 
   bool EnabledForSite(const GURL& site) const;
   void ReplaceDisabledHosts(std::vector<std::string> hosts);
+  bool IsBlockedDomain(const GURL& url) const;
+  void ReplaceBlockedDomains(std::vector<BlockedDomain> domains);
 
  private:
   friend class base::RefCountedThreadSafe<ContentBlockingSettingsSnapshot>;
@@ -46,9 +53,10 @@ class ContentBlockingSettingsSnapshot
 
   mutable base::Lock lock_;
   std::vector<std::string> disabled_hosts_ GUARDED_BY(lock_);
+  std::vector<BlockedDomain> blocked_domains_ GUARDED_BY(lock_);
 };
 
-// Profile-owned persistence for site-specific content-blocking exceptions.
+// Profile-owned persistence for exceptions and user-defined domain rules.
 // The command-line switches remain a development override; product UI writes
 // only this profile preference.
 class ContentBlockingService : public KeyedService {
@@ -63,6 +71,13 @@ class ContentBlockingService : public KeyedService {
   bool EnabledForSite(const GURL& site) const;
   void SetEnabledForSite(const GURL& site, bool enabled);
   std::vector<std::string> DisabledHosts() const;
+  std::vector<BlockedDomain> BlockedDomains() const;
+  bool SetBlockedDomain(std::string_view input, bool include_subdomains);
+  void RemoveBlockedDomain(std::string_view input);
+  // Import merges valid rules without replacing existing scope choices. A
+  // rejected batch does not modify preferences; success returns additions.
+  std::optional<size_t> ImportBlockedDomains(
+      const std::vector<BlockedDomain>& domains);
   base::CallbackListSubscription AddChangedCallback(
       base::RepeatingClosure callback);
 
@@ -78,6 +93,8 @@ class ContentBlockingService : public KeyedService {
  private:
   std::vector<std::string> ReadDisabledHosts() const;
   void OnDisabledSitesChanged();
+  void SaveBlockedDomains(const std::vector<BlockedDomain>& domains);
+  void OnBlockedDomainsChanged();
 
   const raw_ptr<PrefService> prefs_;
   const bool off_the_record_;

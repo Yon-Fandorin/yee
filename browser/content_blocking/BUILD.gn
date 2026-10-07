@@ -3,6 +3,7 @@ import("//testing/test.gni")
 source_set("browser") {
   public = [
     "baseline_list_updater.h",
+    "blocked_domains.h",
     "content_blocking_service.h",
     "content_blocking_service_factory.h",
     "content_blocking_tab_helper.h",
@@ -11,6 +12,8 @@ source_set("browser") {
   sources = [
     "baseline_list_updater.cc",
     "baseline_list_updater.h",
+    "blocked_domains.cc",
+    "blocked_domains.h",
     "content_blocking_service.cc",
     "content_blocking_service_factory.cc",
     "content_blocking_tab_helper.cc",
@@ -43,6 +46,7 @@ source_set("browser") {
 test("yee_filtering_factory_unittests") {
   sources = [
     "baseline_list_updater_unittest.cc",
+    "blocked_domains_unittest.cc",
     "content_blocking_service_unittest.cc",
     "filtering_url_loader_factory_unittest.cc",
   ]

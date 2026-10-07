@@ -319,6 +319,11 @@ class FilteringRequest final : public network::mojom::URLLoader,
     if (context_.settings ? !context_.settings->EnabledForSite(site)
                           : !EnabledForSite(site))
       return {};
+    if (context_.settings && context_.settings->IsBlockedDomain(url)) {
+      NetworkDecision decision;
+      decision.blocked = true;
+      return decision;
+    }
     return BundledEngineForCurrentSequence().Evaluate(
         url.spec(), source.spec(), RequestType(request_), method);
   }

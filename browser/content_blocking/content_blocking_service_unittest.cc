@@ -20,6 +20,7 @@ class ContentBlockingServiceTest : public testing::Test {
   ContentBlockingServiceTest() {
     feature_list_.InitAndEnableFeature(kYeeContentBlocking);
     prefs_.registry()->RegisterListPref(kDisabledSitesPref);
+    prefs_.registry()->RegisterListPref(kBlockedDomainsPref);
     RecreateService();
   }
 
@@ -73,6 +74,57 @@ TEST_F(ContentBlockingServiceTest, RejectsUnsupportedUrls) {
   EXPECT_FALSE(service_->EnabledForSite(GURL("about:blank")));
   service_->SetEnabledForSite(GURL("file:///tmp/page.html"), false);
   EXPECT_TRUE(prefs_.GetList(kDisabledSitesPref).empty());
+}
+
+TEST_F(ContentBlockingServiceTest, DomainScopeAndChangesReachExistingSnapshot) {
+  const auto snapshot = service_->settings_snapshot();
+  EXPECT_TRUE(service_->SetBlockedDomain("Ads.Example.test.", false));
+  EXPECT_TRUE(
+      snapshot->IsBlockedDomain(GURL("https://ads.example.test/request")));
+  EXPECT_TRUE(
+      snapshot->IsBlockedDomain(GURL("https://ads.example.test./request")));
+  EXPECT_FALSE(snapshot->IsBlockedDomain(
+      GURL("https://child.ads.example.test/request")));
+  EXPECT_FALSE(
+      snapshot->IsBlockedDomain(GURL("https://notads.example.test/request")));
+  EXPECT_TRUE(service_->SetBlockedDomain("ads.example.test", true));
+  EXPECT_TRUE(snapshot->IsBlockedDomain(
+      GURL("http://child.ads.example.test:8000/request")));
+  EXPECT_FALSE(
+      snapshot->IsBlockedDomain(GURL("file://ads.example.test/request")));
+  RecreateService();
+  EXPECT_EQ((std::vector<BlockedDomain>{{"ads.example.test", true}}),
+            service_->BlockedDomains());
+  service_->RemoveBlockedDomain("ADS.EXAMPLE.TEST");
+  EXPECT_TRUE(service_->BlockedDomains().empty());
+  EXPECT_FALSE(service_->settings_snapshot()->IsBlockedDomain(
+      GURL("https://ads.example.test/")));
+}
+
+TEST_F(ContentBlockingServiceTest,
+       ImportMergesWithoutOverwritingExistingScope) {
+  ASSERT_TRUE(service_->SetBlockedDomain("ads.example.test", false));
+  EXPECT_EQ(1u, service_->ImportBlockedDomains(
+                    {{"ADS.example.test.", true}, {"new.example.test", true}}));
+  EXPECT_EQ((std::vector<BlockedDomain>{{"ads.example.test", false},
+                                        {"new.example.test", true}}),
+            service_->BlockedDomains());
+  EXPECT_EQ(0u, service_->ImportBlockedDomains({{"new.example.test", false}}));
+  EXPECT_FALSE(service_->ImportBlockedDomains(
+      {{"other.example", true}, {"bad/path", true}}));
+  EXPECT_EQ(2u, service_->BlockedDomains().size());
+}
+
+TEST_F(ContentBlockingServiceTest, CapacityRejectsTheEntireImportBatch) {
+  std::vector<BlockedDomain> rules;
+  for (size_t i = 0; i < kMaxBlockedDomains; ++i) {
+    rules.push_back({"domain" + std::to_string(i) + ".example", false});
+  }
+  ASSERT_EQ(kMaxBlockedDomains, service_->ImportBlockedDomains(rules));
+  EXPECT_FALSE(service_->ImportBlockedDomains({{"another.example", true}}));
+  EXPECT_FALSE(service_->SetBlockedDomain("another.example", true));
+  EXPECT_EQ(kMaxBlockedDomains, service_->BlockedDomains().size());
+  EXPECT_TRUE(service_->SetBlockedDomain("domain0.example", true));
 }
 
 }  // namespace

@@ -9,8 +9,8 @@
   <translation id="2463696930976652074">브라우저 환경과 개인정보 보호 설정을 관리하세요.</translation>
   <translation id="9151681068421308562">브라우징 보호</translation>
   <translation id="2057646437160978909">광고 및 추적 차단</translation>
-  <translation id="3430812647489322570">필터 업데이트와 사이트별 차단 예외를 관리하세요.</translation>
-  <translation id="3037814881240184497">필터 업데이트와 차단 예외 사이트</translation>
+  <translation id="1817694473886901691">필터 업데이트, 차단할 도메인과 사이트별 차단 예외를 관리하세요.</translation>
+  <translation id="4298743177663173221">필터 업데이트, 도메인 차단과 사이트별 예외</translation>
   <translation id="8409855285911497572">브라우저 설정</translation>
   <translation id="6481477749947090980">아래 항목은 고급 설정에서 열립니다.</translation>
   <translation id="5937775024646845428">사이트 권한</translation>
@@ -33,7 +33,8 @@
   <translation id="5098699485799422004">활동 추적 요청</translation>
   <translation id="1404818538165197662">기본 제공</translation>
   <translation id="684722991992683244">업데이트본</translation>
-  <translation id="7207008172890709667">마지막 확인: <ph name="VALUE"/></translation>
+  <translation id="7207008172890709667">마지막 확인: <ph name="VALUE" />
+  </translation>
   <translation id="5954755492376497678">브라우저에 포함된 기본 필터를 사용 중입니다.</translation>
   <translation id="7268015603174929699">새 필터가 준비되었습니다. 브라우저를 다시 시작하면 적용됩니다.</translation>
   <translation id="7842024191578632536">시크릿·게스트 창에서는 필터를 업데이트할 수 없습니다.</translation>
@@ -49,7 +50,8 @@
   <translation id="2727780118202423468">차단을 끄려는 사이트의 주소를 위에 입력하세요.</translation>
   <translation id="6920484175279406134">차단 예외 사이트 목록</translation>
   <translation id="230111505674340710">차단 켜기</translation>
-  <translation id="6870746035555586281"><ph name="VALUE"/> 차단 켜기</translation>
+  <translation id="6870746035555586281">
+    <ph name="VALUE" /> 차단 켜기</translation>
   <translation id="3329917590954651501">example.com 또는 https://example.com처럼 사이트 주소를 입력하세요.</translation>
   <translation id="2014097250360482795">이 창에서는 필터를 업데이트할 수 없습니다.</translation>
   <translation id="6734115820559300286">변경 사항을 저장하지 못했습니다. 다시 시도하세요.</translation>
@@ -61,5 +63,46 @@
   <translation id="5765073876001303786">필터를 업데이트하지 못했습니다. 기존 필터를 사용합니다. 잠시 후 다시 시도하세요.</translation>
   <translation id="6034379694665802459">설정을 불러오지 못했습니다. 다시 시도하세요.</translation>
   <translation id="615233787031865153">다시 시도</translation>
-  <translation id="4186938248247582318"><ph name="VALUE"/> — 설정</translation>
+  <translation id="4186938248247582318">
+    <ph name="VALUE" /> — 설정</translation>
+  <translation id="5828551325648126605">차단할 도메인</translation>
+  <translation id="6017566973278761741">등록한 도메인으로 가는 요청과 해당 사이트 접속을 차단합니다. 하위 도메인 포함 여부도 선택할 수 있습니다. 차단을 끈 사이트에서는 이 규칙도 적용되지 않습니다.</translation>
+  <translation id="1110083349988545375">도메인</translation>
+  <translation id="9143791905449128414">하위 도메인 포함</translation>
+  <translation id="7288897791769447475">도메인 추가</translation>
+  <translation id="8946198220756378117">삭제</translation>
+  <translation id="3353610361705799859">
+    <ph name="VALUE" /> 차단 규칙 삭제</translation>
+  <translation id="16626503440551505">
+    <ph name="VALUE" />의 하위 도메인 포함</translation>
+  <translation id="5736323316908490365">차단 규칙을 저장했습니다. 해당 페이지를 새로고침하면 적용됩니다.</translation>
+  <translation id="6029443799863194511">차단 규칙을 삭제했습니다. 해당 페이지를 새로고침하면 적용됩니다.</translation>
+  <translation id="6938716389398651772">ads.example.com처럼 도메인만 입력하세요. URL, 경로, 와일드카드는 사용할 수 없습니다.</translation>
+  <translation id="407242330273771352">추가한 차단 도메인이 없습니다</translation>
+  <translation id="1019736972640981308">CSV에는 domain 열과 선택 사항인 include_subdomains 열(true/false)을 넣으세요. TXT는 한 줄에 도메인 하나를 적으며 하위 도메인도 포함합니다. UTF-8 파일 2MB, 최대 5,000개 항목을 지원합니다.</translation>
+  <translation id="7588262746643142276">파일 가져오기</translation>
+  <translation id="7779263561879858781">CSV 내보내기</translation>
+  <translation id="7552293532108416453">양식 다운로드</translation>
+  <translation id="1532092778158092221">가져올 도메인 확인</translation>
+  <translation id="6320665315007639362">추가 <ph name="VALUE1" />개 · 중복 <ph name="VALUE2" />개 · 오류 <ph name="VALUE3" />개. 새로운 유효 도메인만 등록하며 기존 규칙은 유지합니다.</translation>
+  <translation id="6212510006908840546">
+    <ph name="VALUE" />개 도메인 등록</translation>
+  <translation id="9181046023695927298">취소</translation>
+  <translation id="4117899907777625646">도메인 <ph name="VALUE" />개를 등록했습니다. 해당 페이지를 새로고침하면 적용됩니다.</translation>
+  <translation id="7823323302277840616">이미 등록했거나 파일 내 중복</translation>
+  <translation id="4594545172814919009">등록 가능</translation>
+  <translation id="5101113990717446454">열 개수가 헤더와 다릅니다</translation>
+  <translation id="4912100699245478549">include_subdomains는 true/false로 입력하세요</translation>
+  <translation id="7210642064172486772">파일을 읽을 수 없습니다. CSV 양식이나 한 줄에 도메인 하나를 적은 UTF-8 TXT 파일을 사용하세요.</translation>
+  <translation id="7215546740655028975">2MB 이하 파일을 선택하세요.</translation>
+  <translation id="2451402887264279411">파일과 저장 목록은 각각 최대 5,000개 도메인을 지원합니다. 변경 사항은 저장하지 않았습니다.</translation>
+  <translation id="2506185502788063398">파일에 가져올 도메인이 없습니다.</translation>
+  <translation id="2316453563705263063">줄</translation>
+  <translation id="2275112559546794539">결과</translation>
+  <translation id="6269311977024820176">이 도메인만</translation>
+  <translation id="3073695815760715527">도메인과 하위 도메인</translation>
+  <translation id="7593872156151936782">읽는 중…</translation>
+  <translation id="4227916800411066722">이전</translation>
+  <translation id="1588991892358526662">다음</translation>
+  <translation id="7009126666638523577">이미 등록된 도메인입니다. 아래 목록에서 하위 도메인 포함 여부를 변경하세요.</translation>
 </translationbundle>

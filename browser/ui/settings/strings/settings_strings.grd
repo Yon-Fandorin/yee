@@ -103,8 +103,8 @@
       <message name="IDS_YEE_SETTINGS_OVERVIEW_DESCRIPTION" desc="overviewDescription: text in the browser settings UI." meaning="overviewDescription">Manage your browser and privacy preferences.</message>
       <message name="IDS_YEE_SETTINGS_BROWSING_PROTECTION" desc="browsingProtection: text in the browser settings UI." meaning="browsingProtection">Browsing protection</message>
       <message name="IDS_YEE_SETTINGS_BLOCKING_TITLE" desc="blockingTitle: text in the browser settings UI." meaning="blockingTitle">Ads &amp; trackers</message>
-      <message name="IDS_YEE_SETTINGS_BLOCKING_DESCRIPTION" desc="blockingDescription: text in the browser settings UI." meaning="blockingDescription">Manage filter updates and site exceptions.</message>
-      <message name="IDS_YEE_SETTINGS_BLOCKING_LINK_DESCRIPTION" desc="blockingLinkDescription: text in the browser settings UI." meaning="blockingLinkDescription">Filter updates and sites with blocking turned off</message>
+      <message name="IDS_YEE_SETTINGS_BLOCKING_DESCRIPTION" desc="blockingDescription: text in the browser settings UI." meaning="blockingDescription">Manage filter updates, blocked domains and site exceptions.</message>
+      <message name="IDS_YEE_SETTINGS_BLOCKING_LINK_DESCRIPTION" desc="blockingLinkDescription: text in the browser settings UI." meaning="blockingLinkDescription">Filter updates, blocked domains and site exceptions</message>
       <message name="IDS_YEE_SETTINGS_BROWSER_SETTINGS" desc="browserSettings: text in the browser settings UI." meaning="browserSettings">Browser settings</message>
       <message name="IDS_YEE_SETTINGS_NATIVE_DESCRIPTION" desc="nativeDescription: text in the browser settings UI." meaning="nativeDescription">These options open in advanced settings.</message>
       <message name="IDS_YEE_SETTINGS_SITE_PERMISSIONS" desc="sitePermissions: text in the browser settings UI." meaning="sitePermissions">Site permissions</message>
@@ -156,6 +156,43 @@
       <message name="IDS_YEE_SETTINGS_LOAD_FAILED" desc="loadFailed: text in the browser settings UI." meaning="loadFailed">Could not load settings. Try again.</message>
       <message name="IDS_YEE_SETTINGS_RETRY" desc="retry: text in the browser settings UI." meaning="retry">Try again</message>
       <message name="IDS_YEE_SETTINGS_PAGE_TITLE" desc="pageTitle: text in the browser settings UI." meaning="pageTitle"><ph name="VALUE">$1<ex>Yee</ex></ph> — Settings</message>
+      <message name="IDS_YEE_SETTINGS_DOMAINS_TITLE" desc="domainsTitle: text in the browser settings UI." meaning="domainsTitle">Blocked domains</message>
+      <message name="IDS_YEE_SETTINGS_DOMAINS_DESCRIPTION" desc="domainsDescription: text in the browser settings UI." meaning="domainsDescription">Block requests and visits to the domains you add. Choose whether to include their subdomains. These rules also follow site exceptions.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_ADDRESS" desc="domainAddress: text in the browser settings UI." meaning="domainAddress">Domain</message>
+      <message name="IDS_YEE_SETTINGS_INCLUDE_SUBDOMAINS" desc="includeSubdomains: text in the browser settings UI." meaning="includeSubdomains">Include subdomains</message>
+      <message name="IDS_YEE_SETTINGS_ADD_DOMAIN" desc="addDomain: text in the browser settings UI." meaning="addDomain">Add domain</message>
+      <message name="IDS_YEE_SETTINGS_REMOVE_DOMAIN" desc="removeDomain: text in the browser settings UI." meaning="removeDomain">Remove</message>
+      <message name="IDS_YEE_SETTINGS_REMOVE_DOMAIN_LABEL" desc="removeDomainLabel: text in the browser settings UI." meaning="removeDomainLabel">Remove <ph name="VALUE">$1<ex>1</ex></ph> from blocked domains</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_SCOPE_LABEL" desc="domainScopeLabel: text in the browser settings UI." meaning="domainScopeLabel">Include subdomains of <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_SAVED" desc="domainSaved: text in the browser settings UI." meaning="domainSaved">Domain rule saved. Reload affected pages to apply the change.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_REMOVED" desc="domainRemoved: text in the browser settings UI." meaning="domainRemoved">Domain rule removed. Reload affected pages to apply the change.</message>
+      <message name="IDS_YEE_SETTINGS_INVALID_DOMAIN" desc="invalidDomain: text in the browser settings UI." meaning="invalidDomain">Enter a domain such as ads.example.com, without a URL, path or wildcard.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAINS_EMPTY" desc="domainsEmpty: text in the browser settings UI." meaning="domainsEmpty">No blocked domains added</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_FILE_HINT" desc="domainFileHint: text in the browser settings UI." meaning="domainFileHint">CSV: domain and optional include_subdomains (true/false). TXT: one domain per line, including subdomains. UTF-8 files up to 2 MB; up to 5,000 entries.</message>
+      <message name="IDS_YEE_SETTINGS_IMPORT_DOMAINS" desc="importDomains: text in the browser settings UI." meaning="importDomains">Import file</message>
+      <message name="IDS_YEE_SETTINGS_EXPORT_DOMAINS" desc="exportDomains: text in the browser settings UI." meaning="exportDomains">Export CSV</message>
+      <message name="IDS_YEE_SETTINGS_DOWNLOAD_DOMAIN_TEMPLATE" desc="downloadDomainTemplate: text in the browser settings UI." meaning="downloadDomainTemplate">Download template</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_PREVIEW_TITLE" desc="domainPreviewTitle: text in the browser settings UI." meaning="domainPreviewTitle">Review imported domains</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_PREVIEW_SUMMARY" desc="domainPreviewSummary: text in the browser settings UI." meaning="domainPreviewSummary"><ph name="VALUE1">$1<ex>1</ex></ph> to add · <ph name="VALUE2">$2<ex>1</ex></ph> duplicates · <ph name="VALUE3">$3<ex>1</ex></ph> invalid. Only new valid domains will be added; existing rules stay as they are.</message>
+      <message name="IDS_YEE_SETTINGS_APPLY_DOMAIN_IMPORT" desc="applyDomainImport: text in the browser settings UI." meaning="applyDomainImport">Add <ph name="VALUE">$1<ex>1</ex></ph> domains</message>
+      <message name="IDS_YEE_SETTINGS_CANCEL_DOMAIN_IMPORT" desc="cancelDomainImport: text in the browser settings UI." meaning="cancelDomainImport">Cancel</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_ADDED" desc="domainImportAdded: text in the browser settings UI." meaning="domainImportAdded">Added <ph name="VALUE">$1<ex>1</ex></ph> domains. Reload affected pages to apply the change.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_DUPLICATE" desc="domainImportDuplicate: text in the browser settings UI." meaning="domainImportDuplicate">Already added or repeated in file</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_ADD" desc="domainImportAdd: text in the browser settings UI." meaning="domainImportAdd">Ready to add</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_INVALID_COLUMNS" desc="domainImportInvalidColumns: text in the browser settings UI." meaning="domainImportInvalidColumns">Column count does not match the header</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_INVALID_SCOPE" desc="domainImportInvalidScope: text in the browser settings UI." meaning="domainImportInvalidScope">Use true/false for include_subdomains</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_INVALID_FILE" desc="domainImportInvalidFile: text in the browser settings UI." meaning="domainImportInvalidFile">Could not read the file. Use the CSV template or a UTF-8 TXT file with one domain per line.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_TOO_LARGE" desc="domainImportTooLarge: text in the browser settings UI." meaning="domainImportTooLarge">Choose a file no larger than 2 MB.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_LIMIT" desc="domainImportLimit: text in the browser settings UI." meaning="domainImportLimit">A file and the saved list can each contain up to 5,000 domains. No changes were saved.</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_IMPORT_EMPTY" desc="domainImportEmpty: text in the browser settings UI." meaning="domainImportEmpty">The file has no domains to import.</message>
+      <message name="IDS_YEE_SETTINGS_PREVIEW_LINE_COLUMN" desc="previewLineColumn: text in the browser settings UI." meaning="previewLineColumn">Line</message>
+      <message name="IDS_YEE_SETTINGS_PREVIEW_STATUS_COLUMN" desc="previewStatusColumn: text in the browser settings UI." meaning="previewStatusColumn">Result</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_EXACT" desc="domainExact: text in the browser settings UI." meaning="domainExact">This domain only</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_AND_SUBDOMAINS" desc="domainAndSubdomains: text in the browser settings UI." meaning="domainAndSubdomains">Domain and subdomains</message>
+      <message name="IDS_YEE_SETTINGS_READING_DOMAIN_FILE" desc="readingDomainFile: text in the browser settings UI." meaning="readingDomainFile">Reading…</message>
+      <message name="IDS_YEE_SETTINGS_PREVIOUS_PAGE" desc="previousPage: text in the browser settings UI." meaning="previousPage">Previous</message>
+      <message name="IDS_YEE_SETTINGS_NEXT_PAGE" desc="nextPage: text in the browser settings UI." meaning="nextPage">Next</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_ALREADY_ADDED" desc="domainAlreadyAdded: text in the browser settings UI." meaning="domainAlreadyAdded">This domain is already added. Change its subdomain setting in the list below.</message>
     </messages>
   </release>
 </grit>

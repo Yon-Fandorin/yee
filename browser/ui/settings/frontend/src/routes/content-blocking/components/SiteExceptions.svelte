@@ -1,6 +1,5 @@
 <script lang="ts">
 	import SettingsGroup from '#lib/components/SettingsGroup.svelte';
-	import SettingsNotice from '#lib/components/SettingsNotice.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -67,10 +66,6 @@
 	{/if}
 </SettingsGroup>
 <p id="site-hint" class="detail">{t('siteHint')}</p>
-{#if model.state?.privateProfile}<SettingsNotice
-		id="private-note"
-		message={t('privateNote')}
-	/>{/if}
 
 <style>
 	@layer components {

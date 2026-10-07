@@ -1,8 +1,10 @@
 // Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
 #include "chrome/browser/ui/views/yee/settings/settings_ui.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -12,6 +14,7 @@
 #include "base/functional/bind.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/memory/weak_ptr.h"
+#include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "base/version_info/version_info.h"
 #include "chrome/browser/browser_process.h"
@@ -35,6 +38,9 @@ namespace yee {
 namespace {
 using content_blocking::BaselineListUpdater;
 using content_blocking::BaselineListUpdateStatus;
+using content_blocking::DomainImport;
+using content_blocking::DomainImportFormat;
+using content_blocking::DomainImportRowError;
 
 #include "chrome/browser/ui/views/yee/settings/settings_string_map.inc"
 
@@ -67,6 +73,24 @@ class SettingsHandler : public content::WebUIMessageHandler {
         "checkContentBlockingLists",
         base::BindRepeating(&SettingsHandler::CheckLists,
                             base::Unretained(this)));
+    web_ui()->RegisterMessageCallback(
+        "addBlockedDomain", base::BindRepeating(&SettingsHandler::SetDomain,
+                                                base::Unretained(this), false));
+    web_ui()->RegisterMessageCallback(
+        "setBlockedDomain", base::BindRepeating(&SettingsHandler::SetDomain,
+                                                base::Unretained(this), true));
+    web_ui()->RegisterMessageCallback(
+        "removeBlockedDomain",
+        base::BindRepeating(&SettingsHandler::RemoveDomain,
+                            base::Unretained(this)));
+    web_ui()->RegisterMessageCallback(
+        "previewBlockedDomains",
+        base::BindRepeating(&SettingsHandler::ReadDomainFile,
+                            base::Unretained(this), false));
+    web_ui()->RegisterMessageCallback(
+        "importBlockedDomains",
+        base::BindRepeating(&SettingsHandler::ReadDomainFile,
+                            base::Unretained(this), true));
   }
 
  private:
@@ -118,9 +142,15 @@ class SettingsHandler : public content::WebUIMessageHandler {
       return;
     }
     base::ListValue sites;
+    base::ListValue domains;
     if (auto* blocking = service()) {
       for (const auto& host : blocking->DisabledHosts()) {
         sites.Append(host);
+      }
+      for (const auto& rule : blocking->BlockedDomains()) {
+        domains.Append(base::DictValue()
+                           .Set("domain", rule.domain)
+                           .Set("includeSubdomains", rule.include_subdomains));
       }
     }
     const bool private_profile =
@@ -131,6 +161,7 @@ class SettingsHandler : public content::WebUIMessageHandler {
                                 content_blocking::kYeeContentBlocking))
             .Set("privateProfile", private_profile)
             .Set("exceptions", std::move(sites))
+            .Set("blockedDomains", std::move(domains))
             .Set("updatesAvailable", status.available && !private_profile)
             .Set("updating", status.in_flight)
             .Set("downloaded", status.downloaded)
@@ -180,6 +211,156 @@ class SettingsHandler : public content::WebUIMessageHandler {
                            weak_factory_.GetWeakPtr(), args[0].GetString()))) {
       RejectJavascriptCallback(args[0], base::Value("updates-unavailable"));
     }
+  }
+  bool CanChangeDomains(const base::Value& callback_id) {
+    if (!service() ||
+        !base::FeatureList::IsEnabled(content_blocking::kYeeContentBlocking)) {
+      RejectJavascriptCallback(callback_id, base::Value("service-unavailable"));
+      return false;
+    }
+    return true;
+  }
+  void SetDomain(bool replace, const base::ListValue& args) {
+    if (!CallbackValid(args, 3) || !args[1].is_string() || !args[2].is_bool()) {
+      return;
+    }
+    AllowJavascript();
+    if (!CanChangeDomains(args[0])) {
+      return;
+    }
+    const auto domain =
+        content_blocking::CanonicalBlockedDomain(args[1].GetString());
+    if (!domain) {
+      RejectJavascriptCallback(args[0], base::Value("invalid-domain"));
+      return;
+    }
+    const bool exists = std::ranges::any_of(
+        service()->BlockedDomains(),
+        [&](const auto& rule) { return rule.domain == *domain; });
+    if (exists != replace) {
+      RejectJavascriptCallback(
+          args[0], base::Value(exists ? "duplicate-domain" : "domain-missing"));
+    } else if (!service()->SetBlockedDomain(*domain, args[2].GetBool())) {
+      RejectJavascriptCallback(args[0], base::Value("too-many-domains"));
+    } else {
+      SendState(args[0].GetString());
+    }
+  }
+  void RemoveDomain(const base::ListValue& args) {
+    if (!CallbackValid(args, 2) || !args[1].is_string()) {
+      return;
+    }
+    AllowJavascript();
+    if (!CanChangeDomains(args[0])) {
+      return;
+    }
+    service()->RemoveBlockedDomain(args[1].GetString());
+    SendState(args[0].GetString());
+  }
+  void ReadDomainFile(bool apply, const base::ListValue& args) {
+    if (!CallbackValid(args, 3) || !args[1].is_string() ||
+        !args[2].is_string()) {
+      return;
+    }
+    AllowJavascript();
+    if (!CanChangeDomains(args[0])) {
+      return;
+    }
+    const auto& format = args[1].GetString();
+    if (format != "csv" && format != "txt") {
+      RejectJavascriptCallback(args[0], base::Value("invalid-file"));
+      return;
+    }
+    if (args[2].GetString().size() > content_blocking::kMaxDomainImportBytes) {
+      RejectJavascriptCallback(args[0], base::Value("file-too-large"));
+      return;
+    }
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::TaskPriority::USER_VISIBLE},
+        base::BindOnce(
+            [](std::string text, DomainImportFormat format) {
+              return content_blocking::ParseDomainImport(text, format);
+            },
+            args[2].GetString(),
+            format == "csv" ? DomainImportFormat::kCsv
+                            : DomainImportFormat::kText),
+        base::BindOnce(&SettingsHandler::DomainFileParsed,
+                       weak_factory_.GetWeakPtr(), args[0].GetString(), apply));
+  }
+  void DomainFileParsed(std::string callback_id,
+                        bool apply,
+                        DomainImport parsed) {
+    if (!IsJavascriptAllowed() || !CanChangeDomains(base::Value(callback_id))) {
+      return;
+    }
+    if (!parsed.error.empty()) {
+      RejectJavascriptCallback(base::Value(callback_id),
+                               base::Value(parsed.error));
+      return;
+    }
+    if (apply) {
+      std::vector<content_blocking::BlockedDomain> rules;
+      for (const auto& row : parsed.rows) {
+        if (row.error == DomainImportRowError::kNone && row.rule) {
+          rules.push_back(*row.rule);
+        }
+      }
+      const auto added = service()->ImportBlockedDomains(rules);
+      if (!added) {
+        RejectJavascriptCallback(base::Value(callback_id),
+                                 base::Value("too-many-domains"));
+      } else {
+        ResolveJavascriptCallback(base::Value(callback_id),
+                                  base::Value(static_cast<int>(*added)));
+      }
+      return;
+    }
+    std::set<std::string> existing;
+    for (const auto& rule : service()->BlockedDomains()) {
+      existing.insert(rule.domain);
+    }
+    base::ListValue rows;
+    int additions = 0, duplicates = 0, invalid = 0;
+    for (const auto& row : parsed.rows) {
+      std::string status;
+      switch (row.error) {
+        case DomainImportRowError::kNone:
+          status = row.rule && existing.contains(row.rule->domain) ? "duplicate"
+                                                                   : "add";
+          break;
+        case DomainImportRowError::kDuplicate:
+          status = "duplicate";
+          break;
+        case DomainImportRowError::kInvalidDomain:
+          status = "invalid-domain";
+          break;
+        case DomainImportRowError::kInvalidColumns:
+          status = "invalid-columns";
+          break;
+        case DomainImportRowError::kInvalidScope:
+          status = "invalid-scope";
+          break;
+      }
+      if (status == "add") {
+        ++additions;
+      } else if (status == "duplicate") {
+        ++duplicates;
+      } else {
+        ++invalid;
+      }
+      rows.Append(base::DictValue()
+                      .Set("line", static_cast<int>(row.line))
+                      .Set("domain", row.rule ? row.rule->domain : row.input)
+                      .Set("includeSubdomains",
+                           row.rule && row.rule->include_subdomains)
+                      .Set("status", status));
+    }
+    ResolveJavascriptCallback(base::Value(callback_id),
+                              base::DictValue()
+                                  .Set("rows", std::move(rows))
+                                  .Set("additions", additions)
+                                  .Set("duplicates", duplicates)
+                                  .Set("invalid", invalid));
   }
   void ListsChecked(std::string callback_id, bool succeeded) {
     if (IsJavascriptAllowed()) {
@@ -240,6 +421,8 @@ SettingsUI::SettingsUI(content::WebUI* web_ui) : WebUIController(web_ui) {
           },
           html));
   source->AddLocalizedStrings(kSettingsStrings);
+  source->AddInteger("domainImportMaxBytes",
+                     content_blocking::kMaxDomainImportBytes);
   source->AddString("productName", version_info::GetProductName());
   source->AddString("nativeSettingsUrl", "chrome://settings/");
   source->AddString("applicationLocale", locale);

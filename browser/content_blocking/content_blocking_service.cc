@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license in LICENSE.
 
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
-#include "chrome/browser/yee_content_blocking/baseline_list_updater.h"
 
 #include <algorithm>
+#include <map>
 #include <string_view>
 #include <utility>
 
 #include "base/functional/bind.h"
 #include "base/strings/string_util.h"
 #include "base/values.h"
+#include "chrome/browser/yee_content_blocking/baseline_list_updater.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/content_settings/core/common/content_settings_utils.h"
 #include "components/pref_registry/pref_registry_syncable.h"
@@ -62,6 +63,40 @@ void ContentBlockingSettingsSnapshot::ReplaceDisabledHosts(
   disabled_hosts_ = std::move(hosts);
 }
 
+bool ContentBlockingSettingsSnapshot::IsBlockedDomain(const GURL& url) const {
+  if (!url.SchemeIsHTTPOrHTTPS()) {
+    return false;
+  }
+  std::string_view host = url.host();
+  if (host.ends_with('.')) {
+    host.remove_suffix(1);
+  }
+  base::AutoLock lock(lock_);
+  bool subdomain = false;
+  while (!host.empty()) {
+    const auto rule = std::ranges::lower_bound(blocked_domains_, host, {},
+                                               &BlockedDomain::domain);
+    if (rule != blocked_domains_.end() && rule->domain == host &&
+        (!subdomain || rule->include_subdomains)) {
+      return true;
+    }
+    const auto dot = host.find('.');
+    if (dot == std::string_view::npos) {
+      break;
+    }
+    host.remove_prefix(dot + 1);
+    subdomain = true;
+  }
+  return false;
+}
+
+void ContentBlockingSettingsSnapshot::ReplaceBlockedDomains(
+    std::vector<BlockedDomain> domains) {
+  std::ranges::sort(domains, {}, &BlockedDomain::domain);
+  base::AutoLock lock(lock_);
+  blocked_domains_ = std::move(domains);
+}
+
 ContentBlockingService::ContentBlockingService(PrefService* prefs,
                                                bool off_the_record)
     : prefs_(prefs),
@@ -74,19 +109,26 @@ ContentBlockingService::ContentBlockingService(PrefService* prefs,
       kDisabledSitesPref,
       base::BindRepeating(&ContentBlockingService::OnDisabledSitesChanged,
                           base::Unretained(this)));
+  pref_change_registrar_.Add(
+      kBlockedDomainsPref,
+      base::BindRepeating(&ContentBlockingService::OnBlockedDomainsChanged,
+                          base::Unretained(this)));
   OnDisabledSitesChanged();
+  OnBlockedDomainsChanged();
 }
 
 ContentBlockingService::~ContentBlockingService() = default;
 void ContentBlockingService::StartBaselineListUpdates() {
-  if (!off_the_record_ && !list_updater_)
+  if (!off_the_record_ && !list_updater_) {
     list_updater_ = BaselineListUpdater::MaybeCreate();
+  }
 }
 
 // static
 void ContentBlockingService::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterListPref(kDisabledSitesPref);
+  registry->RegisterListPref(kBlockedDomainsPref);
 }
 
 bool ContentBlockingService::EnabledForSite(const GURL& site) const {
@@ -95,6 +137,106 @@ bool ContentBlockingService::EnabledForSite(const GURL& site) const {
 
 std::vector<std::string> ContentBlockingService::DisabledHosts() const {
   return ReadDisabledHosts();
+}
+
+std::vector<BlockedDomain> ContentBlockingService::BlockedDomains() const {
+  std::map<std::string, bool> normalized;
+  for (const auto& value : prefs_->GetList(kBlockedDomainsPref)) {
+    if (!value.is_dict()) {
+      continue;
+    }
+    const auto* input = value.GetDict().FindString("domain");
+    const auto scope = value.GetDict().FindBool("includeSubdomains");
+    if (!input || !scope.has_value()) {
+      continue;
+    }
+    if (const auto domain = CanonicalBlockedDomain(*input)) {
+      normalized.try_emplace(*domain, *scope);
+      if (normalized.size() == kMaxBlockedDomains) {
+        break;
+      }
+    }
+  }
+  std::vector<BlockedDomain> domains;
+  for (const auto& [domain, scope] : normalized) {
+    domains.push_back({domain, scope});
+  }
+  return domains;
+}
+
+bool ContentBlockingService::SetBlockedDomain(std::string_view input,
+                                              bool include_subdomains) {
+  const auto domain = CanonicalBlockedDomain(input);
+  if (!domain) {
+    return false;
+  }
+  auto domains = BlockedDomains();
+  auto existing = std::ranges::find(domains, *domain, &BlockedDomain::domain);
+  if (existing != domains.end()) {
+    existing->include_subdomains = include_subdomains;
+  } else {
+    if (domains.size() == kMaxBlockedDomains) {
+      return false;
+    }
+    domains.push_back({*domain, include_subdomains});
+  }
+  SaveBlockedDomains(domains);
+  return true;
+}
+
+void ContentBlockingService::RemoveBlockedDomain(std::string_view input) {
+  const auto domain = CanonicalBlockedDomain(input);
+  if (!domain) {
+    return;
+  }
+  auto domains = BlockedDomains();
+  std::erase_if(domains,
+                [&](const auto& rule) { return rule.domain == *domain; });
+  SaveBlockedDomains(domains);
+}
+
+std::optional<size_t> ContentBlockingService::ImportBlockedDomains(
+    const std::vector<BlockedDomain>& additions) {
+  auto domains = BlockedDomains();
+  std::map<std::string, bool> merged;
+  for (const auto& rule : domains) {
+    merged.emplace(rule.domain, rule.include_subdomains);
+  }
+  for (const auto& rule : additions) {
+    const auto domain = CanonicalBlockedDomain(rule.domain);
+    if (!domain) {
+      return std::nullopt;
+    }
+    merged.try_emplace(*domain, rule.include_subdomains);
+    if (merged.size() > kMaxBlockedDomains) {
+      return std::nullopt;
+    }
+  }
+  const size_t count = merged.size() - domains.size();
+  if (count) {
+    domains.clear();
+    for (const auto& [domain, scope] : merged) {
+      domains.push_back({domain, scope});
+    }
+    SaveBlockedDomains(domains);
+  }
+  return count;
+}
+
+void ContentBlockingService::SaveBlockedDomains(
+    const std::vector<BlockedDomain>& domains) {
+  base::ListValue values;
+  for (const auto& rule : domains) {
+    values.Append(base::DictValue()
+                      .Set("domain", rule.domain)
+                      .Set("includeSubdomains", rule.include_subdomains));
+  }
+  prefs_->SetList(kBlockedDomainsPref, std::move(values));
+}
+
+void ContentBlockingService::OnBlockedDomainsChanged() {
+  settings_snapshot_->ReplaceBlockedDomains(BlockedDomains());
+  changed_callbacks_.Notify();
 }
 
 base::CallbackListSubscription ContentBlockingService::AddChangedCallback(

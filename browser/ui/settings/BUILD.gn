@@ -38,6 +38,8 @@ action("resources") {
     "frontend/src/routes/content-blocking/+page.svelte",
     "frontend/src/routes/content-blocking/components/FilterLists.svelte",
     "frontend/src/routes/content-blocking/components/SiteExceptions.svelte",
+    "frontend/src/routes/content-blocking/components/BlockedDomains.svelte",
+    "frontend/src/routes/content-blocking/components/DomainImport.svelte",
     "frontend/src/lib/components/ui/badge/badge.svelte",
     "frontend/src/lib/components/ui/badge/index.ts",
     "frontend/src/lib/components/ui/button/button.svelte",
