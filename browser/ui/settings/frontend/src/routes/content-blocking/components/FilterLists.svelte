@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SettingsFeedback from '#lib/components/SettingsFeedback.svelte';
 	import SettingsGroup from '#lib/components/SettingsGroup.svelte';
 	import SettingsRow from '#lib/components/SettingsRow.svelte';
 	import SettingsNotice from '#lib/components/SettingsNotice.svelte';
@@ -37,6 +38,7 @@
 		</li>
 	</ul>
 </SettingsGroup>
+<SettingsFeedback id="list-feedback" message={model.listFeedback} error={model.listFeedbackError} />
 <p id="list-state" class="detail">{date ? t('lastChecked', date) : t('bundledNote')}</p>
 {#if model.state?.pendingRestart}<SettingsNotice
 		id="restart-note"

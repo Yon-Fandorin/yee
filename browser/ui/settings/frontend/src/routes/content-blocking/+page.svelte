@@ -5,6 +5,7 @@
 	import { t } from '#lib/i18n.ts';
 	import { useSettings } from '#lib/settings.svelte.ts';
 	import FilterLists from './components/FilterLists.svelte';
+	import FilterSubscriptions from './components/FilterSubscriptions.svelte';
 	import SiteExceptions from './components/SiteExceptions.svelte';
 	import BlockedDomains from './components/BlockedDomains.svelte';
 	const model = useSettings();
@@ -36,6 +37,7 @@
 			message={t('privateNote')}
 		/>{/if}
 	<FilterLists />
+	<FilterSubscriptions />
 	<BlockedDomains />
 	<SiteExceptions />
 </section>

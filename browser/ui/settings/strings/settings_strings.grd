@@ -138,7 +138,7 @@
       <message name="IDS_YEE_SETTINGS_SITE_PLACEHOLDER" desc="sitePlaceholder: text in the browser settings UI." meaning="sitePlaceholder">example.com</message>
       <message name="IDS_YEE_SETTINGS_ADD_EXCEPTION" desc="addException: text in the browser settings UI." meaning="addException">Add site</message>
       <message name="IDS_YEE_SETTINGS_SITE_HINT" desc="siteHint: text in the browser settings UI." meaning="siteHint">Sites you turn blocking off for with the address bar shield also appear here.</message>
-      <message name="IDS_YEE_SETTINGS_PRIVATE_NOTE" desc="privateNote: text in the browser settings UI." meaning="privateNote">Changes here apply only to this private or guest session.</message>
+      <message name="IDS_YEE_SETTINGS_PRIVATE_NOTE" desc="privateNote: text in the browser settings UI." meaning="privateNote">Domain rules and site exceptions apply only to this private or guest session.</message>
       <message name="IDS_YEE_SETTINGS_NO_EXCEPTIONS" desc="noExceptions: text in the browser settings UI." meaning="noExceptions">No sites added</message>
       <message name="IDS_YEE_SETTINGS_NO_EXCEPTIONS_HINT" desc="noExceptionsHint: text in the browser settings UI." meaning="noExceptionsHint">Add a site above to turn off blocking for it.</message>
       <message name="IDS_YEE_SETTINGS_EXCEPTION_LIST_LABEL" desc="exceptionListLabel: text in the browser settings UI." meaning="exceptionListLabel">Sites with blocking turned off</message>
@@ -152,7 +152,7 @@
       <message name="IDS_YEE_SETTINGS_CHECKING_FEEDBACK" desc="checkingFeedback: text in the browser settings UI." meaning="checkingFeedback">Checking for filter updates…</message>
       <message name="IDS_YEE_SETTINGS_UPDATE_READY" desc="updateReady: text in the browser settings UI." meaning="updateReady">Restart the browser to apply the new filters.</message>
       <message name="IDS_YEE_SETTINGS_UP_TO_DATE" desc="upToDate: text in the browser settings UI." meaning="upToDate">Your filters are up to date.</message>
-      <message name="IDS_YEE_SETTINGS_UPDATE_FAILED" desc="updateFailed: text in the browser settings UI." meaning="updateFailed">Could not update filters. Existing filters are still in use. Try again later.</message>
+      <message name="IDS_YEE_SETTINGS_UPDATE_FAILED" desc="updateFailed: text in the browser settings UI." meaning="updateFailed">Could not update all filters. Saved versions are kept for failed lists. Try again later.</message>
       <message name="IDS_YEE_SETTINGS_LOAD_FAILED" desc="loadFailed: text in the browser settings UI." meaning="loadFailed">Could not load settings. Try again.</message>
       <message name="IDS_YEE_SETTINGS_RETRY" desc="retry: text in the browser settings UI." meaning="retry">Try again</message>
       <message name="IDS_YEE_SETTINGS_PAGE_TITLE" desc="pageTitle: text in the browser settings UI." meaning="pageTitle"><ph name="VALUE">$1<ex>Yee</ex></ph> — Settings</message>
@@ -193,6 +193,35 @@
       <message name="IDS_YEE_SETTINGS_PREVIOUS_PAGE" desc="previousPage: text in the browser settings UI." meaning="previousPage">Previous</message>
       <message name="IDS_YEE_SETTINGS_NEXT_PAGE" desc="nextPage: text in the browser settings UI." meaning="nextPage">Next</message>
       <message name="IDS_YEE_SETTINGS_DOMAIN_ALREADY_ADDED" desc="domainAlreadyAdded: text in the browser settings UI." meaning="domainAlreadyAdded">This domain is already added. Change its subdomain setting in the list below.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTIONS_TITLE" desc="subscriptionsTitle: text in the browser settings UI." meaning="subscriptionsTitle">External filter lists</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTIONS_DESCRIPTION" desc="subscriptionsDescription: text in the browser settings UI." meaning="subscriptionsDescription">Subscribe to rules maintained by others. Lists are shared by all profiles; changes apply after restarting the browser.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_URL" desc="subscriptionUrl: text in the browser settings UI." meaning="subscriptionUrl">Filter list URL</message>
+      <message name="IDS_YEE_SETTINGS_ADD_SUBSCRIPTION" desc="addSubscription: text in the browser settings UI." meaning="addSubscription">Subscribe</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_SAVING" desc="subscriptionSaving: text in the browser settings UI." meaning="subscriptionSaving">Saving…</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_HINT" desc="subscriptionHint: text in the browser settings UI." meaning="subscriptionHint">Enter an HTTPS URL pointing to an ad blocking rules file. Up to 10 lists, 4 MB each and 16 MB in total. Enabled lists update automatically.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTIONS_EMPTY" desc="subscriptionsEmpty: text in the browser settings UI." meaning="subscriptionsEmpty">No external filter lists subscribed</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_ENABLED_LABEL" desc="subscriptionEnabledLabel: text in the browser settings UI." meaning="subscriptionEnabledLabel">Enable <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_ENABLED" desc="subscriptionEnabled: text in the browser settings UI." meaning="subscriptionEnabled">Enabled</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_DISABLED" desc="subscriptionDisabled: text in the browser settings UI." meaning="subscriptionDisabled">Disabled</message>
+      <message name="IDS_YEE_SETTINGS_REMOVE_SUBSCRIPTION_LABEL" desc="removeSubscriptionLabel: text in the browser settings UI." meaning="removeSubscriptionLabel">Unsubscribe from <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_ADDED" desc="subscriptionAdded: text in the browser settings UI." meaning="subscriptionAdded">Filter list subscribed. Restart the browser to apply it.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_CHANGED" desc="subscriptionChanged: text in the browser settings UI." meaning="subscriptionChanged">Filter list setting saved. Restart the browser to apply it.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_REMOVED" desc="subscriptionRemoved: text in the browser settings UI." meaning="subscriptionRemoved">Filter list unsubscribed. Restart the browser to apply it.</message>
+      <message name="IDS_YEE_SETTINGS_INVALID_LIST_URL" desc="invalidListUrl: text in the browser settings UI." meaning="invalidListUrl">Enter an HTTPS filter file URL without a username, password or fragment. Built-in lists cannot be added again.</message>
+      <message name="IDS_YEE_SETTINGS_DUPLICATE_LIST" desc="duplicateList: text in the browser settings UI." meaning="duplicateList">This filter list is already subscribed.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_LIMIT" desc="subscriptionLimit: text in the browser settings UI." meaning="subscriptionLimit">You can subscribe to up to 10 filter lists.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_STORAGE_LIMIT" desc="subscriptionStorageLimit: text in the browser settings UI." meaning="subscriptionStorageLimit">Subscribed lists can total up to 16 MB. No changes were saved.</message>
+      <message name="IDS_YEE_SETTINGS_INVALID_LIST" desc="invalidList: text in the browser settings UI." meaning="invalidList">This file does not contain compatible ad blocking rules. HTML pages, empty lists and lists requiring additional included files are not supported.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_DOWNLOAD_FAILED" desc="subscriptionDownloadFailed: text in the browser settings UI." meaning="subscriptionDownloadFailed">Could not download the list. Check the HTTPS file URL and try again. Files must be no larger than 4 MB.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_BUSY" desc="subscriptionBusy: text in the browser settings UI." meaning="subscriptionBusy">Another filter list operation is in progress. Try again when it finishes.</message>
+      <message name="IDS_YEE_SETTINGS_SUBSCRIPTION_RETAINED" desc="subscriptionRetained: text in the browser settings UI." meaning="subscriptionRetained">Update failed. The previously saved list is retained.</message>
+      <message name="IDS_YEE_SETTINGS_SEARCH_DOMAINS" desc="searchDomains: text in the browser settings UI." meaning="searchDomains">Search domains</message>
+      <message name="IDS_YEE_SETTINGS_DOMAIN_COUNT" desc="domainCount: text in the browser settings UI." meaning="domainCount"><ph name="VALUE1">$1<ex>1</ex></ph> of <ph name="VALUE2">$2<ex>1</ex></ph> domains</message>
+      <message name="IDS_YEE_SETTINGS_SELECT_DOMAIN_PAGE" desc="selectDomainPage: text in the browser settings UI." meaning="selectDomainPage">Select this page</message>
+      <message name="IDS_YEE_SETTINGS_SELECT_DOMAIN_LABEL" desc="selectDomainLabel: text in the browser settings UI." meaning="selectDomainLabel">Select <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_SETTINGS_REMOVE_SELECTED_DOMAINS" desc="removeSelectedDomains: text in the browser settings UI." meaning="removeSelectedDomains">Remove selected (<ph name="VALUE">$1<ex>1</ex></ph>)</message>
+      <message name="IDS_YEE_SETTINGS_DOMAINS_NO_MATCHES" desc="domainsNoMatches: text in the browser settings UI." meaning="domainsNoMatches">No domains match your search</message>
+      <message name="IDS_YEE_SETTINGS_DOMAINS_REMOVED" desc="domainsRemoved: text in the browser settings UI." meaning="domainsRemoved">Selected domain rules removed. Reload affected pages to apply the change.</message>
     </messages>
   </release>
 </grit>

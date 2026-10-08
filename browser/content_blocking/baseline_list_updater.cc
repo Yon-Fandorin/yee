@@ -12,6 +12,7 @@
 #include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
+#include "net/url_request/redirect_info.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
@@ -66,6 +67,8 @@ BaselineListUpdater::~BaselineListUpdater() {
   for (auto& callback : completion_callbacks_) {
     std::move(callback).Run(false);
   }
+  if (mutation_callback_)
+    std::move(mutation_callback_).Run("updates-unavailable");
 }
 
 base::CallbackListSubscription BaselineListUpdater::AddChangedCallback(
@@ -74,6 +77,10 @@ base::CallbackListSubscription BaselineListUpdater::AddChangedCallback(
 }
 
 void BaselineListUpdater::CheckNow(base::OnceCallback<void(bool)> callback) {
+  if (mutation_callback_) {
+    std::move(callback).Run(false);
+    return;
+  }
   completion_callbacks_.push_back(std::move(callback));
   if (in_flight_) {
     return;
@@ -98,18 +105,20 @@ void BaselineListUpdater::GetStatus(
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
           kBaselineListDirectorySwitch);
   BaselineListUpdateStatus status;
-  status.running_downloaded = !BaselineLists().generation.empty();
+  status.running_downloaded = BaselineLists().baseline_downloaded;
   status.available = !!Coordinator();
   status.in_flight = Coordinator() && Coordinator()->update_in_flight();
+  if (Coordinator())
+    status.failed_urls = Coordinator()->failed_urls_;
   StoreWorker()->PostTaskAndReplyWithResult(
       FROM_HERE,
       base::BindOnce(
           [](base::FilePath directory, std::string running_generation,
              BaselineListUpdateStatus status) {
             const auto saved = ReadBaselineListStore(directory);
-            status.downloaded = !saved.generation.empty();
-            status.pending_restart =
-                status.downloaded && saved.generation != running_generation;
+            status.downloaded = saved.baseline_downloaded;
+            status.subscriptions = saved.subscriptions;
+            status.pending_restart = saved.generation != running_generation;
             status.recovered = saved.recovered;
             status.checked_at = saved.checked_at;
             return status;
@@ -176,58 +185,207 @@ void BaselineListUpdater::Start() {
     return;
   }
   in_flight_ = true;
-  Download(0);
+  worker_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::FilePath path) {
+            return ReadBaselineListStore(path).subscriptions;
+          },
+          directory_),
+      base::BindOnce(&BaselineListUpdater::PlanLoaded,
+                     weak_factory_.GetWeakPtr()));
   StatusCallbacks().Notify();
 }
+void BaselineListUpdater::PlanLoaded(
+    std::vector<FilterSubscription> subscriptions) {
+  downloads_.clear();
+  for (const auto& info : subscriptions)
+    if (info.enabled)
+      downloads_.push_back({info.url, ""});
+  Download(0);
+}
 void BaselineListUpdater::Download(size_t index) {
+  if (index == 2 + downloads_.size()) {
+    worker_->PostTaskAndReplyWithResult(
+        FROM_HERE,
+        base::BindOnce(&UpdateFilterLists, directory_, std::move(originals_),
+                       std::move(downloads_), base::Time::Now(),
+                       running_generation_),
+        base::BindOnce(&BaselineListUpdater::UpdatesInstalled,
+                       weak_factory_.GetWeakPtr()));
+    return;
+  }
+  download_index_ = index;
+  const bool subscription = index >= 2;
+  const std::string url = subscription ? downloads_[index - 2].url
+                                       : std::string(kBaselineListURLs[index]);
+  CreateLoader(url, subscription);
+  loader_->DownloadToString(
+      factory_.get(),
+      base::BindOnce(&BaselineListUpdater::Downloaded,
+                     weak_factory_.GetWeakPtr(), index),
+      subscription ? kMaxSubscribedListBytes : kMaxBaselineListBytes);
+}
+void BaselineListUpdater::CreateLoader(const std::string& url,
+                                       bool subscription) {
   auto request = std::make_unique<network::ResourceRequest>();
-  request->url = GURL(kBaselineListURLs[index]);
+  request->url = GURL(url);
   request->credentials_mode = network::mojom::CredentialsMode::kOmit;
-  request->redirect_mode = network::mojom::RedirectMode::kError;
+  request->redirect_mode = subscription ? network::mojom::RedirectMode::kFollow
+                                        : network::mojom::RedirectMode::kError;
   request->load_flags = net::LOAD_BYPASS_CACHE;
   constexpr auto annotation =
-      net::DefineNetworkTrafficAnnotation("yee_baseline_filter_update", R"(
+      net::DefineNetworkTrafficAnnotation("yee_filter_list_update", R"(
         semantics {
           sender: "Yee content blocking"
-          description: "Downloads official EasyList and EasyPrivacy rules. A validated pair is applied on the next browser start; previous working rules remain available."
-          trigger: "Thirty seconds after a regular profile starts, then once daily, or when the user checks in Settings. Failed updates retry after six hours."
+          description: "Downloads official EasyList and EasyPrivacy and user-subscribed HTTPS filter lists. Validated rules are applied on the next browser start; previous working rules remain available."
+          trigger: "Thirty seconds after a regular profile starts, then once daily, or when the user checks in Settings or adds a subscription. Failed updates retry after six hours."
           data: "No user content, cookies or credentials."
           destination: WEBSITE
         }
         policy {
           cookies_allowed: NO
-          setting: "Runs with Yee content blocking enabled. Chromium's disable-background-networking switch prevents updates."
+          setting: "Runs with Yee content blocking enabled. Users can remove or disable subscriptions in Settings. Chromium's disable-background-networking switch prevents updates."
           policy_exception_justification: "No enterprise-specific policy is implemented for Yee content blocking."
         })");
   loader_ = network::SimpleURLLoader::Create(std::move(request), annotation);
   loader_->SetTimeoutDuration(base::Seconds(30));
-  loader_->DownloadToString(factory_.get(),
-                            base::BindOnce(&BaselineListUpdater::Downloaded,
-                                           weak_factory_.GetWeakPtr(), index),
-                            kMaxBaselineListBytes);
+  if (subscription) {
+    loader_->SetOnRedirectCallback(base::BindRepeating(
+        [](base::WeakPtr<BaselineListUpdater> owner, std::string url,
+           const GURL&, const net::RedirectInfo& redirect,
+           const network::mojom::URLResponseHead&, std::vector<std::string>*) {
+          if (!owner || CanonicalFilterSubscriptionURL(redirect.new_url.spec()))
+            return;
+          owner->loader_.reset();
+          if (owner->mutation_callback_)
+            owner->MutationCompleted(std::move(url), "download-failed");
+          else
+            owner->Downloaded(owner->download_index_, std::nullopt);
+        },
+        weak_factory_.GetWeakPtr(), url));
+  }
+}
+bool BaselineListUpdater::ResponseComplete() const {
+  return loader_ && loader_->NetError() == net::OK && loader_->ResponseInfo() &&
+         loader_->ResponseInfo()->headers &&
+         loader_->ResponseInfo()->headers->response_code() == net::HTTP_OK;
 }
 void BaselineListUpdater::Downloaded(size_t index,
                                      std::optional<std::string> body) {
-  const bool complete_response =
-      loader_->NetError() == net::OK && loader_->ResponseInfo() &&
-      loader_->ResponseInfo()->headers &&
-      loader_->ResponseInfo()->headers->response_code() == net::HTTP_OK;
+  const bool complete_response = body && ResponseComplete();
   loader_.reset();
-  if (!body || !complete_response) {
-    Completed(false);
+  if (index < 2) {
+    if (complete_response)
+      originals_[index] = std::move(*body);
+    // A failed official pair must not stop independent subscription updates.
+    if (!complete_response) {
+      if (downloads_.empty()) {
+        Completed(false);
+        return;
+      }
+      Download(2);
+      return;
+    }
+  } else if (complete_response) {
+    downloads_[index - 2].body = std::move(*body);
+  }
+  Download(index + 1);
+}
+void BaselineListUpdater::UpdatesInstalled(FilterListUpdateResult result) {
+  failed_urls_ = std::move(result.failed_urls);
+  Completed(result.succeeded);
+}
+
+bool BaselineListUpdater::AddSubscription(
+    std::string url,
+    base::OnceCallback<void(std::string)> callback) {
+  if (!Coordinator())
+    return false;
+  Coordinator()->AddSubscriptionNow(std::move(url), std::move(callback));
+  return true;
+}
+bool BaselineListUpdater::ChangeSubscription(
+    std::string url,
+    std::optional<bool> enabled,
+    base::OnceCallback<void(std::string)> callback) {
+  if (!Coordinator())
+    return false;
+  Coordinator()->ChangeSubscriptionNow(std::move(url), enabled,
+                                       std::move(callback));
+  return true;
+}
+bool BaselineListUpdater::BeginMutation(
+    base::OnceCallback<void(std::string)> callback) {
+  if (in_flight_) {
+    std::move(callback).Run("lists-busy");
+    return false;
+  }
+  in_flight_ = true;
+  timer_.Stop();
+  mutation_callback_ = std::move(callback);
+  StatusCallbacks().Notify();
+  return true;
+}
+void BaselineListUpdater::AddSubscriptionNow(
+    std::string input,
+    base::OnceCallback<void(std::string)> callback) {
+  const auto url = CanonicalFilterSubscriptionURL(input);
+  if (!url ||
+      std::ranges::find(kBaselineListURLs, *url) != kBaselineListURLs.end()) {
+    std::move(callback).Run("invalid-list-url");
     return;
   }
-  originals_[index] = std::move(*body);
-  if (index == 0) {
-    Download(1);
+  if (!BeginMutation(std::move(callback)))
+    return;
+  CreateLoader(*url, true);
+  loader_->DownloadToString(
+      factory_.get(),
+      base::BindOnce(&BaselineListUpdater::SubscriptionDownloaded,
+                     weak_factory_.GetWeakPtr(), *url),
+      kMaxSubscribedListBytes);
+}
+void BaselineListUpdater::SubscriptionDownloaded(
+    std::string url,
+    std::optional<std::string> body) {
+  const bool complete = body && ResponseComplete();
+  loader_.reset();
+  if (!complete) {
+    MutationCompleted(std::move(url), "download-failed");
     return;
   }
   worker_->PostTaskAndReplyWithResult(
       FROM_HERE,
-      base::BindOnce(&InstallBaselineLists, directory_, std::move(originals_),
-                     base::Time::Now(), running_generation_),
-      base::BindOnce(&BaselineListUpdater::Completed,
-                     weak_factory_.GetWeakPtr()));
+      base::BindOnce(&AddFilterSubscription, directory_, url, std::move(*body),
+                     running_generation_),
+      base::BindOnce(&BaselineListUpdater::MutationCompleted,
+                     weak_factory_.GetWeakPtr(), url));
+}
+void BaselineListUpdater::ChangeSubscriptionNow(
+    std::string url,
+    std::optional<bool> enabled,
+    base::OnceCallback<void(std::string)> callback) {
+  if (!BeginMutation(std::move(callback)))
+    return;
+  worker_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(&ChangeFilterSubscription, directory_, url, enabled,
+                     running_generation_),
+      base::BindOnce(&BaselineListUpdater::MutationCompleted,
+                     weak_factory_.GetWeakPtr(), url));
+}
+void BaselineListUpdater::MutationCompleted(std::string url,
+                                            std::string error) {
+  in_flight_ = false;
+  if (error.empty())
+    std::erase(failed_urls_, url);
+  auto callback = std::move(mutation_callback_);
+  timer_.Start(
+      FROM_HERE, base::Seconds(30),
+      base::BindOnce(&BaselineListUpdater::Start, weak_factory_.GetWeakPtr()));
+  StatusCallbacks().Notify();
+  if (callback)
+    std::move(callback).Run(std::move(error));
 }
 void BaselineListUpdater::Completed(bool installed) {
   in_flight_ = false;

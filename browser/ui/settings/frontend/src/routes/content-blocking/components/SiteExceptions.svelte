@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SettingsFeedback from '#lib/components/SettingsFeedback.svelte';
 	import SettingsGroup from '#lib/components/SettingsGroup.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -65,6 +66,11 @@
 		</div>
 	{/if}
 </SettingsGroup>
+<SettingsFeedback
+	id="exception-feedback"
+	message={model.exceptionFeedback}
+	error={model.exceptionFeedbackError}
+/>
 <p id="site-hint" class="detail">{t('siteHint')}</p>
 
 <style>

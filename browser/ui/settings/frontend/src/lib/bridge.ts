@@ -21,11 +21,20 @@ export interface DomainImportPreview {
 
 export type DomainImportFormat = 'csv' | 'txt';
 
+export interface FilterSubscription {
+	url: string;
+	title: string;
+	enabled: boolean;
+	checkedAt: number;
+	updateFailed: boolean;
+}
+
 export interface ContentBlockingState {
 	enabled: boolean;
 	privateProfile: boolean;
 	exceptions: string[];
 	blockedDomains: BlockedDomain[];
+	subscriptions: FilterSubscription[];
 	updatesAvailable: boolean;
 	updating: boolean;
 	runningDownloaded: boolean;
@@ -45,6 +54,14 @@ export const settingsBridge = {
 		sendWithPromise<ContentBlockingState>('setBlockedDomain', domain, includeSubdomains),
 	removeDomain: (domain: string) =>
 		sendWithPromise<ContentBlockingState>('removeBlockedDomain', domain),
+	removeDomains: (domains: string[]) =>
+		sendWithPromise<ContentBlockingState>('removeBlockedDomains', domains),
+	addSubscription: (url: string) =>
+		sendWithPromise<ContentBlockingState>('addFilterSubscription', url),
+	setSubscriptionEnabled: (url: string, enabled: boolean) =>
+		sendWithPromise<ContentBlockingState>('setFilterSubscriptionEnabled', url, enabled),
+	removeSubscription: (url: string) =>
+		sendWithPromise<ContentBlockingState>('removeFilterSubscription', url),
 	previewDomains: (format: DomainImportFormat, text: string) =>
 		sendWithPromise<DomainImportPreview>('previewBlockedDomains', format, text),
 	importDomains: (format: DomainImportFormat, text: string) =>

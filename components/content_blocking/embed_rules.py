@@ -23,6 +23,13 @@ for name, text in zip(["kBundledFilters", "kBundledResources", "kTestFilters", "
     delimiter = "yee_" + hashlib.sha256(text.encode()).hexdigest()[:10]
     assert f'){delimiter}"' not in text
     header.append(f'inline constexpr std::string_view {name} = R"{delimiter}({text}){delimiter}";')
+header.append('inline constexpr std::array<std::string_view, 2> kBundledBaselineOriginals = {')
+for path in [easylist, easyprivacy]:
+    text = path.read_text()
+    delimiter = "yee_" + hashlib.sha256(text.encode()).hexdigest()[:10]
+    assert f'){delimiter}"' not in text
+    header.append(f'R"{delimiter}({text}){delimiter}",')
+header.append('};')
 owned = preprocess(filters.read_text(), str(filters))
 delimiter = "yee_" + hashlib.sha256(owned.encode()).hexdigest()[:10]
 header.append(f'inline constexpr std::string_view kOwnedFilters = R"{delimiter}({owned}){delimiter}";')

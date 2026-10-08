@@ -157,5 +157,73 @@ TEST_F(BaselineListUpdaterTest, ManualCheckReportsFailureAndOwnerShutdown) {
   updater.reset();
   EXPECT_FALSE(closed.Get());
 }
+TEST_F(BaselineListUpdaterTest,
+       AddsSubscriptionWithoutCookiesAndReportsDuplicate) {
+  const std::string url = "https://filters.test/custom.txt";
+  auto updater = Create();
+  base::test::TestFuture<std::string> added;
+  updater->AddSubscriptionNow(url, added.GetCallback());
+  tasks_.RunUntilIdle();
+  ASSERT_EQ(1, factory_.NumPending());
+  const auto& request = factory_.GetPendingRequest(0)->request;
+  EXPECT_EQ(network::mojom::CredentialsMode::kOmit, request.credentials_mode);
+  EXPECT_EQ(network::mojom::RedirectMode::kFollow, request.redirect_mode);
+  factory_.SimulateResponseForPendingRequest(
+      url, "! Title: Custom\n||custom-ad.test^\n");
+  tasks_.RunUntilIdle();
+  EXPECT_EQ("", added.Get());
+  EXPECT_EQ(1u, ReadBaselineListStore(path_).subscriptions.size());
+  base::test::TestFuture<std::string> duplicate;
+  updater->AddSubscriptionNow(url, duplicate.GetCallback());
+  tasks_.RunUntilIdle();
+  factory_.SimulateResponseForPendingRequest(url, "||new-ad.test^\n");
+  tasks_.RunUntilIdle();
+  EXPECT_EQ("duplicate-list", duplicate.Get());
+  base::test::TestFuture<std::string> invalid;
+  const std::string bad_url = "https://filters.test/error.txt";
+  updater->AddSubscriptionNow(bad_url, invalid.GetCallback());
+  tasks_.RunUntilIdle();
+  factory_.SimulateResponseForPendingRequest(bad_url, "<html>not rules</html>");
+  tasks_.RunUntilIdle();
+  EXPECT_EQ("invalid-list", invalid.Get());
+  EXPECT_EQ(1u, ReadBaselineListStore(path_).subscriptions.size());
+}
+TEST_F(BaselineListUpdaterTest, ChecksEnabledSubscriptionsAndKeepsFailedCopy) {
+  const std::string enabled = "https://filters.test/enabled.txt";
+  const std::string disabled = "https://filters.test/disabled.txt";
+  ASSERT_TRUE(
+      InstallBaselineLists(path_, {kList, kPrivacy}, base::Time::Now(), ""));
+  ASSERT_EQ("",
+            AddFilterSubscription(path_, enabled, "||enabled-ad.test^\n", ""));
+  ASSERT_EQ(
+      "", AddFilterSubscription(path_, disabled, "||disabled-ad.test^\n", ""));
+  ASSERT_EQ("", ChangeFilterSubscription(path_, disabled, false, ""));
+  factory_.AddResponse(std::string(kBaselineListURLs[0]), kList);
+  factory_.AddResponse(std::string(kBaselineListURLs[1]), kPrivacy);
+  factory_.AddResponse(enabled, "error", net::HTTP_INTERNAL_SERVER_ERROR);
+  auto updater = Create();
+  base::test::TestFuture<bool> checked;
+  updater->CheckNow(checked.GetCallback());
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(checked.Get());
+  EXPECT_EQ(3u, factory_.total_requests());
+  const auto snapshot = ReadBaselineListStore(path_);
+  EXPECT_EQ(2u, snapshot.subscriptions.size());
+  EXPECT_NE(snapshot.filters.find("enabled-ad.test"), std::string::npos);
+}
+TEST_F(BaselineListUpdaterTest,
+       SubscriptionBusyAndOwnerShutdownResolveCallbacks) {
+  auto updater = Create();
+  base::test::TestFuture<std::string> first;
+  updater->AddSubscriptionNow("https://filters.test/first.txt",
+                              first.GetCallback());
+  base::test::TestFuture<std::string> busy;
+  updater->ChangeSubscriptionNow("https://filters.test/first.txt", false,
+                                 busy.GetCallback());
+  EXPECT_EQ("lists-busy", busy.Get());
+  updater.reset();
+  EXPECT_EQ("updates-unavailable", first.Get());
+  EXPECT_TRUE(ReadBaselineListStore(path_).subscriptions.empty());
+}
 }  // namespace
 }  // namespace yee::content_blocking

@@ -41,7 +41,10 @@
 @media (prefers-reduced-motion: reduce) {
 	[data-slot='button'],
 	[data-slot='input'],
-	[data-slot='badge'] {
+	[data-slot='badge'],
+	[data-slot='checkbox'],
+	[data-slot='switch'],
+	[data-slot='switch-thumb'] {
 		transition: none;
 	}
 }

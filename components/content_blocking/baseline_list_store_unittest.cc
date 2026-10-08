@@ -1,6 +1,8 @@
 // Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
 #include "components/yee_content_blocking/baseline_list_store.h"
 
+#include <algorithm>
+
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -12,6 +14,7 @@
 #include "build/build_config.h"
 #include "components/yee_content_blocking/bundled_rules.h"
 #include "components/yee_content_blocking/engine.h"
+#include "components/yee_content_blocking/filter_list_store.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace yee::content_blocking {
@@ -163,6 +166,117 @@ TEST_F(BaselineListStoreTest, ReadOnlySnapshotSurvivesStoreReplacement) {
   EXPECT_EQ(running.filters, received->filters);
   EXPECT_EQ(running.compiled_filters, received->compiled_filters);
 }
+TEST_F(BaselineListStoreTest,
+       SubscriptionAddsToBundledRulesAndSurvivesOfficialUpdate) {
+  const std::string url = "https://filters.test/regional.txt";
+  const std::string rules =
+      "! Title: Regional rules\n||regional-ad.test^\npage.test##.regional-ad\n";
+  ASSERT_EQ("", AddFilterSubscription(path_, url, rules, ""));
+  auto snapshot = Read();
+  EXPECT_FALSE(snapshot.baseline_downloaded);
+  ASSERT_EQ(1u, snapshot.subscriptions.size());
+  EXPECT_EQ("Regional rules", snapshot.subscriptions[0].title);
+  EXPECT_TRUE(snapshot.subscriptions[0].enabled);
+  auto region = CreateBaselineListRegion(snapshot);
+  const auto received = ReadBaselineListRegion(region);
+  ASSERT_TRUE(received);
+  Engine engine(received->filters, kBundledResources, "", "",
+                received->compiled_filters);
+  EXPECT_TRUE(engine.ShouldBlock("https://regional-ad.test/banner",
+                                 "https://page.test", "image"));
+  EXPECT_TRUE(engine.ShouldBlock("https://doubleclick.net/ad",
+                                 "https://page.test", "script"));
+  const auto selectors = engine.RulesForPage("https://page.test/").selectors;
+  EXPECT_NE(selectors.end(), std::ranges::find(selectors, ".regional-ad"));
+  ASSERT_TRUE(Install("updated"));
+  snapshot = Read();
+  EXPECT_TRUE(snapshot.baseline_downloaded);
+  EXPECT_EQ(1u, snapshot.subscriptions.size());
+  EXPECT_NE(snapshot.filters.find("regional-ad.test"), std::string::npos);
+}
+TEST_F(BaselineListStoreTest,
+       SubscriptionToggleAndRemovalPublishCompleteSelections) {
+  ASSERT_TRUE(Install("old"));
+  const std::string url = "https://filters.test/custom.txt";
+  ASSERT_EQ("", AddFilterSubscription(path_, url, "||custom-ad.test^\n", ""));
+  const auto enabled = Read().generation;
+  ASSERT_EQ("", ChangeFilterSubscription(path_, url, false, enabled));
+  EXPECT_FALSE(Read().subscriptions[0].enabled);
+  EXPECT_EQ(Read().filters.find("custom-ad.test"), std::string::npos);
+  EXPECT_EQ(1u, ReadFilterListSet(path_).subscriptions.size());
+  ASSERT_EQ("", ChangeFilterSubscription(path_, url, true, enabled));
+  EXPECT_EQ(enabled, Read().generation);
+  ASSERT_EQ("", ChangeFilterSubscription(path_, url, std::nullopt, enabled));
+  EXPECT_TRUE(Read().subscriptions.empty());
+  EXPECT_EQ("list-missing",
+            ChangeFilterSubscription(path_, url, true, enabled));
+  EXPECT_EQ(enabled, ReadBaselineListGeneration(path_, enabled).generation);
+}
+TEST_F(BaselineListStoreTest, SubscriptionValidationCannotReplaceSavedState) {
+  ASSERT_TRUE(Install("old"));
+  const auto generation = Read().generation;
+  const std::string url = "https://filters.test/custom.txt";
+  for (const char* body : {"<html>error</html>", "! empty\n", "##\n",
+                           "!#include missing.txt\n||ad.test^\n"}) {
+    EXPECT_EQ("invalid-list", AddFilterSubscription(path_, url, body, ""));
+    EXPECT_EQ(generation, Read().generation);
+  }
+  EXPECT_EQ("invalid-list",
+            AddFilterSubscription(
+                path_, url, std::string(kMaxSubscribedListBytes + 1, 'x'), ""));
+  ASSERT_EQ("", AddFilterSubscription(path_, url, "||ad.test^\n", ""));
+  EXPECT_EQ("duplicate-list",
+            AddFilterSubscription(path_, url, "||other.test^\n", ""));
+  for (const char* input : {"http://filters.test/rules.txt",
+                            "https://user:pass@filters.test/rules.txt",
+                            "https://filters.test/rules.txt#section"})
+    EXPECT_FALSE(CanonicalFilterSubscriptionURL(input));
+  EXPECT_EQ("https://filters.test/rules.txt",
+            CanonicalFilterSubscriptionURL(" HTTPS://FILTERS.TEST/rules.txt "));
+}
+TEST_F(BaselineListStoreTest,
+       FailedSubscriptionUpdateRetainsItsRulesWhileOtherListsAdvance) {
+  ASSERT_TRUE(Install("old"));
+  const std::string url = "https://filters.test/custom.txt";
+  ASSERT_EQ("", AddFilterSubscription(path_, url, "||custom-old.test^\n", ""));
+  const auto last_good = Read().subscriptions[0].checked_at;
+  const auto now = base::Time::Now() + base::Days(1);
+  auto result = UpdateFilterLists(path_, Lists("new"),
+                                  {{url, "<html>error</html>"}}, now, "");
+  EXPECT_FALSE(result.succeeded);
+  EXPECT_EQ((std::vector<std::string>{url}), result.failed_urls);
+  auto snapshot = Read();
+  EXPECT_NE(snapshot.filters.find("||new.test^"), std::string::npos);
+  EXPECT_NE(snapshot.filters.find("custom-old.test"), std::string::npos);
+  EXPECT_EQ(last_good, snapshot.subscriptions[0].checked_at);
+  result = UpdateFilterLists(path_, Lists("new"),
+                             {{url, "||custom-new.test^\n"}}, now, "");
+  EXPECT_TRUE(result.succeeded);
+  snapshot = Read();
+  EXPECT_EQ(now, snapshot.subscriptions[0].checked_at);
+  EXPECT_NE(snapshot.filters.find("custom-new.test"), std::string::npos);
+}
+TEST_F(BaselineListStoreTest,
+       CorruptSubscriptionRecoversEntirePreviousSelection) {
+  ASSERT_TRUE(Install("old"));
+  const auto old = Read().generation;
+  ASSERT_EQ("", AddFilterSubscription(path_, "https://filters.test/custom.txt",
+                                      "||custom.test^\n", old));
+  const auto snapshot = Read();
+  std::string text;
+  ASSERT_TRUE(base::ReadFileToString(
+      Generation(snapshot.generation).AppendASCII("manifest.json"), &text));
+  const auto manifest = base::JSONReader::ReadDict(text, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(manifest);
+  const auto* file =
+      (*manifest->FindList("lists"))[2].GetDict().FindString("file");
+  ASSERT_TRUE(file);
+  ASSERT_TRUE(base::WriteFile(
+      Generation(snapshot.generation).AppendASCII(*file), "broken"));
+  EXPECT_EQ(old, Read().generation);
+  EXPECT_TRUE(Read().recovered);
+}
+
 TEST(BaselineListSharedMemory,
      SupportsBundledSelectionAndRejectsMalformedData) {
   auto region = CreateBaselineListRegion({});

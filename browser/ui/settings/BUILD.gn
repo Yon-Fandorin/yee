@@ -27,6 +27,7 @@ action("resources") {
     "frontend/src/lib/components/Icon.svelte",
     "frontend/src/lib/components/SettingLink.svelte",
     "frontend/src/lib/components/SettingsGroup.svelte",
+    "frontend/src/lib/components/SettingsFeedback.svelte",
     "frontend/src/lib/components/SettingsNotice.svelte",
     "frontend/src/lib/components/SettingsPageHeader.svelte",
     "frontend/src/lib/components/SettingsRow.svelte",
@@ -37,8 +38,12 @@ action("resources") {
     "frontend/src/routes/components/SettingsNavigation.svelte",
     "frontend/src/routes/content-blocking/+page.svelte",
     "frontend/src/routes/content-blocking/components/FilterLists.svelte",
+    "frontend/src/routes/content-blocking/components/FilterSubscriptions.svelte",
     "frontend/src/routes/content-blocking/components/SiteExceptions.svelte",
     "frontend/src/routes/content-blocking/components/BlockedDomains.svelte",
+    "frontend/src/routes/content-blocking/components/DomainList.svelte",
+    "frontend/src/routes/content-blocking/components/DomainListItem.svelte",
+    "frontend/src/routes/content-blocking/components/FilterSubscriptionItem.svelte",
     "frontend/src/routes/content-blocking/components/DomainImport.svelte",
     "frontend/src/lib/components/ui/badge/badge.svelte",
     "frontend/src/lib/components/ui/badge/index.ts",
@@ -52,6 +57,10 @@ action("resources") {
     "frontend/src/lib/components/ui/card/card-title.svelte",
     "frontend/src/lib/components/ui/card/card.svelte",
     "frontend/src/lib/components/ui/card/index.ts",
+    "frontend/src/lib/components/ui/checkbox/index.ts",
+    "frontend/src/lib/components/ui/checkbox/checkbox.svelte",
+    "frontend/src/lib/components/ui/switch/index.ts",
+    "frontend/src/lib/components/ui/switch/switch.svelte",
     "frontend/src/lib/components/ui/input/index.ts",
     "frontend/src/lib/components/ui/input/input.svelte",
     "frontend/src/lib/components/ui/label/index.ts",
@@ -74,6 +83,8 @@ action("resources") {
 
 source_set("settings") {
   sources = [
+    "content_blocking_settings_handler.cc",
+    "content_blocking_settings_handler.h",
     "settings_ui.cc",
     "settings_ui.h",
   ]

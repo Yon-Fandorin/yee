@@ -26,7 +26,7 @@ C++ 리소스로 묶어 `WebUIDataSource`로 제공한다. 외부 폰트·이미
 - 설정은 `vite.config.ts`, 타입 설정은 `$app/tsconfig`를 따른다. `package.json`의
   subpath import로 `#lib/*`와 `#styles`를 선언하며 모듈 확장자를 명시한다.
 - 기본 컨트롤은 shadcn-svelte의 `Button`, `Input`, `Label`, `Badge`, `Separator`,
-  `Card`를 사용한다. 소스는 `src/lib/components/ui/`에 소유하며 설정 행·설정 묶음은
+  `Card`, `Checkbox`, `Switch`를 사용한다. 소스는 `src/lib/components/ui/`에 소유하며 설정 행·설정 묶음은
   이 기본 컴포넌트를 조합한다. 아이콘은 Lucide에서 필요한 항목만 가져온다.
   타입이 있는 브리지가 기존
   WebUI 메시지를 호출하고, 상태 모델이 갱신 알림과 요청 중 상태를 관리한다.
@@ -34,7 +34,7 @@ C++ 리소스로 묶어 `WebUIDataSource`로 제공한다. 외부 폰트·이미
   `strings/settings_strings_ko.xtb`에 둔다. 브라우저 표시 언어를 따르며
   번역이 없는 언어는 영어로 표시한다. 문서 방향과 날짜 형식도 표시 언어를 따른다.
 - 번역은 기존 locale pak에 합친 뒤 `AddLocalizedStrings()`와 `loadTimeData`로
-  전달한다. 독립 resource ID 범위는 65000–65099이며 pak 합치기가 중복을 검사한다.
+  전달한다. 독립 resource ID 범위는 65000–65199이며 pak 합치기가 중복을 검사한다.
 - 정적 bootstrap은 외부 JS 파일로 제공하고 Svelte의 `fragments: 'tree'`를 사용한다.
   Chromium의 기본 CSP·Trusted Types·외부 frame 제한을 유지한다.
 - 설정 코드는 브라우저 실행 파일에 묶여 있다. SvelteKit의 포커스 복귀 시 버전
@@ -67,10 +67,12 @@ settings_workspace="$PWD/.local-build/chromium/src/out/YeePilot/gen/chrome/brows
 shadcn-svelte 공식 레지스트리의 Mira 컴포넌트 소스를 가져와 `#lib/utils.ts` 경로에
 연결했다. 원본은 `huntabyte/shadcn-svelte`의
 `493481fab94f68b8982949bc8a37eede786f2462` 커밋,
-`docs/static/registry/styles/mira/` 아래의 여섯 컴포넌트다. MIT 고지는
+`docs/static/registry/styles/mira/` 아래의 기본 컴포넌트다. MIT 고지는
 `frontend/src/lib/components/ui/LICENSE`에 보관한다. 컴포넌트 소스 갱신은 기존
 제품 조합과 별도로 검토하며 바인딩·키보드 포커스·WebUI 보안 정책을 확인한다.
-구분선 방향 클래스는 설치된 Bits UI의 `data-orientation` 속성에 맞춘다.
+구분선 방향은 설치된 Bits UI의 `data-orientation`, 선택·토글 상태는
+`data-state` 속성에 맞춘다. 선택에는 체크박스, 필터 목록 켜기·끄기에는 스위치를
+사용한다. 부분 선택은 체크박스의 중간 상태로 표시한다.
 기본 강조 버튼·배지의 hover 색상도 제품 토큰을 사용해 흰 글자의 대비를 유지한다.
 
 Tailwind CSS 4는 Vite 플러그인으로 빌드하며 탐색 대상은 프런트엔드 `src/`로
@@ -92,7 +94,9 @@ Tailwind 기반 설정과 문서 전체의 기본 스타일은 `src/styles.css`�
 `+layout.svelte`는 모델 수명과 화면 구성을 연결한다. 본문 스크롤과 이동 후 포커스,
 뒤로·앞으로·새로고침의 위치 복원은 인접한 `routes/settings-scroll.svelte.ts`가
 관리한다. 각 페이지와 전용 컴포넌트는 기존 공통 상태 모델을 사용하며,
-전용 컴포넌트에서 새로운 WebUI 메시지나 상태 모델을 만들지 않는다.
+전용 컴포넌트에서 새로운 WebUI 메시지나 상태 모델을 만들지 않는다. 각 조작의
+결과는 공통 `SettingsFeedback`으로 해당 설정 묶음 옆에 표시하며, 요청이 실패하면
+행의 선택·토글 값은 저장된 상태로 복원한다.
 
 ## 화면 설계
 
@@ -115,17 +119,20 @@ Tailwind 기반 설정과 문서 전체의 기본 스타일은 `src/styles.css`�
 - 도메인 직접 추가·삭제와 하위 도메인 포함 여부 변경. 프로필에 저장하며 기존
   요청 차단 factory도 갱신된 snapshot을 읽는다. 다음 HTTP(S) 페이지·리소스 요청부터
   적용되고, 이미 열린 페이지에는 새로고침 안내를 표시한다.
+- 도메인 목록 검색, 현재 페이지 선택과 여러 규칙의 일괄 삭제. 검색을 바꾸면
+  선택을 초기화하고 현재 검색 결과와 전체 개수를 표시한다.
 - CSV/TXT 도메인 가져오기, 등록 전 미리보기, CSV 내보내기와 CSV 양식 다운로드.
   가져오기는 유효한 새 항목만 병합하며 기존 도메인의 범위를 덮어쓰지 않는다.
 - 정확한 hostname 단위 사이트 예외 추가와 차단 다시 켜기. 방패 버튼과 같은
   프로필 service를 사용하고 변경 이벤트를 받아 표시를 갱신한다. 이미 열린
   사이트는 새로고침 후 적용된다.
-- 시크릿·게스트에서는 필터 갱신을 허용하지 않으며 도메인 규칙과 예외 변경은
+- 외부 HTTPS 필터 목록 구독 추가·삭제와 목록별 사용 여부 변경. 전체 프로필에
+  공통 적용하며 켜진 목록을 공식 목록과 함께 갱신한다. 변경은 재시작 후 적용한다.
+- 시크릿·게스트에서는 필터 갱신·구독 변경을 허용하지 않으며 도메인 규칙과 예외 변경은
   해당 세션에만 적용한다.
 - 사이트 권한·개인정보·다운로드·모양과 전체 고급 설정으로 이동.
 
-사용자 구독 목록, 개별 기본 필터 선택과 실행 중 전체 필터 generation 전환은
-아직 지원하지 않는다. 지원하지 않는 조작을 설정 화면에 표시하지 않는다.
+개별 기본 필터 선택과 실행 중 전체 필터 generation 전환은 아직 지원하지 않는다. 지원하지 않는 조작을 설정 화면에 표시하지 않는다.
 
 ### 직접 도메인 규칙과 파일 형식
 
@@ -173,16 +180,44 @@ tracking.example.com,false
 
 TXT는 한 줄에 도메인 하나를 적는다. 빈 줄과 `#`로 시작하는 주석을 건너뛰며
 하위 도메인을 포함한다. 내보내기는 하위 도메인 선택을 보존하는 CSV를 사용한다.
-외부 필터 목록의 URL 구독과 광고 차단 규칙 파일 가져오기는 별도 후속 범위다.
+광고 차단 규칙 파일은 아래 URL 구독 경로에서 받으며 CSV/TXT 도메인 가져오기와
+형식이 다르다.
+
+### 외부 필터 목록 구독
+
+구독 주소는 사용자 이름·비밀번호·fragment가 없는 HTTPS URL을 받는다. HTTPS
+리다이렉트를 허용하며 HTTP로의 전환은 거부한다. 기본 두 목록은 다시 구독할 수
+없고 정규화한 주소의 중복도 거부한다. 최대 10개, 목록당 4MiB·전체 원본 16MiB다.
+응답은 쿠키·인증 정보 없이 30초 안에 받아야 하며 HTTP 200 완료 응답만 저장한다.
+
+목록의 `! Title:`을 표시 이름으로 사용하고 이름이 없으면 주소를 표시한다.
+UTF-8 광고 차단 규칙을 기존 엔진의 지원 문법으로 검사하며 빈 목록·HTML·잘못된
+전처리 분기와 `!#include`처럼 추가 파일을 요구하는 목록은 거부한다. 외부 목록에는
+기본 권한만 주며 고정 커뮤니티 리소스의 trusted 권한을 부여하지 않는다.
+
+`components/content_blocking/filter_list_store.*`는 기본 두 목록과 구독 원본을 하나의
+불변 generation으로 저장·검증·복구한다. 기존 두 목록만 포함한 저장 형식도 읽는다.
+공식 목록을 갱신할 때 구독을 보존하며 일부 구독이 실패해도 그 목록의 이전 정상본을
+유지하면서 성공한 목록을 갱신한다. 사용을 끈 목록은 다운로드·적용에서 제외하지만
+원본을 보존한다. 전체 필터와 compiled cache를 한 번 준비한 뒤 atomic state 파일로
+선택하고, 브라우저와 새 렌더러는 재시작 시 같은 읽기 전용 snapshot을 받는다.
+
+`BaselineListUpdater`는 하나의 브라우저 공통 coordinator와 store sequence로 자동
+갱신·수동 확인·구독 변경을 직렬화한다. 동시에 진행한 수동 확인은 합류하고 갱신 중
+구독 변경은 안내한다. `content_blocking_settings_handler.*`가 native 메시지를,
+`FilterSubscriptions.svelte`가 페이지 전용 UI를 소유한다. 프로필별 직접 도메인
+규칙·사이트 예외와 브라우저 공통 필터 구독의 적용 범위를 화면에서 구분한다.
 
 ## 검증
 
 `InternalURLsTest`는 양방향 주소 변환과 기존 설정 하위 주소 보존을 검사한다.
 `InternalURLsBrowserTest`는 실제 WebUI, 주소창 표시·복사·저장, 일반 설정 메뉴와
 기존 사이트 정책 service 연결을 검사한다. `BaselineListUpdaterTest`는 수동
-갱신의 예약 우회·중복 합류·실패와 owner 종료를 검사한다. 제품 완료 판정에는
+갱신의 예약 우회·중복 합류·실패, 구독 요청과 owner 종료를 검사한다. 제품 완료 판정에는
 새로 실행한 Yee 앱의 실제 설정 탭과 밝기·폭별 화면 확인도 포함한다.
 
+`BaselineListStoreTest`는 구독과 기본 필터의 병합, 켜기·끄기·삭제, 일부 갱신 실패
+시 정상본 유지, 손상 복구와 렌더러 snapshot 전달을 검사한다.
 `BlockedDomainsTest`는 도메인·CSV/TXT 해석과 파일 한도를,
 `ContentBlockingServiceTest`는 프로필 저장·하위 도메인 범위·병합 원자성을 검사한다.
 `InternalURLsBrowserTest`는 native 미리보기/등록, 시크릿 변경 분리와 실제 HTTP 요청·

@@ -1,5 +1,5 @@
-import("//build/rust/rust_static_library.gni")
 import("//build/rust/rust_executable.gni")
+import("//build/rust/rust_static_library.gni")
 import("//testing/test.gni")
 import("//third_party/rust/yee_adblock/sources.gni")
 import("community_scriptlet_sources.gni")
@@ -51,8 +51,8 @@ action("compiled_filter_data") {
     ":community_filter_data",
     ":yee_compile_filters($host_toolchain)",
   ]
-  compiler = get_label_info(":yee_compile_filters($host_toolchain)", "root_out_dir") +
-             "/yee_compile_filters"
+  compiler = get_label_info(":yee_compile_filters($host_toolchain)",
+                            "root_out_dir") + "/yee_compile_filters"
   if (host_os == "win") {
     compiler += ".exe"
   }
@@ -126,17 +126,22 @@ source_set("filter_data") {
   public = [
     "baseline_list_store.h",
     "filter_data.h",
+    "filter_list_store.h",
   ]
   sources = [
     "baseline_list_store.cc",
     "filter_data.cc",
+    "filter_list_store.cc",
   ]
   deps = [
     ":bundled_rules",
     ":rust_bridge",
     "//crypto",
   ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//url",
+  ]
 }
 
 source_set("core") {
@@ -231,8 +236,8 @@ copy("community_filter_test_data") {
 
 test("yee_content_blocking_unittests") {
   sources = [
-    "document_engine_unittest.cc",
     "baseline_list_store_unittest.cc",
+    "document_engine_unittest.cc",
     "engine_unittest.cc",
     "filter_data_unittest.cc",
     "selector_styles_unittest.cc",

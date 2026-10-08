@@ -33,14 +33,6 @@
 						>{/snippet}
 				</SettingsNotice>
 			{/if}
-			{#if model.feedback}<p
-					id="feedback"
-					class:error={model.feedbackError}
-					role="status"
-					aria-live="polite"
-				>
-					{model.feedback}
-				</p>{/if}
 		</div>
 	</main>
 </div>
@@ -68,14 +60,6 @@
 			width: 100%;
 			max-width: 680px;
 			margin-inline: auto;
-		}
-		#feedback {
-			margin-top: 20px;
-			font-size: 12px;
-			color: var(--muted-foreground);
-		}
-		.error {
-			color: var(--destructive);
 		}
 		.skip-link {
 			position: fixed;

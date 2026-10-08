@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <string_view>
 #include <utility>
 
@@ -185,13 +186,18 @@ bool ContentBlockingService::SetBlockedDomain(std::string_view input,
 }
 
 void ContentBlockingService::RemoveBlockedDomain(std::string_view input) {
-  const auto domain = CanonicalBlockedDomain(input);
-  if (!domain) {
-    return;
-  }
+  RemoveBlockedDomains({std::string(input)});
+}
+
+void ContentBlockingService::RemoveBlockedDomains(
+    const std::vector<std::string>& inputs) {
+  std::set<std::string> removed;
+  for (const auto& input : inputs)
+    if (const auto domain = CanonicalBlockedDomain(input))
+      removed.insert(*domain);
   auto domains = BlockedDomains();
-  std::erase_if(domains,
-                [&](const auto& rule) { return rule.domain == *domain; });
+  std::erase_if(
+      domains, [&](const auto& rule) { return removed.contains(rule.domain); });
   SaveBlockedDomains(domains);
 }
 

@@ -74,6 +74,7 @@ class ContentBlockingService : public KeyedService {
   std::vector<BlockedDomain> BlockedDomains() const;
   bool SetBlockedDomain(std::string_view input, bool include_subdomains);
   void RemoveBlockedDomain(std::string_view input);
+  void RemoveBlockedDomains(const std::vector<std::string>& domains);
   // Import merges valid rules without replacing existing scope choices. A
   // rejected batch does not modify preferences; success returns additions.
   std::optional<size_t> ImportBlockedDomains(

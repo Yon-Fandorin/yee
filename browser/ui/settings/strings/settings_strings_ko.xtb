@@ -45,7 +45,7 @@
   <translation id="955749282183802914">example.com</translation>
   <translation id="4295360098184645276">사이트 추가</translation>
   <translation id="8978260381133177776">주소창의 방패 버튼으로 차단을 끈 사이트도 여기에 표시됩니다.</translation>
-  <translation id="250571607050761296">여기서 바꾼 설정은 현재 시크릿·게스트 세션에만 적용됩니다.</translation>
+  <translation id="7927284973242920751">도메인 규칙과 사이트별 차단 예외 변경은 현재 시크릿·게스트 창에서만 적용됩니다.</translation>
   <translation id="2062050145344963835">추가한 사이트가 없습니다</translation>
   <translation id="2727780118202423468">차단을 끄려는 사이트의 주소를 위에 입력하세요.</translation>
   <translation id="6920484175279406134">차단 예외 사이트 목록</translation>
@@ -60,7 +60,7 @@
   <translation id="564747077622186922">필터 업데이트를 확인하고 있습니다…</translation>
   <translation id="1736247180480848741">브라우저를 다시 시작하면 새 필터가 적용됩니다.</translation>
   <translation id="495069707169612748">필터가 최신 상태입니다.</translation>
-  <translation id="5765073876001303786">필터를 업데이트하지 못했습니다. 기존 필터를 사용합니다. 잠시 후 다시 시도하세요.</translation>
+  <translation id="3647293743830925085">일부 필터를 갱신하지 못했습니다. 해당 목록은 이전 저장본을 유지합니다. 나중에 다시 시도하세요.</translation>
   <translation id="6034379694665802459">설정을 불러오지 못했습니다. 다시 시도하세요.</translation>
   <translation id="615233787031865153">다시 시도</translation>
   <translation id="4186938248247582318">
@@ -105,4 +105,33 @@
   <translation id="4227916800411066722">이전</translation>
   <translation id="1588991892358526662">다음</translation>
   <translation id="7009126666638523577">이미 등록된 도메인입니다. 아래 목록에서 하위 도메인 포함 여부를 변경하세요.</translation>
+  <translation id="6191348196806821176">외부 필터 목록</translation>
+  <translation id="2344676466489693184">다른 사람이 관리하는 차단 규칙을 구독합니다. 모든 프로필에 공통 적용되며, 변경 사항은 브라우저 재시작 후 적용됩니다.</translation>
+  <translation id="3835827226043410709">필터 목록 URL</translation>
+  <translation id="4454068914075565936">구독 추가</translation>
+  <translation id="6881405402971450879">저장 중…</translation>
+  <translation id="2050559852086613576">광고 차단 규칙 파일의 HTTPS 주소를 입력하세요. 최대 10개 목록, 목록당 4MB·전체 16MB를 지원합니다. 켜진 목록은 자동으로 갱신합니다.</translation>
+  <translation id="4289872016442719521">구독한 외부 필터 목록이 없습니다</translation>
+  <translation id="6158937047226463953"><ph name="VALUE" /> 사용</translation>
+  <translation id="6248065102450904">사용 중</translation>
+  <translation id="1622304172963379091">사용 안 함</translation>
+  <translation id="3292420797224094281"><ph name="VALUE" /> 구독 삭제</translation>
+  <translation id="5970222387294324256">필터 목록을 구독했습니다. 브라우저를 다시 시작하면 적용됩니다.</translation>
+  <translation id="2095113195552856421">필터 목록 설정을 저장했습니다. 브라우저를 다시 시작하면 적용됩니다.</translation>
+  <translation id="5291110319043603117">필터 목록 구독을 삭제했습니다. 브라우저를 다시 시작하면 적용됩니다.</translation>
+  <translation id="4227928964289803174">사용자 이름·비밀번호·주소의 # 부분이 없는 HTTPS 규칙 파일 주소를 입력하세요. 기본 목록은 다시 추가할 수 없습니다.</translation>
+  <translation id="7949783336754663648">이미 구독한 필터 목록입니다.</translation>
+  <translation id="2083674069919918662">외부 필터 목록은 최대 10개까지 구독할 수 있습니다.</translation>
+  <translation id="7506405174604632747">구독 목록의 전체 용량은 16MB까지 지원합니다. 변경 사항은 저장하지 않았습니다.</translation>
+  <translation id="9221101337650016008">호환되는 광고 차단 규칙 파일이 아닙니다. HTML 페이지, 빈 목록, 다른 파일을 추가로 불러오는 목록은 지원하지 않습니다.</translation>
+  <translation id="7384771182189604152">목록을 다운로드하지 못했습니다. HTTPS 파일 주소를 확인한 뒤 다시 시도하세요. 파일은 4MB 이하여야 합니다.</translation>
+  <translation id="8539640507715121249">다른 필터 목록 작업이 진행 중입니다. 완료된 뒤 다시 시도하세요.</translation>
+  <translation id="7336760102762402047">갱신하지 못해 이전에 저장한 목록을 유지합니다.</translation>
+  <translation id="1219045817642981039">도메인 검색</translation>
+  <translation id="1932623891346786751">전체 <ph name="VALUE2" />개 중 <ph name="VALUE1" />개</translation>
+  <translation id="6046270057259060491">이 페이지 선택</translation>
+  <translation id="8763436734527702445"><ph name="VALUE" /> 선택</translation>
+  <translation id="3413749411539717570">선택 삭제 (<ph name="VALUE" />개)</translation>
+  <translation id="7435933574351659903">검색 결과가 없습니다</translation>
+  <translation id="6167755326900196662">선택한 차단 규칙을 삭제했습니다. 해당 페이지를 새로고침하면 적용됩니다.</translation>
 </translationbundle>
