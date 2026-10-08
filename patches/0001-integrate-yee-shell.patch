@@ -951,7 +951,7 @@ index 5131a3cc83..4cc798d503 100644
  
  void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
 diff --git a/chrome/browser/ui/chrome_pages.cc b/chrome/browser/ui/chrome_pages.cc
-index b1897340ac..b0af94c4f9 100644
+index b1897340ac..0506da5b1b 100644
 --- a/chrome/browser/ui/chrome_pages.cc
 +++ b/chrome/browser/ui/chrome_pages.cc
 @@ -63,6 +63,7 @@
@@ -962,6 +962,33 @@ index b1897340ac..b0af94c4f9 100644
  #include "content/public/browser/web_contents.h"
  #include "extensions/browser/extension_prefs.h"
  #include "extensions/common/constants.h"
+@@ -117,7 +118,7 @@ void ShowSingletonTabIgnorePathOverwriteNTP(BrowserWindowInterface* browser,
+ 
+ void OpenBookmarkManagerForNode(BrowserWindowInterface* browser,
+                                 int64_t node_id) {
+-  GURL url = GURL(kChromeUIBookmarksURL)
++  GURL url = yee::branding::BookmarksURL()
+                  .Resolve(base::StringPrintf(
+                      "/?id=%s", base::NumberToString(node_id).c_str()));
+   ShowSingletonTabIgnorePathOverwriteNTP(browser, url);
+@@ -324,7 +325,7 @@ BrowserWindowInterface* GetOrCreateBrowserForProfile(Profile* profile) {
+ 
+ void ShowBookmarkManager(BrowserWindowInterface* browser) {
+   base::RecordAction(UserMetricsAction("ShowBookmarkManager"));
+-  ShowSingletonTabIgnorePathOverwriteNTP(browser, GURL(kChromeUIBookmarksURL));
++  ShowSingletonTabIgnorePathOverwriteNTP(browser, yee::branding::BookmarksURL());
+ }
+ 
+ void ShowBookmarkManagerForNode(BrowserWindowInterface* browser,
+@@ -344,7 +345,7 @@ void ShowHistory(BrowserWindowInterface* browser,
+   }
+ 
+   base::RecordAction(UserMetricsAction("ShowHistory"));
+-  GURL url = GURL(kChromeUIHistoryURL);
++  GURL url = yee::branding::HistoryURL();
+   if (!host_name.empty()) {
+     GURL::Replacements replacements;
+     std::string query("q=");
 @@ -379,7 +380,7 @@ void ShowDownloads(BrowserWindowInterface* browser) {
          ->HideBubble();
    }
@@ -22228,16 +22255,18 @@ index 12d37b4f6c..2cd44061a8 100644
    raw_ptr<glic::GlicButtonInterface> locked_expansion_button_ = nullptr;
    raw_ptr<GlicAndActorButtonsContainer> glic_actor_button_container_ = nullptr;
 diff --git a/chrome/browser/ui/webui/BUILD.gn b/chrome/browser/ui/webui/BUILD.gn
-index 1a9110f7cc..195215d13b 100644
+index 1a9110f7cc..7ccacb333e 100644
 --- a/chrome/browser/ui/webui/BUILD.gn
 +++ b/chrome/browser/ui/webui/BUILD.gn
-@@ -112,6 +112,13 @@ source_set("configs") {
+@@ -112,6 +112,15 @@ source_set("configs") {
      "//ui/webui:buildflags",
    ]
  
 +  if (!is_android) {
 +    deps += [
++      "//chrome/browser/ui/views/yee/bookmarks",
 +      "//chrome/browser/ui/views/yee/downloads",
++      "//chrome/browser/ui/views/yee/history",
 +      "//chrome/browser/ui/views/yee/settings",
 +    ]
 +  }
@@ -22246,19 +22275,29 @@ index 1a9110f7cc..195215d13b 100644
      deps += [ "//chrome/browser/ui/webui/signin:inline_login" ]
    }
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 4ca118a4b1..ebaaea3520 100644
+index 4ca118a4b1..6326253af3 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -82,6 +82,8 @@
+@@ -82,6 +82,10 @@
  #include "chrome/browser/actor/ui/actor_overlay_ui.h"
  #include "chrome/browser/contextual_cueing/internals/contextual_cueing_internals_ui.h"
  #include "chrome/browser/ui/tabs/tab_group_home/tab_group_home_ui.h"
++#include "chrome/browser/ui/views/yee/bookmarks/bookmarks_ui.h"
 +#include "chrome/browser/ui/views/yee/downloads/downloads_ui.h"
++#include "chrome/browser/ui/views/yee/history/history_ui.h"
 +#include "chrome/browser/ui/views/yee/settings/settings_ui.h"
  #include "chrome/browser/ui/webui/content_annotator_internals/content_annotator_internals_ui.h"
  #include "chrome/browser/ui/webui/webui_toolbar/webui_toolbar_ui.h"
  #include "chrome/browser/ui/webui_browser/webui_browser_ui.h"
-@@ -349,6 +351,7 @@ void RegisterChromeWebUIConfigs() {
+@@ -342,6 +346,7 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<AutofillMlInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<BookmarksSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<BookmarksUIConfig>());
++  map.AddWebUIConfig(std::make_unique<yee::BookmarksUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ColorPipelineInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<CommentsSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<CustomizeChromeUIConfig>());
+@@ -349,10 +354,12 @@ void RegisterChromeWebUIConfigs() {
        std::make_unique<
            contextual_cueing_internals::ContextualCueingInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<DownloadsUIConfig>());
@@ -22266,7 +22305,12 @@ index 4ca118a4b1..ebaaea3520 100644
    map.AddWebUIConfig(std::make_unique<DrivePickerHostUIConfig>());
    map.AddWebUIConfig(std::make_unique<glic::GlicExperimentalOptInUIConfig>());
    map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
-@@ -382,6 +385,7 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<HistoryUIConfig>());
++  map.AddWebUIConfig(std::make_unique<yee::HistoryUIConfig>());
+   map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<InfobarInternalsUIConfig>());
+@@ -382,6 +389,7 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<ReadingListUIConfig>());
    map.AddWebUIConfig(std::make_unique<SearchEngineChoiceUIConfig>());
    map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
@@ -22379,6 +22423,26 @@ index 846e4777c4..f02589f918 100644
  #if BUILDFLAG(IS_MAC)
    // Isolated world ID for AppleScript.
    ISOLATED_WORLD_ID_APPLESCRIPT,
+diff --git a/chrome/common/extensions/api/_api_features.json b/chrome/common/extensions/api/_api_features.json
+index aa744c53c0..6df061f976 100644
+--- a/chrome/common/extensions/api/_api_features.json
++++ b/chrome/common/extensions/api/_api_features.json
+@@ -148,6 +148,7 @@
+     "contexts": ["webui"],
+     "matches": [
+       "chrome://bookmarks/*",
++      "chrome://yee-bookmarks/*",
+       "chrome://bookmarks-side-panel.top-chrome/*",
+       "chrome://read-later.top-chrome/*"
+     ],
+@@ -163,6 +164,7 @@
+     "contexts": ["webui"],
+     "matches": [
+       "chrome://bookmarks/*",
++      "chrome://yee-bookmarks/*",
+       "chrome://bookmarks-side-panel.top-chrome/*",
+       "chrome://read-later.top-chrome/*",
+       "chrome://welcome/*"
 diff --git a/chrome/renderer/BUILD.gn b/chrome/renderer/BUILD.gn
 index 94d46c0511..4612f1ee9d 100644
 --- a/chrome/renderer/BUILD.gn

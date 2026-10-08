@@ -15,17 +15,22 @@ namespace yee::branding {
 // Stable implementation hosts: persisted tabs survive brand changes.
 inline constexpr char kProductSettingsHost[] = "yee-settings";
 inline constexpr char kProductDownloadsHost[] = "yee-downloads";
+inline constexpr char kProductHistoryHost[] = "yee-history";
+inline constexpr char kProductBookmarksHost[] = "yee-bookmarks";
 
 const char* InternalURLScheme();
 bool IsInternalURLScheme(std::string_view scheme);
 
 // Navigation and persisted URLs use Chromium's WebUI scheme. Product-facing
 // addresses use the current brand without changing WebUI origins or bindings.
-// Original settings and downloads keep their chrome:// addresses.
+// Original settings, downloads, history, and bookmarks keep chrome://
+// addresses.
 GURL CanonicalInternalURL(const GURL& url);
 GURL DisplayInternalURL(const GURL& url);
 GURL SettingsURL();
 GURL DownloadsURL();
+GURL HistoryURL();
+GURL BookmarksURL();
 std::u16string DisplayInternalURLText(const GURL& url,
                                       std::u16string formatted_url);
 

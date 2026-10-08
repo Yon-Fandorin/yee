@@ -32,13 +32,18 @@ GURL CanonicalInternalURL(const GURL& url) {
     replacements.SetHostStr(kProductSettingsHost);
   } else if (url.host() == "downloads") {
     replacements.SetHostStr(kProductDownloadsHost);
+  } else if (url.host() == "history" && url.path() == "/") {
+    replacements.SetHostStr(kProductHistoryHost);
+  } else if (url.host() == "bookmarks") {
+    replacements.SetHostStr(kProductBookmarksHost);
   }
   return url.ReplaceComponents(replacements);
 }
 
 GURL DisplayInternalURL(const GURL& url) {
   if (!url.is_valid() || !url.SchemeIs(kWebUIScheme) ||
-      url.host() == "settings" || url.host() == "downloads") {
+      url.host() == "settings" || url.host() == "downloads" ||
+      url.host() == "history" || url.host() == "bookmarks") {
     return url;
   }
   GURL::Replacements replacements;
@@ -47,6 +52,10 @@ GURL DisplayInternalURL(const GURL& url) {
     replacements.SetHostStr("settings");
   } else if (url.host() == kProductDownloadsHost) {
     replacements.SetHostStr("downloads");
+  } else if (url.host() == kProductHistoryHost) {
+    replacements.SetHostStr("history");
+  } else if (url.host() == kProductBookmarksHost) {
+    replacements.SetHostStr("bookmarks");
   }
   return url.ReplaceComponents(replacements);
 }
@@ -57,6 +66,14 @@ GURL SettingsURL() {
 
 GURL DownloadsURL() {
   return GURL(std::string(kWebUIScheme) + "://" + kProductDownloadsHost + "/");
+}
+
+GURL HistoryURL() {
+  return GURL(std::string(kWebUIScheme) + "://" + kProductHistoryHost + "/");
+}
+
+GURL BookmarksURL() {
+  return GURL(std::string(kWebUIScheme) + "://" + kProductBookmarksHost + "/");
 }
 
 std::u16string DisplayInternalURLText(const GURL& url,

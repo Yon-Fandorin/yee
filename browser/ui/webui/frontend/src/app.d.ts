@@ -1,13 +1,20 @@
 declare module '*/strings.m.js' {}
 declare module '#styles' {}
 
+declare namespace chrome {
+	function send(message: string, args?: unknown[]): void;
+}
+
 declare module 'chrome://resources/js/cr.js' {
 	export function sendWithPromise<T>(method: string, ...args: unknown[]): Promise<T>;
 	export interface WebUiListener {
 		eventName: string;
 		uid: number;
 	}
-	export function addWebUiListener(event: string, callback: () => void): WebUiListener;
+	export function addWebUiListener<TArgs extends unknown[] = []>(
+		event: string,
+		callback: (...args: TArgs) => void
+	): WebUiListener;
 	export function removeWebUiListener(listener: WebUiListener): boolean;
 }
 declare module 'chrome://resources/js/load_time_data.js' {

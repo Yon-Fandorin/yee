@@ -3,4 +3,6 @@ node_modules/
 build/
 package-lock.json
 src/routes/downloads/downloads.mojom-webui.d.ts
+src/routes/history/history.mojom-webui.d.ts
 .native-types.json
+src/routes/bookmarks/native/

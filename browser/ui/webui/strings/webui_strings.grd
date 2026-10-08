@@ -259,6 +259,91 @@
       <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_ARCHIVE" desc="downloadsTypeArchive: filename category in the downloads UI." meaning="downloadsTypeArchive">Archive</message>
       <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_CODE" desc="downloadsTypeCode: filename category in the downloads UI." meaning="downloadsTypeCode">Code file</message>
       <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_APPLICATION" desc="downloadsTypeApplication: filename category in the downloads UI." meaning="downloadsTypeApplication">Application</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_TITLE" desc="historyTitle: text in the history UI." meaning="historyTitle">History</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_SEARCH" desc="historySearch: text in the history UI." meaning="historySearch">Search history</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_CLEAR_SEARCH" desc="historyClearSearch: text in the history UI." meaning="historyClearSearch">Clear search</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_CLEAR_DATA" desc="historyClearData: text in the history UI." meaning="historyClearData">Clear browsing data</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_OTHER_DEVICES" desc="historyOtherDevices: text in the history UI." meaning="historyOtherDevices">Tabs from other devices</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_EMPTY" desc="historyEmpty: text in the history UI." meaning="historyEmpty">No browsing history yet</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_NO_RESULTS" desc="historyNoResults: text in the history UI." meaning="historyNoResults">No visits match your search.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_LOAD_FAILED" desc="historyLoadFailed: text in the history UI." meaning="historyLoadFailed">Could not load history. Reload this page to try again.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_RELOAD" desc="historyReload: text in the history UI." meaning="historyReload">Reload</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_LOADING" desc="historyLoading: text in the history UI." meaning="historyLoading">Loading…</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_LOAD_MORE" desc="historyLoadMore: text in the history UI." meaning="historyLoadMore">Load more</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_REMOVE" desc="historyRemove: text in the history UI." meaning="historyRemove">Remove from history</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_SELECT" desc="historySelect: text in the history UI." meaning="historySelect">Select <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_HISTORY_SELECT_ALL" desc="historySelectAll: text in the history UI." meaning="historySelectAll">Select loaded visits</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_REMOVE_SELECTED" desc="historyRemoveSelected: text in the history UI." meaning="historyRemoveSelected">Delete selected (<ph name="VALUE">$1<ex>1</ex></ph>)</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETE_TITLE" desc="historyDeleteTitle: text in the history UI." meaning="historyDeleteTitle">Delete browsing history?</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETE_DESCRIPTION" desc="historyDeleteDescription: text in the history UI." meaning="historyDeleteDescription">Delete <ph name="VALUE">$1<ex>1</ex></ph> selected entries from your browsing history. This cannot be undone.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETE_CONFIRM" desc="historyDeleteConfirm: text in the history UI." meaning="historyDeleteConfirm">Delete</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETING" desc="historyDeleting: text in the history UI." meaning="historyDeleting">Deleting…</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETED" desc="historyDeleted: text in the history UI." meaning="historyDeleted">Browsing history deleted.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_DELETE_FAILED" desc="historyDeleteFailed: text in the history UI." meaning="historyDeleteFailed">Could not delete history. Try again.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_BOOKMARK" desc="historyBookmark: text in the history UI." meaning="historyBookmark">Bookmarked</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_ACTOR" desc="historyActor: text in the history UI." meaning="historyActor">Automated visit</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_BLOCKED" desc="historyBlocked: text in the history UI." meaning="historyBlocked">Blocked visit</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_OTHER_ACTIVITY" desc="historyOtherActivity: text in the history UI." meaning="historyOtherActivity">Other account activity is managed separately from your browsing history.</message>
+      <message name="IDS_YEE_WEBUI_HISTORY_MANAGE_ACTIVITY" desc="historyManageActivity: text in the history UI." meaning="historyManageActivity">Manage account activity</message>
+      <message name="IDS_YEE_WEBUI_CANCEL" desc="cancel: shared dialog action." meaning="cancel">Cancel</message>
+      <message name="IDS_YEE_WEBUI_CLOSE" desc="close: shared dialog action." meaning="close">Close</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_TITLE" desc="bookmarksTitle: text in the bookmarks UI." meaning="bookmarksTitle">Bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_UNTITLED" desc="bookmarksUntitled: text in the bookmarks UI." meaning="bookmarksUntitled">Untitled</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_COLLAPSE_FOLDER" desc="bookmarksCollapseFolder: text in the bookmarks UI." meaning="bookmarksCollapseFolder">Collapse <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EXPAND_FOLDER" desc="bookmarksExpandFolder: text in the bookmarks UI." meaning="bookmarksExpandFolder">Expand <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_FOLDERS" desc="bookmarksFolders: text in the bookmarks UI." meaning="bookmarksFolders">Bookmark folders</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_FOLDER" desc="bookmarksFolder: text in the bookmarks UI." meaning="bookmarksFolder">Folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SELECT" desc="bookmarksSelect: text in the bookmarks UI." meaning="bookmarksSelect">Select <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MANAGED" desc="bookmarksManaged: text in the bookmarks UI." meaning="bookmarksManaged">Managed</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ACTIONS" desc="bookmarksActions: text in the bookmarks UI." meaning="bookmarksActions">Actions for <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_OPEN" desc="bookmarksOpen: text in the bookmarks UI." meaning="bookmarksOpen">Open in new tab</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_OPEN_FOLDER" desc="bookmarksOpenFolder: text in the bookmarks UI." meaning="bookmarksOpenFolder">Open folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SHOW_IN_FOLDER" desc="bookmarksShowInFolder: text in the bookmarks UI." meaning="bookmarksShowInFolder">Show in folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EDIT" desc="bookmarksEdit: text in the bookmarks UI." meaning="bookmarksEdit">Edit</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_RENAME" desc="bookmarksRename: text in the bookmarks UI." meaning="bookmarksRename">Rename</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MOVE" desc="bookmarksMove: text in the bookmarks UI." meaning="bookmarksMove">Move to folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DELETE" desc="bookmarksDelete: text in the bookmarks UI." meaning="bookmarksDelete">Delete</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MOVE_TITLE" desc="bookmarksMoveTitle: text in the bookmarks UI." meaning="bookmarksMoveTitle">Move to folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EDIT_TITLE" desc="bookmarksEditTitle: text in the bookmarks UI." meaning="bookmarksEditTitle">Edit bookmark</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_RENAME_TITLE" desc="bookmarksRenameTitle: text in the bookmarks UI." meaning="bookmarksRenameTitle">Rename folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ADD_FOLDER" desc="bookmarksAddFolder: text in the bookmarks UI." meaning="bookmarksAddFolder">New folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ADD_BOOKMARK" desc="bookmarksAddBookmark: text in the bookmarks UI." meaning="bookmarksAddBookmark">Add bookmark</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MOVE_DESCRIPTION" desc="bookmarksMoveDescription: text in the bookmarks UI." meaning="bookmarksMoveDescription">Choose a destination for this item.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EDITOR_DESCRIPTION" desc="bookmarksEditorDescription: text in the bookmarks UI." meaning="bookmarksEditorDescription">Keep your saved pages organized.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DESTINATION" desc="bookmarksDestination: text in the bookmarks UI." meaning="bookmarksDestination">Destination folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_NAME" desc="bookmarksName: text in the bookmarks UI." meaning="bookmarksName">Name</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ADDRESS" desc="bookmarksAddress: text in the bookmarks UI." meaning="bookmarksAddress">Address</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SAVING" desc="bookmarksSaving: text in the bookmarks UI." meaning="bookmarksSaving">Saving…</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MOVE_CONFIRM" desc="bookmarksMoveConfirm: text in the bookmarks UI." meaning="bookmarksMoveConfirm">Move</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SAVE" desc="bookmarksSave: text in the bookmarks UI." meaning="bookmarksSave">Save</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DELETE_TITLE" desc="bookmarksDeleteTitle: text in the bookmarks UI." meaning="bookmarksDeleteTitle">Delete bookmarks?</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DELETE_DESCRIPTION" desc="bookmarksDeleteDescription: text in the bookmarks UI." meaning="bookmarksDeleteDescription">Delete the selected items (<ph name="VALUE">$1<ex>1</ex></ph>), including everything inside selected folders?</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DELETING" desc="bookmarksDeleting: text in the bookmarks UI." meaning="bookmarksDeleting">Deleting…</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ADD" desc="bookmarksAdd: text in the bookmarks UI." meaning="bookmarksAdd">Add</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_MORE" desc="bookmarksMore: text in the bookmarks UI." meaning="bookmarksMore">More bookmark actions</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_IMPORT" desc="bookmarksImport: text in the bookmarks UI." meaning="bookmarksImport">Import bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EXPORT" desc="bookmarksExport: text in the bookmarks UI." meaning="bookmarksExport">Export bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SEARCH" desc="bookmarksSearch: text in the bookmarks UI." meaning="bookmarksSearch">Search bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_CLEAR_SEARCH" desc="bookmarksClearSearch: text in the bookmarks UI." meaning="bookmarksClearSearch">Clear search</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SELECTED" desc="bookmarksSelected: text in the bookmarks UI." meaning="bookmarksSelected"><ph name="VALUE">$1<ex>1</ex></ph> selected</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_CLEAR_SELECTION" desc="bookmarksClearSelection: text in the bookmarks UI." meaning="bookmarksClearSelection">Clear selection</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_RETRY" desc="bookmarksRetry: text in the bookmarks UI." meaning="bookmarksRetry">Try again</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_UNDO" desc="bookmarksUndo: text in the bookmarks UI." meaning="bookmarksUndo">Undo</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_READ_ONLY" desc="bookmarksReadOnly: text in the bookmarks UI." meaning="bookmarksReadOnly">Your administrator has disabled bookmark editing.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_LIST" desc="bookmarksList: text in the bookmarks UI." meaning="bookmarksList">Bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SEARCH_RESULTS" desc="bookmarksSearchResults: text in the bookmarks UI." meaning="bookmarksSearchResults">Search results</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_LOCATION" desc="bookmarksLocation: text in the bookmarks UI." meaning="bookmarksLocation">Current folder</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_LOADING" desc="bookmarksLoading: text in the bookmarks UI." meaning="bookmarksLoading">Loading bookmarks…</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_UNAVAILABLE" desc="bookmarksUnavailable: text in the bookmarks UI." meaning="bookmarksUnavailable">Bookmarks could not be loaded.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_NO_RESULTS" desc="bookmarksNoResults: text in the bookmarks UI." meaning="bookmarksNoResults">No bookmarks found</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_EMPTY" desc="bookmarksEmpty: text in the bookmarks UI." meaning="bookmarksEmpty">This folder is empty</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SAVED" desc="bookmarksSaved: text in the bookmarks UI." meaning="bookmarksSaved">Changes saved</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_SAVE_FAILED" desc="bookmarksSaveFailed: text in the bookmarks UI." meaning="bookmarksSaveFailed">Could not save. Check the address or try again.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DELETED" desc="bookmarksDeleted: text in the bookmarks UI." meaning="bookmarksDeleted">Bookmarks deleted</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ACTION_FAILED" desc="bookmarksActionFailed: text in the bookmarks UI." meaning="bookmarksActionFailed">This action could not be completed. Try again.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_LOAD_FAILED" desc="bookmarksLoadFailed: text in the bookmarks UI." meaning="bookmarksLoadFailed">Could not load bookmarks. Try again.</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_ACCOUNT" desc="bookmarksAccount: bookmark storage label." meaning="bookmarksAccount">Account bookmarks</message>
+      <message name="IDS_YEE_WEBUI_BOOKMARKS_DEVICE" desc="bookmarksDevice: bookmark storage label." meaning="bookmarksDevice">On this device</message>
     </messages>
   </release>
 </grit>

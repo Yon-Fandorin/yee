@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/views/yee/webui/frontend_resources.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/template_expressions.h"
 #include "ui/base/webui/web_ui_util.h"
@@ -47,6 +48,10 @@ content::WebUIDataSource* CreatePageDataSource(
     std::vector<std::string> document_paths) {
   auto* source = content::WebUIDataSource::CreateAndAdd(
       Profile::FromWebUI(web_ui), std::string(host));
+  // Svelte uses this policy for compiler-generated static HTML templates.
+  source->OverrideContentSecurityPolicy(
+      network::mojom::CSPDirectiveName::TrustedTypes,
+      "trusted-types svelte-trusted-html;");
   const auto& locale = g_browser_process->GetApplicationLocale();
   ui::TemplateReplacements replacements;
   webui::SetLoadTimeDataDefaults(locale, &replacements);

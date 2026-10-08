@@ -1,0 +1,22 @@
+# Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
+source_set("history") {
+  sources = [
+    "history_ui.cc",
+    "history_ui.h",
+  ]
+  public_deps = [ "//chrome/browser/ui/webui/history" ]
+  deps = [
+    "../webui",
+    "../webui:strings",
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/webui/page_not_available_for_guest",
+    "//chrome/common",
+    "//components/history/core/common",
+    "//components/prefs",
+    "//components/yee_branding",
+    "//content/public/browser",
+    "//content/public/common",
+    "//services/network/public/mojom",
+  ]
+}

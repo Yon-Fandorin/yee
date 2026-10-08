@@ -171,4 +171,89 @@
   <translation id="4444316541421495720">압축 파일</translation>
   <translation id="3089338946722786155">코드 파일</translation>
   <translation id="7131234990466418595">앱 파일</translation>
+  <translation id="8018210923995953725">방문 기록</translation>
+  <translation id="9221518556270188167">방문 기록 검색</translation>
+  <translation id="5301209885295925928">검색 지우기</translation>
+  <translation id="6501187748021966579">인터넷 사용 기록 삭제</translation>
+  <translation id="2508499716012579689">다른 기기의 탭</translation>
+  <translation id="2258604182034840336">아직 방문 기록이 없습니다</translation>
+  <translation id="3606997546282948010">검색 결과가 없습니다.</translation>
+  <translation id="7029021491879580777">방문 기록을 불러오지 못했습니다. 페이지를 새로고침해 다시 시도하세요.</translation>
+  <translation id="5291722212124965686">새로고침</translation>
+  <translation id="2531777423774550907">불러오는 중…</translation>
+  <translation id="8275153601502125713">더 보기</translation>
+  <translation id="8781887174833665319">기록에서 삭제</translation>
+  <translation id="3436176527607206241"><ph name="VALUE" /> 선택</translation>
+  <translation id="6296851930448247090">표시된 기록 선택</translation>
+  <translation id="2732057704844655955">선택 삭제 (<ph name="VALUE" />개)</translation>
+  <translation id="2913926040596862537">방문 기록을 삭제할까요?</translation>
+  <translation id="625385718052635814">선택한 방문 기록 <ph name="VALUE" />개를 삭제합니다. 이 작업은 되돌릴 수 없습니다.</translation>
+  <translation id="4744250070289397620">삭제</translation>
+  <translation id="5475664542637568312">삭제 중…</translation>
+  <translation id="8364440932374633393">방문 기록을 삭제했습니다.</translation>
+  <translation id="7098104881014235463">방문 기록을 삭제하지 못했습니다. 다시 시도하세요.</translation>
+  <translation id="6318981895943115611">북마크에 저장됨</translation>
+  <translation id="8987805949067975161">자동 방문</translation>
+  <translation id="8025649662325158385">차단된 방문</translation>
+  <translation id="8792901661816888364">다른 계정 활동은 방문 기록과 별도로 관리됩니다.</translation>
+  <translation id="3401835417941697490">계정 활동 관리</translation>
+  <translation id="7295220291495177074">취소</translation>
+  <translation id="1807411705551631560">닫기</translation>
+  <translation id="986296130686852463">북마크</translation>
+  <translation id="6235564017603656788">제목 없음</translation>
+  <translation id="3257589750234650121"><ph name="VALUE" /> 접기</translation>
+  <translation id="8964122425093151548"><ph name="VALUE" /> 펼치기</translation>
+  <translation id="6338508669788529928">북마크 폴더</translation>
+  <translation id="4419705885173833979">폴더</translation>
+  <translation id="3340924669340558106"><ph name="VALUE" /> 선택</translation>
+  <translation id="4690335916967136743">관리됨</translation>
+  <translation id="2956036432851881577"><ph name="VALUE" /> 작업</translation>
+  <translation id="3179157264056923144">새 탭에서 열기</translation>
+  <translation id="8894297408717970339">폴더 열기</translation>
+  <translation id="2721967867544724189">폴더에서 보기</translation>
+  <translation id="4081646387984487686">수정</translation>
+  <translation id="7440244859812369582">이름 변경</translation>
+  <translation id="401750992317417374">폴더로 이동</translation>
+  <translation id="9180320842791920915">삭제</translation>
+  <translation id="1720470151702218365">폴더로 이동</translation>
+  <translation id="1945586629570174139">북마크 수정</translation>
+  <translation id="8122369261531978436">폴더 이름 변경</translation>
+  <translation id="4575845285502238199">새 폴더</translation>
+  <translation id="8787964096766920471">북마크 추가</translation>
+  <translation id="4020810903159384214">이 항목을 옮길 폴더를 선택하세요.</translation>
+  <translation id="2390384690909516389">저장한 페이지를 정리하세요.</translation>
+  <translation id="1638832333057481510">대상 폴더</translation>
+  <translation id="8639299228350891080">이름</translation>
+  <translation id="1720743413594820812">주소</translation>
+  <translation id="2644866020695440701">저장 중…</translation>
+  <translation id="3245217372792820315">이동</translation>
+  <translation id="166807144655460353">저장</translation>
+  <translation id="1596293008253474">북마크를 삭제할까요?</translation>
+  <translation id="4051800468121848945">선택한 항목 <ph name="VALUE" />개를 삭제할까요? 선택한 폴더 안의 항목도 모두 삭제됩니다.</translation>
+  <translation id="3272712494032228427">삭제 중…</translation>
+  <translation id="5814455762180858475">추가</translation>
+  <translation id="2236155727660265637">북마크 추가 작업</translation>
+  <translation id="9123518447202733804">북마크 가져오기</translation>
+  <translation id="2976269587074603314">북마크 내보내기</translation>
+  <translation id="600911781059154184">북마크 검색</translation>
+  <translation id="3474193286962643976">검색 지우기</translation>
+  <translation id="5676214120040373496"><ph name="VALUE" />개 선택됨</translation>
+  <translation id="2099170721327049163">선택 해제</translation>
+  <translation id="4612853218217300596">다시 시도</translation>
+  <translation id="8227632162014992171">실행 취소</translation>
+  <translation id="970406831892326903">관리자가 북마크 편집을 사용 중지했습니다.</translation>
+  <translation id="2035908283590513894">북마크 목록</translation>
+  <translation id="7389790546016424458">검색 결과</translation>
+  <translation id="3921966073136405683">현재 폴더</translation>
+  <translation id="4063859973748676387">북마크를 불러오는 중…</translation>
+  <translation id="6859980499360336551">북마크를 불러오지 못했습니다.</translation>
+  <translation id="639307945084645908">검색 결과가 없습니다</translation>
+  <translation id="2860233732375327950">이 폴더는 비어 있습니다</translation>
+  <translation id="2419251852311461304">변경사항을 저장했습니다</translation>
+  <translation id="5488300775162619493">저장하지 못했습니다. 주소를 확인하거나 다시 시도하세요.</translation>
+  <translation id="1975718994907969237">북마크를 삭제했습니다</translation>
+  <translation id="4978896285618641188">작업을 완료하지 못했습니다. 다시 시도하세요.</translation>
+  <translation id="8388644980026661425">북마크를 불러오지 못했습니다. 다시 시도하세요.</translation>
+  <translation id="9164858317422283048">계정 북마크</translation>
+  <translation id="2464364063450151179">이 기기에 저장됨</translation>
 </translationbundle>

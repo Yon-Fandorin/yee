@@ -98,5 +98,40 @@ TEST_F(InternalURLsTest, SeparatesProductDownloadsFromNativeDownloads) {
   EXPECT_EQ(GURL("chrome://yee-downloads/"), DownloadsURL());
 }
 
+TEST_F(InternalURLsTest, SeparatesProductHistoryAndNativeSubpages) {
+  const GURL branded(std::string(InternalURLScheme()) +
+                     "://history/?q=report#recent");
+  const GURL canonical("chrome://yee-history/?q=report#recent");
+  EXPECT_EQ(canonical, CanonicalInternalURL(branded));
+  EXPECT_EQ(branded, DisplayInternalURL(canonical));
+  EXPECT_EQ(
+      base::UTF8ToUTF16(branded.spec()),
+      DisplayInternalURLText(canonical, base::UTF8ToUTF16(canonical.spec())));
+  for (const char* path : {"/", "/syncedTabs", "/grouped"}) {
+    const GURL native(std::string("chrome://history") + path);
+    EXPECT_EQ(native, CanonicalInternalURL(native));
+    EXPECT_EQ(native, DisplayInternalURL(native));
+  }
+  const GURL subpage(std::string(InternalURLScheme()) +
+                     "://history/syncedTabs");
+  EXPECT_EQ(GURL("chrome://history/syncedTabs"), CanonicalInternalURL(subpage));
+  EXPECT_EQ(GURL("chrome://yee-history/"), HistoryURL());
+}
+
+TEST_F(InternalURLsTest, SeparatesProductBookmarksFromNativeBookmarks) {
+  const GURL branded(std::string(InternalURLScheme()) +
+                     "://bookmarks/?id=7#folder");
+  const GURL canonical("chrome://yee-bookmarks/?id=7#folder");
+  EXPECT_EQ(canonical, CanonicalInternalURL(branded));
+  EXPECT_EQ(branded, DisplayInternalURL(canonical));
+  EXPECT_EQ(
+      base::UTF8ToUTF16(branded.spec()),
+      DisplayInternalURLText(canonical, base::UTF8ToUTF16(canonical.spec())));
+  const GURL native("chrome://bookmarks/?id=7");
+  EXPECT_EQ(native, CanonicalInternalURL(native));
+  EXPECT_EQ(native, DisplayInternalURL(native));
+  EXPECT_EQ(GURL("chrome://yee-bookmarks/"), BookmarksURL());
+}
+
 }  // namespace
 }  // namespace yee::branding
