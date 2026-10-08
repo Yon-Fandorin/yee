@@ -25,7 +25,7 @@
 									{...mergeProps(props, { onclick: () => model.toggleFolder(node.id) })}
 									variant="ghost"
 									size="icon-xs"
-									class="folder-toggle"
+									class="folder-toggle h-7 w-4 rounded-none border-0 hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 aria-expanded:bg-transparent dark:hover:bg-transparent"
 									aria-label={t(
 										expanded ? 'bookmarksCollapseFolder' : 'bookmarksExpandFolder',
 										node.title
@@ -39,11 +39,11 @@
 					{:else}<span class="disclosure-space"></span>{/if}
 					<Button
 						variant="ghost"
-						class="folder-link h-auto flex-1 justify-start gap-[7px] px-1 py-[7px]"
+						class="folder-link h-7 flex-1 justify-start gap-2 rounded-none border-0 px-1 py-0 font-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent"
 						aria-current={model.folderId === node.id ? 'page' : undefined}
 						onclick={() => model.navigate(node.id)}
 					>
-						<Folder size={14} aria-hidden="true" />
+						<Folder size={14} strokeWidth={1.5} aria-hidden="true" />
 						<span>{node.title || t('bookmarksUntitled')}</span>
 					</Button>
 				</div>
@@ -87,6 +87,9 @@
 			color: var(--muted-foreground);
 		}
 		ul {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
 			list-style: none;
 			margin: 0;
 			padding: 0;
@@ -96,12 +99,16 @@
 			align-items: center;
 			gap: 2px;
 			padding-inline-start: calc(min(var(--depth), 5) * 12px);
-			border-radius: 6px;
+			border-radius: 4px;
 			color: var(--muted-foreground);
+			transition: background-color 120ms ease;
+		}
+		.folder-row:hover {
+			background: color-mix(in srgb, var(--foreground) 2.5%, var(--background));
 		}
 		.folder-row.active {
 			color: var(--foreground);
-			background: var(--muted);
+			background: color-mix(in srgb, var(--foreground) 4%, var(--background));
 		}
 		.folder-row :global(.folder-link) {
 			min-width: 0;
@@ -113,8 +120,13 @@
 			white-space: nowrap;
 		}
 		.disclosure-space {
-			width: 20px;
+			width: 16px;
 			flex-shrink: 0;
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.folder-row {
+				transition: none;
+			}
 		}
 		@media (max-width: 700px) {
 			.folder-row :global(.folder-toggle),
@@ -130,7 +142,7 @@
 			}
 			.folders > ul,
 			.folder-group > ul {
-				display: flex;
+				flex-direction: row;
 				gap: 4px;
 			}
 			.folders > ul > li,
