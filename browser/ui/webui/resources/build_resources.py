@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Build pinned WebUI frontend dependencies in the ignored GN output tree."""
 
+import argparse
 import hashlib
+import json
 from html.parser import HTMLParser
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import xml.etree.ElementTree as ET
 
 
@@ -35,8 +36,18 @@ class BootstrapParser(HTMLParser):
 
 
 def main():
-    output = Path(sys.argv[1]).resolve()
-    source = Path(sys.argv[2]).resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('source', type=Path)
+    parser.add_argument('--module', nargs=2, action='append', default=[],
+                        metavar=('SOURCE', 'RESOURCE_PATH'))
+    parser.add_argument('--types', nargs=2, action='append', default=[],
+                        metavar=('SOURCE', 'WORKSPACE_PATH'))
+    parser.add_argument('--type-path', nargs=2, action='append', default=[],
+                        metavar=('IMPORT_PATTERN', 'SOURCE_PATTERN'))
+    args = parser.parse_args()
+    output = args.output.resolve()
+    source = args.source.resolve()
     workspace = output.parent / 'frontend_build'
     workspace.mkdir(parents=True, exist_ok=True)
     expected = set()
@@ -55,6 +66,16 @@ def main():
             if Path(previous) not in expected:
                 (workspace / previous).unlink(missing_ok=True)
     manifest.write_text('\n'.join(sorted(str(p) for p in expected)))
+    native_paths = {key: [str(Path(value).resolve())]
+                    for key, value in args.type_path}
+    (workspace / '.native-types.json').write_text(
+        json.dumps({'compilerOptions': {'paths': native_paths}}))
+
+    # Native interface declarations come from their owner's generated sources.
+    for native_source, relative in args.types:
+        target = workspace / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(native_source, target)
 
     npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
     if not npm:
@@ -89,6 +110,10 @@ def main():
         raise RuntimeError('Could not externalize the static bootstrap.')
     html_file.write_text(document)
     (build / 'bootstrap.js').write_text(bootstrap)
+    for native_source, relative in args.module:
+        target = build / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(native_source, target)
 
     parts = ['// Generated Yee WebUI resources.\n'
              '#ifndef YEE_WEBUI_RESOURCES_H_\n#define YEE_WEBUI_RESOURCES_H_\n'

@@ -81,5 +81,22 @@ TEST_F(InternalURLsTest, PreservesNativeSettingsNavigationAndDisplay) {
   EXPECT_EQ(GURL("chrome://yee-settings/"), SettingsURL());
 }
 
+TEST_F(InternalURLsTest, SeparatesProductDownloadsFromNativeDownloads) {
+  const GURL branded(std::string(InternalURLScheme()) +
+                     "://downloads/?q=report#recent");
+  const GURL canonical("chrome://yee-downloads/?q=report#recent");
+  EXPECT_EQ(canonical, CanonicalInternalURL(branded));
+  EXPECT_EQ(branded, DisplayInternalURL(canonical));
+  EXPECT_EQ(
+      base::UTF8ToUTF16(branded.spec()),
+      DisplayInternalURLText(canonical, base::UTF8ToUTF16(canonical.spec())));
+  const GURL native("chrome://downloads/?q=report");
+  EXPECT_EQ(native, CanonicalInternalURL(native));
+  EXPECT_EQ(native, DisplayInternalURL(native));
+  EXPECT_EQ(base::UTF8ToUTF16(native.spec()),
+            DisplayInternalURLText(native, base::UTF8ToUTF16(native.spec())));
+  EXPECT_EQ(GURL("chrome://yee-downloads/"), DownloadsURL());
+}
+
 }  // namespace
 }  // namespace yee::branding

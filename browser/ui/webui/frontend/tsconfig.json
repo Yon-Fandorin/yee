@@ -1,5 +1,5 @@
 {
-	"extends": "$app/tsconfig",
+	"extends": ["$app/tsconfig", "./.native-types.json"],
 	"include": ["src", "test", "*"],
 	"exclude": ["src/service-worker"],
 	"compilerOptions": {

@@ -222,6 +222,43 @@
       <message name="IDS_YEE_WEBUI_REMOVE_SELECTED_DOMAINS" desc="removeSelectedDomains: text in the browser settings UI." meaning="removeSelectedDomains">Remove selected (<ph name="VALUE">$1<ex>1</ex></ph>)</message>
       <message name="IDS_YEE_WEBUI_DOMAINS_NO_MATCHES" desc="domainsNoMatches: text in the browser settings UI." meaning="domainsNoMatches">No domains match your search</message>
       <message name="IDS_YEE_WEBUI_DOMAINS_REMOVED" desc="domainsRemoved: text in the browser settings UI." meaning="domainsRemoved">Selected domain rules removed. Reload affected pages to apply the change.</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TITLE" desc="downloadsTitle: text in the downloads UI." meaning="downloadsTitle">Downloads</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_OPEN_FOLDER" desc="downloadsOpenFolder: text in the downloads UI." meaning="downloadsOpenFolder">Open folder</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_CLEAR" desc="downloadsClear: text in the downloads UI." meaning="downloadsClear">Clear history</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_SEARCH" desc="downloadsSearch: text in the downloads UI." meaning="downloadsSearch">Search downloads</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_CLEAR_SEARCH" desc="downloadsClearSearch: text in the downloads UI." meaning="downloadsClearSearch">Clear search</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_REMOVED" desc="downloadsRemoved: text in the downloads UI." meaning="downloadsRemoved">Download history removed.</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_UNDO" desc="downloadsUndo: text in the downloads UI." meaning="downloadsUndo">Undo</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_LOAD_FAILED" desc="downloadsLoadFailed: text in the downloads UI." meaning="downloadsLoadFailed">Could not load downloads. Reload this page to try again.</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_RELOAD" desc="downloadsReload: text in the downloads UI." meaning="downloadsReload">Reload</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_LOADING" desc="downloadsLoading: text in the downloads UI." meaning="downloadsLoading">Loading…</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_NO_RESULTS" desc="downloadsNoResults: text in the downloads UI." meaning="downloadsNoResults">No downloads match your search.</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_EMPTY" desc="downloadsEmpty: text in the downloads UI." meaning="downloadsEmpty">No downloads yet</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_LOAD_MORE" desc="downloadsLoadMore: text in the downloads UI." meaning="downloadsLoadMore">Load more</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_REVIEW_REQUIRED" desc="downloadsReviewRequired: text in the downloads UI." meaning="downloadsReviewRequired">Security check required</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_REVIEW" desc="downloadsReview: text in the downloads UI." meaning="downloadsReview">Review warning</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_FILE_REMOVED" desc="downloadsFileRemoved: text in the downloads UI." meaning="downloadsFileRemoved">File no longer available</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_CANCELLED" desc="downloadsCancelled: text in the downloads UI." meaning="downloadsCancelled">Cancelled</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_PAUSED" desc="downloadsPaused: text in the downloads UI." meaning="downloadsPaused">Paused</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_COMPLETE" desc="downloadsComplete: text in the downloads UI." meaning="downloadsComplete">Complete</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_PRIVATE" desc="downloadsPrivate: text in the downloads UI." meaning="downloadsPrivate">Private browsing</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_PROGRESS" desc="downloadsProgress: text in the downloads UI." meaning="downloadsProgress">Download progress</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_SHOW_IN_FOLDER" desc="downloadsShowInFolder: text in the downloads UI." meaning="downloadsShowInFolder">Show in folder</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_PAUSE" desc="downloadsPause: text in the downloads UI." meaning="downloadsPause">Pause</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_RESUME" desc="downloadsResume: text in the downloads UI." meaning="downloadsResume">Resume</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_RETRY" desc="downloadsRetry: text in the downloads UI." meaning="downloadsRetry">Retry</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_CANCEL" desc="downloadsCancel: text in the downloads UI." meaning="downloadsCancel">Cancel</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_REMOVE" desc="downloadsRemove: text in the downloads UI." meaning="downloadsRemove">Remove from history</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_FILE" desc="downloadsTypeFile: filename category in the downloads UI." meaning="downloadsTypeFile">File</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_IMAGE" desc="downloadsTypeImage: filename category in the downloads UI." meaning="downloadsTypeImage">Image file</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_VIDEO" desc="downloadsTypeVideo: filename category in the downloads UI." meaning="downloadsTypeVideo">Video file</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_AUDIO" desc="downloadsTypeAudio: filename category in the downloads UI." meaning="downloadsTypeAudio">Audio file</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_DOCUMENT" desc="downloadsTypeDocument: filename category in the downloads UI." meaning="downloadsTypeDocument">Document</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_SPREADSHEET" desc="downloadsTypeSpreadsheet: filename category in the downloads UI." meaning="downloadsTypeSpreadsheet">Spreadsheet</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_PRESENTATION" desc="downloadsTypePresentation: filename category in the downloads UI." meaning="downloadsTypePresentation">Presentation</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_ARCHIVE" desc="downloadsTypeArchive: filename category in the downloads UI." meaning="downloadsTypeArchive">Archive</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_CODE" desc="downloadsTypeCode: filename category in the downloads UI." meaning="downloadsTypeCode">Code file</message>
+      <message name="IDS_YEE_WEBUI_DOWNLOADS_TYPE_APPLICATION" desc="downloadsTypeApplication: filename category in the downloads UI." meaning="downloadsTypeApplication">Application</message>
     </messages>
   </release>
 </grit>

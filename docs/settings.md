@@ -11,9 +11,12 @@
 접두어는 `branding/brand.json`에서 생성한다. `chrome://settings`와 하위 경로는
 기존 화면으로 연결하고 주소창 표시·복사도 `chrome://settings`를 유지한다.
 실제 origin과 저장 URL은 브랜드 변경에도 유지된다.
-일반 설정 메뉴는 Yee 설정 홈을 연다. 사이트 권한·다운로드·개인정보 등 기존
+일반 설정 메뉴는 Yee 설정 홈을 연다. 사이트 권한·다운로드 설정·개인정보 등 기존
 세부 설정 링크와 Chromium 설정 구현은 유지한다. Sidebar footer에는 새 설정
 계층을 복제하지 않는다.
+
+다운로드 목록을 포함한 제품 내부 페이지의 공통 경계는
+[내부 페이지 문서](internal-pages.md)를 따른다.
 
 설정 native 연결은 `browser/ui/settings/`, 공통 프런트엔드·리소스·번역은
 `browser/ui/webui/`에 둔다. Chromium 연결은 WebUI config

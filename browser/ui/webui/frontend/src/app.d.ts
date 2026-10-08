@@ -12,6 +12,7 @@ declare module 'chrome://resources/js/cr.js' {
 }
 declare module 'chrome://resources/js/load_time_data.js' {
 	export const loadTimeData: {
+		getBoolean(key: string): boolean;
 		getInteger(key: string): number;
 		getString(key: string): string;
 		getStringF(key: string, ...args: string[]): string;

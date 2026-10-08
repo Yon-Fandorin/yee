@@ -10,7 +10,19 @@ grit_strings("strings") {
 
 action("resources") {
   script = "resources/build_resources.py"
+  deps = [
+    "//chrome/browser/resources/downloads:build_ts",
+    "//ui/webui/resources/mojo:build_ts",
+    "//ui/webui/resources/mojo:copy_bindings_dts",
+  ]
+  downloads_module = "$root_gen_dir/chrome/browser/resources/downloads/tsc/downloads.mojom-webui.js"
   inputs = [
+    downloads_module,
+    "$root_gen_dir/chrome/browser/resources/downloads/tsc/downloads.mojom-webui.d.ts",
+    "$root_gen_dir/ui/webui/resources/tsc/mojo/mojo/public/js/bindings.d.ts",
+    "$root_gen_dir/ui/webui/resources/tsc/mojo/mojo/public/mojom/base/string16.mojom-webui.d.ts",
+    "$root_gen_dir/ui/webui/resources/tsc/mojo/mojo_browser_proxy.d.ts",
+    "$root_gen_dir/ui/webui/resources/tsc/mojo/url/mojom/url.mojom-webui.d.ts",
     "frontend/.prettierrc.json",
     "frontend/.prettierignore",
     "frontend/package.json",
@@ -20,11 +32,17 @@ action("resources") {
     "frontend/src/app.html",
     "frontend/src/app.d.ts",
     "frontend/src/hooks.client.ts",
+    "frontend/src/hooks.ts",
+    "frontend/src/routes/downloads/+page.svelte",
+    "frontend/src/routes/downloads/downloads.svelte.ts",
+    "frontend/src/routes/downloads/components/DownloadRow.svelte",
+    "frontend/src/routes/downloads/components/DownloadFileIcon.svelte",
     "frontend/src/styles.css",
     "frontend/src/lib/i18n.ts",
     "frontend/src/routes/(settings)/bridge.ts",
     "frontend/src/routes/(settings)/settings.svelte.ts",
     "frontend/src/lib/components/Icon.svelte",
+    "frontend/src/lib/components/Hint.svelte",
     "frontend/src/lib/components/SettingLink.svelte",
     "frontend/src/lib/components/SettingsGroup.svelte",
     "frontend/src/lib/components/SettingsFeedback.svelte",
@@ -68,6 +86,12 @@ action("resources") {
     "frontend/src/lib/components/ui/label/label.svelte",
     "frontend/src/lib/components/ui/separator/index.ts",
     "frontend/src/lib/components/ui/separator/separator.svelte",
+    "frontend/src/lib/components/ui/tooltip/index.ts",
+    "frontend/src/lib/components/ui/tooltip/tooltip.svelte",
+    "frontend/src/lib/components/ui/tooltip/tooltip-trigger.svelte",
+    "frontend/src/lib/components/ui/tooltip/tooltip-content.svelte",
+    "frontend/src/lib/components/ui/tooltip/tooltip-provider.svelte",
+    "frontend/src/lib/components/ui/tooltip/tooltip-portal.svelte",
     "frontend/src/lib/styles/theme.css",
     "frontend/src/lib/utils.ts",
     "strings/webui_strings.grd",
@@ -79,6 +103,17 @@ action("resources") {
   args = [
     rebase_path(outputs[0], root_build_dir),
     rebase_path("frontend", root_build_dir),
+    "--module",
+    rebase_path(downloads_module, root_build_dir),
+    "downloads.mojom-webui.js",
+    "--types",
+    rebase_path(
+        "$root_gen_dir/chrome/browser/resources/downloads/tsc/downloads.mojom-webui.d.ts",
+        root_build_dir),
+    "src/routes/downloads/downloads.mojom-webui.d.ts",
+    "--type-path",
+    "//resources/mojo/*",
+    rebase_path("$root_gen_dir/ui/webui/resources/tsc/mojo/*", root_build_dir),
   ]
 }
 

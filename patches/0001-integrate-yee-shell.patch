@@ -951,7 +951,7 @@ index 5131a3cc83..4cc798d503 100644
  
  void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
 diff --git a/chrome/browser/ui/chrome_pages.cc b/chrome/browser/ui/chrome_pages.cc
-index b1897340ac..f2dd826422 100644
+index b1897340ac..b0af94c4f9 100644
 --- a/chrome/browser/ui/chrome_pages.cc
 +++ b/chrome/browser/ui/chrome_pages.cc
 @@ -63,6 +63,7 @@
@@ -962,6 +962,15 @@ index b1897340ac..f2dd826422 100644
  #include "content/public/browser/web_contents.h"
  #include "extensions/browser/extension_prefs.h"
  #include "extensions/common/constants.h"
+@@ -379,7 +380,7 @@ void ShowDownloads(BrowserWindowInterface* browser) {
+         ->HideBubble();
+   }
+ #endif
+-  ShowSingletonTabOverwritingNTP(browser, GURL(kChromeUIDownloadsURL));
++  ShowSingletonTabOverwritingNTP(browser, yee::branding::DownloadsURL());
+ }
+ 
+ void ShowExtensions(BrowserWindowInterface* browser,
 @@ -463,7 +464,8 @@ bool IsTrustedPopupWindowWithScheme(const BrowserWindowInterface* browser,
  }
  
@@ -22219,33 +22228,45 @@ index 12d37b4f6c..2cd44061a8 100644
    raw_ptr<glic::GlicButtonInterface> locked_expansion_button_ = nullptr;
    raw_ptr<GlicAndActorButtonsContainer> glic_actor_button_container_ = nullptr;
 diff --git a/chrome/browser/ui/webui/BUILD.gn b/chrome/browser/ui/webui/BUILD.gn
-index 1a9110f7cc..ee9b83bed1 100644
+index 1a9110f7cc..195215d13b 100644
 --- a/chrome/browser/ui/webui/BUILD.gn
 +++ b/chrome/browser/ui/webui/BUILD.gn
-@@ -112,6 +112,10 @@ source_set("configs") {
+@@ -112,6 +112,13 @@ source_set("configs") {
      "//ui/webui:buildflags",
    ]
  
 +  if (!is_android) {
-+    deps += [ "//chrome/browser/ui/views/yee/settings" ]
++    deps += [
++      "//chrome/browser/ui/views/yee/downloads",
++      "//chrome/browser/ui/views/yee/settings",
++    ]
 +  }
 +
    if (is_win || is_chromeos) {
      deps += [ "//chrome/browser/ui/webui/signin:inline_login" ]
    }
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 4ca118a4b1..bcf664abaf 100644
+index 4ca118a4b1..ebaaea3520 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -82,6 +82,7 @@
+@@ -82,6 +82,8 @@
  #include "chrome/browser/actor/ui/actor_overlay_ui.h"
  #include "chrome/browser/contextual_cueing/internals/contextual_cueing_internals_ui.h"
  #include "chrome/browser/ui/tabs/tab_group_home/tab_group_home_ui.h"
++#include "chrome/browser/ui/views/yee/downloads/downloads_ui.h"
 +#include "chrome/browser/ui/views/yee/settings/settings_ui.h"
  #include "chrome/browser/ui/webui/content_annotator_internals/content_annotator_internals_ui.h"
  #include "chrome/browser/ui/webui/webui_toolbar/webui_toolbar_ui.h"
  #include "chrome/browser/ui/webui_browser/webui_browser_ui.h"
-@@ -382,6 +383,7 @@ void RegisterChromeWebUIConfigs() {
+@@ -349,6 +351,7 @@ void RegisterChromeWebUIConfigs() {
+       std::make_unique<
+           contextual_cueing_internals::ContextualCueingInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<DownloadsUIConfig>());
++  map.AddWebUIConfig(std::make_unique<yee::DownloadsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<DrivePickerHostUIConfig>());
+   map.AddWebUIConfig(std::make_unique<glic::GlicExperimentalOptInUIConfig>());
+   map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
+@@ -382,6 +385,7 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<ReadingListUIConfig>());
    map.AddWebUIConfig(std::make_unique<SearchEngineChoiceUIConfig>());
    map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());

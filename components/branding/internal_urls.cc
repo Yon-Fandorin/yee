@@ -30,25 +30,33 @@ GURL CanonicalInternalURL(const GURL& url) {
   replacements.SetSchemeStr(kWebUIScheme);
   if (url.host() == "settings") {
     replacements.SetHostStr(kProductSettingsHost);
+  } else if (url.host() == "downloads") {
+    replacements.SetHostStr(kProductDownloadsHost);
   }
   return url.ReplaceComponents(replacements);
 }
 
 GURL DisplayInternalURL(const GURL& url) {
   if (!url.is_valid() || !url.SchemeIs(kWebUIScheme) ||
-      url.host() == "settings") {
+      url.host() == "settings" || url.host() == "downloads") {
     return url;
   }
   GURL::Replacements replacements;
   replacements.SetSchemeStr(kInternalURLScheme);
   if (url.host() == kProductSettingsHost) {
     replacements.SetHostStr("settings");
+  } else if (url.host() == kProductDownloadsHost) {
+    replacements.SetHostStr("downloads");
   }
   return url.ReplaceComponents(replacements);
 }
 
 GURL SettingsURL() {
   return GURL(std::string(kWebUIScheme) + "://" + kProductSettingsHost + "/");
+}
+
+GURL DownloadsURL() {
+  return GURL(std::string(kWebUIScheme) + "://" + kProductDownloadsHost + "/");
 }
 
 std::u16string DisplayInternalURLText(const GURL& url,
