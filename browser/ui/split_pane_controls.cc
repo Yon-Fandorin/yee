@@ -34,6 +34,7 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/outsets.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
@@ -50,6 +51,8 @@
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_shadow.h"
+#include "ui/views/view_targeter.h"
+#include "ui/views/view_targeter_delegate.h"
 #include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
 
@@ -103,14 +106,16 @@ class SplitResizeAreaBackground : public views::Background,
 public:
   DECLARE_SAFE_CAST_TARGET()
 
-  SplitResizeAreaBackground(views::View &owner, views::View &handle)
+  SplitResizeAreaBackground(views::View &owner, views::View &handle,
+                            bool show_resting_marker)
       : owner_(&owner), handle_(&handle), rest_visibility_animation_(this),
-        active_visibility_animation_(this) {
+        active_visibility_animation_(this),
+        show_resting_marker_(show_resting_marker) {
     // View destroys its children before its Background. Track both views so
     // animation callbacks and member destruction cannot retain the handle
     // after it has been deleted.
     owner_.SetTrackEntireViewHierarchy(true);
-    rest_visibility_animation_.Reset(1.0);
+    rest_visibility_animation_.Reset(show_resting_marker_ ? 1.0 : 0.0);
     active_visibility_animation_.Reset(0.0);
     SyncVisuals();
   }
@@ -133,7 +138,8 @@ public:
     }
     if (!rich_animation) {
       active_ = active;
-      rest_visibility_animation_.Reset(active_ ? 0.0 : 1.0);
+      rest_visibility_animation_.Reset(
+          !active_ && show_resting_marker_ ? 1.0 : 0.0);
       active_visibility_animation_.Reset(active_ ? 1.0 : 0.0);
       pending_transform_.reset();
       handle->layer()->GetAnimator()->StopAnimating();
@@ -195,7 +201,7 @@ public:
 
   void Paint(gfx::Canvas *canvas, views::View *view) const override {
     const ui::ColorProvider *const color_provider = view->GetColorProvider();
-    if (!color_provider || marker_size_.IsEmpty()) {
+    if (!show_resting_marker_ || !color_provider || marker_size_.IsEmpty()) {
       return;
     }
 
@@ -231,6 +237,9 @@ private:
       handle->layer()->SetTransform(*pending_transform_);
       pending_transform_.reset();
     }
+    if (!show_resting_marker_) {
+      return;
+    }
     rest_visibility_animation_.SetTweenType(gfx::Tween::SMOOTH_IN_OUT);
     rest_visibility_animation_.SetSlideDuration(
         base::Milliseconds(kResizeHandleRestoreDurationMs));
@@ -256,12 +265,14 @@ private:
   gfx::SlideAnimation active_visibility_animation_;
   std::optional<gfx::Transform> pending_transform_;
   bool active_ = false;
+  const bool show_resting_marker_;
 };
 
 DEFINE_SAFE_CAST_SUBCLASS(SplitResizeAreaBackground, views::Background)
 
 void UpdateResizeAreaBackground(views::View &handle, bool active, bool animate,
-                                const gfx::Transform &target_transform) {
+                                const gfx::Transform &target_transform,
+                                bool show_resting_marker) {
   views::View *const resize_area = handle.parent();
   if (!resize_area) {
     return;
@@ -276,8 +287,8 @@ void UpdateResizeAreaBackground(views::View &handle, bool active, bool animate,
       resize_area->background()->IsA<SplitResizeAreaBackground>()) {
     background = resize_area->background()->AsA<SplitResizeAreaBackground>();
   } else {
-    auto new_background =
-        std::make_unique<SplitResizeAreaBackground>(*resize_area, handle);
+    auto new_background = std::make_unique<SplitResizeAreaBackground>(
+        *resize_area, handle, show_resting_marker);
     background = new_background.get();
     resize_area->SetBackground(std::move(new_background));
   }
@@ -1091,31 +1102,173 @@ SplitPaneControlsView &AsSplitPaneControls(views::View &controls) {
   return static_cast<SplitPaneControlsView &>(controls);
 }
 
-// A sibling of the native SidePanel, never a child of its clipped card. Native
-// callbacks retain width limits, drag direction, persistence, and metrics.
-class SidePanelResizeGutterView : public views::ResizeArea,
-                                public views::ResizeAreaDelegate {
- public:
-  explicit SidePanelResizeGutterView(SidePanelResizeCallbacks callbacks)
-      : views::ResizeArea(this), callbacks_(std::move(callbacks)) {
-    SetID(kSidePanelResizeGutterViewId);
+// Both Sidebar boundaries share the split divider's marker presentation.
+// Chromium's ResizeArea and delegate continue to own the resize gesture.
+class SidebarResizeArea : public views::ResizeArea {
+public:
+  explicit SidebarResizeArea(views::ResizeAreaDelegate *delegate,
+                            bool show_resting_marker = true)
+      : views::ResizeArea(delegate), show_resting_marker_(show_resting_marker) {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
-    SetVisible(false);
-    SetFocusBehavior(FocusBehavior::ALWAYS);
-    GetViewAccessibility().SetRole(ax::mojom::Role::kSlider);
-    GetViewAccessibility().SetName(
-        l10n_util::GetStringUTF16(IDS_ACCNAME_SIDE_PANEL_RESIZE));
     handle_ = AddChildView(std::make_unique<views::View>());
+    handle_->SetVisible(false);
     handle_->SetCanProcessEventsWithinSubtree(false);
     handle_->SetPaintToLayer();
     handle_->layer()->SetFillsBoundsOpaquely(false);
     handle_->layer()->SetOpacity(0.f);
     views::FocusRing::Install(handle_);
     views::FocusRing::Get(handle_)->SetHasFocusPredicate(
-        base::BindRepeating([](const views::View* view) {
+        base::BindRepeating([](const views::View *view) {
           return view->parent() && view->parent()->HasFocus();
         }));
+  }
+
+  void OnMouseMoved(const ui::MouseEvent &event) override {
+    UpdateAnchor(event.y());
+  }
+  void OnMouseEntered(const ui::MouseEvent &event) override {
+    UpdateAnchor(event.y());
+  }
+  void OnMouseExited(const ui::MouseEvent &event) override {
+    if (!is_resizing()) {
+      pointer_y_.reset();
+      ResetAnchor(HasFocus());
+    }
+  }
+  bool OnMouseDragged(const ui::MouseEvent &event) override {
+    const bool handled = ResizeArea::OnMouseDragged(event);
+    UpdateAnchor(event.y());
+    return handled;
+  }
+  void OnMouseReleased(const ui::MouseEvent &event) override {
+    ResizeArea::OnMouseReleased(event);
+    pointer_y_.reset();
+    ResetAnchor(HasFocus() || IsMouseHovered());
+  }
+  void OnMouseCaptureLost() override {
+    ResizeArea::OnMouseCaptureLost();
+    pointer_y_.reset();
+    ResetAnchor(HasFocus());
+  }
+  void OnFocus() override {
+    View::OnFocus();
+    UpdateAppearance(true);
+    views::FocusRing::Get(handle_)->SchedulePaint();
+  }
+  void OnBlur() override {
+    View::OnBlur();
+    UpdateAppearance(IsMouseHovered());
+    views::FocusRing::Get(handle_)->SchedulePaint();
+  }
+  void OnThemeChanged() override {
+    ResizeArea::OnThemeChanged();
+    UpdateAppearance(HasFocus() || IsMouseHovered());
+  }
+  void Layout(PassKey) override {
+    LayoutSuperclass<views::ResizeArea>(this);
+    // The collapsed edge rail keeps its native resize target, but is too
+    // narrow to display a full marker without painting outside the Sidebar.
+    const bool visible = width() >= kSidebarMetrics.resize_handle_thickness &&
+                         height() >= kSidebarMetrics.resize_handle_length;
+    handle_->SetVisible(visible);
+    if (!visible) {
+      SetBackground(nullptr);
+      return;
+    }
+    gfx::Rect marker = GetLocalBounds();
+    marker.ClampToCenteredSize(
+        gfx::Size(kSidebarMetrics.resize_handle_thickness,
+                  kSidebarMetrics.resize_handle_length));
+    handle_->SetBoundsRect(marker);
+    UpdateSplitResizeHandleAppearance(*handle_, HasFocus() || IsMouseHovered(),
+                                      show_resting_marker_);
+    // Window/Side Panel animation can shorten the gutter without another
+    // mouse event. Never leave a transformed marker outside its new bounds.
+    if (pointer_y_) {
+      UpdateAnchor(*pointer_y_);
+    } else {
+      UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(),
+                                    HasFocus() || IsMouseHovered(), false,
+                                    show_resting_marker_);
+    }
+  }
+
+private:
+  void UpdateAppearance(bool emphasized) {
+    if (handle_->GetVisible()) {
+      UpdateSplitResizeHandleAppearance(*handle_, emphasized,
+                                        show_resting_marker_);
+    }
+  }
+
+  void ResetAnchor(bool emphasized) {
+    if (handle_->GetVisible()) {
+      UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(), emphasized,
+                                    true, show_resting_marker_);
+    }
+  }
+
+  void UpdateAnchor(int y) {
+    pointer_y_ = y;
+    if (!handle_->GetVisible()) {
+      return;
+    }
+    const int half = handle_->height() / 2;
+    const int center = std::clamp(y, half, std::max(half, height() - half));
+    UpdateSplitResizeHandleAnchor(
+        *handle_,
+        gfx::Vector2dF(0, center - handle_->bounds().CenterPoint().y()), true,
+        true, show_resting_marker_);
+  }
+  raw_ptr<views::View> handle_ = nullptr;
+  std::optional<int> pointer_y_;
+  const bool show_resting_marker_;
+};
+
+// Include only the resize gutter beyond the Sidebar's normal bounds. The
+// translated flyout still keeps its continuous path from the window edge.
+class SidebarResizeAreaTargeter : public views::ViewTargeterDelegate {
+public:
+  explicit SidebarResizeAreaTargeter(views::ResizeArea &resize_area)
+      : resize_area_(&resize_area) {}
+
+  bool DoesIntersectRect(const views::View *target,
+                         const gfx::Rect &rect) const override {
+    gfx::Rect hit_bounds = target->GetLocalBounds();
+    const int translation = static_cast<int>(target->GetTransform().rc(0, 3));
+    if (translation > 0) {
+      hit_bounds.Outset(gfx::Outsets::TLBR(0, translation, 0, 0));
+    } else if (translation < 0) {
+      hit_bounds.Outset(gfx::Outsets::TLBR(0, 0, 0, -translation));
+    }
+    const views::View *const resize_area = resize_area_.view();
+    if (resize_area && resize_area->parent() == target &&
+        resize_area->GetVisible()) {
+      const gfx::Rect resize_bounds = views::View::ConvertRectToTarget(
+          resize_area, target, resize_area->GetLocalBounds());
+      hit_bounds.Union(resize_bounds);
+    }
+    return hit_bounds.Intersects(rect);
+  }
+
+private:
+  views::ViewTracker resize_area_;
+};
+
+// A sibling of the native SidePanel, never a child of its clipped card. Native
+// callbacks retain width limits, drag direction, persistence, and metrics.
+class SidePanelResizeGutterView : public SidebarResizeArea,
+                                 public views::ResizeAreaDelegate {
+public:
+  explicit SidePanelResizeGutterView(SidePanelResizeCallbacks callbacks)
+      : SidebarResizeArea(this), callbacks_(std::move(callbacks)) {
+    SetID(kSidePanelResizeGutterViewId);
+    SetVisible(false);
+    SetFocusBehavior(FocusBehavior::ALWAYS);
+    GetViewAccessibility().SetRole(ax::mojom::Role::kSlider);
+    GetViewAccessibility().SetName(
+        l10n_util::GetStringUTF16(IDS_ACCNAME_SIDE_PANEL_RESIZE));
   }
 
   void OnResize(int amount, bool done) override {
@@ -1125,7 +1278,7 @@ class SidePanelResizeGutterView : public views::ResizeArea,
     }
   }
 
-  bool OnKeyPressed(const ui::KeyEvent& event) override {
+  bool OnKeyPressed(const ui::KeyEvent &event) override {
     if (event.key_code() != ui::VKEY_LEFT &&
         event.key_code() != ui::VKEY_RIGHT) {
       return false;
@@ -1136,82 +1289,43 @@ class SidePanelResizeGutterView : public views::ResizeArea,
     return true;
   }
 
-  void OnMouseMoved(const ui::MouseEvent& event) override {
-    UpdateAnchor(event.y());
-  }
-  void OnMouseEntered(const ui::MouseEvent& event) override {
-    UpdateAnchor(event.y());
-  }
-  void OnMouseExited(const ui::MouseEvent& event) override {
-    if (!is_resizing()) {
-      pointer_y_.reset();
-      UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(), HasFocus(), true);
-    }
-  }
-  bool OnMouseDragged(const ui::MouseEvent& event) override {
-    const bool handled = ResizeArea::OnMouseDragged(event);
-    UpdateAnchor(event.y());
-    return handled;
-  }
-  void OnMouseReleased(const ui::MouseEvent& event) override {
-    ResizeArea::OnMouseReleased(event);
-    pointer_y_.reset();
-    UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(),
-                                  HasFocus() || IsMouseHovered(), true);
-  }
-  void OnMouseCaptureLost() override {
-    ResizeArea::OnMouseCaptureLost();
-    pointer_y_.reset();
-    UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(), HasFocus(), true);
-  }
-  void OnFocus() override {
-    View::OnFocus();
-    UpdateSplitResizeHandleAppearance(*handle_, true);
-    views::FocusRing::Get(handle_)->SchedulePaint();
-  }
   void OnBlur() override {
-    View::OnBlur();
-    UpdateSplitResizeHandleAppearance(*handle_, IsMouseHovered());
-    views::FocusRing::Get(handle_)->SchedulePaint();
+    SidebarResizeArea::OnBlur();
     callbacks_.record_metrics.Run();
     callbacks_.set_keyboard_resized.Run(false);
   }
-  void OnThemeChanged() override {
-    ResizeArea::OnThemeChanged();
-    UpdateSplitResizeHandleAppearance(*handle_, HasFocus() || IsMouseHovered());
-  }
-  void Layout(PassKey) override {
-    LayoutSuperclass<views::ResizeArea>(this);
-    gfx::Rect marker = GetLocalBounds();
-    marker.ClampToCenteredSize(gfx::Size(kSidebarMetrics.resize_handle_thickness,
-                                        kSidebarMetrics.resize_handle_length));
-    handle_->SetBoundsRect(marker);
-    UpdateSplitResizeHandleAppearance(*handle_, HasFocus() || IsMouseHovered());
-    // Window/Side Panel animation can shorten the gutter without another
-    // mouse event. Never leave a transformed marker outside its new bounds.
-    if (pointer_y_) {
-      UpdateAnchor(*pointer_y_);
-    } else {
-      UpdateSplitResizeHandleAnchor(*handle_, gfx::Vector2dF(),
-                                    HasFocus() || IsMouseHovered(), false);
-    }
-  }
 
- private:
-  void UpdateAnchor(int y) {
-    pointer_y_ = y;
-    const int half = handle_->height() / 2;
-    const int center = std::clamp(y, half, std::max(half, height() - half));
-    UpdateSplitResizeHandleAnchor(
-        *handle_, gfx::Vector2dF(0, center - handle_->bounds().CenterPoint().y()),
-        true, true);
-  }
+private:
   SidePanelResizeCallbacks callbacks_;
-  raw_ptr<views::View> handle_ = nullptr;
-  std::optional<int> pointer_y_;
 };
 
 } // namespace
+
+std::unique_ptr<views::ResizeArea>
+CreateSidebarResizeArea(views::ResizeAreaDelegate *delegate) {
+  return std::make_unique<SidebarResizeArea>(delegate,
+                                            /*show_resting_marker=*/false);
+}
+
+gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect &sidebar,
+                                    int resize_area_width) {
+  // Center the marker between the visible Tab row edge and Browser Surface,
+  // including the Sidebar's own trailing row inset in the visual gap.
+  const int trailing_offset =
+      resize_area_width >= kSidebarMetrics.resize_handle_thickness
+          ? (kSidebarMetrics.content_gutter -
+             kSidebarMetrics.tab_strip_horizontal_padding + resize_area_width) /
+                2
+          : 0;
+  return gfx::Rect(sidebar.right() + trailing_offset - resize_area_width,
+                   sidebar.y(), resize_area_width, sidebar.height());
+}
+
+std::unique_ptr<views::ViewTargeter>
+CreateSidebarResizeAreaTargeter(views::ResizeArea &resize_area) {
+  return std::make_unique<views::ViewTargeter>(
+      std::make_unique<SidebarResizeAreaTargeter>(resize_area));
+}
 
 bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point& point,
                                              const gfx::Rect& controls,
@@ -1325,12 +1439,14 @@ gfx::Rect GetSplitPaneControlsBounds(views::View &controls,
   return AsSplitPaneControls(controls).GetAnchoredBounds(parent_bounds);
 }
 
-void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized) {
+void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized,
+                                       bool show_resting_marker) {
   if (!handle.layer()) {
     return;
   }
   UpdateResizeAreaBackground(handle, emphasized, /*animate=*/true,
-                             handle.layer()->GetTargetTransform());
+                             handle.layer()->GetTargetTransform(),
+                             show_resting_marker);
   const ui::ColorProvider *const color_provider = handle.GetColorProvider();
   if (!color_provider) {
     return;
@@ -1343,13 +1459,15 @@ void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized) {
 
 void UpdateSplitResizeHandleAnchor(views::View &handle,
                                    const gfx::Vector2dF &offset,
-                                   bool emphasized, bool animate) {
+                                   bool emphasized, bool animate,
+                                   bool show_resting_marker) {
   if (!handle.layer()) {
     return;
   }
   gfx::Transform transform;
   transform.Translate(offset.x(), offset.y());
-  UpdateResizeAreaBackground(handle, emphasized, animate, transform);
+  UpdateResizeAreaBackground(handle, emphasized, animate, transform,
+                             show_resting_marker);
 }
 
 } // namespace yee

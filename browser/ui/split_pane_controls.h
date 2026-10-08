@@ -13,13 +13,25 @@
 #include "ui/gfx/geometry/vector2d_f.h"
 
 namespace views {
+class ResizeArea;
+class ResizeAreaDelegate;
 class View;
+class ViewTargeter;
 }
 
 namespace yee {
 
 inline constexpr int kSplitPaneControlsViewId = 92011;
 inline constexpr int kSidePanelResizeGutterViewId = 92020;
+
+// Adds a hover/focus-only marker to Chromium's native Sidebar resize delegate.
+// Native resizing, keyboard commands, and state stay intact.
+std::unique_ptr<views::ResizeArea>
+CreateSidebarResizeArea(views::ResizeAreaDelegate* delegate);
+gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect& sidebar,
+                                   int resize_area_width);
+std::unique_ptr<views::ViewTargeter>
+CreateSidebarResizeAreaTargeter(views::ResizeArea& resize_area);
 
 // A bounded diagonal corridor, not a halo over the whole page.
 bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point& point,
@@ -62,13 +74,14 @@ void UpdateSplitPaneControls(views::View& controls,
 gfx::Rect GetSplitPaneControlsBounds(views::View& controls,
                                      const gfx::Rect& parent_bounds);
 
-// Keeps Chromium's keyboard-accessible resize handle visible at rest while
-// deriving its contrast from Yee's split canvas.
-void UpdateSplitResizeHandleAppearance(views::View& handle, bool emphasized);
+// Derives resize marker contrast from Yee's split canvas. Split and Side Panel
+// dividers keep the resting marker; the Sidebar opts into hover/focus only.
+void UpdateSplitResizeHandleAppearance(views::View& handle, bool emphasized,
+                                       bool show_resting_marker = true);
 void UpdateSplitResizeHandleAnchor(views::View& handle,
                                    const gfx::Vector2dF& offset,
-                                   bool emphasized,
-                                   bool animate);
+                                   bool emphasized, bool animate,
+                                   bool show_resting_marker = true);
 
 }  // namespace yee
 

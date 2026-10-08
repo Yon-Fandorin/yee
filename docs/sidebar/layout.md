@@ -91,3 +91,8 @@ constant에 다시 적지 않는다.
   정렬선은 같다.
 - Footer 지속 행은 50 DIP이고 Sidebar 좌우 inset 8을 공유한다. Tab ScrollView는
   Footer 위까지의 남은 공간을 채우며 Footer를 덮지 않는다.
+- Sidebar 분할바는 10 DIP resize target과 4 × 24 DIP 손잡이를 사용한다.
+  손잡이는 Tab 행의 실제 trailing 경계와 Browser Surface 사이에 중앙 정렬한다.
+  Tab 행 inset 8 DIP와 Content Gutter 6 DIP를 포함해 양옆 간격은 각각 5 DIP다.
+- Sidebar 손잡이는 평소에는 숨기고 경계 hover, 드래그, 키보드 focus에서
+  표시한다. 멀티탭 분할바는 기존 dimmed 중앙 표시를 유지한다.
