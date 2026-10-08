@@ -114,6 +114,7 @@ Vivaldi는 [`vivaldi://settings`](https://help.vivaldi.com/de/desktop-de/werkzeu
 Chromium에는 scheme 등록·Omnibox 입력 분류·navigation 정규화·주소 포매팅·복사·
 드래그·북마크와 세션 저장 연결을 둔다. 실제 WebUI 주소와 origin은 `chrome://`
 형식을 사용하며, 사용자에게 보여주고 복사하는 주소는 현재 브랜드를 따른다.
+기존 Chromium 설정은 `chrome://settings`와 하위 경로를 그대로 표시·복사한다.
 브라우저에서 시작한 이동은 navigation 이전에 정규화하고, renderer에서 시작한
 이동에는 기존 WebUI 접근 검사를 적용한다. 북마크와 세션의 저장 주소도 정규화해
 다음 빌드에서 브랜드가 바뀌어도 같은 내부 페이지를 복원한다.
@@ -141,9 +142,9 @@ LocationBarModelDelegate의 주소 포매팅과 Omnibox 복사 처리를 별도�
 WebUI 본문의 고정 링크 문구와 북마크 편집 화면 등 모든 표시 문자열의 브랜드
 전환은 별도 소비 경로를 확인한 뒤 연결한다.
 
-`브랜드://settings`는 Yee 설정으로, `브랜드://chromium-settings`는 기존
-Chromium 설정으로 연결한다. `chrome://settings` 입력은 기존 설정을 유지하며
-주소창에는 브랜드의 `chromium-settings` 경로로 표시한다. 화면과 디자인 근거는
+`브랜드://settings`는 Yee 설정으로 연결한다. 기존 Chromium 설정은
+`chrome://settings`로 접근하며 하위 경로와 주소창 표시·복사를 유지한다.
+Yee 설정의 고급 설정·세부 설정 링크도 이 주소를 사용한다. 화면 설계는
 [Yee 설정](settings.md)에 둔다.
 
 ## 빌드 없는 검증

@@ -30,22 +30,19 @@ GURL CanonicalInternalURL(const GURL& url) {
   replacements.SetSchemeStr(kWebUIScheme);
   if (url.host() == "settings") {
     replacements.SetHostStr(kProductSettingsHost);
-  } else if (url.host() == kChromiumSettingsAliasHost) {
-    replacements.SetHostStr("settings");
   }
   return url.ReplaceComponents(replacements);
 }
 
 GURL DisplayInternalURL(const GURL& url) {
-  if (!url.is_valid() || !url.SchemeIs(kWebUIScheme)) {
+  if (!url.is_valid() || !url.SchemeIs(kWebUIScheme) ||
+      url.host() == "settings") {
     return url;
   }
   GURL::Replacements replacements;
   replacements.SetSchemeStr(kInternalURLScheme);
   if (url.host() == kProductSettingsHost) {
     replacements.SetHostStr("settings");
-  } else if (url.host() == "settings") {
-    replacements.SetHostStr(kChromiumSettingsAliasHost);
   }
   return url.ReplaceComponents(replacements);
 }
@@ -62,6 +59,9 @@ std::u16string DisplayInternalURLText(const GURL& url,
     return formatted_url;
   }
   const auto displayed = DisplayInternalURL(url);
+  if (displayed == url) {
+    return formatted_url;
+  }
   const auto original_host = base::ASCIIToUTF16(url.host());
   const auto host_start = kWebUIPrefix.size();
   if (formatted_url.compare(host_start, original_host.size(), original_host) ==

@@ -79,8 +79,7 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
 IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
                        ExternalLaunchUsesCanonicalPolicy) {
   for (const char* suffix :
-       {"version/", "settings/", "settings/content-blocking",
-        "chromium-settings/resetProfileSettings"}) {
+       {"version/", "settings/", "settings/content-blocking"}) {
     const GURL branded(std::string(InternalURLScheme()) + "://" + suffix);
     const GURL canonical = CanonicalInternalURL(branded);
     EXPECT_EQ(startup::ValidateLaunchUrlWebUnsafe(canonical),
@@ -119,13 +118,11 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest, NativeCopyBookmarkAndSession) {
 }
 
 IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
-                       ReloadAndHistoryKeepBrandDisplay) {
+                       ReloadAndHistoryKeepPageAddress) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Branded("version")));
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL("chrome://settings/")));
-  EXPECT_EQ(base::UTF8ToUTF16(std::string(InternalURLScheme()) +
-                              "://chromium-settings"),
-            Address());
+  EXPECT_EQ(u"chrome://settings", Address());
   content::TestNavigationObserver back(Contents());
   Contents()->GetController().GoBack();
   back.Wait();
@@ -138,6 +135,15 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
   EXPECT_EQ(GURL("chrome://version/"), Contents()->GetLastCommittedURL());
   EXPECT_EQ(base::UTF8ToUTF16(std::string(InternalURLScheme()) + "://version"),
             Address());
+  content::TestNavigationObserver forward(Contents());
+  Contents()->GetController().GoForward();
+  forward.Wait();
+  EXPECT_EQ(u"chrome://settings", Address());
+  content::TestNavigationObserver native_reload(Contents());
+  Contents()->GetController().Reload(content::ReloadType::NORMAL, false);
+  native_reload.Wait();
+  EXPECT_EQ(GURL("chrome://settings/"), Contents()->GetLastCommittedURL());
+  EXPECT_EQ(u"chrome://settings", Address());
 }
 
 IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
@@ -166,14 +172,23 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
   EXPECT_EQ(false, content::EvalJs(
                        Contents(),
                        "document.getElementById('content-blocking').hidden"));
-  const GURL native(std::string(InternalURLScheme()) +
-                    "://chromium-settings/content");
+  const GURL native("chrome://settings/content");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), native));
   EXPECT_EQ(GURL("chrome://settings/content"),
             Contents()->GetLastCommittedURL());
   EXPECT_EQ(base::UTF8ToUTF16(native.spec()), Address());
   EXPECT_EQ(true, content::EvalJs(Contents(),
                                   "!!document.querySelector('settings-ui')"));
+  std::u16string copied_text = Address();
+  GURL copied_url;
+  bool write_url = false;
+  omnibox::AdjustTextForCopy(0, &copied_text, false, false, std::nullopt,
+                             Contents()->GetVisibleURL(), nullptr,
+                             metrics::OmniboxEventProto::OTHER, GURL(),
+                             &copied_url, &write_url);
+  EXPECT_TRUE(write_url);
+  EXPECT_EQ(native, copied_url);
+  EXPECT_EQ(base::UTF8ToUTF16(native.spec()), copied_text);
   chrome::ShowSettings(browser());
   ASSERT_TRUE(content::WaitForLoadStop(Contents()));
   EXPECT_EQ(SettingsURL(), Contents()->GetLastCommittedURL());

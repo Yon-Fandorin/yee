@@ -65,15 +65,19 @@ TEST_F(InternalURLsTest, FormatsOnlyActualWebUIAddresses) {
   EXPECT_EQ(u"settings", DisplayInternalURLText(url, u"settings"));
 }
 
-TEST_F(InternalURLsTest, PreservesNativeSettingsAndMapsItsOwnAlias) {
-  const GURL native("chrome://settings/content?name=a%20b#section");
-  const GURL alias(std::string(InternalURLScheme()) +
-                   "://chromium-settings/content?name=a%20b#section");
-  EXPECT_EQ(native, CanonicalInternalURL(native));
-  EXPECT_EQ(native, CanonicalInternalURL(alias));
-  EXPECT_EQ(alias, DisplayInternalURL(native));
-  EXPECT_EQ(base::UTF8ToUTF16(alias.spec()),
-            DisplayInternalURLText(native, base::UTF8ToUTF16(native.spec())));
+TEST_F(InternalURLsTest, PreservesNativeSettingsNavigationAndDisplay) {
+  for (const char* input :
+       {"chrome://settings/", "chrome://settings/content?name=a%20b#section",
+        "chrome://settings/resetProfileSettings"}) {
+    const GURL native(input);
+    EXPECT_EQ(native, CanonicalInternalURL(native));
+    EXPECT_EQ(native, DisplayInternalURL(native));
+    EXPECT_EQ(base::UTF8ToUTF16(native.spec()),
+              DisplayInternalURLText(native, base::UTF8ToUTF16(native.spec())));
+  }
+  EXPECT_EQ(
+      u"chrome://settings",
+      DisplayInternalURLText(GURL("chrome://settings/"), u"chrome://settings"));
   EXPECT_EQ(GURL("chrome://yee-settings/"), SettingsURL());
 }
 

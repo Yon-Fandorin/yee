@@ -6,10 +6,11 @@
 | --- | --- | --- |
 | `브랜드://settings` | `chrome://yee-settings/` | Yee 설정 홈 |
 | `브랜드://settings/content-blocking` | `chrome://yee-settings/content-blocking` | 기본 필터·도메인 차단·사이트 예외 |
-| `브랜드://chromium-settings` | `chrome://settings/` | 기존 Chromium 설정 |
+| `chrome://settings` | `chrome://settings/` | 기존 Chromium 설정 |
 
 접두어는 `branding/brand.json`에서 생성한다. `chrome://settings`와 하위 경로는
-기존 화면으로 연결하며, 실제 origin과 저장 URL은 브랜드 변경에도 유지된다.
+기존 화면으로 연결하고 주소창 표시·복사도 `chrome://settings`를 유지한다.
+실제 origin과 저장 URL은 브랜드 변경에도 유지된다.
 일반 설정 메뉴는 Yee 설정 홈을 연다. 사이트 권한·다운로드·개인정보 등 기존
 세부 설정 링크와 Chromium 설정 구현은 유지한다. Sidebar footer에는 새 설정
 계층을 복제하지 않는다.
