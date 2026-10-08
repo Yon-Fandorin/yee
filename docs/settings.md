@@ -15,7 +15,8 @@
 세부 설정 링크와 Chromium 설정 구현은 유지한다. Sidebar footer에는 새 설정
 계층을 복제하지 않는다.
 
-UI 소스와 리소스는 `browser/ui/settings/`에 둔다. Chromium 연결은 WebUI config
+설정 native 연결은 `browser/ui/settings/`, 공통 프런트엔드·리소스·번역은
+`browser/ui/webui/`에 둔다. Chromium 연결은 WebUI config
 등록·일반 설정 메뉴의 목적지·번역 pak 합치기다. SvelteKit의 정적 빌드 결과를
 C++ 리소스로 묶어 `WebUIDataSource`로 제공한다. 외부 폰트·이미지·CDN을 설정
 화면에서 요청하지 않는다.
@@ -25,14 +26,14 @@ C++ 리소스로 묶어 `WebUIDataSource`로 제공한다. 외부 폰트·이미
 - SvelteKit 3·Svelte 5·TypeScript를 사용한다. 버전은 `frontend/package.json`과
   잠금 파일에 고정한다. Node 22.17 이상과 npm은 빌드 도구다.
 - 설정은 `vite.config.ts`, 타입 설정은 `$app/tsconfig`를 따른다. `package.json`의
-  subpath import로 `#lib/*`와 `#styles`를 선언하며 모듈 확장자를 명시한다.
+  subpath import로 `#lib/*`·`#settings/*`·`#styles`를 선언하며 모듈 확장자를 명시한다.
 - 기본 컨트롤은 shadcn-svelte의 `Button`, `Input`, `Label`, `Badge`, `Separator`,
   `Card`, `Checkbox`, `Switch`를 사용한다. 소스는 `src/lib/components/ui/`에 소유하며 설정 행·설정 묶음은
   이 기본 컴포넌트를 조합한다. 아이콘은 Lucide에서 필요한 항목만 가져온다.
   타입이 있는 브리지가 기존
   WebUI 메시지를 호출하고, 상태 모델이 갱신 알림과 요청 중 상태를 관리한다.
-- GRIT 원문은 `strings/settings_strings.grd`, 한국어 번역은
-  `strings/settings_strings_ko.xtb`에 둔다. 브라우저 표시 언어를 따르며
+- GRIT 원문은 `strings/webui_strings.grd`, 한국어 번역은
+  `strings/webui_strings_ko.xtb`에 둔다. 브라우저 표시 언어를 따르며
   번역이 없는 언어는 영어로 표시한다. 문서 방향과 날짜 형식도 표시 언어를 따른다.
 - 번역은 기존 locale pak에 합친 뒤 `AddLocalizedStrings()`와 `loadTimeData`로
   전달한다. 독립 resource ID 범위는 65000–65199이며 pak 합치기가 중복을 검사한다.
@@ -57,10 +58,10 @@ C++ 리소스로 묶어 `WebUIDataSource`로 제공한다. 외부 폰트·이미
 정돈하려면 저장소 루트에서 다음을 실행한다.
 
 ```sh
-settings_source="$PWD/browser/ui/settings/frontend"
-settings_workspace="$PWD/.local-build/chromium/src/out/YeePilot/gen/chrome/browser/ui/views/yee/settings/frontend_build"
-(cd "$settings_workspace" && npm exec --offline -- prettier --write \
-  --ignore-path "$settings_source/.prettierignore" "$settings_source")
+webui_source="$PWD/browser/ui/webui/frontend"
+webui_workspace="$PWD/.local-build/chromium/src/out/YeePilot/gen/chrome/browser/ui/views/yee/webui/frontend_build"
+(cd "$webui_workspace" && npm exec --offline -- prettier --write \
+  --ignore-path "$webui_source/.prettierignore" "$webui_source")
 ```
 
 ### 기본 컴포넌트와 테마
@@ -88,12 +89,14 @@ Tailwind 기반 설정과 문서 전체의 기본 스타일은 `src/styles.css`�
 ### 컴포넌트 배치
 
 페이지 전용 UI는 해당 `routes` 경로 아래의 `components/`에 둔다. 전체 설정의
-탐색은 `routes/components/SettingsNavigation.svelte`, 필터 목록과 사이트 예외는
-`routes/content-blocking/components/`가 소유한다. 여러 화면에서 사용하는 헤더·행·
+탐색은 `routes/(settings)/components/SettingsNavigation.svelte`, 필터 목록과 사이트 예외는
+`routes/(settings)/content-blocking/components/`가 소유한다. 여러 화면에서 사용하는 헤더·행·
 설정 묶음·안내 UI와 기본 컨트롤은 `src/lib/components/`에 둔다.
 
-`+layout.svelte`는 모델 수명과 화면 구성을 연결한다. 본문 스크롤과 이동 후 포커스,
-뒤로·앞으로·새로고침의 위치 복원은 인접한 `routes/settings-scroll.svelte.ts`가
+`routes/(settings)/+layout.svelte`는 설정 모델 수명과 화면 구성을 연결한다.
+설정 전용 브리지와 상태 모델도 같은 경로 그룹에 두며 공통 `lib`에 포함하지 않는다.
+본문 스크롤과 이동 후 포커스,
+뒤로·앞으로·새로고침의 위치 복원은 인접한 `routes/(settings)/settings-scroll.svelte.ts`가
 관리한다. 각 페이지와 전용 컴포넌트는 기존 공통 상태 모델을 사용하며,
 전용 컴포넌트에서 새로운 WebUI 메시지나 상태 모델을 만들지 않는다. 각 조작의
 결과는 공통 `SettingsFeedback`으로 해당 설정 묶음 옆에 표시하며, 요청이 실패하면
@@ -140,7 +143,7 @@ Tailwind 기반 설정과 문서 전체의 기본 스타일은 `src/styles.css`�
 도메인 규칙은 `browser/content_blocking/blocked_domains.*`가 정규화·파일 해석을
 소유하고, `ContentBlockingService`가 프로필 저장과 thread-safe snapshot을 갱신한다.
 설정의 기존 상태 모델이 native 메시지를 호출한다. 입력 UI와 파일 미리보기는
-`routes/content-blocking/components/BlockedDomains.svelte`와 `DomainImport.svelte`에
+`routes/(settings)/content-blocking/components/BlockedDomains.svelte`와 `DomainImport.svelte`에
 두며 파서는 worker에서 실행한다. 기존 엔진의 기본 필터 generation은 바꾸지 않는다.
 
 개별 입력은 도메인만 받는다. 대소문자·마지막 점·국제화 도메인을 정규화하며

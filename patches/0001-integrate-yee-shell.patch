@@ -22289,7 +22289,7 @@ index 5d8a77b3bc..9ca5413a1a 100644
      }
  
 diff --git a/chrome/chrome_repack_locales.gni b/chrome/chrome_repack_locales.gni
-index 226c91dd84..b602b2741c 100644
+index 226c91dd84..f16332e4a7 100644
 --- a/chrome/chrome_repack_locales.gni
 +++ b/chrome/chrome_repack_locales.gni
 @@ -102,9 +102,14 @@ template("chrome_repack_locales") {
@@ -22301,11 +22301,11 @@ index 226c91dd84..b602b2741c 100644
 -      deps += [ "//chrome/browser/indigo/resources:indigo_strings" ]
 +      source_patterns += [
 +        "${root_gen_dir}/chrome/browser/indigo/resources/indigo_strings_",
-+        "${root_gen_dir}/chrome/browser/ui/views/yee/settings/settings_strings_",
++        "${root_gen_dir}/chrome/browser/ui/views/yee/webui/webui_strings_",
 +      ]
 +      deps += [
 +        "//chrome/browser/indigo/resources:indigo_strings",
-+        "//chrome/browser/ui/views/yee/settings:strings",
++        "//chrome/browser/ui/views/yee/webui:strings",
 +      ]
      }
      if (enable_builtin_search_provider_assets && !is_android) {

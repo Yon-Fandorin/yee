@@ -1,86 +1,4 @@
 # Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
-import("//tools/grit/grit_rule.gni")
-
-grit_strings("strings") {
-  source = "strings/settings_strings.grd"
-  resource_ids = "strings/resource_ids.spec"
-  output_prefix = "settings_strings_"
-  outputs = [ "grit/settings_strings.h" ]
-}
-
-action("resources") {
-  script = "resources/build_resources.py"
-  inputs = [
-    "frontend/.prettierrc.json",
-    "frontend/.prettierignore",
-    "frontend/package.json",
-    "frontend/package-lock.json",
-    "frontend/vite.config.ts",
-    "frontend/tsconfig.json",
-    "frontend/src/app.html",
-    "frontend/src/app.d.ts",
-    "frontend/src/hooks.client.ts",
-    "frontend/src/styles.css",
-    "frontend/src/lib/i18n.ts",
-    "frontend/src/lib/bridge.ts",
-    "frontend/src/lib/settings.svelte.ts",
-    "frontend/src/lib/components/Icon.svelte",
-    "frontend/src/lib/components/SettingLink.svelte",
-    "frontend/src/lib/components/SettingsGroup.svelte",
-    "frontend/src/lib/components/SettingsFeedback.svelte",
-    "frontend/src/lib/components/SettingsNotice.svelte",
-    "frontend/src/lib/components/SettingsPageHeader.svelte",
-    "frontend/src/lib/components/SettingsRow.svelte",
-    "frontend/src/routes/+layout.ts",
-    "frontend/src/routes/+layout.svelte",
-    "frontend/src/routes/+page.svelte",
-    "frontend/src/routes/settings-scroll.svelte.ts",
-    "frontend/src/routes/components/SettingsNavigation.svelte",
-    "frontend/src/routes/content-blocking/+page.svelte",
-    "frontend/src/routes/content-blocking/components/FilterLists.svelte",
-    "frontend/src/routes/content-blocking/components/FilterSubscriptions.svelte",
-    "frontend/src/routes/content-blocking/components/SiteExceptions.svelte",
-    "frontend/src/routes/content-blocking/components/BlockedDomains.svelte",
-    "frontend/src/routes/content-blocking/components/DomainList.svelte",
-    "frontend/src/routes/content-blocking/components/DomainListItem.svelte",
-    "frontend/src/routes/content-blocking/components/FilterSubscriptionItem.svelte",
-    "frontend/src/routes/content-blocking/components/DomainImport.svelte",
-    "frontend/src/lib/components/ui/badge/badge.svelte",
-    "frontend/src/lib/components/ui/badge/index.ts",
-    "frontend/src/lib/components/ui/button/button.svelte",
-    "frontend/src/lib/components/ui/button/index.ts",
-    "frontend/src/lib/components/ui/card/card-action.svelte",
-    "frontend/src/lib/components/ui/card/card-content.svelte",
-    "frontend/src/lib/components/ui/card/card-description.svelte",
-    "frontend/src/lib/components/ui/card/card-footer.svelte",
-    "frontend/src/lib/components/ui/card/card-header.svelte",
-    "frontend/src/lib/components/ui/card/card-title.svelte",
-    "frontend/src/lib/components/ui/card/card.svelte",
-    "frontend/src/lib/components/ui/card/index.ts",
-    "frontend/src/lib/components/ui/checkbox/index.ts",
-    "frontend/src/lib/components/ui/checkbox/checkbox.svelte",
-    "frontend/src/lib/components/ui/switch/index.ts",
-    "frontend/src/lib/components/ui/switch/switch.svelte",
-    "frontend/src/lib/components/ui/input/index.ts",
-    "frontend/src/lib/components/ui/input/input.svelte",
-    "frontend/src/lib/components/ui/label/index.ts",
-    "frontend/src/lib/components/ui/label/label.svelte",
-    "frontend/src/lib/components/ui/separator/index.ts",
-    "frontend/src/lib/components/ui/separator/separator.svelte",
-    "frontend/src/lib/styles/theme.css",
-    "frontend/src/lib/utils.ts",
-    "strings/settings_strings.grd",
-  ]
-  outputs = [
-    "$target_gen_dir/settings_resources.h",
-    "$target_gen_dir/settings_string_map.inc",
-  ]
-  args = [
-    rebase_path(outputs[0], root_build_dir),
-    rebase_path("frontend", root_build_dir),
-  ]
-}
-
 source_set("settings") {
   sources = [
     "content_blocking_settings_handler.cc",
@@ -90,12 +8,9 @@ source_set("settings") {
   ]
   public_deps = [ "//content/public/browser" ]
   deps = [
-    ":resources",
-    ":strings",
+    "../webui",
+    "../webui:strings",
     "//base",
-    "//base/version_info",
-    "//chrome/browser:browser_process",
-    "//chrome/browser/profiles:profile",
     "//chrome/browser/yee_content_blocking:browser",
     "//components/yee_branding",
     "//components/yee_content_blocking:core",
