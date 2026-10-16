@@ -9,12 +9,10 @@ import hashlib
 import json
 import os
 import re
-import stat
 import sys
 from pathlib import Path
 import subprocess
 import time
-import uuid
 
 
 def normalize_usage(result):
@@ -43,55 +41,12 @@ def private_write(path, data):
         stream.write('\n')
 
 
-def resume_session(parent, identity):
-    """Only resume a measured session with identical explicitly scoped setup."""
-    for path, directory in ((parent, True), (parent / 'summary.json', False)):
-        info = path.lstat()
-        if (info.st_uid != os.getuid() or info.st_mode & 0o077 or
-                not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))):
-            raise ValueError('resume record must be owned, private and non-symlink')
-    previous = json.loads((parent / 'summary.json').read_text())
-    if (not isinstance(previous, dict) or previous.get('session_identity') != identity or previous.get('returncode') != 0 or
-            previous.get('timed_out') is not False or not previous.get('usage') or
-            previous.get('authority_audit', {}).get('passed') is not True):
-        raise ValueError('resume requires a successful scoped record with unchanged identity')
-    session = previous.get('session_id')
-    if not isinstance(session, str) or str(uuid.UUID(session)) != session:
-        raise ValueError('resume requires an explicit canonical session UUID')
-    return session
-
-
 def file_sha256(path):
     digest = hashlib.sha256()
     with path.open('rb') as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def direct_arguments(commands, max_turns):
-    """Exact shell grants, never a catch-all or shell composition grant."""
-    if not commands or not 2 <= max_turns <= 30:
-        raise ValueError('direct testing requires exact commands and 2..30 turns')
-    for command in commands:
-        if not re.fullmatch(r'[A-Za-z0-9_./ =,:@+-]+', command):
-            raise ValueError('direct command contains unsupported shell/rule syntax')
-    result = ['--tools', 'Bash', '--permission-mode', 'dontAsk']
-    for command in commands:
-        result += ['--allow', 'Bash(' + command + ')']
-    return result
-
-
-def plan_file_arguments(path, python_plan=False):
-    extension = 'py' if python_plan else 'jsonl'
-    if not re.fullmatch(r'/private/tmp/yee-agent\.[A-Za-z0-9_]+/[A-Za-z0-9_-]+\.' + extension, str(path)):
-        raise ValueError('plan file must have the expected extension inside a private test directory')
-    for target, directory in ((path.parent, True), (path, False)):
-        info = target.lstat()
-        regular = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
-        if not regular or info.st_uid != os.getuid() or info.st_mode & 0o077:
-            raise ValueError('plan file and directory must be owned, private, non-symlink paths')
-    return ['--allow', f'Edit({path})', '--allow', f'Read({path})']
 
 
 def mcp_arguments(name, max_turns, handoff=False):
@@ -260,32 +215,17 @@ def main():
     if args.host_handoff and args.mcp_tool != 'aside__repl':
         parser.error('host handoff requires the exact Aside repl tool')
     if args.mcp_tool:
-        if args.direct_command or args.plan_file or args.python_plan or args.provider != 'grok':
+        if args.plan_file or args.provider != 'grok':
             parser.error('MCP mode cannot combine with shell/file grants or Kimi')
         try:
             direct_args = mcp_arguments(args.mcp_tool, args.max_turns, args.host_handoff)
         except ValueError as exc:
             parser.error(str(exc))
-    elif args.direct_command:
-        if args.provider != 'grok':
-            parser.error('direct Kimi test runner is not yet implemented')
-        try:
-            direct_args = direct_arguments(args.direct_command, args.max_turns)
-        except ValueError as exc:
-            parser.error(str(exc))
     elif args.max_turns != 1:
-        parser.error('multiple turns require explicit direct-command grants')
-    if args.plan_file and args.python_plan:
-        parser.error('choose one plan format')
-    editable_plan = args.plan_file or args.python_plan
-    if editable_plan:
-        if not direct_args:
-            parser.error('plan-file requires a scoped direct Grok test')
-        try:
-            direct_args += plan_file_arguments(editable_plan, bool(args.python_plan))
-        except (ValueError, OSError) as exc:
-            parser.error(str(exc))
-        direct_args[1] = 'Bash,search_replace,read_file'
+        parser.error('multiple turns require a scoped MCP trial')
+    if args.plan_file:
+        parser.error('plan-file requires a scoped direct Grok test')
+    editable_plan = None
     for path in (args.binary, args.cwd, args.prompt, args.record):
         if not path.is_absolute():
             parser.error('all paths must be absolute')
@@ -301,11 +241,6 @@ def main():
                     'mcp_config_sha256': hashlib.sha256(config.read_bytes()).hexdigest()}
         if args.host_handoff:
             identity['host_tool'] = 'trial_host__request_user'
-        if args.resume_record:
-            try:
-                resumed_session = resume_session(args.resume_record, identity)
-            except (ValueError, OSError, TypeError) as exc:
-                parser.error(str(exc))
     prompt = args.prompt.read_text(encoding='utf-8')
     if len(prompt.encode('utf-8')) > 65536:
         parser.error('prompt exceeds 64 KiB')
@@ -333,8 +268,6 @@ def main():
         # needed for the project-local MCP definition, never for the product
         # checkout or a global MCP configuration.
         argv.insert(1, '--trust')
-    if resumed_session:
-        argv.extend(['--resume', resumed_session])
     if args.provider == 'kimi':
         argv = [str(args.binary), '--model', args.model, '--skills-dir', str(args.cwd),
                 '--output-format', 'stream-json', '-p', prompt]

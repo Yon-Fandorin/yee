@@ -47,36 +47,21 @@ class UsageTests(unittest.TestCase):
             self.assertIn('exact no-tools profile',result.stderr)
             self.assertFalse((Path(directory)/'new').exists())
 
-    def test_resume_requires_explicit_successful_unchanged_private_record(self):
-        with tempfile.TemporaryDirectory() as directory:
-            parent = Path(directory)
-            identity = {'cwd':'/private/tmp/scoped','tool':'yee__yee_browser','model':'grok-4.6'}
-            summary = {'session_identity':identity,'returncode':0,'timed_out':False,
-                       'usage':{'total_tokens':10},'authority_audit':{'passed':True},
-                       'session_id':'807b65e7-6236-4807-af28-48b45cf5eb82'}
-            path = parent / 'summary.json'
-            record.private_write(path, summary)
-            self.assertEqual(record.resume_session(parent,identity),summary['session_id'])
-            for changes in ({'session_id':'latest'}, {'returncode':1}, {'usage':None},
-                            {'authority_audit':{'passed':False}}, {'session_identity':{}}, {'timed_out':True}):
-                path.write_text(json.dumps({**summary,**changes}))
-                with self.assertRaises(ValueError):
-                    record.resume_session(parent,identity)
-            path.write_text(json.dumps(summary))
-            path.chmod(0o644)
-            with self.assertRaises(ValueError):
-                record.resume_session(parent,identity)
-
     def test_disabled_shell_path_exits_before_creating_record_or_invoking_binary(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'record'
-            result = subprocess.run([sys.executable, str(Path(__file__).with_name('run-grok-recorded.py')),
-                '--binary', '/does-not-exist', '--cwd', directory, '--prompt', '/does-not-exist',
-                '--record', str(target), '--model', 'test', '--direct-command', 'safe'],
-                capture_output=True, text=True)
-            self.assertEqual(result.returncode, 2)
-            self.assertIn('file/shell model trials disabled', result.stderr)
-            self.assertFalse(target.exists())
+            for flag, value, error in (
+                ('--direct-command', 'safe', 'file/shell model trials disabled'),
+                ('--python-plan', '/missing', 'Python-plan model trials disabled'),
+            ):
+                with self.subTest(flag=flag):
+                    result = subprocess.run([sys.executable, str(Path(__file__).with_name('run-grok-recorded.py')),
+                        '--binary', '/does-not-exist', '--cwd', directory, '--prompt', '/does-not-exist',
+                        '--record', str(target), '--model', 'test', flag, value],
+                        capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertIn(error, result.stderr)
+                    self.assertFalse(target.exists())
 
     def test_project_trust_requires_a_scoped_mcp_trial_before_creating_record(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -114,16 +99,6 @@ class UsageTests(unittest.TestCase):
             self.assertEqual(record.audit_authority(stream(name, args), [],
                              mcp_tool='yee__yee_browser')['passed'], expected)
 
-    def test_python_plan_grant_is_explicit_and_separate_from_jsonl(self):
-        with tempfile.TemporaryDirectory(prefix='yee-agent.', dir='/private/tmp') as directory:
-            path = Path(directory) / 'plan.py'
-            path.write_text('print(page_info())\n')
-            path.chmod(0o600)
-            with self.assertRaises(ValueError):
-                record.plan_file_arguments(path)
-            self.assertEqual(record.plan_file_arguments(path, True),
-                             ['--allow', f'Edit({path})', '--allow', f'Read({path})'])
-
     def test_form_preflight_requires_empty_correct_size_and_origin(self):
         ready = {'ok': True, 'truncated': False, 'document': 'test-doc',
                  'viewport': {'width': 1440, 'height': 900},
@@ -144,47 +119,6 @@ class UsageTests(unittest.TestCase):
         for name in ('*', 'yee__*', 'other__tool', 'yee__yee_browser) Bash(*)'):
             with self.assertRaises(ValueError):
                 record.mcp_arguments(name, 6)
-
-    def test_plan_edit_grant_is_one_existing_private_test_file(self):
-        with tempfile.TemporaryDirectory(prefix='yee-agent.', dir='/private/tmp') as directory:
-            path = Path(directory) / 'plan.jsonl'
-            path.write_text('REPLACE_WITH_JSONL_PLAN\n')
-            path.chmod(0o600)
-            grants = record.plan_file_arguments(path)
-            self.assertEqual(grants, ['--allow', f'Edit({path})', '--allow', f'Read({path})'])
-            path.chmod(0o644)
-            with self.assertRaises(ValueError):
-                record.plan_file_arguments(path)
-
-    def test_plan_grant_rejects_symlinks_and_product_paths(self):
-        with self.assertRaises(ValueError):
-            record.plan_file_arguments(Path('/Users/yongjunkim/erast/yee/source.jsonl'))
-        with tempfile.TemporaryDirectory(prefix='yee-agent.', dir='/private/tmp') as directory:
-            path = Path(directory) / 'actual.jsonl'
-            path.write_text('test')
-            path.chmod(0o600)
-            link = Path(directory) / 'plan.jsonl'
-            link.symlink_to(path)
-            with self.assertRaises(ValueError):
-                record.plan_file_arguments(link)
-
-    def test_shell_stdin_redirection_is_not_granted(self):
-        command = 'python3 /tmp/yee.py session < /private/tmp/yee-agent.Ab12/plan.jsonl'
-        with self.assertRaises(ValueError):
-            record.direct_arguments([command], 4)
-        for suffix in (' < /etc/passwd', ' << EOF', ' > /private/tmp/out',
-                       ' < /private/tmp/yee-agent.Ab12/../secret.jsonl',
-                       ' < /private/tmp/yee-agent.Ab12/plan.jsonl; echo bad'):
-            with self.assertRaises(ValueError):
-                record.direct_arguments(['python3 /tmp/yee.py session' + suffix], 4)
-
-    def test_direct_grants_are_exact_and_do_not_bypass_permissions(self):
-        args = record.direct_arguments(['python3 /tmp/yee.py observe'], 4)
-        self.assertIn('Bash(python3 /tmp/yee.py observe)', args)
-        self.assertIn('dontAsk', args)
-        for command in ['python3 *', 'echo ok; rm x', '$(whoami)', 'echo\nsecret', 'x(y)']:
-            with self.assertRaises(ValueError):
-                record.direct_arguments([command], 4)
 
     def test_stream_requires_one_terminal_result(self):
         self.assertEqual(record.parse_grok_output(b'{"type":"assistant"}\n{"type":"result","usage":{}}', True),

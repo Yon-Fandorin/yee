@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/generated_resources.h"
+#include "ui/base/class_property.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -58,6 +59,9 @@
 
 namespace yee {
 namespace {
+
+DEFINE_UI_CLASS_PROPERTY_KEY(int, kSidebarFlyoutHitTestTopInsetKey, 0)
+DEFINE_UI_CLASS_PROPERTY_KEY(int, kSidebarFlyoutHitTestBottomInsetKey, 0)
 
 constexpr int kControlButtonSize = 30;
 constexpr int kControlButtonGap = 2;
@@ -1226,8 +1230,7 @@ private:
   const bool show_resting_marker_;
 };
 
-// Include only the resize gutter beyond the Sidebar's normal bounds. The
-// translated flyout still keeps its continuous path from the window edge.
+// 시각적 flyout 여백과 resize gutter만 포함해 가장자리 hover 경로를 잇는다.
 class SidebarResizeAreaTargeter : public views::ViewTargeterDelegate {
 public:
   explicit SidebarResizeAreaTargeter(views::ResizeArea &resize_area)
@@ -1236,6 +1239,11 @@ public:
   bool DoesIntersectRect(const views::View *target,
                          const gfx::Rect &rect) const override {
     gfx::Rect hit_bounds = target->GetLocalBounds();
+    hit_bounds.Outset(
+        gfx::Outsets()
+            .set_top(target->GetProperty(kSidebarFlyoutHitTestTopInsetKey))
+            .set_bottom(
+                target->GetProperty(kSidebarFlyoutHitTestBottomInsetKey)));
     const int translation = static_cast<int>(target->GetTransform().rc(0, 3));
     if (translation > 0) {
       hit_bounds.Outset(gfx::Outsets::TLBR(0, translation, 0, 0));
@@ -1327,9 +1335,18 @@ CreateSidebarResizeAreaTargeter(views::ResizeArea &resize_area) {
       std::make_unique<SidebarResizeAreaTargeter>(resize_area));
 }
 
-bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point& point,
-                                             const gfx::Rect& controls,
-                                             const gfx::Rect& divider) {
+void SetSidebarFlyoutHitTestInsets(views::View &sidebar, int top, int bottom) {
+  sidebar.SetProperty(kSidebarFlyoutHitTestTopInsetKey,
+                      std::clamp(top, 0, kSidebarMetrics.sidebar_flyout_inset));
+  sidebar.SetProperty(kSidebarFlyoutHitTestBottomInsetKey,
+                      std::clamp(bottom, 0,
+                                 kSidebarMetrics.sidebar_flyout_inset -
+                                     kSidebarMetrics.content_gutter));
+}
+
+bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point &point,
+                                             const gfx::Rect &controls,
+                                             const gfx::Rect &divider) {
   if (controls.IsEmpty() || divider.IsEmpty()) {
     return false;
   }

@@ -6,7 +6,11 @@
 
 ## 1. 정책과 순수 geometry
 
-`test-sidebar.sh unit`이 창을 열지 않고 확인한다.
+`test-sidebar.sh`의 기본값은 `unit`이며 `--no-build`만 줘도 단위 검사만 실행한다.
+기존 공통 테스트 source_set을 묶은 작은 `yee_layout_unittests`를 사용하며 전체
+Chromium `unit_tests`를 빌드하지 않는다. 기존 Sidebar 필터의 검사는 모두 유지한다.
+계산·색상·직접 callback 검사는 창 활성화 없이 검사한다. native Footer의 popup·focus
+계약 검사는 실제 Widget을 표시하고 활성화할 수 있으므로 완전한 무창 검사는 아니다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
@@ -24,6 +28,11 @@
 ## 2. 펼친 Sidebar의 실제 View 구조
 
 `test-sidebar.sh interactive`가 실제 Yee 창과 `TabStripModel`을 함께 사용한다.
+주소줄·Header의 실제 색상·popup·renderer 연결 검사는
+[`test-header.sh interactive`](../header/test-coverage.md)가 소유하며 여기서 중복
+실행하지 않는다. 두 영역을 함께 바꾸면 두 gate를 선택한다. 아래의 Sidebar flyout
+두 검사는 `test-browser-surface-layout.sh interactive`가 소유하며 applied layout
+변경 시 함께 실행한다. 실제 입력·focus·animation 계약의 검사는 유지한다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
@@ -35,25 +44,29 @@
 | Favorite 하나를 집어 기존 독의 다른 위치로 재정렬하면 pin 상태와 선택한 순서 유지 | `YeeSidebarSingleFavoriteDragReordersWithinDock` |
 | Group 헤더 drag는 Favorite 드롭존·preview·pin을 만들지 않음 | `YeeSidebarGroupHeaderDragHasNoFavoriteAffordance` |
 | Group 헤더와 행은 32 DIP, Group 행은 10 DIP 들여쓰기, 접기 시 자식 숨김 | `YeeSidebarExpandedGroupUsesSharedRowMetrics` |
-| New Tab·Agent control은 Sidebar Header에 한 번만 남고 split/collapse에서도 소유권 유지 | `YeeSidebarHeaderControlsPersistAcrossSplitAndCollapse` |
-| Context Switcher Footer는 탭 목록 아래에 한 번만 남고 split에서 복제되지 않으며 collapse와 expand를 따름 | `YeeSidebarFooterPersistsAcrossSplitAndCollapse` |
-| Footer trigger는 하나의 메뉴 Widget을 열고 Root를 Context → Browser tools → Yee Memory 순서로 표시하며, 선별되지 않은 Chromium 설정은 복제하지 않고 메뉴 폭·접근성 이름·재클릭 닫기를 유지 | `YeeSidebarFooterOpensCuratedRootMenu` |
+| Header의 New Tab·Agent와 탭 목록 아래 Footer는 한 번만 남고 split/collapse에서도 같은 View의 소유권을 유지 | `YeeSidebarControlsPersistAcrossSplitAndCollapse` |
+| 저장된 좁은 폭에서도 Header가 온전히 표시되고, 창 버튼 아래54 DIP 상단·가로/하단12 DIP 외곽을 유지하며, 창 버튼 행은 native hit target에서 제외. 실제 hover·Footer 팝업은 페이지 폭을 바꾸지 않고 닫기 후 접힘으로 복귀 | `YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds` |
+| hover에서 고정·접힘으로 전환할 때 폭·불투명도·위치가 중간 프레임에서 튀지 않고 Header 버튼이 겹치거나 부분적으로 잘리지 않음 | `YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation` |
 
-Footer의 Root 순서, Browser tools의 제한된 action 목록, 하위 화면의 Back 목적지, 단일 local context fallback은
-`SidebarFooterPolicyTest.*`가 창을 열지 않고 확인한다. `SidebarFooterViewTest.*`는
-bubble이 Footer 폭 변경을 추적하는지, 접근 가능한 창 이름을 제공하는지, trigger
-재클릭으로 같은 bubble을 닫는지, Memory 변경을 callback으로 전달하는지 확인한다.
-`TriggerUsesOnlyWorkspaceMarkAndDisclosure`는 지속 행의 후행 profile mark가 다시
-추가되지 않도록 한다. `InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
+위 두 flyout 검사는 고정 상태에서 펼침 잠금을 얻은 뒤 접는 순서도 확인한다.
+Footer·Create에 키보드 focus가 있어도 종료 통지 뒤 hover로 인계하고,
+focus와 잠금을 해제하면 페이지 폭을 바꾸지 않고 숨겨야 한다.
+실제 애니메이션과 애니메이션 생략 경로를 기존 두 검사 안에서 각각 검증한다.
+
+`SidebarFooterPolicyTest.*`는 local context의 실제 계정·빈 계정 fallback을 확인한다.
+`SidebarFooterViewTest.*`는 실제 메뉴의 목적지, 키보드 이동과 Back, 선별된 Browser
+action 실행, 접근 가능한 이름, Footer와 독립적인 메뉴 폭, Memory callback을 확인한다.
+`WorkspaceMarkAppearsOnlyInFooter`는 profile mark 중복을 확인한다.
+`InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
 rest와 direct focus → keyboard traversal focus 순서에서 배경·외곽선 painter와
 고정 inset 계약을 확인한다. `PointerDismissDoesNotRestoreFocusOrOutlinedSurface`는
 별도 focus target으로 직접 focus가 이동한 뒤 lost-focus 종료를 수행해 새 focus를
 보존하고 배경과 active 외곽선을 제거하는지 확인한다.
 `EscapeDismissRestoresKeyboardTraversalFocus`는 그 과정에서도 Escape의 keyboard
 focus 복원 계약이 유지되는지 확인한다.
-또한 `ThemeChangeAfterCloseHasNoDanglingBubble`과
-`ThemeChangeAfterNativeTeardownHasNoDanglingBubble`은 정상 종료와 네이티브 종료
-직후 theme 변경에도 닫힌 bubble의 anchor observer가 남지 않는지 검증한다.
+또한 `TriggerReclickClosesTheSameBubble`과
+`ThemeChangeAfterNativeTeardownHasNoDanglingBubble`은 정상·네이티브 종료 직후
+theme 변경과 즉시 다시 열기에서 이전 anchor·잠금이 남지 않는지 검증한다.
 
 ## 3. 드래그 출발점과 도착점
 

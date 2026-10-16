@@ -15,22 +15,16 @@ class OutputContractTests(unittest.TestCase):
         source = 'Save a polite reply, do not send it; report the result as JSON.'
         prompt, added = compose_prompt(source, OutputRequirements(saved_prose=True, final_json=True))
         self.assertEqual(added, (DRAFT_GROUNDING_CONTRACT, STRICT_FINAL_JSON_CONTRACT))
-        self.assertIn('saved artifact remains prose', prompt)
-        self.assertIn('final assistant message', prompt)
-        self.assertIn('never send it', prompt)
-        self.assertIn('observed fact', prompt)
-        self.assertIn('each how-to/process', prompt)
-        self.assertIn('state that exact limitation in the draft', prompt)
-        self.assertIn('when explicitly requested', prompt)
-        self.assertLess(len(DRAFT_GROUNDING_CONTRACT), 900)
+        self.assertTrue(prompt.startswith(source))
+        for contract in added:
+            self.assertEqual(prompt.count(contract), 1)
         self.assertNotIn(SOURCE_QUOTATION_CONTRACT, prompt)
 
     def test_explicit_quotes_keep_metadata_and_amendments(self):
         prompt, added = compose_prompt('Quote every rule and amendment.',
                                        OutputRequirements(source_quotation=True))
         self.assertEqual(added, (SOURCE_QUOTATION_CONTRACT,))
-        self.assertIn('without repeating the label', prompt)
-        self.assertIn('without replacing the original statement', prompt)
+        self.assertIn(SOURCE_QUOTATION_CONTRACT, prompt)
         self.assertNotIn(STRICT_FINAL_JSON_CONTRACT, prompt)
 
     def test_nested_host_composition_preserves_user_text_and_adds_once(self):

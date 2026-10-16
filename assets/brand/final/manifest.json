@@ -1,0 +1,17 @@
+{
+  "name": "Yee 이음매듭 최종 시안",
+  "viewBox": "0 0 128 128",
+  "fill": "currentColor",
+  "variants": [
+    {
+      "id": "01",
+      "name": "살짝 돌출된 매듭",
+      "file": "yee-ieum-knot-01.svg"
+    },
+    {
+      "id": "02",
+      "name": "곡선을 따라 채운 매듭",
+      "file": "yee-ieum-knot-02.svg"
+    }
+  ]
+}

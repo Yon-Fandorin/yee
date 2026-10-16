@@ -19,7 +19,7 @@
   <translation id="1412223401206735569">인터넷 사용 기록과 보안</translation>
   <translation id="6807776153502104854">모양</translation>
   <translation id="2990488457307705254">테마와 화면 표시</translation>
-  <translation id="8110830742817670814">이 화면은 시스템의 라이트·다크 모드를 따릅니다.</translation>
+  <translation id="243274385267179746">이 화면은 브라우저의 라이트·다크 모드를 따르며, 테마색을 은은하게 반영합니다.</translation>
   <translation id="6094984954313876672">다운로드</translation>
   <translation id="2524519825755556632">파일 저장 위치와 다운로드 설정</translation>
   <translation id="121765559298954495">차단 켜짐</translation>
@@ -256,4 +256,107 @@
   <translation id="8388644980026661425">북마크를 불러오지 못했습니다. 다시 시도하세요.</translation>
   <translation id="9164858317422283048">계정 북마크</translation>
   <translation id="2464364063450151179">이 기기에 저장됨</translation>
+  <translation id="2222975468665491739"><ph name="PRODUCT_NAME" /> 브라우저가 기본 브라우저로 설정되어 있지 않습니다</translation>
+  <translation id="5547874373965217287"><ph name="PRODUCT_NAME" /> 브라우저를 기본 브라우저로 설정하고 작업 표시줄에 고정하세요</translation>
+  <translation id="7575889255043835106">확장 프로그램을 불러오지 못했습니다. 다시 시도해 주세요.</translation>
+  <translation id="9073228781425370294">확장 프로그램을 변경하지 못했습니다. 다시 시도해 주세요.</translation>
+  <translation id="795822993800494385">사용 중</translation>
+  <translation id="4686007251677171793">사용 안 함</translation>
+  <translation id="8474094755215576628">중지됨</translation>
+  <translation id="6151764144531633360">차단됨</translation>
+  <translation id="2266985058735425712">관리자가 이 확장 프로그램을 차단했습니다.</translation>
+  <translation id="7201520361496645301">확장 프로그램이 손상되었을 수 있습니다. 브라우저 관리 화면에서 복구해 주세요.</translation>
+  <translation id="8007464931473502941">설치가 의심스러워 확장 프로그램이 비활성화되었습니다.</translation>
+  <translation id="6802515217309586070">이 확장 프로그램을 사용하려면 업데이트가 필요합니다.</translation>
+  <translation id="2856414744040600677">이 확장 프로그램을 사용하려면 확장 프로그램 스토어에 게시되어 있어야 합니다.</translation>
+  <translation id="4707617005417530710">이 확장 프로그램은 지원되지 않는 매니페스트 버전을 사용합니다.</translation>
+  <translation id="1428559545291889870">이 개발자 확장 프로그램은 더 이상 지원되지 않습니다.</translation>
+  <translation id="5474498298023509877">이 확장 프로그램을 사용하려면 보호자의 승인이 필요합니다.</translation>
+  <translation id="1384806040359212106">보호자가 이 확장 프로그램의 권한을 비활성화했습니다.</translation>
+  <translation id="8014636786114562214">확장 프로그램을 다시 불러오는 중입니다.</translation>
+  <translation id="408703181208979412">다른 확장 프로그램에서 필요하므로 이 확장 프로그램을 비활성화할 수 없습니다.</translation>
+  <translation id="4667991110495013137">향상된 세이프 브라우징에서 신뢰하지 않는 확장 프로그램입니다.</translation>
+  <translation id="3921862247186143552">https://example.com 또는 *.example.com과 같은 사이트를 입력해 주세요.</translation>
+  <translation id="2193902852383724740">특정 사이트에서 접근을 허용하려면 사이트를 추가해 주세요.</translation>
+  <translation id="1032987628833530723">확장 프로그램</translation>
+  <translation id="2063577520848950942">모든 확장 프로그램</translation>
+  <translation id="1719125744393733310">검색 지우기</translation>
+  <translation id="8368633036357637957"><ph name="VALUE"/>개 설치됨</translation>
+  <translation id="6833442165741512694">개발자 도구</translation>
+  <translation id="6170919530369619247">설치된 확장 프로그램이 없습니다</translation>
+  <translation id="6950927142553923633">확장 프로그램 찾기</translation>
+  <translation id="6954553684430517147">확장 프로그램을 불러오는 중…</translation>
+  <translation id="2150630905381471439">검색 결과가 없습니다</translation>
+  <translation id="9176168217146179901">이 확장 프로그램은 더 이상 설치되어 있지 않습니다</translation>
+  <translation id="9105655532272777892">확장 프로그램 관리자 열기</translation>
+  <translation id="7860852999304223444">다시 시도</translation>
+  <translation id="6554956524893232972">확장 프로그램 검색</translation>
+  <translation id="7926507895596439413">키보드 단축키</translation>
+  <translation id="8500720329593763524">고급 설정</translation>
+  <translation id="5635863902149362513">확장 프로그램 관리자에서 개발자 기능과 추가 권한을 관리합니다.</translation>
+  <translation id="1104486892574470840">오류 수집</translation>
+  <translation id="2130615541731062402">문제 해결을 위해 확장 프로그램 오류를 기록합니다.</translation>
+  <translation id="5825432519353908898">사용</translation>
+  <translation id="1725971879492434357">확장 프로그램 오류</translation>
+  <translation id="5792320305851437117">확장 프로그램 관리자에서 기록된 오류를 확인합니다.</translation>
+  <translation id="2213552243507226843">파일 URL에 대한 액세스 허용</translation>
+  <translation id="4327709588082908234">열어 둔 로컬 파일을 이 확장 프로그램이 읽고 변경하도록 허용합니다.</translation>
+  <translation id="3415315739633950836">확장 프로그램 ID</translation>
+  <translation id="514385305367935891">시크릿 모드에서 허용</translation>
+  <translation id="2659425154677496769">확장 프로그램이 시크릿 모드에서 방문 기록을 저장할 수 있습니다.</translation>
+  <translation id="4358967226853614935">조직에서 관리함</translation>
+  <translation id="5158230391297533">확장 프로그램 관리자에서 확인</translation>
+  <translation id="8222895975437366394">여기서는 이 확장 프로그램의 사용 상태를 변경할 수 없습니다. 확장 프로그램 관리자에서 제한 사항과 복구 방법을 확인하세요.</translation>
+  <translation id="2984063593644657839">다른 권한은 요청하지 않았습니다</translation>
+  <translation id="3953511906225334998">옵션 열기</translation>
+  <translation id="3054612665289675083">확장 프로그램 옵션</translation>
+  <translation id="6532665484376922130">이 확장 프로그램에서 제공하는 설정을 엽니다.</translation>
+  <translation id="4774467761560085404">브라우저를 다시 시작하면 이 변경 사항이 적용됩니다.</translation>
+  <translation id="448198700755627428">권한</translation>
+  <translation id="4576152706532231110">확장 프로그램 삭제</translation>
+  <translation id="6037780551783362210"><ph name="VALUE"/> 사용</translation>
+  <translation id="8315329207705736523">버전 <ph name="VALUE"/></translation>
+  <translation id="3325154927987548133">오류 보기</translation>
+  <translation id="7026035740840514420">추가</translation>
+  <translation id="875592376958293405">사이트 추가</translation>
+  <translation id="6868925153888681962">이 사이트의 데이터를 이 확장 프로그램이 읽고 변경하도록 허용합니다.</translation>
+  <translation id="1558227562414720350">모든 사이트에서</translation>
+  <translation id="3944052764939456897"><ph name="VALUE"/>에 대한 액세스 허용</translation>
+  <translation id="8617549621568402621">취소</translation>
+  <translation id="6059005973747905972">허용된 사이트</translation>
+  <translation id="6693565538442601511">클릭할 때</translation>
+  <translation id="4657601377078717204"><ph name="VALUE"/>에 대한 액세스 삭제</translation>
+  <translation id="5565006900817540687">요청한 사이트</translation>
+  <translation id="8176915300143406595">사이트</translation>
+  <translation id="1547516824893879683">사이트 액세스</translation>
+  <translation id="5541096680407990599">액세스 방식을 변경하면 허용한 특정 사이트 목록이 지워집니다.</translation>
+  <translation id="4248269380737619002">이 확장 프로그램이 사이트 데이터를 읽고 변경할 수 있는 범위를 선택합니다.</translation>
+  <translation id="149924786702148607">도메인이나 URL을 입력하세요. 하위 도메인을 포함하려면 *.example.com을 사용하세요.</translation>
+  <translation id="3039826465326125613">https://example.com</translation>
+  <translation id="1182602285418096538">특정 사이트에서</translation>
+  <translation id="5339635016371995540"><ph name="VALUE"/> 작업</translation>
+  <translation id="6936049675074393694">세부정보</translation>
+  <translation id="4663699640281611539">요청한 모든 사이트에서 허용</translation>
+  <translation id="4107276239682881273">아래에서 사이트를 개별적으로 선택하려면 끄세요.</translation>
+  <translation id="2857631400471864814">현재 브라우저 구성에서는 확장 프로그램 관리자에서 사이트 액세스를 관리하세요.</translation>
+  <translation id="6348109993278909135">테마 색상은 사이드바와 창에 적용됩니다. 주소줄은 페이지 색을 따르고, 내부 페이지는 기본 강조색에 은은한 테마색을 더합니다.</translation>
+  <translation id="2953811107270873481">로컬</translation>
+  <translation id="7658879162010422254">개인</translation>
+  <translation id="2300471726247384518">로컬 프로필</translation>
+  <translation id="6914038138908370878">브라우저 도구</translation>
+  <translation id="4472899824319573501">메모리</translation>
+  <translation id="2109592546212924279">작업공간 전환</translation>
+  <translation id="8939958751272557963">닫은 탭 다시 열기</translation>
+  <translation id="1854408386303945851">다운로드</translation>
+  <translation id="1218354429040706944">방문 기록</translation>
+  <translation id="4359766031763360683">다른 기기의 탭</translation>
+  <translation id="7790651502438466911">확장 프로그램 관리</translation>
+  <translation id="3295136327698456154">켜짐</translation>
+  <translation id="5440722994133512690">꺼짐</translation>
+  <translation id="196328508664815446">연결되지 않음</translation>
+  <translation id="8855769312569419890">메모리는 이 작업공간 안에서만 사용됩니다.</translation>
+  <translation id="6755618198941006007">작업공간을 연결하세요.</translation>
+  <translation id="7456280270661020131">작업공간 및 계정 메뉴</translation>
+  <translation id="949500661125537406"><ph name="WORKSPACE"/>, <ph name="ACCOUNT"/>, 작업공간 메뉴</translation>
+  <translation id="6864736088085555216">작업공간 메뉴로 돌아가기</translation>
 </translationbundle>

@@ -2,6 +2,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { currentPageURL } from '#lib/navigation.ts';
 	import History from '@lucide/svelte/icons/history';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
@@ -13,16 +14,16 @@
 	import HistoryDeletionDialog from './components/HistoryDeletionDialog.svelte';
 	import { entryKey, HistoryModel } from './history.svelte.ts';
 
-	const model = new HistoryModel(page.url.searchParams.get('q') ?? '');
+	const model = new HistoryModel(currentPageURL().searchParams.get('q') ?? '');
 	function setQuery(value: string) {
 		model.setQuery(value);
-		const url = new URL(page.url.href);
+		const url = new URL(currentPageURL().href);
 		if (value) url.searchParams.set('q', value);
 		else url.searchParams.delete('q');
 		void goto(url, { shallow: true, replace: true, state: page.state });
 	}
 	$effect(() => {
-		const query = page.url.searchParams.get('q') ?? '';
+		const query = currentPageURL().searchParams.get('q') ?? '';
 		untrack(() => model.setQuery(query));
 	});
 	onMount(() => {

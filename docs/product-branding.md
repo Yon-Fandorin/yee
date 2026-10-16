@@ -12,8 +12,17 @@ Brave의 제품명·번역·아이콘·설치 식별자·내부 URL 연결 분�
   "name": "New Brand",
   "short_name": "NewBrand",
   "provisional": true,
-  "logo_source": "assets/brand/yee-logo-v8c-dino-nubs.png",
-  "logo_crop_size": 820
+  "logo_source": "assets/brand/yee-logo.svg",
+  "logo_palette": {
+    "primary": "#242824",
+    "secondary": "#438578",
+    "dark_primary": "#F5F6F2",
+    "dark_secondary": "#8BC4B3",
+    "background": "#F7F9F5",
+    "dark_background": "#202724"
+  },
+  "logo_assets_manifest": "assets/brand/generated/manifest.json",
+  "strings_policy": "branding/strings.json"
 }
 ```
 
@@ -31,8 +40,13 @@ URL scheme으로 사용할 수 없는 이름은 `internal_url_scheme`에 영문 
 명시한다. 이 값도 같은 브랜드 설정에서 관리하며 코드에 고정하지 않는다.
 접두어는 소문자 ASCII 문자로 시작하고 영문·숫자·`+`·`.`·`-`만 포함할 수 있다.
 `http`, `chrome`, `file` 등 기존 브라우저 프로토콜과 충돌하는 값은 거부한다.
-`logo_source`는 저장소 내부의 상대 경로이며, `logo_crop_size`는 기존 로고의
-가운데 crop 크기다. 새 로고를 넣으면 그 이미지에 맞게 지정한다.
+`logo_source`는 저장소 내부의 기준 SVG 경로다. `logo_palette`는 두 색의
+기본·어두운 배경 값과 앱 아이콘 배경을 지정한다. 경로의 `data-brand-colour`는
+`primary` 또는 `secondary`를 사용한다. 단색 원본은 기본 `primary`를 따른다.
+`logo_assets_manifest`는 같은 원본·배색·제품명에서 생성한 desktop 자산 묶음이다.
+이름 변경은 워드마크도 갱신한다. SVG·배색·생성기 변경도 재생성 입력으로 추적한다.
+네이티브 벡터 생성기는 내용이 같은 선언·정의·검사 파일의 수정 시간을 유지한다.
+로고 경로만 바꿨을 때 같은 선언 헤더 때문에 전체 native UI를 다시 컴파일하지 않는다.
 `provisional`은 이름 확정 여부만 나타낸다. OS 등록이나 저장소 이전을
 실행하지 않는다. 이름에는 공백·한글·작은따옴표를 사용할 수 있다. 경로에
 쓸 수 없는 문자, `$`, `@PRODUCT_FULLNAME@` 같은 생성기 치환 구문은 거부한다.
@@ -46,10 +60,13 @@ python3 tools/overlay/brand_config.py show
 ./tools/overlay/install-branding.sh "$PWD/.local-build/chromium/src" --check
 ```
 
-빌드 없이 제품명 입력만 적용하려면 `--check`를 빼고 실행한다. 로고 입력은
-`install-brand-assets.sh` 또는 Windows의 `install-brand-assets.ps1`로 별도 생성한다.
-이 스크립트들은 앱을 빌드하지 않는다. macOS 로고 생성은 기존 방식대로 작은
-ICNS packer를 컴파일한다.
+빌드 없이 제품명 입력만 적용하려면 `--check`를 빼고 실행한다.
+로고는 `generate-brand-assets.py`가 macOS에서 생성하며,
+`install-brand-assets.sh`와 `install-brand-assets.ps1`이 같은 묶음을 검증하고 적용한다.
+macOS 적용은 오래된 입력을 먼저 재생성한다. `--check`는 재생성하지 않는다.
+생성에는 CairoSVG·Pillow·Xcode의 asset compiler와 작은 ICNS packer를 사용한다.
+Windows 적용에는 이미지 생성 도구나 Python이 필요 없다.
+이 스크립트들은 앱을 빌드하지 않는다.
 
 Windows에서는 아래 명령이 같은 설정을 사용한다. 설정 읽기와 제품명 적용에
 별도 Python 설치가 필요하지 않다.
@@ -58,8 +75,8 @@ Windows에서는 아래 명령이 같은 설정을 사용한다. 설정 읽기�
 .\tools\overlay\install-branding.ps1 -ChromiumSrc F:\chromium\src -CheckOnly
 ```
 
-`apply.*`·`configure.*`는 제품명 입력과 로고를 적용한다. `build.*`·`build-ui.*`는
-제품명 입력을 먼저 갱신하므로 이름 변경 후 기존 output을 재사용할 수 있다.
+`apply.*`·`configure.*`와 `build.*`·`build-ui.*`는 제품명 입력과 로고 묶음을
+함께 적용하므로 이름 변경 후 기존 output을 재사용할 수 있다.
 실행 스크립트도 새 이름의 앱 경로를 찾는다. 정상 종료 전에는 같은 build output의
 동일 Bundle ID를 가진 기존 `.app`도 찾아 정확한 실행 경로로 종료를 요청한다.
 삭제된 번들이나 다른 output에 있는 프로세스까지 검색하는 기능은 아니다.
@@ -91,11 +108,29 @@ Bundle ID·Keychain 이름·기본 profile 경로와 Windows install-mode identi
 이 설정의 범위에 넣지 않았다. 독립 설치 식별자로 전환할 때 데이터 이전을
 함께 설계한다.
 
-이번 연결은 핵심 제품명 ID와 Yee-owned UI 이름을 대상으로 한다. Chromium
-문자열에 제품명이 문장 일부로 직접 들어간 설정·안내·오류 문구와 `.xtb` 번역은
-별도 전환 작업이다. 영어 원문을 바꾸면 GRIT translation ID도 달라질 수 있다.
-변경된 원문과 번역을 함께 이전해야 한다. 생성된 `.grdp`의 제품명 ID는
-원래와 동일하게 `translateable="false"`이므로 번역 파일 변경이 필요하지 않다.
+제품 문구와 번역은 `strings_policy`가 지정하는 정책을 따른다.
+`brand_strings.py`는 Chromium `HEAD`의 GRD·GRDP·XTB를 읽어 여섯 문자열 계열의
+제품 참조를 같은 이름으로 생성한다. 원래 GRD 파일 이름과 리소스 ID 순서는 유지하고,
+GRDP·XTB 사본은 `chrome/app/yee_branding_strings/`에 둔다. 바뀐 원문에는 GRIT의
+메시지 ID를 다시 계산해 기존 언어·gender 번역을 연결한다. placeholder, 원래 번역 파일,
+외부 제품명·URL·저작권은 보존하며 라이선스의 앱 이름과 프로젝트 링크를 구분한다.
+입력의 로컬 수정은 적용 전에 거부한다. 재적용은 내용이 같은 파일의 시간을 유지한다.
+
+`yee_branding_strings.gni`는 번역 생성 여부를 GN에 전달한다. Windows 설치 문자열도
+활성 정책에서는 생성된 XTB를 읽고, 정책이 없는 구성에서는 원래 경로를 사용한다.
+이름을 바꾸면 항상 동일한 upstream에서 다시 생성하므로 이전 브랜드명이 남지 않는다.
+PDF 뷰어의 표시명은 제품 메타데이터를 JSON으로 escape해 읽는다. macOS 문서 설명과
+앱 폴더 표시명도 같은 설정을 따르며 기존 lookup key·저장 경로는 유지한다.
+
+기본 브라우저 InfoBar는 Yee 소유 영어·한국어 GRIT 템플릿에 현재 제품명을
+매개변수로 넣고 다른 언어는 영어로 fallback한다. 아이콘은 같은 SVG 설정에서 만든
+투명한 두 색 로고를 `ProductLogoIcon()`으로 공유한다. PDF·Dock/작업표시줄 고정·
+세션 복원·Windows 시작 시 실행·macOS 업데이터 권한 승격 안내도 같은 경로를 사용한다.
+PDF와 고정 안내는 기존 delegate와 중앙 `InfoBarSpec` 경로를 모두 연결한다.
+실제 배너 배경에 따라 `IDR_PRODUCT_LOGO`·`IDR_PRODUCT_LOGO_WHITE`를 선택한다.
+플랫폼·기능 플래그별 실제 실행 검수는 적용 범위 문서에서 별도로 구분한다.
+쿠키·권한·화면 공유·확장 프로그램·보안 안내의 기능 아이콘은 의미를 유지한다.
+핵심 제품명 세 ID는 계속 `translateable="false"`다.
 
 [전체 적용 범위와 후속 기준](branding-coverage.md)에 OS 안내, 번역,
 보조 앱, 추가 아이콘, URL 저장·복사 및 영속 identity의 미연결 경로를 남겼다.
@@ -151,6 +186,8 @@ Yee 설정의 고급 설정·세부 설정 링크도 이 주소를 사용한다.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-brand-config.py
+PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-brand-assets.py
+PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-brand-strings.py
 PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-branding-overlay.py
 PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-branding-audit.py
 PYTHONDONTWRITEBYTECODE=1 python3 tools/dev/test-browser-bundle-executables.py

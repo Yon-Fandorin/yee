@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ui/views/yee/agent_browser_contract.h"
-#include "chrome/browser/ui/views/yee/agent_request_timing.h"
 #include <algorithm>
+#include "chrome/browser/ui/views/yee/agent_request_timing.h"
 
 #include "base/strings/string_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -19,7 +19,8 @@ TEST(AgentBrowserContractTest, PageLocationPreservesExactPathQueryAndFragment) {
   EXPECT_EQ(url.spec(), location.url);
   EXPECT_FALSE(location.truncated);
   EXPECT_FALSE(location.credentials_redacted);
-  const auto file = GetAgentPageLocation(GURL("file:///tmp/readme.html#section"));
+  const auto file =
+      GetAgentPageLocation(GURL("file:///tmp/readme.html#section"));
   EXPECT_EQ("file:///tmp/readme.html#section", file.url);
 }
 
@@ -44,7 +45,8 @@ TEST(AgentBrowserContractTest, PageLocationOmitsUnsupportedAndInvalidURLs) {
   }
 }
 
-TEST(AgentBrowserContractTest, ContentWaitIgnoresOnlyRefsAndKeepsDeltaIdentity) {
+TEST(AgentBrowserContractTest,
+     ContentWaitIgnoresOnlyRefsAndKeepsDeltaIdentity) {
   AgentSemanticSnapshot original;
   original.document_ref = "doc";
   original.title = "Tickets";
@@ -57,34 +59,41 @@ TEST(AgentBrowserContractTest, ContentWaitIgnoresOnlyRefsAndKeepsDeltaIdentity) 
   original.nodes.push_back(node);
   auto current = original;
   current.nodes[0].ref = "doc_2";
-  EXPECT_TRUE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_TRUE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current));
   const auto delta = SerializeAgentSemanticSnapshot(current, &original, 16000);
   EXPECT_NE(delta.find("doc_2"), std::string::npos);
   EXPECT_NE(delta.find("doc_1"), std::string::npos);
   current.nodes[0].value.back() = 'y';
-  EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_FALSE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   for (auto field : {&AgentSemanticNode::enabled, &AgentSemanticNode::checked,
                      &AgentSemanticNode::focused, &AgentSemanticNode::visible,
                      &AgentSemanticNode::secret}) {
     current = original;
     current.nodes[0].*field = !(current.nodes[0].*field);
-    EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+    EXPECT_FALSE(
+        AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   }
   current = original;
   current.document_ref = "other";
-  EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_FALSE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   current = original;
   current.title = "Other";
-  EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_FALSE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   current = original;
   current.origin = "http://127.0.0.1:5678";
-  EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_FALSE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
   node.name = "Second";
   original.nodes.push_back(node);
   current = original;
   std::reverse(current.nodes.begin(), current.nodes.end());
-  EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current, false));
+  EXPECT_FALSE(
+      AgentSnapshotsHaveSameObservableSemantics(original, current, false));
 }
 
 TEST(AgentBrowserContractTest, WaitComparisonIgnoresRevisionAndRedactedValues) {
@@ -106,7 +115,8 @@ TEST(AgentBrowserContractTest, WaitComparisonIgnoresRevisionAndRedactedValues) {
   EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(original, current));
 }
 
-TEST(AgentBrowserContractTest, WaitComparisonRetainsMetadataIdentityAndFullValues) {
+TEST(AgentBrowserContractTest,
+     WaitComparisonRetainsMetadataIdentityAndFullValues) {
   AgentSemanticSnapshot original;
   original.document_ref = "document";
   original.title = "Policy";
@@ -144,17 +154,12 @@ TEST(AgentBrowserContractTest, TimingSeparatesMultipleWaitsAndResets) {
   timing.BeginUserWait(start + base::Milliseconds(15));
   timing.EndUserWait(start + base::Milliseconds(20));
   EXPECT_EQ(base::Milliseconds(15), timing.UserWait());
-  EXPECT_EQ(base::Milliseconds(25), timing.Elapsed(start + base::Milliseconds(25)));
+  EXPECT_EQ(base::Milliseconds(25),
+            timing.Elapsed(start + base::Milliseconds(25)));
   timing.Start(start + base::Seconds(1));
   EXPECT_EQ(base::TimeDelta(), timing.UserWait());
-}
-
-TEST(AgentBrowserContractTest, TimingCanFinishPendingWaitOnCancelOrExpiry) {
-  AgentRequestTiming timing;
-  const auto start = base::TimeTicks() + base::Seconds(1);
-  timing.Start(start);
-  timing.BeginUserWait(start);
-  timing.EndUserWait(start + base::Seconds(120));
+  timing.BeginUserWait(start + base::Seconds(1));
+  timing.EndUserWait(start + base::Seconds(121));
   EXPECT_EQ(base::Seconds(120), timing.UserWait());
   timing.Start(start);
   timing.EndUserWait(start + base::Milliseconds(5));
@@ -267,31 +272,29 @@ TEST(AgentBrowserContractTest, FieldTruncationPreservesUTF8Boundaries) {
   EXPECT_EQ(std::string::npos, output.find("\xEF\xBF\xBD"));
 }
 
-TEST(AgentBrowserContractTest, OutputHasHardBudget) {
-  AgentSemanticSnapshot snapshot = ExampleSnapshot();
-  snapshot.nodes[0].name.assign(500, 'x');
-
-  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 80).size(), 80U);
-}
-
-TEST(AgentBrowserContractTest, LongFieldValueIsCompleteAndPreservesEscapedWhitespace) {
+TEST(AgentBrowserContractTest,
+     LongFieldValueIsCompleteAndPreservesEscapedWhitespace) {
   AgentSemanticSnapshot snapshot = ExampleSnapshot();
   snapshot.nodes[2].value = std::string(2000, 'x') + "\nline\tquote\"\\";
   const auto output = SerializeAgentSemanticSnapshot(snapshot, nullptr, 16000);
-  EXPECT_NE(std::string::npos, output.find(std::string(2000, 'x') + "\\nline\\tquote\\\"\\\\"));
+  EXPECT_NE(std::string::npos,
+            output.find(std::string(2000, 'x') + "\\nline\\tquote\\\"\\\\"));
   EXPECT_EQ(std::string::npos, output.find("value_truncated"));
   snapshot.nodes[2].secret = true;
-  const auto redacted = SerializeAgentSemanticSnapshot(snapshot, nullptr, 16000);
+  const auto redacted =
+      SerializeAgentSemanticSnapshot(snapshot, nullptr, 16000);
   EXPECT_EQ(std::string::npos, redacted.find(std::string(2000, 'x')));
 }
 
-TEST(AgentBrowserContractTest, OversizedFieldValueSignalsClippingAndKeepsHardBudget) {
+TEST(AgentBrowserContractTest,
+     OversizedFieldValueSignalsClippingAndKeepsHardBudget) {
   AgentSemanticSnapshot snapshot = ExampleSnapshot();
   snapshot.nodes[2].value = std::string(4096, 'x') + "tail";
   const auto output = SerializeAgentSemanticSnapshot(snapshot, nullptr, 16000);
   EXPECT_NE(std::string::npos, output.find("value_truncated"));
   EXPECT_EQ(std::string::npos, output.find("tail"));
-  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 300).size(), 300U);
+  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 300).size(),
+            300U);
 }
 
 TEST(AgentBrowserContractTest, OutputSignalsTruncationAtEveryBudget) {
@@ -393,11 +396,13 @@ TEST(AgentBrowserContractTest, ProseTruncationIsExplicitAndBudgeted) {
   EXPECT_TRUE(base::IsStringUTF8(output));
   EXPECT_NE(std::string::npos, output.find("text_truncated"));
   EXPECT_EQ(std::string::npos, output.find("TAIL"));
-  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 100).size(), 100U);
+  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 100).size(),
+            100U);
   snapshot.nodes[0].secret = true;
   snapshot.nodes[0].name = "private body";
-  EXPECT_EQ(std::string::npos,
-            SerializeAgentSemanticSnapshot(snapshot, nullptr).find("private body"));
+  EXPECT_EQ(
+      std::string::npos,
+      SerializeAgentSemanticSnapshot(snapshot, nullptr).find("private body"));
   EXPECT_EQ(std::string::npos,
             SerializeAgentSemanticSnapshot(snapshot, nullptr).find("text=\""));
 }
@@ -409,8 +414,8 @@ TEST(AgentBrowserContractTest, LabeledProseBodyChangeProducesDelta) {
   after.revision++;
   after.nodes[0].value = "after";
   EXPECT_NE(std::string::npos,
-            SerializeAgentSemanticSnapshot(after, &before).find(
-                "~@1 text \"Article\" text=\"after\""));
+            SerializeAgentSemanticSnapshot(after, &before)
+                .find("~@1 text \"Article\" text=\"after\""));
 }
 
 TEST(AgentBrowserContractTest, LinkDestinationIsEscapedBoundedAndSecretSafe) {
@@ -419,21 +424,27 @@ TEST(AgentBrowserContractTest, LinkDestinationIsEscapedBoundedAndSecretSafe) {
   auto& node = snapshot.nodes[0];
   node.href = "https://example.test/policy?q=\"한글\"\nnext\\path";
   const std::string output = SerializeAgentSemanticSnapshot(snapshot, nullptr);
-  EXPECT_NE(std::string::npos, output.find("href=\"https://example.test/policy?q=\\\"한글\\\"\\nnext\\\\path\""));
+  EXPECT_NE(std::string::npos,
+            output.find("href=\"https://example.test/"
+                        "policy?q=\\\"한글\\\"\\nnext\\\\path\""));
   EXPECT_EQ(std::string::npos, output.find("href_truncated"));
   node.href = std::string(4095, 'x') + "한TAIL";
   const std::string clipped = SerializeAgentSemanticSnapshot(snapshot, nullptr);
   EXPECT_TRUE(base::IsStringUTF8(clipped));
   EXPECT_NE(std::string::npos, clipped.find("href_truncated"));
   EXPECT_EQ(std::string::npos, clipped.find("TAIL"));
-  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 100).size(), 100U);
+  EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 100).size(),
+            100U);
   node.secret = true;
   node.href = "https://example.test/private-credential";
-  EXPECT_EQ(std::string::npos, SerializeAgentSemanticSnapshot(snapshot, nullptr).find("private-credential"));
-  EXPECT_NE(std::string::npos, SerializeAgentSemanticSnapshot(snapshot, nullptr).find("href=<redacted>"));
+  EXPECT_EQ(std::string::npos, SerializeAgentSemanticSnapshot(snapshot, nullptr)
+                                   .find("private-credential"));
+  EXPECT_NE(std::string::npos, SerializeAgentSemanticSnapshot(snapshot, nullptr)
+                                   .find("href=<redacted>"));
 }
 
-TEST(AgentBrowserContractTest, LinkDestinationChangeIsObservableWithoutLabelChange) {
+TEST(AgentBrowserContractTest,
+     LinkDestinationChangeIsObservableWithoutLabelChange) {
   AgentSemanticSnapshot before = ExampleSnapshot();
   before.nodes = {{"link", AgentSemanticRole::kLink, "Policy"}};
   before.nodes[0].href = "https://example.test/before";
@@ -442,7 +453,10 @@ TEST(AgentBrowserContractTest, LinkDestinationChangeIsObservableWithoutLabelChan
   after.nodes[0].href = "https://example.test/after";
   EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(before, after));
   EXPECT_FALSE(AgentSnapshotsHaveSameObservableSemantics(before, after, false));
-  EXPECT_NE(std::string::npos, SerializeAgentSemanticSnapshot(after, &before).find("~@link link \"Policy\" href=\"https://example.test/after\""));
+  EXPECT_NE(
+      std::string::npos,
+      SerializeAgentSemanticSnapshot(after, &before)
+          .find("~@link link \"Policy\" href=\"https://example.test/after\""));
   before.nodes[0].secret = true;
   after.nodes[0].secret = true;
   EXPECT_TRUE(AgentSnapshotsHaveSameObservableSemantics(before, after));

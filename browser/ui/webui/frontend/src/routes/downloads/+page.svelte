@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { currentPageURL } from '#lib/navigation.ts';
 	import Download from '@lucide/svelte/icons/download';
 	import FolderOpen from '@lucide/svelte/icons/folder-open';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -12,15 +13,18 @@
 	import DownloadRow from './components/DownloadRow.svelte';
 	import { DownloadsModel } from './downloads.svelte.ts';
 
-	const model = new DownloadsModel(page.url.searchParams.get('q') ?? '');
+	const model = new DownloadsModel(currentPageURL().searchParams.get('q') ?? '');
 	function setQuery(value: string) {
 		model.setQuery(value);
-		const url = new URL(page.url.href);
+		const url = new URL(currentPageURL().href);
 		if (value) url.searchParams.set('q', value);
 		else url.searchParams.delete('q');
 		void goto(url, { shallow: true, replace: true, state: page.state });
 	}
-	$effect(() => model.setQuery(page.url.searchParams.get('q') ?? ''));
+	$effect(() => {
+		const query = currentPageURL().searchParams.get('q') ?? '';
+		untrack(() => model.setQuery(query));
+	});
 	onMount(() => {
 		void model.connect();
 		return () => model.dispose();

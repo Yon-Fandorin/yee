@@ -133,5 +133,29 @@ TEST_F(InternalURLsTest, SeparatesProductBookmarksFromNativeBookmarks) {
   EXPECT_EQ(GURL("chrome://yee-bookmarks/"), BookmarksURL());
 }
 
+TEST_F(InternalURLsTest, SeparatesProductExtensionsFromNativeTools) {
+  const GURL branded(std::string(InternalURLScheme()) +
+                     "://extensions/?id=sample&q=options%3Dtest#details");
+  const GURL canonical(
+      "chrome://yee-extensions/?id=sample&q=options%3Dtest#details");
+  EXPECT_EQ(canonical, CanonicalInternalURL(branded));
+  EXPECT_EQ(branded, DisplayInternalURL(canonical));
+  EXPECT_EQ(base::UTF8ToUTF16(branded.spec()),
+            DisplayInternalURLText(canonical, base::UTF8ToUTF16(canonical.spec())));
+  for (const char* suffix : {"/", "/?id=sample", "/?options=sample",
+                            "/shortcuts", "/?activity=sample", "/?errors=sample"}) {
+    const GURL native(std::string("chrome://extensions") + suffix);
+    EXPECT_EQ(native, CanonicalInternalURL(native));
+    EXPECT_EQ(native, DisplayInternalURL(native));
+    if (std::string_view(suffix) != "/" &&
+        std::string_view(suffix) != "/?id=sample") {
+      EXPECT_EQ(native, CanonicalInternalURL(
+                            GURL(std::string(InternalURLScheme()) +
+                                 "://extensions" + suffix)));
+    }
+  }
+  EXPECT_EQ(GURL("chrome://yee-extensions/"), ExtensionsURL());
+}
+
 }  // namespace
 }  // namespace yee::branding

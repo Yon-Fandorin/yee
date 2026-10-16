@@ -43,8 +43,8 @@ Tab Sidebar의 배치와 동작을 주제별로 기록한다.
 저장소 루트에서 실행한다.
 
 ```sh
-# 브라우저 창을 열지 않는 규칙·배치·UI 단위 테스트
-# macOS 화면 세션 접근은 필요
+# 기본값: 규칙·배치·UI 단위 테스트
+# native popup·focus 사례는 GUI Widget을 활성화할 수 있음
 ./tools/dev/test-sidebar.sh unit
 
 # 실제 창의 배치·드래그·그룹·스크롤 테스트
@@ -57,6 +57,9 @@ Tab Sidebar의 배치와 동작을 주제별로 기록한다.
 `interactive`와 `all`은 기존 개발 브라우저를 정상 종료한 뒤 테스트 창을 연다.
 테스트 창이 입력 초점을 가져갈 수 있다.
 필요한 프로그램을 이미 빌드했다면 마지막에 `--no-build`를 붙인다.
+모드를 생략하거나 `--no-build`만 주면 `unit`을 실행한다. 주소줄·Header 검사는
+`test-header.sh interactive`, flyout의 실제 hover·popup·animation 검사는
+`test-browser-surface-layout.sh interactive`가 담당한다.
 
 ## 아직 결정하지 않은 항목
 

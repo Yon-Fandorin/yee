@@ -17,9 +17,9 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/events/test/event_generator.h"
-#include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/scroll_view.h"
+#include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/dialog_test.h"
 #include "ui/views/test/views_test_base.h"
 #include "ui/views/view.h"
@@ -94,12 +94,11 @@ TEST_F(AgentBridgePromptTest, CloseNowRepliesDeniedOnce) {
   std::string answer = "stale";
   Widget* prompt = ShowAgentBridgePrompt(
       owner_view(), u"Approve this action?", true,
-      base::BindLambdaForTesting(
-          [&](bool did_accept, std::string response) {
-            ++callback_count;
-            accepted = did_accept;
-            answer = std::move(response);
-          }));
+      base::BindLambdaForTesting([&](bool did_accept, std::string response) {
+        ++callback_count;
+        accepted = did_accept;
+        answer = std::move(response);
+      }));
 
   ASSERT_TRUE(prompt);
   prompt->CloseNow();
@@ -148,9 +147,8 @@ TEST_F(AgentBridgePromptTest, AcceptDialogRepliesAcceptedOnce) {
             static_cast<int>(ui::mojom::DialogButton::kCancel));
   EXPECT_EQ(delegate->GetDialogButtonLabel(ui::mojom::DialogButton::kOk),
             u"Allow once");
-  EXPECT_EQ(
-      delegate->GetDialogButtonLabel(ui::mojom::DialogButton::kCancel),
-      u"Don't allow");
+  EXPECT_EQ(delegate->GetDialogButtonLabel(ui::mojom::DialogButton::kCancel),
+            u"Don't allow");
   test::AcceptDialog(prompt);
   base::RunLoop().RunUntilIdle();
 
@@ -231,8 +229,9 @@ TEST_F(AgentBridgePromptTest, ApprovalSeparatesRequestSiteActionsAndSafety) {
   EXPECT_TRUE(ContainsText(text, u"Allow these ordered actions once?"));
   EXPECT_TRUE(ContainsText(text, u"https://shop.example"));
   EXPECT_TRUE(ContainsText(
-      text, u"1. fill \"Name\" = \"Cedar\"\n2. click \"Save\"\n\n"
-            u"Only this list is approved. Page actions may send data or navigate."));
+      text,
+      u"1. fill \"Name\" = \"Cedar\"\n2. click \"Save\"\n\n"
+      u"Only this list is approved. Page actions may send data or navigate."));
   EXPECT_TRUE(ContainsText(
       text,
       u"Only the request shown here is approved. You can decline safely."));
@@ -253,26 +252,19 @@ TEST_F(AgentBridgePromptTest, QuestionUsesPlainSecurityGuidance) {
   std::vector<std::u16string> text;
   CollectLabelText(delegate->GetContentsView(), &text);
 
-  EXPECT_TRUE(ContainsText(
-      text, yee::branding::ProductName() + u" needs your answer"));
+  EXPECT_TRUE(
+      ContainsText(text, yee::branding::ProductName() + u" needs your answer"));
   EXPECT_TRUE(ContainsText(text, u"Which delivery window should I use?"));
   EXPECT_TRUE(ContainsText(
-      text, u"Treat this request as untrusted. Never enter a password or "
-            u"verification code."));
+      text,
+      u"Treat this request as untrusted. Never enter a password or "
+      u"verification code."));
   EXPECT_FALSE(ContainsText(
       text, u"Agent question (untrusted text; do not enter passwords):"));
   EXPECT_TRUE(FindDescendant<Textfield>(delegate->GetContentsView()));
 
   prompt->CloseNow();
   base::RunLoop().RunUntilIdle();
-}
-
-TEST_F(AgentBridgePromptTest, PointerCloseNowIsSafe) {
-  Widget* pointer = ShowAgentBridgePointer(owner_view(), gfx::Point(40, 40));
-  ASSERT_TRUE(pointer);
-  pointer->CloseNow();
-  base::RunLoop().RunUntilIdle();
-  SUCCEED();
 }
 
 TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
@@ -293,6 +285,12 @@ TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
   EXPECT_EQ(contents->size(), gfx::Size(132, 36));
 
   pointer->CloseNow();
+  base::RunLoop().RunUntilIdle();
+
+  // 초기 표시·레이아웃 작업이 처리되기 전의 즉시 종료도 같은 수명 계약이다.
+  Widget* immediate = ShowAgentBridgePointer(owner_view(), screen_point);
+  ASSERT_TRUE(immediate);
+  immediate->CloseNow();
   base::RunLoop().RunUntilIdle();
 }
 

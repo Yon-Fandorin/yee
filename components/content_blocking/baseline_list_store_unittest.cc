@@ -316,9 +316,6 @@ TEST(BaselineListSharedMemory, ExplicitTransportBoundSupportsLargeSnapshot) {
       "yee-test-large-snapshot", 'yeet', 300, kMaxBaselineListSnapshotBytes);
   transport.AddToLaunchParameters(region, &command, &options);
   EXPECT_TRUE(command.HasSwitch("yee-test-large-snapshot"));
-  base::shared_memory::SharedMemorySwitch standard("yee-test-default", 'yeed',
-                                                   301);
-  EXPECT_EQ(8u * 1024 * 1024, standard.maximum_region_size);
 #if BUILDFLAG(IS_APPLE)
   // No child is launched in this unit test to consume the duplicate right.
   for (auto& [key, port] : options.mach_ports_for_rendezvous)

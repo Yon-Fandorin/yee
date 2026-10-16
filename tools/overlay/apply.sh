@@ -33,17 +33,21 @@ if [[ ! -f "$CHROMIUM_SRC/chrome/browser/ui/tabs/tab_strip_prefs.cc" || \
   exit 2
 fi
 
-# Preflight every input and every patch before the first checkout write.
-python3 "$SCRIPT_DIR/brand_config.py" show >/dev/null
-python3 "$SCRIPT_DIR/brand_config.py" install "$CHROMIUM_SRC" --check >/dev/null
+# 체크아웃에 쓰기 전에 브랜딩·소스·에셋 입력과 전체 패치를 검증한다.
+"$SCRIPT_DIR/install-branding.sh" "$CHROMIUM_SRC" --check
 "$SCRIPT_DIR/install-yee-ui-sources.sh" "$CHROMIUM_SRC" --check
-python3 "$SCRIPT_DIR/lib/overlay_tools.py" patches "$CHROMIUM_SRC" "${check_args[@]}"
-python3 "$SCRIPT_DIR/brand_config.py" install "$CHROMIUM_SRC" "${check_args[@]}"
-if (( ! CHECK_ONLY )); then
-  "$SCRIPT_DIR/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
-fi
 if (( ! SKIP_BRAND_ASSETS )); then
-  "$SCRIPT_DIR/install-brand-assets.sh" "$CHROMIUM_SRC" "${check_args[@]}"
+  asset_preflight_args=(--prepare)
+  (( CHECK_ONLY )) && asset_preflight_args=(--check)
+  "$SCRIPT_DIR/install-brand-assets.sh" "$CHROMIUM_SRC" "${asset_preflight_args[@]}"
+fi
+python3 "$SCRIPT_DIR/lib/overlay_tools.py" patches "$CHROMIUM_SRC" "${check_args[@]}"
+if (( ! CHECK_ONLY )); then
+  "$SCRIPT_DIR/install-branding.sh" "$CHROMIUM_SRC"
+  "$SCRIPT_DIR/install-yee-ui-sources.sh" "$CHROMIUM_SRC"
+  if (( ! SKIP_BRAND_ASSETS )); then
+    "$SCRIPT_DIR/install-brand-assets.sh" "$CHROMIUM_SRC" --install-prepared
+  fi
 fi
 
 PRODUCT_NAME="$(python3 "$SCRIPT_DIR/brand_config.py" show --get name)"

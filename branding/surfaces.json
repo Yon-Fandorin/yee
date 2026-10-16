@@ -3,8 +3,11 @@
   "scope": "Desktop source inventory only; platform/channel branches included as candidates, runtime coverage not claimed. Android/ChromeOS product surfaces require separate scope decisions.",
   "string_roots": [
     "chrome/app/chromium_strings.grd",
+    "chrome/app/generated_resources.grd",
     "components/components_chromium_strings.grd",
-    "extensions/strings/extensions_strings.grd"
+    "components/components_strings.grd",
+    "extensions/strings/extensions_strings.grd",
+    "ui/strings/ui_strings.grd"
   ],
   "status_definitions": {
     "managed": "Configuration consumer is implemented; input application and runtime validation are separate.",
@@ -119,7 +122,7 @@
     },
     {
       "id": "settings-text-and-accessibility",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -141,7 +144,7 @@
         "short_name",
         "localization"
       ],
-      "notes": "Includes about/update/help labels, Safety Hub accessibility and permission descriptions; regenerate GRDP/XTB together.",
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_SETTINGS_ABOUT_PROGRAM",
@@ -152,11 +155,12 @@
         "IDS_SETTINGS_UPGRADE_UP_TO_DATE",
         "IDS_SETTINGS_SAFETY_HUB_VERSION_NAVIGATION_ARIA_LABEL",
         "IDS_SETTINGS_SAFETY_HUB_VERSION_RELAUNCH_ARIA_LABEL"
-      ]
+      ],
+      "input_check": "brand_strings"
     },
     {
       "id": "native-menu-window-and-task-manager",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -182,7 +186,7 @@
         "localization",
         "menu_mnemonic_escape"
       ],
-      "notes": "Product-name core IDs do not substitute branding embedded in these messages.",
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_ABOUT",
@@ -192,11 +196,58 @@
         "IDS_APPMENU_TOOLTIP_UPDATE_AVAILABLE",
         "IDS_APPMENU_TOOLTIP_ALERT",
         "IDS_RELAUNCH_TO_UPDATE"
-      ]
+      ],
+      "input_check": "brand_strings"
+    },
+    {
+      "id": "default-browser-infobar-branding",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "browser/ui/default_browser_prompt.cc"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/webui/strings/webui_strings.grd"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/webui/strings/webui_strings_ko.xtb"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/product_logo.cc"
+        }
+      ],
+      "symbols": [
+        "yee::branding::DefaultBrowserPromptMessage",
+        "yee::branding::DefaultBrowserPromptIcon",
+        "IDS_YEE_DEFAULT_BROWSER_INFOBAR_TEXT",
+        "IDS_YEE_DEFAULT_BROWSER_PIN_INFOBAR_TEXT",
+        "yee::branding::ProductLogoIcon",
+        "IDR_PRODUCT_LOGO",
+        "IDR_PRODUCT_LOGO_WHITE"
+      ],
+      "configuration_roles": [
+        "name",
+        "logo_source",
+        "localization"
+      ],
+      "message_ids": [
+        "IDS_DEFAULT_BROWSER_INFOBAR_TEXT",
+        "IDS_DEFAULT_BROWSER_PIN_INFOBAR_TEXT"
+      ],
+      "notes": "The native infobar uses owned English/Korean placeholder templates and the shared transparent two-color product mark from configured 1x/2x light/dark assets. Other locales fall back to English. Separate pin infobars now use the same product-mark provider; modal/bubble and OS-notification surfaces do not share this infobar rendering path.",
+      "runtime_verification": "not_verified"
     },
     {
       "id": "startup-profile-default-and-password-prompts",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -208,39 +259,34 @@
         },
         {
           "scope": "chromium",
-          "path": "chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc"
-        },
-        {
-          "scope": "chromium",
           "path": "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc"
         }
       ],
       "symbols": [
         "IDS_COULDNT_STARTUP_PROFILE_ERROR",
         "IDS_PASSWORDS_PAGE_AUTHENTICATION_PROMPT",
-        "IDS_DEFAULT_BROWSER_INFOBAR_TEXT",
         "IDS_PIN_INFOBAR_DOCK_TEXT"
       ],
       "configuration_roles": [
         "name",
         "localization"
       ],
-      "notes": "Includes infobars, OS authentication and errors; remaining message IDs outside this reviewed list remain unreviewed.",
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_COULDNT_STARTUP_PROFILE_ERROR",
         "IDS_PASSWORDS_PAGE_AUTHENTICATION_PROMPT",
-        "IDS_DEFAULT_BROWSER_INFOBAR_TEXT",
         "IDS_PIN_INFOBAR_DOCK_TEXT",
         "IDS_PIN_INFOBAR_TEXT",
         "IDS_PIN_INFOBAR_BUTTON",
         "IDS_UNINSTALL_CHROME",
         "IDS_DEFAULT_BROWSER_CHANGED_MESSAGE"
-      ]
+      ],
+      "input_check": "brand_strings"
     },
     {
       "id": "components-error-crash-page-info",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -257,7 +303,7 @@
         "localization",
         "internal_url_scheme"
       ],
-      "notes": "Components strings are independent from chrome/app strings.",
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_ERRORPAGES_SUGGESTION_NETWORK_PREDICTION_BODY",
@@ -273,7 +319,8 @@
         "IDS_SESSION_CRASHED_VIEW_MESSAGE",
         "IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH",
         "IDS_INTERNAL_DEBUG_PAGES_DISABLED_BODY"
-      ]
+      ],
+      "input_check": "brand_strings"
     },
     {
       "id": "attribution-project-links-and-copyright",
@@ -298,7 +345,7 @@
         "attribution_policy",
         "name"
       ],
-      "notes": "Preserve upstream project link text, company and copyright; product prefixes in license messages are a separate pending surface.",
+      "notes": "Copyright/company and linked Chromium project names are preserved. Product references outside project-link placeholders follow the configured product name.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_ABOUT_VERSION_COMPANY_NAME",
@@ -308,7 +355,7 @@
     },
     {
       "id": "extension-install-error-and-pdf-manifest",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -329,7 +376,7 @@
         "localization",
         "generated_native_constants"
       ],
-      "notes": "PDF Viewer manifest embeds a C++ literal outside GRIT; extension install error lives outside branded app strings.",
+      "notes": "Extension error strings use the shared GRD/XTB generator. The PDF manifest uses configured product metadata and JSON escaping without changing extension identity.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_EXTENSION_INSTALL_PROCESS_CRASHED"
@@ -374,7 +421,7 @@
     },
     {
       "id": "translations-and-message-fingerprint",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -394,12 +441,13 @@
         "localization",
         "translation_mapping"
       ],
-      "notes": "GRD/GRDP and XTB must derive from a fixed upstream baseline; source candidates do not prove translation coverage.",
-      "runtime_verification": "not_verified"
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
+      "runtime_verification": "not_verified",
+      "input_check": "brand_strings"
     },
     {
       "id": "mac-helper-permissions-and-shortcut-localization",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -428,7 +476,7 @@
         "localization",
         "stable_document_type_identity"
       ],
-      "notes": "Localized Helper and many OS permission descriptions read GRIT; Shortcut localization key must match plist document type.",
+      "notes": "Helper/permission/Shortcut text uses branded locale packs. Extension document labels use the configured product name. InfoPlist lookup keys and UTType identifiers are preserved.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_HELPER_NAME",
@@ -436,7 +484,8 @@
         "IDS_RUNTIME_PERMISSION_OS_REASON_TEXT",
         "IDS_LOCAL_NETWORK_ACCESS_PERMISSION_DESC",
         "IDS_CHROMIUM_SHORCUT_DESCRIPTION"
-      ]
+      ],
+      "input_check": "brand_strings"
     },
     {
       "id": "stable-os-install-profile-keychain-and-uttypes",
@@ -499,7 +548,7 @@
     },
     {
       "id": "installed-web-app-folder-and-assets",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -526,12 +575,13 @@
         "identity",
         "pwa_assets"
       ],
-      "notes": "Finder display, stable directory path and installed app overlay assets have separate consumers.",
+      "notes": "Localized folder display names use generated GRIT text and the four folder icons use the shared SVG. The persistent .localized directory name is preserved.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_APP_SHORTCUTS_SUBDIR_NAME",
         "IDS_APP_SHORTCUTS_SUBDIR_NAME_CANARY"
-      ]
+      ],
+      "input_check": "brand_strings"
     },
     {
       "id": "internal-url-input-and-normalization",
@@ -705,7 +755,7 @@
     },
     {
       "id": "mac-app-icon-catalog-and-compiled-assets",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -730,12 +780,12 @@
         "mac_asset_catalog",
         "toolchain_assets"
       ],
-      "notes": "ICNS alone does not update mac asset catalog; Xcode26 catalog inputs/toolchain are separate and runtime unverified.",
+      "notes": "The configured SVG and palette generate the Icon Composer layers, fallback PNG catalog, compiled Assets.car and ICNS in one hash-verified desktop package.",
       "runtime_verification": "not_verified"
     },
     {
       "id": "scaled-webui-native-and-payment-logos",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -748,6 +798,26 @@
         {
           "scope": "chromium",
           "path": "chrome/app/theme/theme_resources.grd"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/resources/version_ui_scaled_resources.grdp"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/omnibox/browser/BUILD.gn"
+        },
+        {
+          "scope": "chromium",
+          "path": "ui/message_center/BUILD.gn"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/vector_icons/BUILD.gn"
+        },
+        {
+          "scope": "chromium",
+          "path": "ui/webui/resources/cr_components/searchbox/icons/BUILD.gn"
         }
       ],
       "symbols": [
@@ -762,12 +832,12 @@
         "vector_sources",
         "third_party_asset_policy"
       ],
-      "notes": "Raster logo cannot automatically produce all wordmarks/vectors; preserve unrelated payment-provider marks.",
+      "notes": "The package generates separate new-tab/version favicons, all nine native product vector inputs including legacy variants, shared WebUI marks, 1x/2x version/product PNGs and name-derived wordmarks. Native default canvas sizes and caller theme colours are preserved.",
       "runtime_verification": "not_verified"
     },
     {
       "id": "windows-document-icons-tiles-and-visual-elements",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -787,7 +857,7 @@
         "windows_tile_assets",
         "identity"
       ],
-      "notes": "Document/list/incognito resource indices are compatibility-sensitive; tiles include logos and background.",
+      "notes": "The package supplies app/list/document/PDF, setup/mini-installer/PWA-launcher ICO and both tiles without changing resource indices. Incognito remains its semantic glyph; the profile icon cache version is bumped. Windows runtime is not verified.",
       "runtime_verification": "not_verified"
     },
     {
@@ -863,7 +933,7 @@
     },
     {
       "id": "license-app-name-prefix",
-      "status": "pending",
+      "status": "managed",
       "sources": [
         {
           "scope": "chromium",
@@ -879,13 +949,14 @@
         "localization",
         "attribution_policy"
       ],
-      "notes": "The first Chromium token denotes this application; linked Chromium denotes the upstream project. Transform the app prefix only and preserve project-link nodes.",
+      "notes": "Listed GRIT messages and every available upstream translation are generated from the pinned HEAD using branding/strings.json. Source application is checked against a fresh generation; runtime and platform coverage are separate.",
       "runtime_verification": "not_verified",
       "message_ids": [
         "IDS_VERSION_UI_LICENSE",
         "IDS_VERSION_UI_LICENSE_CHROMIUM"
       ],
-      "candidate_policy": "Mixed message: application prefix pending; preserve linked project attribution; never replace whole message globally."
+      "candidate_policy": "Mixed message: application prefix pending; preserve linked project attribution; never replace whole message globally.",
+      "input_check": "brand_strings"
     },
     {
       "id": "windows-existing-output-source-sync",
@@ -1112,6 +1183,255 @@
         "profile_migration"
       ],
       "notes": "GCM category derives ASCII alnum from display short name and stores it in profile prefs. Unicode/new profile/rename needs an independent stable service identity and migration/server review.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "desktop-logo-asset-package",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "branding/brand.json"
+        },
+        {
+          "scope": "repository",
+          "path": "assets/brand/yee-logo.svg"
+        },
+        {
+          "scope": "repository",
+          "path": "assets/brand/generated/manifest.json"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/generate-brand-assets.py"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/brand_assets.py"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/install-brand-assets.ps1"
+        },
+        {
+          "scope": "repository",
+          "path": "browser/ui/webui/frontend/src/lib/components/BrandMark.svelte"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/audit_logo_assets.py"
+        }
+      ],
+      "symbols": [
+        "logo_source",
+        "logo_palette",
+        "logo_assets_manifest",
+        "IDR_PRODUCT_LOGO_SVG"
+      ],
+      "configuration_roles": [
+        "name",
+        "short_name",
+        "logo_source",
+        "logo_palette",
+        "logo_assets_manifest"
+      ],
+      "notes": "Name, source SVG, palette and generator hashes invalidate the package. Every output is checked before writing, and unchanged files keep their modification times. Generated assets are excluded from the shell patch. The independent logo audit inspects GRIT bindings, duplicate native vector families, shared WebUI resources and reviewed embedded artwork for missing/unapplied assets.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "embedded-first-run-logo-artwork",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/intro/intro_ui.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/intro/images/refresh_showcase_illustration_chromium.png"
+        }
+      ],
+      "symbols": [
+        "IDR_INTRO_IMAGES_REFRESH_SHOWCASE_ILLUSTRATION_CHROMIUM_PNG",
+        "IDR_PRODUCT_LOGO_SVG",
+        "IDR_PRODUCT_LOGO_ANIMATION_SVG"
+      ],
+      "configuration_roles": [
+        "logo_source",
+        "logo_palette"
+      ],
+      "notes": "First-run/default-browser browser illustration is generated from the same configured knot SVG instead of artwork containing an embedded Chromium logo. Shared logo resources cover the surrounding welcome/default-browser/profile pages.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "desktop-product-logo-accessibility",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/version/version_ui.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/intro/intro_ui.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc"
+        }
+      ],
+      "symbols": [
+        "IDS_SHORT_PRODUCT_NAME",
+        "logo_alt_text",
+        "productLogoAltText",
+        "aboutProductLogoAlt"
+      ],
+      "configuration_roles": [
+        "short_name"
+      ],
+      "notes": "Desktop logo image accessible names read the configured short product name. General product copy and translations are generated separately by the shared string policy.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "embedded-preview-and-inline-toolbar-logo",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/side_panel/customize_chrome/icons/mini_new_tab_page.svg"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/webui_toolbar/icons.ts"
+        },
+        {
+          "scope": "chromium",
+          "path": "ui/webui/resources/cr_elements/icons.html.ts"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/settings/icons.html.ts"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/resources/webui_browser/icons.html.ts"
+        }
+      ],
+      "symbols": [
+        "miniNewTabPage",
+        "chrome_product",
+        "chrome-product"
+      ],
+      "configuration_roles": [
+        "logo_source"
+      ],
+      "notes": "Embedded product paths are generated from the same SVG, preserving surrounding artwork, functional/service icons and rounded/legacy selection code. Shared cr:chrome-product (including the Chromium Settings About menu), settings20:chrome-product in Safety Hub and WebUI Browser product groups use canonical 128-unit knot geometry and currentColor in both variants. Independent discovery scans underscore/hyphen product IDs in application and shared WebUI roots; execution verification is separate.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "shared-localized-product-strings",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repo",
+          "path": "branding/strings.json"
+        },
+        {
+          "scope": "repo",
+          "path": "tools/overlay/brand_strings.py"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/app/yee_branding_strings/manifest.json"
+        }
+      ],
+      "symbols": [
+        "GRD",
+        "GRDP",
+        "XTB",
+        "message fingerprint"
+      ],
+      "configuration_roles": [
+        "name",
+        "strings_policy"
+      ],
+      "input_check": "brand_strings",
+      "notes": "Six GRIT families use immutable upstream inputs, branded copies and rekeyed upstream translations. Upstream translation files remain intact; local input edits fail preflight.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "pdf-infobar-product-colors",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "browser/ui/product_logo.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc"
+        }
+      ],
+      "symbols": [
+        "yee::branding::ProductLogoIcon",
+        "IDR_PRODUCT_LOGO",
+        "IDR_PRODUCT_LOGO_WHITE"
+      ],
+      "configuration_roles": [
+        "logo_source",
+        "logo_palette"
+      ],
+      "notes": "PDF product notice shares the transparent configured two-color mark with the default-browser notice; selects the light/dark asset for the actual infobar background. Semantic toolbar/search icons remain monochrome. Both the legacy delegate and opt-in centralized InfoBarSpec use the same provider, which refreshes on background theme changes.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "additional-native-infobar-product-colors",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "browser/ui/product_logo.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/infobars/browser_infobar_registry.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/startup/startup_launch_infobar_delegate.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/browser/ui/cocoa/keystone_infobar_delegate.cc"
+        }
+      ],
+      "symbols": [
+        "yee::branding::ProductLogoIcon",
+        "SetIconProvider",
+        "IDR_PRODUCT_LOGO",
+        "IDR_PRODUCT_LOGO_WHITE"
+      ],
+      "configuration_roles": [
+        "logo_source",
+        "logo_palette"
+      ],
+      "notes": "Pin legacy and centralized-spec notices, desktop session restore, Windows startup launch and updater-enabled macOS Keystone promotion share the configured transparent two-color product mark, refreshed for the actual infobar background. Existing behavior and semantic warning/permission/extension icons are preserved. Windows, Linux and updater-disabled paths are not runtime-verified by the macOS core build. Chrome-branded-only Windows installer-download notices and separate bubble/OS-notification surfaces keep their existing vector rendering.",
       "runtime_verification": "not_verified"
     }
   ]

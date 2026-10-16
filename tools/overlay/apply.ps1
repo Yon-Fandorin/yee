@@ -30,9 +30,12 @@ foreach ($relativePath in $requiredFiles) {
     }
 }
 
-# Preflight all inputs and patches before the first checkout write.
+# 체크아웃에 쓰기 전에 브랜딩·소스·에셋 입력과 전체 패치를 검증한다.
 & (Join-Path $scriptDir 'install-branding.ps1') -ChromiumSrc $chromiumPath -CheckOnly
 $sourcePlan = @(Get-YeeOverlaySourcePlan -ChromiumSrc $chromiumPath -RepoRoot $repoRoot)
+if (-not $SkipBrandAssets) {
+    & (Join-Path $scriptDir 'install-brand-assets.ps1') -ChromiumSrc $chromiumPath -CheckOnly
+}
 $patchPlan = @(Get-YeeOverlayPatchPlan -ChromiumSrc $chromiumPath -RepoRoot $repoRoot)
 Invoke-YeeOverlayPatchPlan -ChromiumSrc $chromiumPath -Plan $patchPlan -CheckOnly:$CheckOnly
 & (Join-Path $scriptDir 'install-branding.ps1') -ChromiumSrc $chromiumPath -CheckOnly:$CheckOnly

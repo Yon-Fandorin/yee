@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_bubble_delegate_view.h"
+#include "chrome/browser/ui/views/yee/brand.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
@@ -290,8 +291,6 @@ SiteControlsButton::SiteControlsButton(Browser* browser)
     : views::ImageButton(base::BindRepeating(&SiteControlsButton::OnPressed,
                                              base::Unretained(this))),
       browser_(browser) {
-  SetTooltipText(u"Yee site controls");
-  GetViewAccessibility().SetName(u"Yee site controls");
   SetPreferredSize(gfx::Size(kActionSize, kActionSize));
   SetMinimumImageSize(gfx::Size(kShieldIconSize, kShieldIconSize));
   SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
@@ -385,7 +384,7 @@ void SiteControlsButton::RefreshVisualState() {
                                                kShieldIconSize));
   const bool show_badge = enabled && blocked_count_ > 0;
   badge_->SetVisible(show_badge);
-  std::u16string accessible_name = u"Yee site controls";
+  std::u16string accessible_name = branding::ProductName() + u" site controls";
   if (show_badge) {
     badge_->SetText(
         blocked_count_ > 99 ? u"99+" : base::NumberToString16(blocked_count_));

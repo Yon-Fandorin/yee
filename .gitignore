@@ -5,9 +5,8 @@
 __pycache__/
 *.py[cod]
 
-# Keep brand explorations local; the selected v8c mark remains versioned.
+# Keep loose raster experiments local; production assets have their own package.
 /assets/brand/*.png
-!/assets/brand/yee-logo-v8c-dino-nubs.png
 
 # Repository-local workbench and generated knowledge-tool artifacts
 /.local-exclude/

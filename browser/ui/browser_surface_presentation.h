@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_PRESENTATION_H_
 
 #include <cstdint>
+#include <optional>
 
 #include "third_party/skia/include/core/SkColor.h"
 
@@ -30,6 +31,8 @@ struct BrowserSurfacePresentation {
   SkColor disabled = SK_ColorTRANSPARENT;
   SkColor location_hover = SK_ColorTRANSPARENT;
   SkColor focus_stroke = SK_ColorTRANSPARENT;
+  SkColor editor_selection_background = SK_ColorTRANSPARENT;
+  SkColor editor_selection_foreground = SK_ColorTRANSPARENT;
   SkColor header_separator = SK_ColorTRANSPARENT;
   SkColor resting_divider = SK_ColorTRANSPARENT;
   SkColor popup_hover = SK_ColorTRANSPARENT;
@@ -45,7 +48,8 @@ BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
     SkColor surface,
     uint64_t source_id,
     uint64_t revision,
-    uint64_t popup_revision);
+    uint64_t popup_revision,
+    std::optional<SkColor> theme_accent = std::nullopt);
 
 BrowserSurfacePresentation UseNativeBrowserSurfaceColors(
     const BrowserSurfacePresentation& presentation);

@@ -276,7 +276,10 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
       if (await sendWithPromise('importBlockedDomains', 'csv', csv) !== 1) return false;
       const after = await sendWithPromise('getContentBlockingState');
       if (after.blockedDomains.length !== 2 || after.blockedDomains[0].includeSubdomains) return false;
-      try {await sendWithPromise('setBlockedDomain', 'https://wrong.example', true);}
+      try {
+        await sendWithPromise('setBlockedDomain', 'https://wrong.example', true);
+        return false;
+      }
       catch (error) {if (error !== 'invalid-domain') return false;}
       await sendWithPromise('removeBlockedDomain', 'new.example.test');
       return (await sendWithPromise('getContentBlockingState')).blockedDomains.length === 1;

@@ -200,10 +200,16 @@ Windows 개발 실행 파일은 `out\YeePilot\chrome.exe`, 설치 프로그램�
 개발 명령은 [Python 테스트](../../tests/tooling/README.md)로 확인한다.
 C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 
+- `test-header.sh`, `test-sidebar.sh`: 기본값과 단독 `--no-build`는 단위 검사
 - `test-browser-surface-layout.sh fast`: 크기·위치 계산 테스트
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
+
+계산·색상·직접 callback 검사는 창 활성화를 피한다. native popup·focus 단위 검사와
+명시적 `interactive` 검사는 필요한 창 활성화를 유지한다. Sidebar는 Header의 주소줄
+검사를 중복 실행하지 않으므로 두 영역을 바꿨을 때 각각의 gate를 선택한다. 실제
+hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 대체하지 않는다.
 
 ### 콘텐츠 차단 검증
 

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "roots": [
+    "chrome/app/chromium_strings.grd",
+    "chrome/app/generated_resources.grd",
+    "components/components_chromium_strings.grd",
+    "components/components_strings.grd",
+    "extensions/strings/extensions_strings.grd",
+    "ui/strings/ui_strings.grd"
+  ],
+  "preserved_message_patterns": [
+    "COPYRIGHT|LICENSE|LICENCE|CHROMIUM_PROJECT|CHROME_ROOT_PROGRAM",
+    "IMPORT.*(?:CHROME|CHROMIUM)|(?:CHROME|CHROMIUM).*IMPORT",
+    "CHROME_WEB_STORE|WEBSTORE|WEB_STORE",
+    "CHROME_BROWSER_CLOUD|CHROME_ENTERPRISE|CHROME_OS|CHROMEOS|CHROMECAST|CHROME_REMOTE_DESKTOP"
+  ],
+  "branded_message_ids": [
+    "IDS_WEBSTORE_APP_DESCRIPTION"
+  ],
+  "attribution_message_ids": [
+    "IDS_VERSION_UI_LICENSE",
+    "IDS_VERSION_UI_LICENSE_CHROMIUM",
+    "IDS_VERSION_UI_LICENSE_OTHER"
+  ],
+  "protected_phrases": [
+    "Google Chrome for Testing",
+    "Chrome for Testing",
+    "Chrome Web Store",
+    "Chrome 웹 스토어",
+    "Chrome 웹스토어",
+    "크롬 웹 스토어",
+    "크롬 웹스토어",
+    "ChromeOS",
+    "ChromiumOS",
+    "Chrome OS",
+    "Chromium OS",
+    "Chromecast",
+    "Chromium Projects",
+    "Chrome Remote Desktop",
+    "Chrome Enterprise",
+    "Chrome Browser Cloud Management",
+    "Chrome Root Program",
+    "The Chromium Authors",
+    "Google Chrome on iOS",
+    "Chrome on iOS",
+    "Chrome help center",
+    "Chrome Help Center",
+    "Chrome help centre",
+    "Chrome Help Centre"
+  ],
+  "product_aliases": [
+    "Google Chrome",
+    "Chromium",
+    "Chrome",
+    "क्रोमियम",
+    "क्रोम",
+    "크로미움",
+    "크롬"
+  ]
+}

@@ -103,7 +103,7 @@ TEST_F(SidePanelResizeGutterViewTest, KeyboardDelegatesAndMarkerSharesMetrics) {
       base::BindLambdaForTesting([&](bool value) { keyboard = value; })}));
   widget->SetBounds(gfx::Rect(0, 0, kSidebarMetrics.resize_gutter_width, 400));
   gutter->SetVisible(true);
-  widget->Show();
+  widget->ShowInactive();
   views::test::RunScheduledLayout(gutter);
   ASSERT_EQ(1u, gutter->children().size());
   views::View* const marker = gutter->children().front();
@@ -154,7 +154,7 @@ class SplitPaneControlsTest : public ChromeViewsTestBase {
         anchor_));
     controls_->SetBoundsRect(
         GetSplitPaneControlsBounds(*controls_, root_->GetLocalBounds()));
-    widget_->Show();
+    widget_->ShowInactive();
   }
 
   void TearDown() override {

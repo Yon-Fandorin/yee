@@ -51,6 +51,8 @@ function Get-YeeBuildJobs {
 function Sync-YeeBranding {
     & (Join-Path $script:YeeRoot 'tools\overlay\install-branding.ps1') `
         -ChromiumSrc $script:ChromiumSrc
+    & (Join-Path $script:YeeRoot 'tools\overlay\install-brand-assets.ps1') `
+        -ChromiumSrc $script:ChromiumSrc
 }
 
 function Sync-YeeUiSources {

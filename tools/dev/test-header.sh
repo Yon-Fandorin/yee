@@ -6,10 +6,10 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
-MODE="${1:-all}"
+MODE="${1:-unit}"
 SKIP_BUILD=false
 if [[ "$MODE" == "--no-build" ]]; then
-  MODE="all"
+  MODE="unit"
   SKIP_BUILD=true
 elif [[ "${2:-}" == "--no-build" ]]; then
   SKIP_BUILD=true
@@ -24,8 +24,9 @@ require_depot_tools
 require_chromium_src
 
 UNIT_FILTER='BrowserSurfaceColorControllerTest.*:BrowserSurfacePresentationResolverTest.*:YeeRestingTextViewTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
-INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeaderOmitsUnsupportedSidebarControl:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/MultiContentsViewUiTest.YeeLocationBarRehostSynchronizesOncePerGeneration/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
+INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeadersRetainNativeControls:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
 UNIT_FILTER+=':BrowserSurfaceColorSampleTest.*'
+UNIT_FILTER+=':YeeNativePresentationTest.*:YeeTabIconPresentationTest.*'
 UNIT_FILTER+=':SplitPaneControlsTest.*:SplitPaneControlsTransitTest.*:SidePanelResizeGutterTest.*:SidePanelResizeGutterViewTest.*'
 INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
 RTL_FILTER='SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'

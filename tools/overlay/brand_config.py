@@ -42,6 +42,9 @@ class Brand:
     logo_crop_size: int
     internal_url_scheme: str
     provisional: bool = True
+    logo_assets_manifest: Path | None = None
+    logo_palette: dict | None = None
+    strings_policy: Path | None = None
 
     @property
     def product_values(self):
@@ -60,6 +63,9 @@ class Brand:
             "logo_crop_size": self.logo_crop_size,
             "provisional": self.provisional,
             "internal_url_scheme": self.internal_url_scheme,
+            "logo_assets_manifest": str(self.logo_assets_manifest) if self.logo_assets_manifest else None,
+            "logo_palette": self.logo_palette,
+            "strings_policy": str(self.strings_policy) if self.strings_policy else None,
         }
 
 
@@ -67,7 +73,7 @@ def load_brand(config_path=CONFIG_PATH, repo_root=REPO_ROOT, *, validate_assets=
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise ValueError("brand.json must contain an object")
-    if set(config) - {"name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme"}:
+    if set(config) - {"name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme", "logo_assets_manifest", "logo_palette", "strings_policy"}:
         raise ValueError("brand.json contains an unknown field")
     name = config.get("name")
     short_name = config.get("short_name", name)
@@ -88,13 +94,33 @@ def load_brand(config_path=CONFIG_PATH, repo_root=REPO_ROOT, *, validate_assets=
     logo_source = (root / logo).resolve()
     if not logo_source.is_relative_to(root) or (validate_assets and not logo_source.is_file()):
         raise ValueError("logo_source must identify a file inside the repository")
-    crop_size = config.get("logo_crop_size")
+    crop_size = config.get("logo_crop_size", 1024)
     if type(crop_size) is not int or crop_size <= 0:
         raise ValueError("logo_crop_size must be a positive integer")
     if "internal_url_scheme" in config and not isinstance(config["internal_url_scheme"], str):
         raise ValueError("internal_url_scheme must be a string")
     scheme = internal_url_scheme(short_name, config.get("internal_url_scheme"))
-    return Brand(name, short_name, logo_source, crop_size, scheme, provisional)
+    manifest = config.get("logo_assets_manifest")
+    if manifest is not None:
+        if not isinstance(manifest, str) or not manifest or Path(manifest).is_absolute():
+            raise ValueError("logo_assets_manifest must be a repository-relative file path")
+        manifest = (root / manifest).resolve()
+        if not manifest.is_relative_to(root) or (validate_assets and not manifest.is_file()):
+            raise ValueError("logo_assets_manifest must identify a file inside the repository")
+    palette = config.get("logo_palette", {})
+    palette_keys = {"primary", "secondary", "dark_primary", "dark_secondary", "background", "dark_background"}
+    if (not isinstance(palette, dict) or set(palette) - palette_keys
+            or any(not isinstance(v, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", v)
+                   for v in palette.values())):
+        raise ValueError("logo_palette must contain named six-digit hexadecimal colours")
+    strings_policy = config.get("strings_policy")
+    if strings_policy is not None:
+        if not isinstance(strings_policy, str) or not strings_policy or Path(strings_policy).is_absolute():
+            raise ValueError("strings_policy must be a repository-relative file path")
+        strings_policy = (root / strings_policy).resolve()
+        if not strings_policy.is_relative_to(root) or not strings_policy.is_file():
+            raise ValueError("strings_policy must identify a file inside the repository")
+    return Brand(name, short_name, logo_source, crop_size, scheme, provisional, manifest, palette, strings_policy)
 
 
 def product_parts(brand):
@@ -117,7 +143,8 @@ def product_parts(brand):
 
 
 def branding_plan(chromium_src, brand, check_only=False):
-    app_dir = Path(chromium_src) / "chrome/app"
+    src = Path(chromium_src)
+    app_dir = src / "chrome/app"
     branding_path = app_dir / "theme/chromium/BRANDING"
     # Preserve upstream company/copyright, install identity, and extra fields.
     text = branding_path.read_bytes().decode("utf-8")
@@ -141,10 +168,25 @@ def branding_plan(chromium_src, brand, check_only=False):
         text = re.sub(pattern, scheme_key + "=" + brand.internal_url_scheme, text)
     else:
         text = text.rstrip("\r\n") + "\n" + scheme_key + "=" + brand.internal_url_scheme + "\n"
-    return {branding_path: text, **{
+    plan = {branding_path: text,
+            app_dir / "yee_branding_strings.gni":
+                '# Generated from branding/brand.json.\n'
+                'yee_brand_strings_enabled = ' + ('true' if brand.strings_policy else 'false') + '\n',
+            **{
         app_dir / filename: text
         for filename, text in product_parts(brand).items()
     }}
+    for path in plan:
+        for ancestor in (path, *path.parents):
+            if ancestor.is_symlink():
+                raise ValueError("Branding output traverses a symlink: " + str(path))
+            if ancestor != path and ancestor.exists() and not ancestor.is_dir():
+                raise ValueError("Branding output parent is not a directory: " + str(path))
+            if ancestor == src:
+                break
+        if path.exists() and not path.is_file():
+            raise ValueError("Branding output is not a file: " + str(path))
+    return plan
 
 
 def install_brand(chromium_src, brand, check_only=False):
@@ -172,7 +214,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     show = commands.add_parser("show", help="read the validated brand configuration")
-    show.add_argument("--get", choices=("name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme"))
+    show.add_argument("--get", choices=("name", "short_name", "logo_source", "logo_crop_size", "provisional", "internal_url_scheme", "logo_assets_manifest", "strings_policy"))
     show.add_argument("--format", choices=("json", "lines"), default="json")
     install = commands.add_parser("install", help="install branding inputs; does not build")
     install.add_argument("chromium_src", type=Path)

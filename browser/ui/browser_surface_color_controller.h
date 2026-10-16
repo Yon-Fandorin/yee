@@ -78,6 +78,7 @@ class BrowserSurfaceColorController
   void DidFirstVisuallyNonEmptyPaint() override;
   void DidChangeThemeColor() override;
   void OnBackgroundColorChanged() override;
+  void OnColorProviderChanged() override;
   void OnVisibilityChanged(content::Visibility visibility) override;
   void DidGetUserInteraction(const blink::WebInputEvent& event) override;
   void DidChangeVerticalScrollDirection(

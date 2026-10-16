@@ -1,6 +1,15 @@
 {
   "name": "Yee",
   "provisional": true,
-  "logo_source": "assets/brand/yee-logo-v8c-dino-nubs.png",
-  "logo_crop_size": 820
+  "logo_source": "assets/brand/yee-logo.svg",
+  "logo_palette": {
+    "primary": "#242824",
+    "secondary": "#438578",
+    "dark_primary": "#F5F6F2",
+    "dark_secondary": "#8BC4B3",
+    "background": "#F7F9F5",
+    "dark_background": "#202724"
+  },
+  "logo_assets_manifest": "assets/brand/generated/manifest.json",
+  "strings_policy": "branding/strings.json"
 }

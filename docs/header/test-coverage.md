@@ -7,6 +7,8 @@
 
 `test-header.sh unit`은 Header 전용 `yee_header_unittests` 실행 파일만 빌드해
 확인한다. Chromium 전체 `unit_tests` 빌드는 광범위 최종 게이트에서만 사용한다.
+모드를 생략하거나 `--no-build`만 주면 이 단위 검사만 실행한다. geometry·색상과
+직접 callback 검사는 활성화 없이 Widget을 표시하거나 숨긴 채 확인한다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
@@ -21,18 +23,22 @@
 | Header 텍스트·버튼·focus stroke가 전체 gray 및 대표 chromatic surface에서 같은 대비 계약을 사용하고 실제 Label이 물리색을 유지 | `BrowserSurfacePresentationResolverTest.ExhaustiveGrayAndChromaticContrastContract`, `YeeRestingTextViewTest.WidgetAttachedLabelsUseExactSurfaceAndPhysicalForeground` |
 | popup은 exact surface를 쓰되 high contrast/forced colors에서는 native mixer를 보존하고 global provider cache를 늘리지 않음 | `YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache` |
 | 단일·분할 Header가 42 DIP, 주소 표면 34 DIP, 공통 중심축과 edge inset을 공유 | `YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract` |
+| LTR·RTL에서 고정·hover Header의 새 탭·Agent 버튼은 창 드래그 영역에서 제외 | `YeeNativePresentationTest.SidebarHeaderButtonsStayOutsideWindowCaption` |
+| 빈 주소 힌트·선택색·Side Panel 바탕·배너 링크 기준선·제품 로고와 favicon 테마가 실제 native View에서 유지 | `YeeNativePresentationTest.*`, `YeeTabIconPresentationTest.*` |
 
 ## 2. 실제 native View 구조
 
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
 렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
 단위·GUI 실행 모두 launcher retry를 0으로 고정한다.
+실제 View parent·renderer·popup·입력 전달 계약은 순수 geometry 검사로 대체하지
+않는다. `interactive`와 명시적 `all`에서는 필요한 창 활성화를 유지한다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
 | native LocationBar 하나가 단일 Toolbar와 active Pane Header 사이를 이동해도 높이·중심축을 유지하고 분할 해제 시 원래 parent로 복귀 | `YeeSingleAndSplitHeadersShareLocationBarGeometry` |
 | 단일 A → 분할 active A/inactive B → active B → popup B → 분할 해제 B 전환에서 주소 배경, 일반·disabled 버튼, IME inline·rich autocomplete·AI hint label, Pane Header 텍스트, location/security icon이 같은 source snapshot을 사용하고, 열린 popup은 animation의 최종 `popup_revision`에서만 한 번 갱신되며 native 모드에서 모든 물리색 override를 제거 | `YeePresentationFollowsSingleAndSplitSources` |
-| active pane 전환과 분할 해제에서 native LocationBar가 최종 parent로 이동하고 실제 host 변경 generation마다 layout/bounds 동기화를 정확히 한 번 수행 | `YeeLocationBarRehostSynchronizesOncePerGeneration` |
+| active pane 전환과 분할 해제에서 native LocationBar가 최종 parent로 이동하고 실제 host 변경 generation마다 layout/bounds 동기화를 정확히 한 번 수행 | `YeePresentationFollowsSingleAndSplitSources` |
 | 분할 생성·제거 중 Chromium의 focus 정책이 popup을 닫는 동작은 우회하지 않고, popup 색·anchor는 단일과 안정화된 각 분할 상태에서 별도로 검증 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |

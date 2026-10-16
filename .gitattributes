@@ -1,0 +1,4 @@
+# 모든 플랫폼에서 브랜드 묶음의 검증된 해시를 유지한다.
+assets/brand/generated/** -text
+assets/brand/yee-logo.svg -text
+tools/overlay/generate-brand-assets.py text eol=lf

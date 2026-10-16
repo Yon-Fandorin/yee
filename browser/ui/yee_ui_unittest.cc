@@ -10,13 +10,14 @@
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+#include "chrome/browser/ui/views/yee/sidebar_presentation.h"
+#include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/test/views_test_base.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -95,6 +96,66 @@ TEST(BrowserSurfacePresentationResolverTest,
   }
 }
 
+TEST(YeeSurfaceColorTest, ThemeTintKeepsPageColorAndReadableInteractionStates) {
+  for (SkColor accent : {SK_ColorRED, SK_ColorGREEN, SK_ColorBLUE,
+                         SK_ColorWHITE, SK_ColorBLACK}) {
+    for (int gray = 0; gray <= 255; ++gray) {
+      const SkColor surface = SkColorSetRGB(gray, gray, gray);
+      const auto neutral = ResolveBrowserSurfacePresentation(surface, 1, 2, 3);
+      const auto tinted =
+          ResolveBrowserSurfacePresentation(surface, 1, 2, 3, accent);
+      EXPECT_EQ(tinted.surface, neutral.surface);
+      EXPECT_EQ(tinted.primary, neutral.primary);
+      EXPECT_EQ(tinted.secondary, neutral.secondary);
+      for (SkColor ink : {tinted.primary, tinted.secondary}) {
+        EXPECT_GE(color_utils::GetContrastRatio(ink, tinted.location_hover),
+                  color_utils::kMinimumReadableContrastRatio);
+      }
+      EXPECT_GE(color_utils::GetContrastRatio(tinted.focus_stroke, surface),
+                color_utils::kMinimumVisibleContrastRatio);
+      EXPECT_GE(color_utils::GetContrastRatio(tinted.focus_stroke,
+                                              tinted.location_hover),
+                color_utils::kMinimumVisibleContrastRatio);
+      EXPECT_GE(
+          color_utils::GetContrastRatio(tinted.editor_selection_foreground,
+                                        tinted.editor_selection_background),
+          color_utils::kMinimumReadableContrastRatio);
+      for (SkColor fill : {tinted.popup_hover, tinted.popup_selected}) {
+        EXPECT_GE(color_utils::GetContrastRatio(tinted.focus_stroke, fill),
+                  color_utils::kMinimumVisibleContrastRatio);
+        EXPECT_GE(
+            color_utils::GetContrastRatio(tinted.popup_selected_primary, fill),
+            color_utils::kMinimumReadableContrastRatio);
+        EXPECT_GE(color_utils::GetContrastRatio(tinted.popup_selected_secondary,
+                                                fill),
+                  color_utils::kMinimumReadableContrastRatio);
+      }
+    }
+  }
+}
+
+TEST(YeeSurfaceColorTest, FocusFollowsTextPolarityOnChromaticPages) {
+  for (SkColor surface :
+       {SkColorSetRGB(0x32, 0x63, 0xB5), SkColorSetRGB(0x4B, 0x2B, 0x85),
+        SK_ColorWHITE, SK_ColorBLACK}) {
+    for (SkColor accent : {SK_ColorRED, SK_ColorBLUE, SK_ColorGREEN}) {
+      const auto p =
+          ResolveBrowserSurfacePresentation(surface, 0, 0, 0, accent);
+      const float background_luminance =
+          color_utils::GetRelativeLuminance(surface);
+      EXPECT_EQ(
+          color_utils::GetRelativeLuminance(p.primary) > background_luminance,
+          color_utils::GetRelativeLuminance(p.focus_stroke) >
+              background_luminance);
+      EXPECT_GE(color_utils::GetContrastRatio(p.focus_stroke, p.location_hover),
+                color_utils::kMinimumVisibleContrastRatio);
+      EXPECT_GE(color_utils::GetContrastRatio(p.editor_selection_foreground,
+                                              p.editor_selection_background),
+                color_utils::kMinimumReadableContrastRatio);
+    }
+  }
+}
+
 TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
   ui::ColorProviderManager& manager = ui::ColorProviderManager::Get();
   const size_t cache_size = manager.color_provider_cache_size_for_testing();
@@ -103,30 +164,38 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
         ResolveBrowserSurfacePresentation(surface, 0, 0, 0);
     const SkColor hover_overlay = SkColorSetA(
         color_utils::GetColorWithMaxContrast(presentation.surface), 0x0F);
-    return std::array<std::pair<ui::ColorId, SkColor>, 25>{
+    return std::array<std::pair<ui::ColorId, SkColor>, 26>{
         {{kColorOmniboxResultsBackground, presentation.surface},
          {kColorOmniboxResultsBackgroundHovered, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundSelected, presentation.popup_selected},
          {kColorOmniboxResultsBackgroundIph, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundHoverOverlay, hover_overlay},
          {kColorOmniboxBubbleOutline, presentation.popup_outline},
+         {kColorOmniboxResultsFocusIndicator, presentation.focus_stroke},
          {kColorOmniboxResultsChipBackground, presentation.popup_hover},
          {kColorOmniboxText, presentation.popup_selected_primary},
          {kColorOmniboxTextDimmed, presentation.popup_selected_secondary},
-         {kColorOmniboxResultsTextSelected, presentation.popup_selected_primary},
+         {kColorOmniboxResultsTextSelected,
+          presentation.popup_selected_primary},
          {kColorOmniboxResultsTextAnswer, presentation.popup_selected_primary},
-         {kColorOmniboxResultsTextDimmed, presentation.popup_selected_secondary},
-         {kColorOmniboxResultsTextDimmedSelected, presentation.popup_selected_secondary},
-         {kColorOmniboxResultsTextSecondary, presentation.popup_selected_secondary},
-         {kColorOmniboxResultsTextSecondarySelected, presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextDimmed,
+          presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextDimmedSelected,
+          presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextSecondary,
+          presentation.popup_selected_secondary},
+         {kColorOmniboxResultsTextSecondarySelected,
+          presentation.popup_selected_secondary},
          {kColorOmniboxResultsUrl, presentation.popup_selected_primary},
          {kColorOmniboxResultsUrlSelected, presentation.popup_selected_primary},
          {kColorOmniboxKeywordSelected, presentation.popup_selected_primary},
          {kColorOmniboxKeywordSeparator, presentation.popup_selected_secondary},
          {kColorOmniboxResultsIcon, presentation.popup_selected_primary},
-         {kColorOmniboxResultsIconSelected, presentation.popup_selected_primary},
+         {kColorOmniboxResultsIconSelected,
+          presentation.popup_selected_primary},
          {kColorOmniboxResultsButtonIcon, presentation.popup_selected_primary},
-         {kColorOmniboxResultsButtonIconSelected, presentation.popup_selected_primary},
+         {kColorOmniboxResultsButtonIconSelected,
+          presentation.popup_selected_primary},
          {kColorOmniboxResultsButtonBorder, presentation.popup_outline},
          {kColorOmniboxResultsIconGM3Background, presentation.popup_hover}}};
   };
@@ -154,13 +223,14 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     EXPECT_EQ(cache_size, manager.color_provider_cache_size_for_testing());
   }
 
-  const std::array<ui::ColorId, 25> overridden_ids = {
+  const std::array<ui::ColorId, 26> overridden_ids = {
       kColorOmniboxResultsBackground,
       kColorOmniboxResultsBackgroundHovered,
       kColorOmniboxResultsBackgroundSelected,
       kColorOmniboxResultsBackgroundIph,
       kColorOmniboxResultsBackgroundHoverOverlay,
       kColorOmniboxBubbleOutline,
+      kColorOmniboxResultsFocusIndicator,
       kColorOmniboxResultsChipBackground,
       kColorOmniboxText,
       kColorOmniboxTextDimmed,
@@ -210,17 +280,21 @@ TEST(BrowserSurfacePresentationResolverTest,
         SkColorSetRGB(gray, gray, gray), 1, 1, 1);
     EXPECT_NE(p.popup_hover, p.popup_selected) << gray;
     EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary,
-                                           p.popup_selected), 4.5f)
+                                            p.popup_selected),
+              4.5f)
         << gray;
     EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
-                                           p.popup_selected), 4.5f)
+                                            p.popup_selected),
+              4.5f)
         << gray;
     for (SkColor chip_surface : {p.surface, p.popup_hover}) {
-      EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary,
-                                             chip_surface), 4.5f)
+      EXPECT_GE(
+          color_utils::GetContrastRatio(p.popup_selected_primary, chip_surface),
+          4.5f)
           << gray;
       EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
-                                             chip_surface), 4.5f)
+                                              chip_surface),
+                4.5f)
           << gray;
     }
   }
@@ -244,16 +318,16 @@ TEST(BrowserSurfacePresentationResolverTest,
             4.5f);
 }
 
-class YeeRestingTextViewTest : public views::ViewsTestBase {
+class YeeRestingTextViewTest : public ChromeViewsTestBase {
  public:
   void SetUp() override {
-    views::ViewsTestBase::SetUp();
+    ChromeViewsTestBase::SetUp();
     widget_ = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
   }
 
   void TearDown() override {
     widget_.reset();
-    views::ViewsTestBase::TearDown();
+    ChromeViewsTestBase::TearDown();
   }
 
  protected:
@@ -296,6 +370,20 @@ TEST(YeeSurfaceGeometryTest, SplitAndSingleSurfacesShareCornerContract) {
 }
 
 TEST(YeeSurfaceGeometryTest, SplitAndSingleHeadersShareMetricsContract) {
+  EXPECT_EQ(158, GetSidebarHeaderMinimumWidth(86));
+  const auto flyout = ResolveSidebarFlyoutGeometry(0.0, 1.0, true);
+  EXPECT_EQ(12, flyout.leading_offset);
+  EXPECT_EQ(54, flyout.top_inset);
+  EXPECT_EQ(6, flyout.header_inset);
+  EXPECT_EQ(6, flyout.hit_test_top_inset);
+  EXPECT_EQ(12, flyout.bottom_inset + kSidebarMetrics.content_gutter);
+  const auto hidden = ResolveSidebarFlyoutGeometry(0.0, -1.0, true);
+  EXPECT_EQ(0, hidden.leading_offset);
+  EXPECT_EQ(48, hidden.top_inset);
+  EXPECT_EQ(0, hidden.hit_test_top_inset);
+  EXPECT_EQ(0, hidden.bottom_inset);
+  EXPECT_EQ(0, ResolveSidebarFlyoutGeometry(1.0, 0.0, true).top_inset);
+  EXPECT_EQ(12, ResolveSidebarFlyoutGeometry(0.0, 1.0, false).top_inset);
   EXPECT_EQ(42, kSidebarMetrics.browser_surface_header_height());
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
             kSidebarMetrics.split_pane_header_height);
@@ -370,13 +458,12 @@ TEST(YeeSurfaceGeometryTest,
   // edge. Yee must restore those shadow insets before applying its own uniform
   // six-DIP Surface gutter.
   gfx::Rect native_remaining_bounds(244, 0, 656, 800);
-  const gfx::Insets native_shadow_insets =
-      gfx::Insets::TLBR(6, 0, 6, 6);
+  const gfx::Insets native_shadow_insets = gfx::Insets::TLBR(6, 0, 6, 6);
   native_remaining_bounds.Inset(native_shadow_insets);
 
   const gfx::Rect restored_content_column =
-      RestoreBrowserSurfaceContentColumnAfterSidePanel(
-          native_remaining_bounds, native_shadow_insets);
+      RestoreBrowserSurfaceContentColumnAfterSidePanel(native_remaining_bounds,
+                                                       native_shadow_insets);
   const ResolvedBrowserSurfaceSeed open_seed = ResolveBrowserSurfaceSeed(
       BrowserSurfaceSeedInput{restored_content_column, gfx::Insets(6),
                               /*split=*/false,
@@ -484,45 +571,6 @@ TEST(YeeSurfaceGeometryTest,
   }
 }
 
-TEST(YeeSurfaceGeometryTest, CurrentPaneGeometryIsPureAndDirectional) {
-  CurrentPaneGeometryInput input;
-  input.available_space = gfx::Rect(0, 0, 900, 600);
-  input.split = true;
-  input.axis = PaneSplitAxis::kHorizontal;
-  input.start_ratio = 0.4;
-  input.divider_size = 8;
-  input.minimums = {200, 200};
-
-  const CurrentPaneGeometry horizontal = ComputeCurrentPaneGeometry(input);
-  EXPECT_EQ(gfx::Rect(0, 0, 357, 600), horizontal.start);
-  EXPECT_EQ(gfx::Rect(357, 0, 8, 600), horizontal.divider);
-  EXPECT_EQ(gfx::Rect(365, 0, 535, 600), horizontal.end);
-
-  input.axis = PaneSplitAxis::kVertical;
-  input.available_space = gfx::Rect(0, 0, 900, 500);
-  input.start_ratio = 0.95;
-  const CurrentPaneGeometry vertical = ComputeCurrentPaneGeometry(input);
-  EXPECT_EQ(292, vertical.start.height());
-  EXPECT_EQ(8, vertical.divider.height());
-  EXPECT_EQ(200, vertical.end.height());
-  EXPECT_EQ(input.available_space.x(), vertical.start.x());
-  EXPECT_EQ(input.available_space.y(), vertical.start.y());
-  EXPECT_EQ(input.available_space.width(), vertical.end.width());
-  EXPECT_EQ(input.available_space.bottom(), vertical.end.bottom());
-}
-
-TEST(YeeSurfaceGeometryTest, InfoBarSlotUsesOnlyCurrentActiveBody) {
-  ExternalInfoBarSlotInput input;
-  input.manager_body_bounds_in_browser = gfx::Rect(727, 48, 466, 745);
-  input.notice_flow_bounds = gfx::Rect(250, 6, 944, 788);
-  input.semantic_height = 54;
-
-  EXPECT_EQ(gfx::Rect(727, 48, 466, 54), ResolveExternalInfoBarSlot(input));
-
-  input.semantic_height = 800;
-  EXPECT_TRUE(ResolveExternalInfoBarSlot(input).IsEmpty());
-}
-
 TEST(YeeSurfaceGeometryTest, HoverCardAnchorOnlyAddsContentSideClearance) {
   const gfx::Rect original(10, 20, 100, 32);
   const gfx::Rect adjusted = AdjustVerticalTabHoverCardAnchor(original);
@@ -627,8 +675,14 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
     const SidebarItemColors dragging = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kDragging, /*hover_progress=*/0.0,
         /*frame_active=*/true, /*persistent_surface=*/false);
-    EXPECT_EQ(kSidebarMetrics.favorites_cell_active_fill_alpha,
+    EXPECT_EQ(kSidebarMetrics.sidebar_row_active_fill_alpha,
               static_cast<int>(SkColorGetA(active.fill)));
+    EXPECT_GT(SkColorGetA(active.fill), SkColorGetA(hovered_row.fill));
+    const SidebarItemColors active_favorite = ResolveSidebarItemColors(
+        provider, SidebarItemVisualState::kActive, /*hover_progress=*/0.0,
+        /*frame_active=*/true, /*persistent_surface=*/true);
+    EXPECT_LT(SkColorGetA(active.fill), SkColorGetA(active_favorite.fill));
+    EXPECT_EQ(active.foreground, active_favorite.foreground);
     EXPECT_EQ(kSidebarMetrics.favorites_cell_active_stroke_alpha,
               static_cast<int>(SkColorGetA(active.stroke)));
     EXPECT_GT(static_cast<int>(SkColorGetA(dragging.fill)),
@@ -657,6 +711,25 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
     EXPECT_LT(
         color_utils::GetContrastRatio(inactive.foreground, inactive_shell),
         color_utils::GetContrastRatio(active.foreground, shell));
+
+    // 고정과 hover에서 실제 합성되는 상태 면 모두 글자 대비를 유지한다.
+    for (const bool frame_active : {false, true}) {
+      const SkColor flyout = ResolveSidebarFlyoutColor(provider, frame_active);
+      EXPECT_NE(provider.GetColor(ui::kColorSysBase), flyout);
+      for (const auto state :
+           {SidebarItemVisualState::kResting, SidebarItemVisualState::kHovered,
+            SidebarItemVisualState::kActive,
+            SidebarItemVisualState::kDragging}) {
+        for (const bool persistent : {false, true}) {
+          const SidebarItemColors colors = ResolveSidebarItemColors(
+              provider, state, 1.0, frame_active, persistent);
+          EXPECT_GE(color_utils::GetContrastRatio(
+                        colors.foreground, color_utils::GetResultingPaintColor(
+                                               colors.fill, flyout)),
+                    color_utils::kMinimumReadableContrastRatio);
+        }
+      }
+    }
   }
 }
 

@@ -11,6 +11,8 @@
 
 #include "base/functional/callback_forward.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
+#include "chrome/browser/ui/views/yee/shell_features.h"
+#include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/gfx/geometry/point.h"
@@ -42,6 +44,7 @@ struct SidebarMetrics {
   int expanded_width = 244;
   int collapsed_width = 8;
   int content_gutter = 6;
+  int sidebar_flyout_inset = 12;
   int resize_gutter_width = 10;
   int resize_handle_thickness = 4;
   int resize_handle_length = 24;
@@ -70,26 +73,41 @@ struct SidebarMetrics {
   int shell_control_size = 30;
   int shell_control_corner_radius = 8;
   int shell_control_horizontal_margin = 1;
-  int sidebar_header_controls_leading_adjustment = 12;
+  int sidebar_header_control_top_padding = 4;
   int sidebar_footer_row_height = 50;
   int sidebar_footer_top_spacing = 6;
-  int sidebar_footer_corner_radius = 10;
-  int sidebar_footer_icon_size = 28;
+  int sidebar_footer_corner_radius = 6;
+  int sidebar_footer_icon_size = 20;
   int sidebar_footer_disclosure_size = 14;
   int sidebar_footer_icon_label_spacing = 8;
   int sidebar_footer_surface_outline_width = 1;
   int sidebar_footer_surface_padding_vertical = 4;
   int sidebar_footer_surface_padding_horizontal = 5;
   int sidebar_row_hover_animation_duration_ms = 50;
-  int sidebar_footer_menu_gap = 4;
-  int sidebar_footer_root_row_height = 46;
-  int sidebar_footer_menu_row_height = 38;
+  int sidebar_row_active_fill_alpha = 30;
+  int sidebar_footer_menu_gap = 8;
+  int sidebar_footer_root_row_height = 44;
+  int sidebar_footer_menu_row_height = 28;
+  int sidebar_footer_menu_corner_radius = 6;
+  int sidebar_footer_menu_inset = 6;
+  int sidebar_footer_menu_min_width = 224;
+  int sidebar_footer_menu_max_width = 288;
+  int sidebar_footer_menu_surface_corner_radius = 10;
+  int sidebar_footer_menu_icon_slot_size = 20;
+  int sidebar_footer_menu_icon_size = 14;
+  int sidebar_footer_menu_disclosure_size = 12;
+  int sidebar_footer_menu_horizontal_inset = 10;
   int sidebar_footer_screen_fade_out_duration_ms = 45;
   int sidebar_footer_screen_fade_in_duration_ms = 70;
 
   constexpr int sidebar_header_controls_leading_inset() const {
-    return toolbar_leading_inset + toolbar_interior_inset -
-           sidebar_header_controls_leading_adjustment;
+    return tab_strip_horizontal_padding + tab_content_horizontal_padding +
+           (tab_icon_design_width - shell_control_size) / 2 -
+           shell_control_horizontal_margin;
+  }
+
+  constexpr int sidebar_caption_toolbar_inset() const {
+    return shell_control_horizontal_margin - toolbar_interior_inset;
   }
 
   constexpr int sidebar_footer_surface_vertical_inset() const {
@@ -121,6 +139,7 @@ struct SidebarMetrics {
   }
   int tab_icon_design_width = 16;
   int tab_row_height = 32;
+  int tab_row_corner_radius = 6;
   int tab_content_vertical_padding = 3;
   int tab_content_horizontal_padding = 8;
   int tab_strip_horizontal_padding = 8;
@@ -182,9 +201,8 @@ struct SidebarMetrics {
 
 inline constexpr SidebarMetrics kSidebarMetrics;
 
-// One theme-aware state contract for rows, Favorite tiles, and drag previews.
-// Geometry remains component-specific, while state colors stay identical
-// across light/dark themes and active/inactive windows.
+// 행·Favorite·드래그 미리보기는 같은 테마와 전경 역할을 쓴다.
+// 평평한 행의 선택 면은 지속 카드보다 옅게 표현한다.
 enum class SidebarItemVisualState {
   kResting,
   kHovered,
@@ -265,10 +283,10 @@ SkColor ResolveBrowserSurfaceHeaderColor(
 BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
     SkColor surface_color);
 
-// Returns a quiet one-DIP focus stroke derived from the page-aware Header.
-// Light surfaces prefer a darker stroke; surfaces too dark to distinguish a
-// darker stroke switch to the light endpoint to retain non-text contrast.
-SkColor ResolveBrowserSurfaceFocusStrokeColor(SkColor surface_color);
+// 페이지를 따르는 Header에서 읽을 수 있는 명암으로 1 DIP focus 선을 정한다.
+SkColor ResolveBrowserSurfaceFocusStrokeColor(
+    SkColor surface_color,
+    std::optional<SkColor> theme_accent = std::nullopt);
 
 // Keeps native semantic colors unchanged when readable, otherwise adjusts
 // luminance toward a contrasting endpoint without substituting a neutral role.
@@ -280,6 +298,10 @@ SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic);
 std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
     SkColor background_color,
     SkColor focus_stroke_color);
+
+// Native 강조색 계산에 실제 컨트롤 바탕을 전달한다.
+void SetBrowserSurfaceControlBackground(views::View& view,
+                                        std::optional<SkColor> surface);
 
 // Adds Yee's exact neutral popup roles after Chromium has populated an
 // uncached provider with every registered platform, component, and Chrome
@@ -358,8 +380,7 @@ void UpdateCombinedSurfaceOutlineLayout(views::View& view,
 // Chromium continues to own split layout, resizing, and semantic highlights.
 gfx::RoundedCornersF ResolveSplitPaneRoundedCorners();
 std::unique_ptr<views::View> CreateSplitPaneEmphasisView();
-void UpdateSplitPaneEmphasisView(views::View& view,
-                                 bool visible,
+void UpdateSplitPaneEmphasisView(views::View &view, bool visible,
                                  bool emphasized);
 
 // Non-interactive resting presentation layered over Chromium's real Omnibox.
@@ -378,8 +399,6 @@ void UpdateOmniboxRestingTextView(
     bool visible);
 
 void ApplyShellControlStyle(ToolbarButton& button);
-
-bool IsShellEnabled();
 
 // Yee's collapsed sidebar is an 8px edge target, not Chromium's 56px icon
 // rail. Tab, group, and favorites presentation therefore stays on the
@@ -409,7 +428,8 @@ gfx::Rect AdjustVerticalTabHoverCardAnchor(const gfx::Rect& bounds);
 std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
     views::Button::PressedCallback callback);
 std::unique_ptr<ToolbarButton> CreateShellAddButton(
-    ShellCreateCallback callback);
+    ShellCreateCallback callback,
+    SidebarPopupLockCallback acquire_popup_lock = {});
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
     views::Button::PressedCallback callback);
 
@@ -419,13 +439,18 @@ std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
 // exclusion; Yee owns their presentation and geometry.
 std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
     ShellCreateCallback create_callback,
-    views::Button::PressedCallback agent_callback);
-void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
-                                             int leading_exclusion);
-void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible);
-bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
-                                                   const gfx::Point& point);
+    views::Button::PressedCallback agent_callback,
+    SidebarPopupLockCallback acquire_popup_lock = {});
+// 최소 폭은 움직이지 않는 창 버튼 영역을 기준으로 하여 hover 중에도 유지한다.
+int GetSidebarHeaderMinimumWidth(int leading_exclusion);
+void SetSidebarHeaderActionsLeadingExclusion(views::View &view,
+                                             int leading_exclusion,
+                                             int leading_offset = 0,
+                                             int top_inset = 0);
+void SetSidebarHeaderActionsControlsVisible(views::View &view, bool visible);
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View &view,
+                                                   const gfx::Point &point);
 
-}  // namespace yee
+} // namespace yee
 
-#endif  // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_
+#endif // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_

@@ -113,7 +113,7 @@
       <message name="IDS_YEE_WEBUI_PRIVACY_DESCRIPTION" desc="privacyDescription: text in the browser settings UI." meaning="privacyDescription">Browsing data and security</message>
       <message name="IDS_YEE_WEBUI_APPEARANCE" desc="appearance: text in the browser settings UI." meaning="appearance">Appearance</message>
       <message name="IDS_YEE_WEBUI_APPEARANCE_DESCRIPTION" desc="appearanceDescription: text in the browser settings UI." meaning="appearanceDescription">Theme and display preferences</message>
-      <message name="IDS_YEE_WEBUI_APPEARANCE_HINT" desc="appearanceHint: text in the browser settings UI." meaning="appearanceHint">This page uses your system’s light or dark mode.</message>
+      <message name="IDS_YEE_WEBUI_APPEARANCE_HINT" desc="appearanceHint: text in the browser settings UI." meaning="appearanceHint">This page follows the browser’s light or dark mode, with subtle theme highlights.</message>
       <message name="IDS_YEE_WEBUI_DOWNLOADS" desc="downloads: text in the browser settings UI." meaning="downloads">Downloads</message>
       <message name="IDS_YEE_WEBUI_DOWNLOADS_DESCRIPTION" desc="downloadsDescription: text in the browser settings UI." meaning="downloadsDescription">Save location and download preferences</message>
       <message name="IDS_YEE_WEBUI_PROTECTION_ENABLED" desc="protectionEnabled: text in the browser settings UI." meaning="protectionEnabled">Blocking is on</message>
@@ -344,6 +344,109 @@
       <message name="IDS_YEE_WEBUI_BOOKMARKS_LOAD_FAILED" desc="bookmarksLoadFailed: text in the bookmarks UI." meaning="bookmarksLoadFailed">Could not load bookmarks. Try again.</message>
       <message name="IDS_YEE_WEBUI_BOOKMARKS_ACCOUNT" desc="bookmarksAccount: bookmark storage label." meaning="bookmarksAccount">Account bookmarks</message>
       <message name="IDS_YEE_WEBUI_BOOKMARKS_DEVICE" desc="bookmarksDevice: bookmark storage label." meaning="bookmarksDevice">On this device</message>
+      <message name="IDS_YEE_DEFAULT_BROWSER_INFOBAR_TEXT" desc="Native infobar shown when this browser is not the default. $1 is the configured product name." meaning="defaultBrowserInfobar"><ph name="PRODUCT_NAME">$1<ex>Yee</ex></ph> isn't your default browser</message>
+      <message name="IDS_YEE_DEFAULT_BROWSER_PIN_INFOBAR_TEXT" desc="Native infobar offering to set this browser as default and pin it to the taskbar. $1 is the configured product name." meaning="defaultBrowserPinInfobar">Set <ph name="PRODUCT_NAME">$1<ex>Yee</ex></ph> as your default browser and pin it to your taskbar</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_LOAD_FAILED" desc="extensionsLoadFailed: text in the extensions UI." meaning="extensionsLoadFailed">Could not load extensions. Try again.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ACTION_FAILED" desc="extensionsActionFailed: text in the extensions UI." meaning="extensionsActionFailed">Could not change this extension. Try again.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ENABLED" desc="extensionsEnabled: text in the extensions UI." meaning="extensionsEnabled">Enabled</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_DISABLED" desc="extensionsDisabled: text in the extensions UI." meaning="extensionsDisabled">Disabled</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_TERMINATED" desc="extensionsTerminated: text in the extensions UI." meaning="extensionsTerminated">Stopped</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_BLOCKED" desc="extensionsBlocked: text in the extensions UI." meaning="extensionsBlocked">Blocked</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_POLICY_BLOCKED" desc="extensionsPolicyBlocked: text in the extensions UI." meaning="extensionsPolicyBlocked">Your administrator has blocked this extension.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_CORRUPT_INSTALL" desc="extensionsCorruptInstall: text in the extensions UI." meaning="extensionsCorruptInstall">This extension may be corrupted. Open browser controls to repair it.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SUSPICIOUS_INSTALL" desc="extensionsSuspiciousInstall: text in the extensions UI." meaning="extensionsSuspiciousInstall">This extension was disabled because its installation is suspicious.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_UPDATE_REQUIRED" desc="extensionsUpdateRequired: text in the extensions UI." meaning="extensionsUpdateRequired">This extension needs an update before it can be enabled.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_STORE_REQUIRED" desc="extensionsStoreRequired: text in the extensions UI." meaning="extensionsStoreRequired">This extension must be published in the extension store before it can be enabled.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_UNSUPPORTED_MANIFEST" desc="extensionsUnsupportedManifest: text in the extensions UI." meaning="extensionsUnsupportedManifest">This extension uses an unsupported manifest version.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_UNSUPPORTED_DEVELOPER" desc="extensionsUnsupportedDeveloper: text in the extensions UI." meaning="extensionsUnsupportedDeveloper">This developer extension is no longer supported.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_CUSTODIAN_APPROVAL" desc="extensionsCustodianApproval: text in the extensions UI." meaning="extensionsCustodianApproval">A parent's approval is required to enable this extension.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_PARENT_PERMISSIONS" desc="extensionsParentPermissions: text in the extensions UI." meaning="extensionsParentPermissions">A parent has disabled permissions for this extension.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_RELOADING" desc="extensionsReloading: text in the extensions UI." meaning="extensionsReloading">This extension is reloading.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_DEPENDENCY_WARNING" desc="extensionsDependencyWarning: text in the extensions UI." meaning="extensionsDependencyWarning">Other extensions depend on this extension, so it cannot be disabled.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ALLOWLIST_WARNING" desc="extensionsAllowlistWarning: text in the extensions UI." meaning="extensionsAllowlistWarning">Enhanced Safe Browsing does not trust this extension.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_INVALID_HOST" desc="extensionsInvalidHost: text in the extensions UI." meaning="extensionsInvalidHost">Enter a site such as https://example.com or *.example.com.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADD_HOST_FIRST" desc="extensionsAddHostFirst: text in the extensions UI." meaning="extensionsAddHostFirst">Add a site to allow access on specific sites.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_TITLE" desc="extensionsTitle: text in the extensions UI." meaning="extensionsTitle">Extensions</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_BACK" desc="extensionsBack: text in the extensions UI." meaning="extensionsBack">All extensions</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_CLEAR_SEARCH" desc="extensionsClearSearch: text in the extensions UI." meaning="extensionsClearSearch">Clear search</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_COUNT" desc="extensionsCount: text in the extensions UI." meaning="extensionsCount"><ph name="VALUE">$1<ex>1</ex></ph> installed</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_DEVELOPER_TOOLS" desc="extensionsDeveloperTools: text in the extensions UI." meaning="extensionsDeveloperTools">Developer tools</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_EMPTY" desc="extensionsEmpty: text in the extensions UI." meaning="extensionsEmpty">No extensions installed</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_FIND_EXTENSIONS" desc="extensionsFindExtensions: text in the extensions UI." meaning="extensionsFindExtensions">Find extensions</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_LOADING" desc="extensionsLoading: text in the extensions UI." meaning="extensionsLoading">Loading extensions…</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NO_RESULTS" desc="extensionsNoResults: text in the extensions UI." meaning="extensionsNoResults">No extensions match your search</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NOT_FOUND" desc="extensionsNotFound: text in the extensions UI." meaning="extensionsNotFound">This extension is no longer installed</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_OPEN_NATIVE" desc="extensionsOpenNative: text in the extensions UI." meaning="extensionsOpenNative">Open extension manager</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_RETRY" desc="extensionsRetry: text in the extensions UI." meaning="extensionsRetry">Try again</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SEARCH" desc="extensionsSearch: text in the extensions UI." meaning="extensionsSearch">Search extensions</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SHORTCUTS" desc="extensionsShortcuts: text in the extensions UI." meaning="extensionsShortcuts">Keyboard shortcuts</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADVANCED" desc="extensionsAdvanced: text in the extensions UI." meaning="extensionsAdvanced">Advanced settings</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADVANCED_DESCRIPTION" desc="extensionsAdvancedDescription: text in the extensions UI." meaning="extensionsAdvancedDescription">Manage developer features and additional permissions in the extension manager.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_COLLECT_ERRORS" desc="extensionsCollectErrors: text in the extensions UI." meaning="extensionsCollectErrors">Collect errors</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_COLLECT_ERRORS_DESCRIPTION" desc="extensionsCollectErrorsDescription: text in the extensions UI." meaning="extensionsCollectErrorsDescription">Record extension errors for troubleshooting.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ENABLED_SETTING" desc="extensionsEnabledSetting: text in the extensions UI." meaning="extensionsEnabledSetting">Enabled</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ERRORS" desc="extensionsErrors: text in the extensions UI." meaning="extensionsErrors">Extension errors</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ERRORS_DESCRIPTION" desc="extensionsErrorsDescription: text in the extensions UI." meaning="extensionsErrorsDescription">Review recorded errors in the extension manager.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_FILE_ACCESS" desc="extensionsFileAccess: text in the extensions UI." meaning="extensionsFileAccess">Allow access to file URLs</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_FILE_ACCESS_DESCRIPTION" desc="extensionsFileAccessDescription: text in the extensions UI." meaning="extensionsFileAccessDescription">Allow this extension to read and change local files you open.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ID" desc="extensionsId: text in the extensions UI." meaning="extensionsId">Extension ID</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_INCOGNITO" desc="extensionsIncognito: text in the extensions UI." meaning="extensionsIncognito">Allow in incognito</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_INCOGNITO_WARNING" desc="extensionsIncognitoWarning: text in the extensions UI." meaning="extensionsIncognitoWarning">Extensions may record your browsing history in incognito mode.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_MANAGED" desc="extensionsManaged: text in the extensions UI." meaning="extensionsManaged">Managed by your organization</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NATIVE_DETAILS" desc="extensionsNativeDetails: text in the extensions UI." meaning="extensionsNativeDetails">Review in extension manager</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NATIVE_RECOVERY_DESCRIPTION" desc="extensionsNativeRecoveryDescription: text in the extensions UI." meaning="extensionsNativeRecoveryDescription">This extension cannot be switched here. Review its restrictions and any recovery steps in the extension manager.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NO_PERMISSIONS" desc="extensionsNoPermissions: text in the extensions UI." meaning="extensionsNoPermissions">No other permissions requested</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_OPEN_OPTIONS" desc="extensionsOpenOptions: text in the extensions UI." meaning="extensionsOpenOptions">Open options</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_OPTIONS" desc="extensionsOptions: text in the extensions UI." meaning="extensionsOptions">Extension options</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_OPTIONS_DESCRIPTION" desc="extensionsOptionsDescription: text in the extensions UI." meaning="extensionsOptionsDescription">Open the settings provided by this extension.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_PENDING_CHANGE" desc="extensionsPendingChange: text in the extensions UI." meaning="extensionsPendingChange">This change will apply when the browser restarts.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_PERMISSIONS" desc="extensionsPermissions: text in the extensions UI." meaning="extensionsPermissions">Permissions</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_REMOVE" desc="extensionsRemove: text in the extensions UI." meaning="extensionsRemove">Remove extension</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_TOGGLE" desc="extensionsToggle: text in the extensions UI." meaning="extensionsToggle">Enable <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_VERSION" desc="extensionsVersion: text in the extensions UI." meaning="extensionsVersion">Version <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_VIEW_ERRORS" desc="extensionsViewErrors: text in the extensions UI." meaning="extensionsViewErrors">View errors</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADD" desc="extensionsAdd: text in the extensions UI." meaning="extensionsAdd">Add</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADD_SITE" desc="extensionsAddSite: text in the extensions UI." meaning="extensionsAddSite">Add site</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ADD_SITE_DESCRIPTION" desc="extensionsAddSiteDescription: text in the extensions UI." meaning="extensionsAddSiteDescription">Allow this extension to read and change data on this site.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ALL_SITES" desc="extensionsAllSites: text in the extensions UI." meaning="extensionsAllSites">On all sites</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ALLOW_SITE" desc="extensionsAllowSite: text in the extensions UI." meaning="extensionsAllowSite">Allow access to <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_CANCEL" desc="extensionsCancel: text in the extensions UI." meaning="extensionsCancel">Cancel</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_GRANTED_SITES" desc="extensionsGrantedSites: text in the extensions UI." meaning="extensionsGrantedSites">Allowed sites</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ON_CLICK" desc="extensionsOnClick: text in the extensions UI." meaning="extensionsOnClick">When clicked</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_REMOVE_SITE" desc="extensionsRemoveSite: text in the extensions UI." meaning="extensionsRemoveSite">Remove access to <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_REQUESTED_SITES" desc="extensionsRequestedSites: text in the extensions UI." meaning="extensionsRequestedSites">Requested sites</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE" desc="extensionsSite: text in the extensions UI." meaning="extensionsSite">Site</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE_ACCESS" desc="extensionsSiteAccess: text in the extensions UI." meaning="extensionsSiteAccess">Site access</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE_ACCESS_CHANGE_NOTE" desc="extensionsSiteAccessChangeNote: text in the extensions UI." meaning="extensionsSiteAccessChangeNote">Changing the access mode clears the specific sites you have allowed.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE_ACCESS_DESCRIPTION" desc="extensionsSiteAccessDescription: text in the extensions UI." meaning="extensionsSiteAccessDescription">Choose where this extension can read and change site data.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE_HELP" desc="extensionsSiteHelp: text in the extensions UI." meaning="extensionsSiteHelp">Enter a domain or URL. Use *.example.com to include subdomains.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SITE_PLACEHOLDER" desc="extensionsSitePlaceholder: text in the extensions UI." meaning="extensionsSitePlaceholder">https://example.com</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_SPECIFIC_SITES" desc="extensionsSpecificSites: text in the extensions UI." meaning="extensionsSpecificSites">On specific sites</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ACTIONS" desc="extensionsActions: text in the extensions UI." meaning="extensionsActions">Actions for <ph name="VALUE">$1<ex>1</ex></ph></message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_DETAILS" desc="extensionsDetails: text in the extensions UI." meaning="extensionsDetails">Details</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ALL_REQUESTED_SITES" desc="extensionsAllRequestedSites: text in the extensions UI." meaning="extensionsAllRequestedSites">Allow on all requested sites</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_ALL_REQUESTED_SITES_DESCRIPTION" desc="extensionsAllRequestedSitesDescription: text in the extensions UI." meaning="extensionsAllRequestedSitesDescription">Turn off to choose individual sites below.</message>
+      <message name="IDS_YEE_WEBUI_EXTENSIONS_NATIVE_SITE_ACCESS_DESCRIPTION" desc="extensionsNativeSiteAccessDescription: text in the extensions UI." meaning="extensionsNativeSiteAccessDescription">Manage site access in the extension manager for the current browser configuration.</message>
+      <message name="IDS_YEE_WEBUI_CUSTOMIZATION_DESCRIPTION" desc="customizationDescription: theme behavior in the browser appearance panel." meaning="customizationDescription">Theme colors tint the sidebar and frame. The address bar follows each page; internal pages keep their own accent with subtle theme highlights.</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_LOCAL" desc="footerLocal: native sidebar workspace menu." meaning="footerLocal">Local</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_PERSONAL" desc="footerPersonal: native sidebar workspace menu." meaning="footerPersonal">Personal</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE" desc="footerLocalProfile: native sidebar workspace menu." meaning="footerLocalProfile">Local profile</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_BROWSER_TOOLS" desc="footerBrowserTools: native sidebar workspace menu." meaning="footerBrowserTools">Browser tools</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MEMORY" desc="footerMemory: native sidebar workspace menu." meaning="footerMemory">Memory</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_SWITCH_CONTEXT" desc="footerSwitchContext: native sidebar workspace menu." meaning="footerSwitchContext">Switch workspace</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_REOPEN_TAB" desc="footerReopenTab: native sidebar workspace menu." meaning="footerReopenTab">Reopen closed tab</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_DOWNLOADS" desc="footerDownloads: native sidebar workspace menu." meaning="footerDownloads">Downloads</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_HISTORY" desc="footerHistory: native sidebar workspace menu." meaning="footerHistory">History</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_OTHER_DEVICES" desc="footerOtherDevices: native sidebar workspace menu." meaning="footerOtherDevices">Tabs from other devices</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_EXTENSIONS" desc="footerExtensions: native sidebar workspace menu." meaning="footerExtensions">Manage extensions</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MEMORY_ON" desc="footerMemoryOn: native sidebar workspace menu." meaning="footerMemoryOn">On</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MEMORY_OFF" desc="footerMemoryOff: native sidebar workspace menu." meaning="footerMemoryOff">Off</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_NOT_CONNECTED" desc="footerNotConnected: native sidebar workspace menu." meaning="footerNotConnected">Not connected</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MEMORY_DESCRIPTION" desc="footerMemoryDescription: native sidebar workspace menu." meaning="footerMemoryDescription">Memory stays in this workspace.</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MEMORY_UNAVAILABLE" desc="footerMemoryUnavailable: native sidebar workspace menu." meaning="footerMemoryUnavailable">Connect a workspace to use memory.</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MENU_TITLE" desc="footerMenuTitle: native sidebar workspace menu." meaning="footerMenuTitle">Workspace and account menu</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_MENU_ACCESSIBLE_NAME" desc="Accessible name of the workspace menu trigger, including the current workspace and account." meaning="footerMenuAccessibleName"><ph name="WORKSPACE">$1<ex>Personal</ex></ph>, <ph name="ACCOUNT">$2<ex>Local profile</ex></ph>, workspace menu</message>
+      <message name="IDS_YEE_WEBUI_FOOTER_BACK" desc="Accessible description for the native sidebar menu back button." meaning="footerBack">Back to workspace menu</message>
     </messages>
   </release>
 </grit>

@@ -20,19 +20,22 @@
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_reopen_suppressor.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
-#include "chrome/browser/ui/views/yee/brand.h"
+#include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/accessibility/ax_enums.mojom.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/color/color_id.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/slide_animation.h"
+#include "ui/gfx/text_utils.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -42,9 +45,12 @@
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/typography.h"
+#include "ui/views/style/typography_provider.h"
+#include "ui/views/vector_icons.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
@@ -53,10 +59,13 @@
 namespace yee {
 namespace {
 
-constexpr int kMenuInsets = 7;
-constexpr int kMenuIconGlyphSize = 16;
-constexpr int kMenuCornerRadius = 8;
-constexpr int kMenuRowHorizontalInset = 6;
+constexpr int kMenuInsets = kSidebarMetrics.sidebar_footer_menu_inset;
+constexpr int kMenuIconGlyphSize =
+    kSidebarMetrics.sidebar_footer_menu_icon_size;
+constexpr int kMenuCornerRadius =
+    kSidebarMetrics.sidebar_footer_menu_corner_radius;
+constexpr int kMenuRowHorizontalInset =
+    kSidebarMetrics.sidebar_footer_menu_horizontal_inset;
 constexpr int kMenuRowVerticalInset = 3;
 
 gfx::Insets FooterSurfaceInsets() {
@@ -65,25 +74,18 @@ gfx::Insets FooterSurfaceInsets() {
       kSidebarMetrics.sidebar_footer_surface_horizontal_inset());
 }
 
-std::unique_ptr<views::Border> CreateFooterSurfaceBorder(bool paint_outline,
-                                                         SkColor outline) {
-  if (!paint_outline) {
-    return views::CreateEmptyBorder(FooterSurfaceInsets());
-  }
-  return views::CreatePaddedBorder(
-      views::CreateRoundedRectBorder(
-          kSidebarMetrics.sidebar_footer_surface_outline_width,
-          kSidebarMetrics.sidebar_footer_corner_radius, outline),
-      gfx::Insets::VH(
-          kSidebarMetrics.sidebar_footer_surface_padding_vertical,
-          kSidebarMetrics.sidebar_footer_surface_padding_horizontal));
-}
-
-bool HasKeyboardTraversalFocus(const views::View& view) {
-  const views::FocusManager* const focus_manager = view.GetFocusManager();
+bool HasKeyboardTraversalFocus(const views::View &view) {
+  const views::FocusManager *const focus_manager = view.GetFocusManager();
   return view.HasFocus() && focus_manager &&
          focus_manager->focus_change_reason() ==
              views::FocusManager::FocusChangeReason::kFocusTraversal;
+}
+
+ui::ColorId MenuOutlineColorId(const views::View &view) {
+  const bool light_mode =
+      view.GetWidget() && view.GetWidget()->GetColorMode() ==
+                              ui::ColorProviderKey::ColorMode::kLight;
+  return light_mode ? ui::kColorSysNeutralOutline : ui::kColorMenuSeparator;
 }
 
 enum class MenuIconTone {
@@ -118,7 +120,43 @@ std::u16string FirstCodePointMark(std::u16string_view value) {
 }
 
 std::u16string ContextSubtitle(const SidebarContextItem& context) {
+  if (context.is_local_context || context.tenant_name.empty()) {
+    return context.account_name;
+  }
   return context.tenant_name + u" · " + context.account_name;
+}
+
+int PreferredMenuWidth(const SidebarFooterModel& model) {
+  const auto& typography = views::TypographyProvider::Get();
+  const gfx::FontList& title_font = typography.GetFont(
+      views::style::CONTEXT_MENU, views::style::STYLE_BODY_4);
+  const gfx::FontList& subtitle_font = typography.GetFont(
+      views::style::CONTEXT_MENU, views::style::STYLE_BODY_5);
+  int text_width = 0;
+  for (int id :
+       {IDS_YEE_WEBUI_FOOTER_BROWSER_TOOLS, IDS_YEE_WEBUI_FOOTER_MEMORY,
+        IDS_YEE_WEBUI_FOOTER_SWITCH_CONTEXT, IDS_YEE_WEBUI_FOOTER_REOPEN_TAB,
+        IDS_YEE_WEBUI_FOOTER_DOWNLOADS, IDS_YEE_WEBUI_FOOTER_HISTORY,
+        IDS_YEE_WEBUI_FOOTER_OTHER_DEVICES, IDS_YEE_WEBUI_FOOTER_EXTENSIONS,
+        IDS_YEE_WEBUI_FOOTER_NOT_CONNECTED}) {
+    text_width = std::max(
+        text_width,
+        gfx::GetStringWidth(l10n_util::GetStringUTF16(id), title_font));
+  }
+  for (const auto& context : model.contexts) {
+    text_width = std::max(
+        text_width, gfx::GetStringWidth(context.workspace_name, title_font));
+    text_width =
+        std::max(text_width,
+                 gfx::GetStringWidth(ContextSubtitle(context), subtitle_font));
+  }
+  const int columns = 2 * (kMenuInsets + kMenuRowHorizontalInset) +
+                      kSidebarMetrics.sidebar_footer_menu_icon_slot_size +
+                      2 * kSidebarMetrics.sidebar_footer_icon_label_spacing +
+                      kSidebarMetrics.sidebar_footer_menu_disclosure_size;
+  return std::clamp(text_width + columns,
+                    kSidebarMetrics.sidebar_footer_menu_min_width,
+                    kSidebarMetrics.sidebar_footer_menu_max_width);
 }
 
 std::unique_ptr<views::Label> CreateMarkLabel(std::u16string text, int size) {
@@ -126,7 +164,7 @@ std::unique_ptr<views::Label> CreateMarkLabel(std::u16string text, int size) {
   label->SetID(kSidebarFooterWorkspaceMarkViewId);
   label->SetPreferredSize(gfx::Size(size, size));
   label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-  label->SetTextStyle(views::style::STYLE_BODY_5_BOLD);
+  label->SetTextStyle(views::style::STYLE_BODY_5_EMPHASIS);
   label->SetEnabledColor(ui::kColorSysOnTonalContainer);
   label->SetSkipSubpixelRenderingOpacityCheck(true);
   label->SetBackground(views::CreateRoundedRectBackground(
@@ -141,8 +179,8 @@ std::unique_ptr<views::ImageView> CreateMenuIcon(
   auto icon_view = std::make_unique<views::ImageView>();
   icon_view->SetID(kSidebarFooterMenuActionIconViewId);
   icon_view->SetPreferredSize(
-      gfx::Size(kSidebarMetrics.sidebar_footer_icon_size,
-                kSidebarMetrics.sidebar_footer_icon_size));
+      gfx::Size(kSidebarMetrics.sidebar_footer_menu_icon_slot_size,
+                kSidebarMetrics.sidebar_footer_menu_icon_slot_size));
   const ui::ColorId icon_color = tone == MenuIconTone::kAccent
                                      ? ui::kColorSysOnTonalContainer
                                      : ui::kColorIconSecondary;
@@ -159,15 +197,12 @@ std::unique_ptr<views::ImageView> CreateMenuIcon(
 std::unique_ptr<views::Label> CreateTrailingLabel(std::u16string text,
                                                   bool emphasized = false) {
   auto label = std::make_unique<views::Label>(std::move(text));
-  label->SetEnabledColor(emphasized ? ui::kColorSysOnTonalContainer
+  label->SetEnabledColor(emphasized ? ui::kColorSysPrimary
                                     : ui::kColorLabelForegroundSecondary);
   label->SetTextStyle(views::style::STYLE_BODY_5);
   label->SetHorizontalAlignment(gfx::ALIGN_RIGHT);
   label->SetSkipSubpixelRenderingOpacityCheck(true);
-  label->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(1, 5)));
-  label->SetBackground(views::CreateRoundedRectBackground(
-      emphasized ? ui::kColorSysTonalContainer : ui::kColorSysNeutralContainer,
-      8));
+  label->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, 2)));
   label->SetCanProcessEventsWithinSubtree(false);
   return label;
 }
@@ -176,8 +211,9 @@ std::unique_ptr<views::ImageView> CreateTrailingIcon(
     const gfx::VectorIcon& icon,
     ui::ColorId color = ui::kColorIconSecondary) {
   auto icon_view = std::make_unique<views::ImageView>();
-  icon_view->SetPreferredSize(gfx::Size(16, 16));
-  icon_view->SetImage(ui::ImageModel::FromVectorIcon(icon, color, 16));
+  const int size = kSidebarMetrics.sidebar_footer_menu_disclosure_size;
+  icon_view->SetPreferredSize(gfx::Size(size, size));
+  icon_view->SetImage(ui::ImageModel::FromVectorIcon(icon, color, size));
   icon_view->SetCanProcessEventsWithinSubtree(false);
   return icon_view;
 }
@@ -208,7 +244,9 @@ std::unique_ptr<views::View> CreateDisclosure() {
 std::unique_ptr<views::ImageView> CreateFooterChevron() {
   auto chevron = std::make_unique<views::ImageView>();
   const int size = kSidebarMetrics.sidebar_footer_disclosure_size;
-  chevron->SetPreferredSize(gfx::Size(size, size));
+  chevron->SetPreferredSize(
+      gfx::Size(kSidebarMetrics.sidebar_footer_icon_size,
+                kSidebarMetrics.sidebar_footer_icon_size));
   chevron->SetImage(ui::ImageModel::FromVectorIcon(
       vector_icons::kKeyboardArrowUpIcon, ui::kColorIconSecondary, size));
   chevron->SetID(kSidebarFooterChevronViewId);
@@ -216,24 +254,57 @@ std::unique_ptr<views::ImageView> CreateFooterChevron() {
   return chevron;
 }
 
+void SetCompactContentMargins(views::View *icon, views::View *secondary) {
+    // 두 열의 세로 간격은 기본 control-list 여백 대신 이 행의 border가 정한다.
+  if (icon) {
+    icon->parent()->SetProperty(views::kMarginsKey, gfx::Insets());
+  }
+  if (secondary) {
+    secondary->SetProperty(
+        views::kMarginsKey,
+        gfx::Insets().set_left(
+            kSidebarMetrics.sidebar_footer_icon_label_spacing));
+  }
+}
+
 class SidebarFooterMenuRow : public HoverButton {
  public:
-  SidebarFooterMenuRow(PressedCallback callback, Params params, bool selected)
+  SidebarFooterMenuRow(PressedCallback callback,
+                       Params params,
+                       bool selected,
+                       bool keyboard_focus_visible)
       : HoverButton(std::move(callback), std::move(params)),
-        selected_(selected) {
+        keyboard_focus_visible_(keyboard_focus_visible) {
+    SetCompactContentMargins(icon_view(), secondary_view());
     SetFocusRingCornerRadius(kMenuCornerRadius);
+    // 자동 focus 채움을 끄고 hover·누름에만 상태 면을 표시한다.
+    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
+    views::FocusRing::Install(this);
+    views::FocusRing::Get(this)->SetColorId(ui::kColorSysStateFocusRing);
+    views::FocusRing::Get(this)->SetHasFocusPredicate(
+        base::BindRepeating([](const views::View* view) {
+          const auto* row = static_cast<const SidebarFooterMenuRow*>(view);
+          return row->HasFocus() && (row->keyboard_focus_visible_ ||
+                                     HasKeyboardTraversalFocus(*row));
+        }));
     title()->SetSkipSubpixelRenderingOpacityCheck(true);
-    title()->SetTextStyle(views::style::STYLE_BODY_4_EMPHASIS);
+    title()->SetTextStyle(subtitle() ? views::style::STYLE_BODY_4_EMPHASIS
+                                     : views::style::STYLE_BODY_4);
     if (subtitle()) {
       subtitle()->SetSkipSubpixelRenderingOpacityCheck(true);
       subtitle()->SetTextStyle(views::style::STYLE_BODY_5);
     }
-    GetViewAccessibility().SetIsSelected(selected_);
+    GetViewAccessibility().SetIsSelected(selected);
     UpdateSurface();
   }
   SidebarFooterMenuRow(const SidebarFooterMenuRow&) = delete;
   SidebarFooterMenuRow& operator=(const SidebarFooterMenuRow&) = delete;
   ~SidebarFooterMenuRow() override = default;
+
+  void ShowKeyboardFocus() {
+    keyboard_focus_visible_ = true;
+    views::FocusRing::Get(this)->SchedulePaint();
+  }
 
  protected:
   void OnThemeChanged() override {
@@ -241,17 +312,32 @@ class SidebarFooterMenuRow : public HoverButton {
     UpdateSurface();
   }
 
+  void StateChanged(ButtonState old_state) override {
+    HoverButton::StateChanged(old_state);
+    UpdateSurface();
+  }
+
  private:
   void UpdateSurface() {
-    if (selected_) {
+    if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
       SetBackground(views::CreateRoundedRectBackground(
-          ui::kColorSysNeutralContainer, kMenuCornerRadius));
+          GetState() == STATE_PRESSED ? ui::kColorSysStateRippleNeutralOnSubtle
+                                      : ui::kColorSysStateHoverOnSubtle,
+          kMenuCornerRadius));
     } else {
       SetBackground(nullptr);
     }
   }
 
-  const bool selected_;
+  bool keyboard_focus_visible_ = false;
+};
+
+class SidebarFooterMenuSeparator : public views::Separator {
+ protected:
+  void OnThemeChanged() override {
+    views::Separator::OnThemeChanged();
+    SetColorId(MenuOutlineColorId(*this));
+  }
 };
 
 class FooterBubbleDelegate final : public views::BubbleDialogDelegate {
@@ -275,8 +361,10 @@ class FooterBubble final : public views::WidgetObserver {
  public:
   FooterBubble(std::unique_ptr<FooterBubbleDelegate> delegate,
                views::Widget::ClosedCallback on_close,
-               base::RepeatingClosure on_native_destroying)
-      : delegate_(std::move(delegate)),
+               base::RepeatingClosure on_native_destroying,
+               base::ScopedClosureRunner popup_lock)
+      : popup_lock_(std::move(popup_lock)),
+        delegate_(std::move(delegate)),
         widget_(views::BubbleDialogDelegate::CreateBubble(delegate_.get(),
                                                           std::move(on_close))),
         on_native_destroying_(std::move(on_native_destroying)) {
@@ -308,9 +396,12 @@ class FooterBubble final : public views::WidgetObserver {
     if (on_native_destroying_) {
       on_native_destroying_.Run();
     }
+    popup_lock_.RunAndReset();
   }
 
  private:
+  // 정상 닫기는 지연 삭제되므로 Widget이 사라질 때까지 잠금을 유지한다.
+  base::ScopedClosureRunner popup_lock_;
   // Declaration order is intentional: normal member destruction also deletes
   // the Widget before the delegate.
   std::unique_ptr<FooterBubbleDelegate> delegate_;
@@ -320,32 +411,36 @@ class FooterBubble final : public views::WidgetObserver {
       widget_observation_{this};
 };
 
-HoverButton::Params CreateFooterTriggerParams(const SidebarFooterModel& model) {
-  const SidebarContextItem& context = SelectedContext(model);
+HoverButton::Params CreateFooterTriggerParams(const SidebarFooterModel &model) {
+  const SidebarContextItem &context = SelectedContext(model);
   HoverButton::Params params;
   params.icon_view = CreateMarkLabel(FirstCodePointMark(context.workspace_name),
                                      kSidebarMetrics.sidebar_footer_icon_size);
   params.title = context.workspace_name;
   params.subtitle = ContextSubtitle(context);
   params.add_vertical_label_spacing = false;
-  params.icon_label_spacing = kSidebarMetrics.sidebar_footer_icon_label_spacing;
+  params.icon_label_spacing =
+      2 * kSidebarMetrics.tab_content_horizontal_padding +
+      kSidebarMetrics.tab_icon_design_width -
+      kSidebarMetrics.sidebar_footer_surface_horizontal_inset() -
+      kSidebarMetrics.sidebar_footer_icon_size;
   params.secondary_view = CreateFooterChevron();
   return params;
 }
 
 class YeeSidebarFooterMenuView : public views::View,
                                  public gfx::AnimationDelegate {
- public:
+public:
   YeeSidebarFooterMenuView(
-      views::BubbleDialogDelegate* bubble_delegate,
-      int anchor_width,
-      SidebarFooterModel model,
+      views::BubbleDialogDelegate *bubble_delegate, SidebarFooterModel model,
+      bool keyboard_navigation,
       SidebarContextSelectedCallback select_context_callback,
       SidebarFooterBrowserActionCallback browser_action_callback,
       SidebarMemoryChangedCallback memory_changed_callback)
       : bubble_delegate_(bubble_delegate),
-        anchor_width_(anchor_width),
         model_(NormalizeModel(std::move(model))),
+        menu_width_(PreferredMenuWidth(model_)),
+        keyboard_navigation_(keyboard_navigation),
         select_context_callback_(std::move(select_context_callback)),
         browser_action_callback_(std::move(browser_action_callback)),
         memory_changed_callback_(std::move(memory_changed_callback)),
@@ -353,7 +448,8 @@ class YeeSidebarFooterMenuView : public views::View,
     CHECK(bubble_delegate_);
     SetID(kSidebarFooterMenuViewId);
     SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kVertical, gfx::Insets(kMenuInsets), 2));
+        views::BoxLayout::Orientation::kVertical,
+        gfx::Insets::VH(kMenuInsets, 0), 2));
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     SetScreenContents(SidebarFooterScreen::kRoot, /*move_focus=*/false);
@@ -380,24 +476,43 @@ class YeeSidebarFooterMenuView : public views::View,
     screen_animation_.Show();
   }
 
-  void SetAnchorWidth(int anchor_width) {
-    anchor_width_ = std::max(0, anchor_width);
-    for (views::View* child : children()) {
-      gfx::Size preferred_size = child->GetPreferredSize();
-      preferred_size.set_width(ContentWidth());
-      child->SetPreferredSize(preferred_size);
-    }
-    InvalidateLayout();
-    PreferredSizeChanged();
-    if (GetWidget()) {
-      bubble_delegate_->SizeToContents();
-    }
-  }
-
   bool OnKeyPressed(const ui::KeyEvent& event) override {
-    if (event.key_code() == ui::VKEY_ESCAPE &&
+    if ((event.key_code() == ui::VKEY_ESCAPE ||
+         event.key_code() == ui::VKEY_LEFT) &&
         screen_ != SidebarFooterScreen::kRoot) {
+      keyboard_navigation_ = true;
       ShowScreen(ParentSidebarFooterScreen(screen_), /*move_focus=*/true);
+      return true;
+    }
+    if (event.key_code() == ui::VKEY_UP || event.key_code() == ui::VKEY_DOWN ||
+        event.key_code() == ui::VKEY_HOME || event.key_code() == ui::VKEY_END) {
+      keyboard_navigation_ = true;
+      std::vector<SidebarFooterMenuRow*> enabled_rows;
+      for (const auto& row : rows_) {
+        row->ShowKeyboardFocus();
+        if (row->GetEnabled()) {
+          enabled_rows.push_back(row);
+        }
+      }
+      if (enabled_rows.empty()) {
+        return true;
+      }
+      auto current =
+          std::ranges::find(enabled_rows, GetFocusManager()->GetFocusedView());
+      int index = current == enabled_rows.end()
+                      ? (event.key_code() == ui::VKEY_DOWN ? -1 : 0)
+                      : static_cast<int>(current - enabled_rows.begin());
+      const int count = static_cast<int>(enabled_rows.size());
+      if (event.key_code() == ui::VKEY_HOME) {
+        index = 0;
+      } else if (event.key_code() == ui::VKEY_END) {
+        index = count - 1;
+      } else {
+        index =
+            (index + (event.key_code() == ui::VKEY_UP ? count - 1 : 1)) % count;
+      }
+      enabled_rows[index]->RequestFocusWithReason(
+          views::FocusManager::FocusChangeReason::kFocusTraversal);
       return true;
     }
     return views::View::OnKeyPressed(event);
@@ -426,8 +541,13 @@ class YeeSidebarFooterMenuView : public views::View,
   }
 
  private:
-  int ContentWidth() const {
-    return std::max(0, anchor_width_ - 2 * kMenuInsets);
+  int ContentWidth() const { return menu_width_ - 2 * kMenuInsets; }
+
+  void RegisterRow(SidebarFooterMenuRow* row) {
+    rows_.push_back(row);
+    if (!first_actionable_ && row->GetEnabled()) {
+      first_actionable_ = row;
+    }
   }
 
   HoverButton* AddRow(
@@ -448,151 +568,180 @@ class YeeSidebarFooterMenuView : public views::View,
     params.icon_label_spacing = 8;
     params.secondary_view = std::move(trailing);
 
-    std::unique_ptr<HoverButton> row = std::make_unique<SidebarFooterMenuRow>(
-        std::move(callback), std::move(params), selected);
+    auto row = std::make_unique<SidebarFooterMenuRow>(
+        std::move(callback), std::move(params), selected, keyboard_navigation_);
     row->SetPreferredSize(gfx::Size(ContentWidth(), preferred_height));
     row->SetBorder(views::CreateEmptyBorder(
         gfx::Insets::VH(kMenuRowVerticalInset, kMenuRowHorizontalInset)));
+    row->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kMenuInsets));
     if (view_id) {
       row->SetID(view_id);
     }
     row->SetEnabled(enabled);
-    HoverButton* const result = AddChildView(std::move(row));
-    if (!first_actionable_ && enabled) {
-      first_actionable_ = result;
-    }
+    SidebarFooterMenuRow* const result = row.get();
+    AddChildView<HoverButton>(std::move(row));
+    RegisterRow(result);
     return result;
   }
 
   void AddSectionLabel(std::u16string text) {
     auto label = std::make_unique<views::Label>(std::move(text));
-    label->SetPreferredSize(gfx::Size(ContentWidth(), 22));
-    label->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(6, 7, 2, 7)));
+    label->SetPreferredSize(gfx::Size(ContentWidth(), 20));
+    label->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kMenuInsets));
+    label->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(
+        4, kMenuRowHorizontalInset, 0, kMenuRowHorizontalInset)));
     label->SetEnabledColor(ui::kColorSysOnSurfaceSubtle);
-    label->SetTextStyle(views::style::STYLE_BODY_5_BOLD);
+    label->SetTextStyle(views::style::STYLE_BODY_5);
     label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     label->SetSkipSubpixelRenderingOpacityCheck(true);
     AddChildView(std::move(label));
   }
 
-  void AddHeader(std::u16string eyebrow,
-                 std::u16string title,
-                 SidebarFooterScreen destination) {
-    AddRow(std::move(title), std::move(eyebrow),
-           CreateMenuIcon(vector_icons::kArrowBackIcon), nullptr,
-           base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
-                               base::Unretained(this), destination,
-                               /*move_focus=*/true),
-           /*view_id=*/0, kSidebarMetrics.sidebar_footer_root_row_height);
+  void AddSeparator() {
+    auto separator = std::make_unique<SidebarFooterMenuSeparator>();
+    separator->SetOrientation(views::Separator::Orientation::kHorizontal);
+    separator->SetColorId(ui::kColorMenuSeparator);
+    separator->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 0)));
+    separator->SetPreferredSize(gfx::Size(menu_width_, 9));
+    AddChildView<views::Separator>(std::move(separator));
+  }
+
+  void AddDescription(std::u16string text) {
+    auto label = std::make_unique<views::Label>(std::move(text));
+    label->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kMenuInsets));
+    label->SetBorder(
+        views::CreateEmptyBorder(gfx::Insets::VH(6, kMenuRowHorizontalInset)));
+    label->SetEnabledColor(ui::kColorSysOnSurfaceSubtle);
+    label->SetTextStyle(views::style::STYLE_BODY_5);
+    label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    label->SetMultiLine(true);
+    label->SetSkipSubpixelRenderingOpacityCheck(true);
+    label->SizeToFit(ContentWidth());
+    AddChildView(std::move(label));
+  }
+
+  void AddHeader(std::u16string title, SidebarFooterScreen destination) {
+    HoverButton* const back =
+        AddRow(std::move(title), {},
+               CreateMenuIcon(vector_icons::kArrowBackIcon), nullptr,
+               base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
+                                   base::Unretained(this), destination,
+                                   /*move_focus=*/true),
+               /*view_id=*/0);
+    back->GetViewAccessibility().SetDescription(
+        l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_BACK));
+    back->title()->SetTextStyle(views::style::STYLE_BODY_4_EMPHASIS);
+    AddSeparator();
   }
 
   void AddRoot() {
-    const SidebarContextItem& context = SelectedContext(model_);
-    AddRow(context.workspace_name, ContextSubtitle(context),
-           CreateMarkLabel(FirstCodePointMark(context.workspace_name),
-                           kSidebarMetrics.sidebar_footer_icon_size),
-           CreateDisclosure(),
-           base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
-                               base::Unretained(this),
-                               SidebarFooterScreen::kContext,
-                               /*move_focus=*/true),
-           kSidebarFooterRootContextViewId,
-           kSidebarMetrics.sidebar_footer_root_row_height);
-    AddRow(u"Browser tools", u"Recent tabs, downloads, and more",
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_BROWSER_TOOLS), {},
            CreateMenuIcon(vector_icons::kHistoryIcon), CreateDisclosure(),
            base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
                                base::Unretained(this),
                                SidebarFooterScreen::kBrowserTools,
                                /*move_focus=*/true),
-           kSidebarFooterRootBrowserToolsViewId,
-           kSidebarMetrics.sidebar_footer_root_row_height);
-    AddRow(branding::ProductName() + u" & memory", u"Workspace-specific memory",
-           CreateMenuIcon(vector_icons::kLightbulbIcon),
-           CreateTrailingStack(
-               CreateTrailingLabel(
-                   model_.memory_available
-                       ? (model_.memory_enabled ? u"On" : u"Paused")
-                       : u"Not connected",
-                   /*emphasized=*/model_.memory_available &&
-                       model_.memory_enabled),
-               /*show_disclosure=*/true),
+           kSidebarFooterRootBrowserToolsViewId);
+    HoverButton* const memory =
+        AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MEMORY), {},
+               CreateMenuIcon(vector_icons::kLightbulbIcon), CreateDisclosure(),
+               base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
+                                   base::Unretained(this),
+                                   SidebarFooterScreen::kMemory,
+                                   /*move_focus=*/true),
+               kSidebarFooterRootMemoryViewId);
+    memory->GetViewAccessibility().SetDescription(l10n_util::GetStringUTF16(
+        model_.memory_available ? IDS_YEE_WEBUI_FOOTER_MEMORY_DESCRIPTION
+                                : IDS_YEE_WEBUI_FOOTER_MEMORY_UNAVAILABLE));
+    AddSeparator();
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_SWITCH_CONTEXT), {},
+           CreateMenuIcon(vector_icons::kDesktopWindowsIcon),
+           CreateDisclosure(),
            base::BindRepeating(&YeeSidebarFooterMenuView::ShowScreen,
                                base::Unretained(this),
-                               SidebarFooterScreen::kMemory,
+                               SidebarFooterScreen::kContext,
                                /*move_focus=*/true),
-           kSidebarFooterRootMemoryViewId,
-           kSidebarMetrics.sidebar_footer_root_row_height);
+           kSidebarFooterRootContextViewId);
   }
 
   void AddContext() {
-    AddHeader(u"Account & contexts", u"Switch context",
+    AddHeader(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_SWITCH_CONTEXT),
               SidebarFooterScreen::kRoot);
-    AddSectionLabel(u"Available contexts");
     for (size_t index = 0; index < model_.contexts.size(); ++index) {
       const SidebarContextItem& choice = model_.contexts[index];
-      AddRow(choice.workspace_name,
-             choice.tenant_name + u" · " + choice.account_name,
-             CreateMarkLabel(FirstCodePointMark(choice.workspace_name),
-                             kSidebarMetrics.sidebar_footer_icon_size),
-             index == model_.selected_context_index
-                 ? CreateTrailingIcon(vector_icons::kCheckCircleFilledIcon,
-                                      ui::kColorIconSecondary)
-                 : nullptr,
-             base::BindRepeating(&YeeSidebarFooterMenuView::SelectContext,
-                                 base::Unretained(this), index),
-             /*view_id=*/0, kSidebarMetrics.sidebar_footer_root_row_height,
-             /*enabled=*/true,
-             /*selected=*/index == model_.selected_context_index);
+      AddRow(
+          choice.workspace_name, ContextSubtitle(choice),
+          /*icon=*/nullptr,
+          index == model_.selected_context_index
+              ? CreateTrailingIcon(views::kCheckIcon, ui::kColorIconSecondary)
+              : nullptr,
+          base::BindRepeating(&YeeSidebarFooterMenuView::SelectContext,
+                              base::Unretained(this), index),
+          /*view_id=*/0, kSidebarMetrics.sidebar_footer_root_row_height,
+          /*enabled=*/true,
+          /*selected=*/index == model_.selected_context_index);
     }
   }
 
   void AddBrowserTools() {
-    AddHeader(u"Browser", u"Browser tools", SidebarFooterScreen::kRoot);
-    AddRow(u"Reopen closed tab", u"Restore the most recently closed tab",
+    AddHeader(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_BROWSER_TOOLS),
+              SidebarFooterScreen::kRoot);
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_REOPEN_TAB), {},
            CreateMenuIcon(vector_icons::kUndoIcon), nullptr,
            BrowserActionCallback(SidebarFooterBrowserAction::kReopenClosedTab),
            /*view_id=*/0, kSidebarMetrics.sidebar_footer_menu_row_height);
-    AddRow(u"Downloads", u"Open downloaded files and activity",
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_DOWNLOADS), {},
            CreateMenuIcon(vector_icons::kDownloadIcon), nullptr,
            BrowserActionCallback(SidebarFooterBrowserAction::kDownloads),
            /*view_id=*/0, kSidebarMetrics.sidebar_footer_menu_row_height);
-    AddRow(u"History", u"Review browsing history",
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_HISTORY), {},
            CreateMenuIcon(vector_icons::kHistoryIcon), nullptr,
            BrowserActionCallback(SidebarFooterBrowserAction::kHistory),
            /*view_id=*/0, kSidebarMetrics.sidebar_footer_menu_row_height);
-    AddRow(u"Tabs from other devices", u"Continue from a synced device",
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_OTHER_DEVICES), {},
            CreateMenuIcon(vector_icons::kDevicesIcon), nullptr,
            BrowserActionCallback(
                SidebarFooterBrowserAction::kTabsFromOtherDevices),
            /*view_id=*/0, kSidebarMetrics.sidebar_footer_menu_row_height);
-    AddRow(u"Manage extensions", u"Review installed browser extensions",
+    AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_EXTENSIONS), {},
            CreateMenuIcon(vector_icons::kChromeExtensionIcon), nullptr,
            BrowserActionCallback(SidebarFooterBrowserAction::kManageExtensions),
            /*view_id=*/0, kSidebarMetrics.sidebar_footer_menu_row_height);
   }
 
   void AddMemory() {
-    AddHeader(branding::ProductName(), u"Memory", SidebarFooterScreen::kRoot);
+    AddHeader(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MEMORY),
+              SidebarFooterScreen::kRoot);
     const SidebarContextItem& context = SelectedContext(model_);
-    AddSectionLabel(context.workspace_name + u" workspace");
+    AddSectionLabel(context.workspace_name);
     if (model_.memory_available) {
-      AddRow(u"Workspace memory", u"Memory stays inside the selected context",
-             nullptr,
-             CreateTrailingLabel(model_.memory_enabled ? u"On" : u"Paused",
-                                 /*emphasized=*/model_.memory_enabled),
+      AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MEMORY), {},
+             CreateMenuIcon(vector_icons::kLightbulbIcon),
+             CreateTrailingLabel(
+                 l10n_util::GetStringUTF16(
+                     model_.memory_enabled ? IDS_YEE_WEBUI_FOOTER_MEMORY_ON
+                                           : IDS_YEE_WEBUI_FOOTER_MEMORY_OFF),
+                 /*emphasized=*/model_.memory_enabled),
              base::BindRepeating(&YeeSidebarFooterMenuView::ToggleMemory,
                                  base::Unretained(this)),
-             /*view_id=*/0, kSidebarMetrics.sidebar_footer_root_row_height);
+             kSidebarFooterMemoryToggleViewId);
     } else {
-      AddRow(u"Workspace memory", u"Connect a workspace provider to use memory",
-             nullptr, CreateTrailingLabel(u"Unavailable"),
-             views::Button::PressedCallback(),
-             /*view_id=*/0, kSidebarMetrics.sidebar_footer_root_row_height,
+      AddRow(l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_NOT_CONNECTED), {},
+             CreateMenuIcon(vector_icons::kLightbulbIcon), nullptr,
+             views::Button::PressedCallback(), kSidebarFooterMemoryToggleViewId,
+             kSidebarMetrics.sidebar_footer_menu_row_height,
              /*enabled=*/false);
     }
+    AddDescription(l10n_util::GetStringUTF16(
+        model_.memory_available ? IDS_YEE_WEBUI_FOOTER_MEMORY_DESCRIPTION
+                                : IDS_YEE_WEBUI_FOOTER_MEMORY_UNAVAILABLE));
   }
 
   void ShowScreen(SidebarFooterScreen screen, bool move_focus) {
+    if (GetFocusManager() && GetFocusManager()->GetFocusedView() &&
+        HasKeyboardTraversalFocus(*GetFocusManager()->GetFocusedView())) {
+      keyboard_navigation_ = true;
+    }
     const bool rich_animation = GetWidget() && move_focus &&
                                 gfx::Animation::ShouldRenderRichAnimation() &&
                                 !gfx::Animation::PrefersReducedMotion();
@@ -619,6 +768,7 @@ class YeeSidebarFooterMenuView : public views::View,
   void SetScreenContents(SidebarFooterScreen screen, bool move_focus) {
     screen_ = screen;
     first_actionable_ = nullptr;
+    rows_.clear();
     RemoveAllChildViews();
     switch (screen_) {
       case SidebarFooterScreen::kRoot:
@@ -679,8 +829,9 @@ class YeeSidebarFooterMenuView : public views::View,
   }
 
   const raw_ptr<views::BubbleDialogDelegate> bubble_delegate_;
-  int anchor_width_ = 0;
   SidebarFooterModel model_;
+  const int menu_width_;
+  bool keyboard_navigation_ = false;
   SidebarContextSelectedCallback select_context_callback_;
   SidebarFooterBrowserActionCallback browser_action_callback_;
   SidebarMemoryChangedCallback memory_changed_callback_;
@@ -689,6 +840,7 @@ class YeeSidebarFooterMenuView : public views::View,
   bool pending_move_focus_ = false;
   bool transitioning_out_ = false;
   raw_ptr<HoverButton> first_actionable_ = nullptr;
+  std::vector<raw_ptr<SidebarFooterMenuRow>> rows_;
   gfx::SlideAnimation screen_animation_;
 };
 
@@ -716,15 +868,18 @@ class YeeSidebarFooterView : public HoverButton {
       SidebarFooterModel model,
       SidebarContextSelectedCallback context_callback,
       SidebarFooterBrowserActionCallback browser_action_callback,
-      SidebarMemoryChangedCallback memory_changed_callback)
+      SidebarMemoryChangedCallback memory_changed_callback,
+      SidebarPopupLockCallback acquire_popup_lock)
       : HoverButton(PressedCallback(), CreateFooterTriggerParams(model)),
         model_(NormalizeModel(std::move(model))),
         context_callback_(std::move(context_callback)),
         browser_action_callback_(std::move(browser_action_callback)),
         memory_changed_callback_(std::move(memory_changed_callback)),
+        acquire_popup_lock_(std::move(acquire_popup_lock)),
         hover_animation_delegate_(this),
         hover_animation_(&hover_animation_delegate_) {
     SetID(kSidebarFooterViewId);
+    SetCompactContentMargins(icon_view(), secondary_view());
     SetCallback(base::BindRepeating(&YeeSidebarFooterView::ToggleBubble,
                                     base::Unretained(this)));
     SetPreferredSize(gfx::Size(0, kSidebarMetrics.sidebar_footer_row_height));
@@ -759,6 +914,8 @@ class YeeSidebarFooterView : public HoverButton {
     title()->SetSkipSubpixelRenderingOpacityCheck(true);
     subtitle()->SetSkipSubpixelRenderingOpacityCheck(true);
     GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    AddExtraAccessibleText(
+        l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MENU_TITLE));
     GetViewAccessibility().SetIsCollapsed();
     UpdateIdentity();
   }
@@ -794,17 +951,6 @@ class YeeSidebarFooterView : public HoverButton {
   void RemovedFromWidget() override {
     paint_as_active_subscription_ = {};
     HoverButton::RemovedFromWidget();
-  }
-
-  void OnBoundsChanged(const gfx::Rect& previous_bounds) override {
-    HoverButton::OnBoundsChanged(previous_bounds);
-    if (previous_bounds.width() == width()) {
-      return;
-    }
-    if (auto* const menu =
-            static_cast<YeeSidebarFooterMenuView*>(bubble_tracker_.view())) {
-      menu->SetAnchorWidth(width());
-    }
   }
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
@@ -874,12 +1020,18 @@ class YeeSidebarFooterView : public HoverButton {
         static_cast<int>(ui::mojom::DialogButton::kNone));
     bubble_delegate->set_margins(gfx::Insets());
     bubble_delegate->set_close_on_deactivate(true);
-    bubble_delegate->set_corner_radius(12);
-    bubble_delegate->set_shadow(views::BubbleBorder::STANDARD_SHADOW);
+    // 지속 활성 면은 Yee가 그린다. 기본 anchor 강조가 ink drop을 계속
+    // ACTIVATED로 두어 배경을 한 번 더 채우지 않게 한다.
+    bubble_delegate->set_highlight_button_when_shown(false);
+    bubble_delegate->set_corner_radius(
+        kSidebarMetrics.sidebar_footer_menu_surface_corner_radius);
+    bubble_delegate->set_shadow(views::BubbleBorder::DIALOG_SHADOW);
     bubble_delegate->SetBackgroundColor(ui::kColorSysBaseContainerElevated);
-    bubble_delegate->SetAccessibleTitle(u"Workspace and account menu");
+    bubble_delegate->SetAccessibleTitle(
+        l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MENU_TITLE));
     auto menu = std::make_unique<YeeSidebarFooterMenuView>(
-        bubble_delegate.get(), width(), model_,
+        bubble_delegate.get(), model_, /*keyboard_navigation=*/
+        !is_pointer_interaction,
         base::BindRepeating(&YeeSidebarFooterView::SelectContext,
                             weak_factory_.GetWeakPtr()),
         browser_action_callback_, memory_changed_callback_);
@@ -890,7 +1042,9 @@ class YeeSidebarFooterView : public HoverButton {
         base::BindOnce(&YeeSidebarFooterView::OnBubbleClosed,
                        weak_factory_.GetWeakPtr()),
         base::BindRepeating(&YeeSidebarFooterView::OnBubbleNativeDestroying,
-                            weak_factory_.GetWeakPtr()));
+                            weak_factory_.GetWeakPtr()),
+        acquire_popup_lock_ ? acquire_popup_lock_.Run()
+                            : base::ScopedClosureRunner());
     bubble_reopen_suppressor_.Observe(bubble_->widget());
     bubble_->widget()->Show();
     UpdateSurface();
@@ -914,19 +1068,8 @@ class YeeSidebarFooterView : public HoverButton {
   }
 
   void OnBubbleNativeDestroying() {
-    bubble_tracker_.SetView(nullptr);
-    UpdateSurface();
-    // Native teardown can skip or defer the normal close callback. Finish the
-    // client-owned cleanup on the next task so Widget observer dispatch has
-    // unwound, without trying to return focus while the browser itself may be
-    // closing.
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&YeeSidebarFooterView::ReleaseNativeClosedBubble,
-                       weak_factory_.GetWeakPtr()));
-  }
-
-  void ReleaseNativeClosedBubble() {
+    // 닫힌 인스턴스를 즉시 분리하고 삭제만 미룬다. 그 사이 새 팝업을 열어도
+    // 이전 인스턴스의 정리가 새 팝업에 영향을 주지 않는다.
     if (bubble_) {
       ReleaseBubble(/*restore_keyboard_focus=*/false);
     }
@@ -939,6 +1082,18 @@ class YeeSidebarFooterView : public HoverButton {
     // delegate destruction order encoded by FooterBubble.
     base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
         FROM_HERE, std::move(bubble_));
+    if (!restore_keyboard_focus) {
+      // 부모 창이 다시 활성화돼도 닫힌 메뉴의 Footer 포커스를 복원하지 않는다.
+      // 클릭한 다른 목적지의 현재·저장 포커스는 유지한다.
+      if (views::FocusManager *const focus_manager = GetFocusManager()) {
+        if (HasFocus()) {
+          focus_manager->ClearFocus();
+        }
+        if (focus_manager->GetStoredFocusView() == this) {
+          focus_manager->SetStoredFocusView(nullptr);
+        }
+      }
+    }
     UpdateSurface();
     if (restore_keyboard_focus && GetVisible()) {
       RequestFocusWithReason(
@@ -960,9 +1115,9 @@ class YeeSidebarFooterView : public HoverButton {
     title()->SetText(context.workspace_name);
     subtitle()->SetText(ContextSubtitle(context));
     mark_->SetText(FirstCodePointMark(context.workspace_name));
-    GetViewAccessibility().SetName(context.workspace_name + u", " +
-                                   context.tenant_name + u", " +
-                                   context.account_name + u", context menu");
+    GetViewAccessibility().SetName(l10n_util::GetStringFUTF16(
+        IDS_YEE_WEBUI_FOOTER_MENU_ACCESSIBLE_NAME, context.workspace_name,
+        ContextSubtitle(context)));
   }
 
   void UpdateSurface() {
@@ -971,7 +1126,7 @@ class YeeSidebarFooterView : public HoverButton {
     } else {
       GetViewAccessibility().SetIsCollapsed();
     }
-    const ui::ColorProvider* const color_provider = GetColorProvider();
+    const ui::ColorProvider *const color_provider = GetColorProvider();
     if (!color_provider) {
       return;
     }
@@ -982,28 +1137,24 @@ class YeeSidebarFooterView : public HoverButton {
     } else if (GetState() == STATE_HOVERED || hover_progress > 0.0) {
       visual_state = SidebarItemVisualState::kHovered;
     } else if (HasKeyboardTraversalFocus(*this)) {
-      // Pointer focus is intentionally neutral. Only keyboard traversal uses
-      // the stronger outlined treatment shared with the visible focus ring.
+      // 키보드 포커스는 활성 면과 system focus ring 한 겹으로 구분한다.
       visual_state = SidebarItemVisualState::kActive;
     }
-    const views::Widget* const widget = GetWidget();
+    const views::Widget *const widget = GetWidget();
     const SidebarItemColors colors =
         ResolveSidebarItemColors(*color_provider, visual_state, hover_progress,
                                  !widget || widget->ShouldPaintAsActive(),
                                  /*persistent_surface=*/false);
     const bool paint_background =
         visual_state != SidebarItemVisualState::kResting;
-    const bool paint_outline = visual_state == SidebarItemVisualState::kActive;
-    // A transparent painter is still a surface in the View hierarchy. Remove
-    // the resting background and use a non-painting border for rest and hover.
-    // Both border variants reserve the same metrics-owned insets, so text does
-    // not move when the active outline appears.
+    // 모든 상태가 같은 여백을 예약한다. 포커스에는 system ring만 그려
+    // 내부 stroke와 겹친 이중 윤곽이 생기지 않게 한다.
     SetBackground(
         paint_background
             ? views::CreateRoundedRectBackground(
                   colors.fill, kSidebarMetrics.sidebar_footer_corner_radius)
             : nullptr);
-    SetBorder(CreateFooterSurfaceBorder(paint_outline, colors.stroke));
+    SetBorder(views::CreateEmptyBorder(FooterSurfaceInsets()));
     // Identity hierarchy remains stable across interaction states: the
     // workspace name is always primary, while the tenant/account line stays
     // secondary. Hover, focus, and open state are expressed by the shared
@@ -1021,6 +1172,7 @@ class YeeSidebarFooterView : public HoverButton {
   SidebarContextSelectedCallback context_callback_;
   SidebarFooterBrowserActionCallback browser_action_callback_;
   SidebarMemoryChangedCallback memory_changed_callback_;
+  SidebarPopupLockCallback acquire_popup_lock_;
   raw_ptr<views::Label> mark_ = nullptr;
   raw_ptr<views::ImageView> chevron_ = nullptr;
   views::ViewTracker bubble_tracker_;
@@ -1037,14 +1189,17 @@ class YeeSidebarFooterView : public HoverButton {
 SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string account_name) {
   const bool account_name_is_placeholder = account_name.empty();
   if (account_name_is_placeholder) {
-    account_name = u"Local profile";
+    account_name =
+        l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE);
   }
   SidebarFooterModel model;
   model.contexts.push_back(
-      {.tenant_name = u"Local",
-       .workspace_name = u"Personal",
+      {.tenant_name = l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL),
+       .workspace_name =
+           l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_PERSONAL),
        .account_name = std::move(account_name),
-       .account_name_is_placeholder = account_name_is_placeholder});
+       .account_name_is_placeholder = account_name_is_placeholder,
+       .is_local_context = true});
   return model;
 }
 
@@ -1052,10 +1207,12 @@ std::unique_ptr<views::View> CreateSidebarFooterView(
     SidebarFooterModel model,
     SidebarContextSelectedCallback context_selected_callback,
     SidebarFooterBrowserActionCallback browser_action_callback,
-    SidebarMemoryChangedCallback memory_changed_callback) {
+    SidebarMemoryChangedCallback memory_changed_callback,
+    SidebarPopupLockCallback acquire_popup_lock) {
   return std::make_unique<YeeSidebarFooterView>(
       NormalizeModel(std::move(model)), std::move(context_selected_callback),
-      std::move(browser_action_callback), std::move(memory_changed_callback));
+      std::move(browser_action_callback), std::move(memory_changed_callback),
+      std::move(acquire_popup_lock));
 }
 
 void SetSidebarFooterVisible(views::View& view, bool visible) {

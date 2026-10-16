@@ -227,7 +227,9 @@ def shell_exclusions(catalog, repo_root=REPO_ROOT):
     roots = [b['destination'] for b in catalog['source_roots']] + catalog['generated_roots']
     paths = [path for patch in catalog['patches'] if patch['role'] != 'shell'
              for path in patch_paths(Path(repo_root) / patch['file'])]
-    return [f':(exclude){root}/**' for root in roots] + [f':(exclude){path}' for path in paths]
+    return [pattern for root in roots
+            for pattern in (f':(exclude){root}', f':(exclude){root}/**')] + [
+                f':(exclude){path}' for path in paths]
 
 
 def main():

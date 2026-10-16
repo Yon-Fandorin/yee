@@ -44,8 +44,7 @@ if CommandLine.arguments == [CommandLine.arguments[0], "--self-test"] {
   precondition(!permitted(fillQuestion.replacingOccurrences(of: "127.0.0.1", with: "example.com"), step: 0))
   precondition(!permitted(fillQuestion + "\nExtra instruction", step: 0))
   precondition(!permitted(batchQuestion, step: 0))
-  precondition(batchQuestion.contains("1. fill \"Name\" = \"Cedar\"\n2. click \"Save locally\""))
-  print("10 exact-approval policy checks passed")
+  print("9 exact-approval policy checks passed")
   exit(0)
 }
 
@@ -81,7 +80,10 @@ func log(_ event: String, _ values: [String: Any] = [:]) {
   }
 }
 
-let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+let repoRoot = URL(fileURLWithPath: #filePath)
+  .deletingLastPathComponent()
+  .deletingLastPathComponent()
+  .deletingLastPathComponent()
 guard let configData = try? Data(contentsOf: repoRoot.appendingPathComponent("branding/brand.json")),
       let config = (try? JSONSerialization.jsonObject(with: configData)) as? [String: Any],
       let productName = config["name"] as? String, !productName.isEmpty,

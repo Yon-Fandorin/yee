@@ -9,9 +9,7 @@ diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRAN
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
-@@ -293,12 +293,7 @@
-           </message>
-         </then>
+@@ -295,8 +295,3 @@
          <else>
 -          <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
 -            Chromium
@@ -21,23 +19,18 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
 -          </message>
 +          <part file="yee_product_names.grdp" />
          </else>
-       </if>
-       <message name="IDS_APP_MENU_YOUR_CHROME_HEADER" desc="Header title for the Your Chromium section in the main App Menu">
-@@ -1182,9 +1177,7 @@
-       </if>
- 
+@@ -1184,5 +1179,3 @@
        <if expr="is_macosx">
 -        <message name="IDS_APP_MENU_PRODUCT_NAME" desc="The application's short name, used for the Mac's application menu, activity monitor, etc. This should be less than 16 characters. Example: Chrome, not Google Chrome." translateable="false">
 -          Chromium
 -        </message>
 +        <part file="yee_app_menu_name.grdp" />
          <message name="IDS_HELPER_NAME" desc="The helper application's name.  Should contain the Chrome application name (IDS_PRODUCT_NAME). Example: Google Chrome Helper.">
-           Chromium Helper
-         </message>
 diff --git a/chrome/installer/mac/signing/build_props_config.py.in b/chrome/installer/mac/signing/build_props_config.py.in
+index 739dfa9d51..fdde35468c 100644
 --- a/chrome/installer/mac/signing/build_props_config.py.in
 +++ b/chrome/installer/mac/signing/build_props_config.py.in
-@@ -25,11 +25,11 @@
+@@ -25,11 +25,11 @@ class BuildPropsCodeSignConfig(CodeSignConfig):
  
      @property
      def app_product(self):
@@ -52,9 +45,10 @@ diff --git a/chrome/installer/mac/signing/build_props_config.py.in b/chrome/inst
      @property
      def version(self):
 diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n/create_string_rc.py
+index bccce42ac9..56151d9ab2 100755
 --- a/base/win/embedded_i18n/create_string_rc.py
 +++ b/base/win/embedded_i18n/create_string_rc.py
-@@ -83,7 +83,7 @@
+@@ -83,7 +83,7 @@ class GrdHandler(sax.handler.ContentHandler):
      referenced_xtb_files: A list of all xtb files referenced inside the .grd
        file.
    """
@@ -63,7 +57,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
      """Constructs a handler that reads selected strings from a .grd file.
  
      The dict attribute |messages| is populated with the strings that are read.
-@@ -96,6 +96,11 @@
+@@ -96,6 +96,11 @@ class GrdHandler(sax.handler.ContentHandler):
      self.messages = collections.defaultdict(dict)
      self.referenced_xtb_files = []
      self.__id_set = string_id_set
@@ -75,7 +69,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
      self.__message_name = None
      self.__element_stack = []
      self.__text_scraps = []
-@@ -106,9 +111,24 @@
+@@ -106,9 +111,24 @@ class GrdHandler(sax.handler.ContentHandler):
  
      self.__characters_callback = None
  
@@ -101,7 +95,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
        self.__OnOpenMessage(attrs.getValue('name'))
      elif name == 'ph':
        self.__OnOpenPlaceholder(attrs.getValue('name'))
-@@ -271,7 +291,8 @@
+@@ -271,7 +291,8 @@ class XtbHandler(sax.handler.ContentHandler):
  class StringRcMaker(object):
    """Makes .h and .rc files containing strings and translations."""
    def __init__(self, inputs, expected_xtb_input_files, header_file, rc_file,
@@ -111,7 +105,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
      """Constructs a maker.
  
      Args:
-@@ -294,6 +315,7 @@
+@@ -294,6 +315,7 @@ class StringRcMaker(object):
          dictionary.
      """
      self.inputs = inputs
@@ -119,7 +113,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
      self.expected_xtb_input_files = expected_xtb_input_files
      self.expected_xtb_input_files.sort()
      self.header_file = header_file
-@@ -386,7 +408,7 @@
+@@ -386,7 +408,7 @@ Extra input files:
      sax_parser = sax.make_parser()
  
      # Read the source (en-US) string from the .grd file.
@@ -128,7 +122,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
      sax_parser.setContentHandler(grd_handler)
      sax_parser.parse(grd_file)
      source_strings = grd_handler.messages
-@@ -560,6 +582,9 @@
+@@ -560,6 +582,9 @@ def BuildArgumentParser():
                        required=True,
                        help='expected xtb input files to read',
                        dest='expected_xtb_input_files')
@@ -138,7 +132,7 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
    parser.add_argument('--header-file',
                        required=True,
                        help='path to generated .h file to write',
-@@ -635,7 +660,7 @@
+@@ -635,7 +660,7 @@ def main():
  
    StringRcMaker(inputs, args.expected_xtb_input_files, args.header_file,
      args.rc_file,  brand, args.first_resource_id, string_ids_to_extract,
@@ -148,9 +142,10 @@ diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n
  
  if '__main__' == __name__:
 diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedded_i18n/generate_embedded_i18n.gni
+index 90b46df50f..941bfda779 100644
 --- a/base/win/embedded_i18n/generate_embedded_i18n.gni
 +++ b/base/win/embedded_i18n/generate_embedded_i18n.gni
-@@ -47,6 +47,9 @@
+@@ -47,6 +47,9 @@ import("//build/config/python.gni")
  #       The branding used to determine specific string extractions.
  #       Will not be passed to the generation script if it is undefined.
  #
@@ -160,7 +155,7 @@ diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedd
  #   deps (optional)
  #   visibility (optional)
  
-@@ -87,6 +90,9 @@
+@@ -87,6 +90,9 @@ template("generate_embedded_i18n") {
    action_with_pydeps(target_name) {
      script = "//base/win/embedded_i18n/create_string_rc.py"
      inputs = []
@@ -170,11 +165,10 @@ diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedd
  
      output_dir = rebase_path(target_gen_dir, root_build_dir)
  
-@@ -106,6 +112,15 @@
-       "--first-resource-id",
+@@ -107,6 +113,15 @@ template("generate_embedded_i18n") {
        first_resource_id,
      ]
-+
+ 
 +    if (defined(invoker.source_parts)) {
 +      foreach(source_part, invoker.source_parts) {
 +        args += [
@@ -183,13 +177,34 @@ diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedd
 +        ]
 +      }
 +    }
- 
++
      foreach(grd_file_info, grd_files_info) {
        grdfile_folder = grd_file_info[0]
+       grdfile_name = grd_file_info[1]
 diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
+index b42bb73601..5c3e90a3f6 100644
 --- a/chrome/installer/util/BUILD.gn
 +++ b/chrome/installer/util/BUILD.gn
-@@ -244,6 +244,9 @@
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
+ 
+ import("//base/win/embedded_i18n/generate_embedded_i18n.gni")
++import("//chrome/app/yee_branding_strings.gni")
+ import("//build/config/chrome_build.gni")
+ 
+ import("//testing/test.gni")
+@@ -234,6 +235,10 @@ generate_embedded_i18n("generate_strings") {
+   grdfile_folder = "//chrome/app/"
+   grdfile_name = "${branding_path_product}_strings"
+   xtb_relative_path = "resources"
++  if (!is_chrome_branded && !is_chrome_for_testing_branded &&
++      yee_brand_strings_enabled) {
++    xtb_relative_path = "yee_branding_strings/inputs/chrome/app/resources"
++  }
+   grd_files_info = [ [
+         grdfile_folder,
+         grdfile_name,
+@@ -244,6 +249,9 @@ generate_embedded_i18n("generate_strings") {
    output_file_name_base = "installer_util_strings"
  
    branding = branding_path_product
@@ -200,9 +215,10 @@ diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
  
  # Compile the generated .rc file.
 diff --git a/build/util/version.py b/build/util/version.py
+index a5611af802..b6261da262 100755
 --- a/build/util/version.py
 +++ b/build/util/version.py
-@@ -25,7 +25,7 @@
+@@ -25,7 +25,7 @@ def FetchValuesFromFile(values_dict, file_name):
  
      The file must exist, otherwise you get the Python exception from open().
      """
@@ -211,7 +227,7 @@ diff --git a/build/util/version.py b/build/util/version.py
          for line in f.readlines():
              key, val = line.rstrip('\r\n').split('=', 1)
              values_dict[key] = val
-@@ -99,21 +99,21 @@
+@@ -99,21 +99,21 @@ def SubstFile(file_name, values):
  
      This is like SubstTemplate, except it operates on a file.
      """
@@ -237,7 +253,7 @@ diff --git a/build/util/version.py b/build/util/version.py
          pass
      else:
          if contents == old_contents and mode == stat.S_IMODE(
-@@ -121,7 +121,7 @@
+@@ -121,7 +121,7 @@ def WriteIfChanged(file_name, contents, mode):
          ):
              return
          os.unlink(file_name)
@@ -246,20 +262,20 @@ diff --git a/build/util/version.py b/build/util/version.py
          f.write(contents)
      os.chmod(file_name, mode)
  
-@@ -147,6 +147,12 @@
-         '--output',
+@@ -148,6 +148,12 @@ def BuildParser():
          default=None,
          help='Write substituted strings to FILE.',
-+    )
+     )
 +    parser.add_argument(
 +        '--output-encoding',
 +        choices=('utf-8', 'utf-16'),
 +        default='utf-8',
 +        help='Encoding for generated output; Windows RC requires utf-16.',
-     )
++    )
      parser.add_argument(
          '-t',
-@@ -315,7 +321,8 @@
+         '--template',
+@@ -315,7 +321,8 @@ def main(args):
  
      if output['options'].output is not None:
          WriteIfChanged(
@@ -270,9 +286,10 @@ diff --git a/build/util/version.py b/build/util/version.py
      else:
          print(output['contents'])
 diff --git a/chrome/process_version_rc_template.gni b/chrome/process_version_rc_template.gni
+index 8d7edf5044..d785ab2d67 100644
 --- a/chrome/process_version_rc_template.gni
 +++ b/chrome/process_version_rc_template.gni
-@@ -53,10 +53,19 @@
+@@ -53,10 +53,19 @@ template("process_version_rc_template") {
    process_version(target_name) {
      template_file = _template_file
      sources = _sources
@@ -293,9 +310,10 @@ diff --git a/chrome/process_version_rc_template.gni b/chrome/process_version_rc_
                             ])
    }
 diff --git a/chrome/installer/setup/installer_crash_reporter_client.cc b/chrome/installer/setup/installer_crash_reporter_client.cc
+index 64c13b78f7..9af4c2ce45 100644
 --- a/chrome/installer/setup/installer_crash_reporter_client.cc
 +++ b/chrome/installer/setup/installer_crash_reporter_client.cc
-@@ -38,7 +38,7 @@
+@@ -38,7 +38,7 @@ void InstallerCrashReporterClient::GetProductNameAndVersion(
      std::wstring* channel_name) {
    // Report crashes under the same product name as the browser. This string
    // MUST match server-side configuration.
@@ -305,9 +323,10 @@ diff --git a/chrome/installer/setup/installer_crash_reporter_client.cc b/chrome/
    std::unique_ptr<FileVersionInfo> version_info(
        FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
 diff --git a/chrome/notification_helper/notification_helper_crash_reporter_client.cc b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
+index 86604e9427..0fa79a79c4 100644
 --- a/chrome/notification_helper/notification_helper_crash_reporter_client.cc
 +++ b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
-@@ -60,7 +60,7 @@
+@@ -60,7 +60,7 @@ void NotificationHelperCrashReporterClient::GetProductNameAndVersion(
      std::wstring* channel_name) {
    // Report crashes under the same product name as the browser. This string
    // MUST match server-side configuration.
@@ -317,9 +336,10 @@ diff --git a/chrome/notification_helper/notification_helper_crash_reporter_clien
    std::unique_ptr<FileVersionInfo> version_info(
        FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
 diff --git a/chrome/windows_services/service_program/crash_reporting.cc b/chrome/windows_services/service_program/crash_reporting.cc
+index 04cfd98a00..42ee02921e 100644
 --- a/chrome/windows_services/service_program/crash_reporting.cc
 +++ b/chrome/windows_services/service_program/crash_reporting.cc
-@@ -116,7 +116,7 @@
+@@ -116,7 +116,7 @@ void CrashClient::GetProductNameAndVersion(const std::wstring& exe_path,
                                             std::wstring* channel_name) {
    // Report crashes under the same product name as the browser. This string
    // MUST match server-side configuration.
@@ -329,9 +349,10 @@ diff --git a/chrome/windows_services/service_program/crash_reporting.cc b/chrome
    special_build->clear();
    *channel_name =
 diff --git a/chrome/installer/linux/common/installer.py b/chrome/installer/linux/common/installer.py
+index 7646f80c84..a2a1de26c8 100644
 --- a/chrome/installer/linux/common/installer.py
 +++ b/chrome/installer/linux/common/installer.py
-@@ -390,8 +390,8 @@
+@@ -390,8 +390,8 @@ class InstallerConfig:
              return env
  
          def parse_simple(file_path: pathlib.Path) -> dict[str, str]:
@@ -342,3 +363,840 @@ diff --git a/chrome/installer/linux/common/installer.py b/chrome/installer/linux
  
          data["info_vars"] = parse_shell(
              output_dir / "installer/common" /
+diff --git a/chrome/browser/pdf/BUILD.gn b/chrome/browser/pdf/BUILD.gn
+index e1de032ece..0517085987 100644
+--- a/chrome/browser/pdf/BUILD.gn
++++ b/chrome/browser/pdf/BUILD.gn
+@@ -31,6 +31,7 @@ source_set("pdf") {
+     "//ui/webui/resources/cr_components/help_bubble:mojo_bindings",
+   ]
+   deps = [
++    "//base/version_info",
+     "//build:chromeos_buildflags",
+     "//chrome/browser:browser_process",
+     "//chrome/browser:resources",
+diff --git a/chrome/browser/pdf/pdf_extension_util.cc b/chrome/browser/pdf/pdf_extension_util.cc
+index 0ff31abd00..6be72e2fbb 100644
+--- a/chrome/browser/pdf/pdf_extension_util.cc
++++ b/chrome/browser/pdf/pdf_extension_util.cc
+@@ -10,10 +10,11 @@
+ #include <vector>
+ 
+ #include "base/feature_list.h"
++#include "base/json/string_escape.h"
+ #include "base/notreached.h"
+ #include "base/strings/string_util.h"
+ #include "base/values.h"
+-#include "build/branding_buildflags.h"
++#include "base/version_info/version_info.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/glic/public/glic_enabling.h"
+@@ -332,18 +333,17 @@ bool IsPdfSaveToDriveEnabled(content::BrowserContext* context) {
+ }  // namespace
+ 
+ std::string GetManifest() {
+-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+-  static constexpr char kExtensionName[] = "Chrome PDF Viewer";
+-#else
+-  static constexpr char kExtensionName[] = "Chromium PDF Viewer";
+-#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
++  std::string extension_name;
++  base::EscapeJSONString(std::string(version_info::GetProductName()) +
++                            " PDF Viewer",
++                        false, &extension_name);
+ 
+   std::string manifest_contents(
+       ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
+           IDR_PDF_MANIFEST));
+   DCHECK(manifest_contents.find(kNameTag) != std::string::npos);
+   base::ReplaceFirstSubstringAfterOffset(&manifest_contents, 0, kNameTag,
+-                                         kExtensionName);
++                                         extension_name);
+ 
+   return manifest_contents;
+ }
+diff --git a/chrome/browser/profiles/profile_shortcut_manager_win.cc b/chrome/browser/profiles/profile_shortcut_manager_win.cc
+index 127f270b08..d685bc544e 100644
+--- a/chrome/browser/profiles/profile_shortcut_manager_win.cc
++++ b/chrome/browser/profiles/profile_shortcut_manager_win.cc
+@@ -78,7 +78,7 @@ const int kMaxProfileShortcutFileNameLength = 64;
+ // Incrementing this number will cause profile icons to be regenerated on
+ // profile startup (it should be incremented whenever the product/avatar icons
+ // change, etc).
+-const int kCurrentProfileIconVersion = 10;
++const int kCurrentProfileIconVersion = 11;
+ 
+ bool disabled_for_unit_tests = false;
+ bool disable_unpinning_for_unit_tests = false;
+diff --git a/chrome/browser/resources/intro/default_browser/app.css b/chrome/browser/resources/intro/default_browser/app.css
+index 30163c22b1..e2725f670e 100644
+--- a/chrome/browser/resources/intro/default_browser/app.css
++++ b/chrome/browser/resources/intro/default_browser/app.css
+@@ -75,6 +75,8 @@
+   --illustration-width: 185px;
+   --product-logo-size: 52px;
+   --product-logo-top: 26px;
++  /* 페이지 테마와 관계없이 삽화의 화면은 밝은 바탕을 유지한다. */
++  color-scheme: light;
+   height: var(--illustration-height);
+   margin-top: var(--illustration-margin-top);
+   position: relative;
+diff --git a/chrome/browser/ui/pdf/infobar/BUILD.gn b/chrome/browser/ui/pdf/infobar/BUILD.gn
+index e87fd97e3e..0711bcc58c 100644
+--- a/chrome/browser/ui/pdf/infobar/BUILD.gn
++++ b/chrome/browser/ui/pdf/infobar/BUILD.gn
+@@ -31,14 +31,13 @@ source_set("infobar") {
+     "//chrome/browser/ui:ui_features",
+     "//chrome/browser/ui/browser_window",
+     "//chrome/browser/ui/tabs:tab_strip",
++    "//chrome/browser/ui/views/yee:product_logo",
+     "//chrome/common:constants",
+     "//chrome/installer/util:with_no_strings",
+     "//components/infobars/core",
+-    "//components/omnibox/browser:vector_icons",
+     "//components/pdf/common:constants",
+     "//components/prefs",
+     "//components/tabs:public",
+-    "//components/vector_icons",
+     "//ui/gfx:native_ui_types",
+   ]
+   if (is_win) {
+diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc b/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc
+index 6a2b16400f..f6ed37f8d2 100644
+--- a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc
++++ b/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc
+@@ -9,16 +9,14 @@
+ #include "base/metrics/histogram_functions.h"
+ #include "chrome/browser/infobars/confirm_infobar_creator.h"
+ #include "chrome/browser/ui/pdf/infobar/pdf_infobar_controller.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/common/buildflags.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+-#include "components/omnibox/browser/vector_icons.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/l10n/l10n_util.h"
+-#include "ui/base/ui_base_features.h"
+ #include "ui/gfx/native_ui_types.h"
+ 
+ namespace pdf::infobar {
+@@ -45,11 +43,8 @@ infobars::InfoBarDelegate::InfoBarIdentifier PdfInfoBarDelegate::GetIdentifier()
+   return PDF_INFOBAR_DELEGATE;
+ }
+ 
+-const gfx::VectorIcon& PdfInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel PdfInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ std::u16string PdfInfoBarDelegate::GetMessageText() const {
+diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h b/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h
+index 74ad771f86..062c247979 100644
+--- a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h
++++ b/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h
+@@ -28,7 +28,7 @@ class PdfInfoBarDelegate : public ConfirmInfoBarDelegate {
+ 
+   // InfoBarDelegate:
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
++  ui::ImageModel GetIcon() const override;
+ 
+   // ConfirmInfoBarDelegate:
+   std::u16string GetMessageText() const override;
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn b/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
+index df168a846a..19e3f16933 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
++++ b/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
+@@ -77,6 +77,7 @@ source_set("impl") {
+     "//chrome/browser/ui/tabs:tab_strip",
+     "//chrome/browser/ui/views/frame:toolbar_button_provider",
+     "//chrome/browser/ui/views/toolbar",
++    "//chrome/browser/ui/views/yee:default_browser_prompt",
+     "//chrome/browser/ui/webui/default_browser:default_browser_modal",
+     "//components/infobars/content",
+     "//components/infobars/core",
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
+index ebe5ec8442..fae17d39b3 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
++++ b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
+@@ -10,14 +10,11 @@
+ #include "chrome/browser/infobars/confirm_infobar_creator.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/startup/default_browser_prompt/default_browser_prompt_prefs.h"
+-#include "chrome/grit/branded_strings.h"
++#include "chrome/browser/ui/views/yee/default_browser_prompt.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/infobars/core/confirm_infobar_delegate.h"
+ #include "components/infobars/core/infobar.h"
+-#include "components/omnibox/browser/vector_icons.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "ui/base/l10n/l10n_util.h"
+-#include "ui/base/ui_base_features.h"
+ 
+ // static
+ infobars::InfoBar* DefaultBrowserInfoBarDelegate::Create(
+@@ -43,11 +40,8 @@ DefaultBrowserInfoBarDelegate::GetIdentifier() const {
+   return DEFAULT_BROWSER_INFOBAR_DELEGATE;
+ }
+ 
+-const gfx::VectorIcon& DefaultBrowserInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel DefaultBrowserInfoBarDelegate::GetIcon() const {
++  return yee::branding::DefaultBrowserPromptIcon(dark_mode());
+ }
+ 
+ bool DefaultBrowserInfoBarDelegate::ShouldExpire(
+@@ -65,9 +59,7 @@ void DefaultBrowserInfoBarDelegate::InfoBarDismissed() {
+ }
+ 
+ std::u16string DefaultBrowserInfoBarDelegate::GetMessageText() const {
+-  return l10n_util::GetStringUTF16(can_pin_to_taskbar_
+-                                       ? IDS_DEFAULT_BROWSER_PIN_INFOBAR_TEXT
+-                                       : IDS_DEFAULT_BROWSER_INFOBAR_TEXT);
++  return yee::branding::DefaultBrowserPromptMessage(can_pin_to_taskbar_);
+ }
+ 
+ int DefaultBrowserInfoBarDelegate::GetButtons() const {
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.h b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.h
+index 2f2eece414..4a5411451c 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.h
++++ b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.h
+@@ -40,7 +40,7 @@ class DefaultBrowserInfoBarDelegate : public ConfirmInfoBarDelegate {
+  private:
+   // ConfirmInfoBarDelegate:
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
++  ui::ImageModel GetIcon() const override;
+   bool ShouldExpire(const NavigationDetails& details) const override;
+   void InfoBarDismissed() override;
+   std::u16string GetMessageText() const override;
+diff --git a/chrome/browser/ui/webui/intro/intro_ui.cc b/chrome/browser/ui/webui/intro/intro_ui.cc
+index b4143152e4..5a79e48e2c 100644
+--- a/chrome/browser/ui/webui/intro/intro_ui.cc
++++ b/chrome/browser/ui/webui/intro/intro_ui.cc
+@@ -94,7 +94,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
+       {"backupCardTitle", IDS_FRE_BACKUP_CARD_TITLE},
+       {"acceptSignInButtonTitle", IDS_FRE_ACCEPT_SIGN_IN_BUTTON_TITLE},
+       {"createAccountDisclaimer", IDS_FRE_CREATE_ACCOUNT_DESCRIPTION},
+-      {"productLogoAltText", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"productLogoAltText", IDS_SHORT_PRODUCT_NAME},
+       // Strings for welcome subpage.
+       {"welcomeTitle", IDS_FRE_WELCOME_TITLE},
+       {"welcomeStartButtonLabel", IDS_FRE_WELCOME_START_BUTTON_LABEL},
+@@ -102,7 +102,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
+       {"defaultBrowserTitle", IDS_FRE_DEFAULT_BROWSER_TITLE_NEW},
+       {"defaultBrowserSubtitle", IDS_FRE_DEFAULT_BROWSER_SUBTITLE_NEW},
+       {"defaultBrowserIllustrationAltText",
+-       IDS_FRE_DEFAULT_BROWSER_ILLUSTRATION_ALT_TEXT},
++       IDS_SHORT_PRODUCT_NAME},
+       {"defaultBrowserSetAsDefault", IDS_FRE_DEFAULT_BROWSER_SET_AS_DEFAULT},
+       {"defaultBrowserSkip", IDS_FRE_DEFAULT_BROWSER_SKIP},
+       // Strings for refreshed default browser promo subpage.
+diff --git a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
+index 250f7472e4..891257ddc4 100644
+--- a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
++++ b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
+@@ -23,6 +23,7 @@ if (!is_android) {
+     deps = [
+       ":mojo_bindings",
+       "//base",
++      "//chrome/app:branded_strings",
+       "//chrome/app:generated_resources",
+       "//chrome/app/theme:chrome_unscaled_resources",
+       "//chrome/browser/profiles:profile",
+diff --git a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
+index eb67b3ebb8..a8d228fd1e 100644
+--- a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
++++ b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
+@@ -16,6 +16,7 @@
+ #include "chrome/browser/search_engine_choice/search_engine_choice_service_factory.h"
+ #include "chrome/browser/ui/webui/search_engine_choice/search_engine_choice_handler.h"
+ #include "chrome/common/webui_url_constants.h"
++#include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/chrome_unscaled_resources.h"
+ #include "chrome/grit/search_engine_choice_resources.h"
+ #include "chrome/grit/search_engine_choice_resources_map.h"
+@@ -26,7 +27,6 @@
+ #include "components/search_engines/search_engines_switches.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/signin/public/base/signin_switches.h"
+-#include "components/strings/grit/components_branded_strings.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_ui_data_source.h"
+@@ -108,7 +108,7 @@ SearchEngineChoiceUI::SearchEngineChoiceUI(content::WebUI* web_ui)
+                              IDS_SEARCH_ENGINE_CHOICE_LIST_A11Y_LABEL);
+   source->AddLocalizedString("infoDialogButtonText", IDS_CLOSE);
+   source->AddLocalizedString("productLogoAltText",
+-                             IDS_SHORT_PRODUCT_LOGO_ALT_TEXT);
++                             IDS_SHORT_PRODUCT_NAME);
+   source->AddLocalizedString("moreButtonText",
+                              IDS_SEARCH_ENGINE_CHOICE_MORE_BUTTON);
+   source->AddLocalizedString("guestCheckboxText",
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+index 3ae8b2a6e4..8a6c2c0e98 100644
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -308,7 +308,7 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
+ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
+   // Top level About Page strings.
+   static constexpr webui::LocalizedString kLocalizedStrings[] = {
+-      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_NAME},
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+       {"aboutReportAnIssue", IDS_SETTINGS_ABOUT_PAGE_REPORT_AN_ISSUE},
+       {"aboutPrivacyPolicy", IDS_SETTINGS_ABOUT_PAGE_PRIVACY_POLICY},
+diff --git a/chrome/browser/ui/webui/version/version_ui.cc b/chrome/browser/ui/webui/version/version_ui.cc
+index 4c523d48d8..272c6889ed 100644
+--- a/chrome/browser/ui/webui/version/version_ui.cc
++++ b/chrome/browser/ui/webui/version/version_ui.cc
+@@ -79,7 +79,7 @@ void CreateAndAddVersionUIDataSource(Profile* profile) {
+   // These localized strings are used to label version details.
+   static constexpr webui::LocalizedString kStrings[] = {
+       {version_ui::kTitle, IDS_VERSION_UI_TITLE},
+-      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_NAME},
+       {version_ui::kApplicationLabel, IDS_PRODUCT_NAME},
+       {version_ui::kCompany, IDS_ABOUT_VERSION_COMPANY_NAME},
+       {version_ui::kCopyLabel, IDS_VERSION_UI_COPY_LABEL},
+diff --git a/chrome/tools/build/mac/infoplist_strings_util.cc b/chrome/tools/build/mac/infoplist_strings_util.cc
+index f52b1cf14e..7adf6ea5ea 100644
+--- a/chrome/tools/build/mac/infoplist_strings_util.cc
++++ b/chrome/tools/build/mac/infoplist_strings_util.cc
+@@ -196,6 +196,9 @@ int main(int argc, char* const argv[]) {
+         {"NSWebBrowserPublicKeyCredentialUsageDescription", permission_reason},
+ 
+         {"\"Chromium Shortcut\"", chromium_shortcut_description},
++        {"\"Chromium Extension\"",
++         LoadStringFromDataPack(branded_data_pack.get(), lang, IDS_PRODUCT_NAME,
++                                "IDS_PRODUCT_NAME") + " Extension"},
+     };
+     std::string strings_file_contents_string;
+     for (const auto& kv : infoplist_strings) {
+diff --git a/components/vector_icons/aggregate_vector_icons.py b/components/vector_icons/aggregate_vector_icons.py
+index 1974b6fc9e..f60718c336 100644
+--- a/components/vector_icons/aggregate_vector_icons.py
++++ b/components/vector_icons/aggregate_vector_icons.py
+@@ -4,6 +4,7 @@
+ 
+ import fileinput
+ import glob
++import io
+ import optparse
+ import os
+ import re
+@@ -17,6 +18,15 @@ REFERENCE_SIZE_DIP = 48
+ TEMPLATE_PLACEHOLDER = "TEMPLATE_PLACEHOLDER"
+ 
+ 
++def WriteIfChanged(path, contents):
++  if os.path.isfile(path):
++    with open(path, "r", encoding="utf-8") as existing:
++      if existing.read() == contents:
++        return
++  with open(path, "w", encoding="utf-8") as output:
++    output.write(contents)
++
++
+ def Error(msg):
+   print(msg, file=sys.stderr)
+   sys.exit(1)
+@@ -146,7 +156,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+             "r") as input_header_template:
+     header_template_contents = input_header_template.readlines()
+ 
+-  output_header = open(output_h, "w")
++  output_header = io.StringIO()
+   for line in header_template_contents:
+     if not TEMPLATE_PLACEHOLDER in line:
+       output_header.write(line)
+@@ -157,6 +167,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+                                os.path.basename(path_map[icon]))
+       output_header.write("VECTOR_ICON_TEMPLATE_H({})\n".format(
+           GetIconName(icon_name)))
++  WriteIfChanged(output_h, output_header.getvalue())
+   output_header.close()
+ 
+   # Copy the vector icon drawing commands from the .icon files, splitting them
+@@ -167,7 +178,8 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+   cc_template_contents = input_cc_template.readlines()
+   input_cc_template.close()
+ 
+-  output_cc = open(output_cc, "w")
++  output_cc_path = output_cc
++  output_cc = io.StringIO()
+   for line in cc_template_contents:
+     if not TEMPLATE_PLACEHOLDER in line:
+       output_cc.write(line)
+@@ -194,6 +206,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+           GetRepListName(icon_name), GetIconName(icon_name),
+           ", ".join(icon_representation_strings)))
+ 
++  WriteIfChanged(output_cc_path, output_cc.getvalue())
+   output_cc.close()
+ 
+   if (output_test_h):
+@@ -203,7 +216,8 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+       input_test_cc_template.close()
+ 
+       # Write the vector icon unittests.
+-      output_test_h = open(output_test_h, "w")
++      output_test_h_path = output_test_h
++      output_test_h = io.StringIO()
+       for line in cc_test_template_contents:
+         if not TEMPLATE_PLACEHOLDER in line:
+           output_test_h.write(line)
+@@ -224,6 +238,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
+           output_test_h.write("""; \\
+               CheckThatParsedElementsMatch(s, {}); \\
+               }} \\\n \\\n""".format(formatted_name))
++      WriteIfChanged(output_test_h_path, output_test_h.getvalue())
+       output_test_h.close()
+ 
+ 
+diff --git a/chrome/browser/infobars/browser_infobar_manager.cc b/chrome/browser/infobars/browser_infobar_manager.cc
+index 51f2946e16..ddd188d134 100644
+--- a/chrome/browser/infobars/browser_infobar_manager.cc
++++ b/chrome/browser/infobars/browser_infobar_manager.cc
+@@ -23,6 +23,7 @@
+ #include "components/infobars/core/infobar.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/web_contents.h"
++#include "ui/base/models/image_model.h"
+ #include "ui/gfx/vector_icon_types.h"
+ #include "url/gurl.h"
+ 
+@@ -52,6 +53,11 @@ class RegistryInfoBarDelegate final : public ConfirmInfoBarDelegate {
+ 
+   int GetIconId() const override { return spec_.icon_id(); }
+ 
++  ui::ImageModel GetIcon() const override {
++    return spec_.icon_provider() ? spec_.icon_provider().Run(dark_mode())
++                                 : ConfirmInfoBarDelegate::GetIcon();
++  }
++
+   const gfx::VectorIcon& GetVectorIcon() const override {
+     return spec_.icon() ? *spec_.icon()
+                         : ConfirmInfoBarDelegate::GetVectorIcon();
+diff --git a/chrome/browser/infobars/infobar_spec.cc b/chrome/browser/infobars/infobar_spec.cc
+index 11702640fe..3918d33811 100644
+--- a/chrome/browser/infobars/infobar_spec.cc
++++ b/chrome/browser/infobars/infobar_spec.cc
+@@ -72,6 +72,12 @@ InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconId(int icon_id) {
+   return *this;
+ }
+ 
++InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconProvider(
++    IconProvider provider) {
++  spec_.icon_provider_ = std::move(provider);
++  return *this;
++}
++
+ InfoBarSpec::Builder& InfoBarSpec::Builder::SetScope(InfoBarScope scope) {
+   spec_.scope_ = scope;
+   return *this;
+diff --git a/chrome/browser/infobars/infobar_spec.h b/chrome/browser/infobars/infobar_spec.h
+index dfc289fc8d..e68872e0f3 100644
+--- a/chrome/browser/infobars/infobar_spec.h
++++ b/chrome/browser/infobars/infobar_spec.h
+@@ -59,6 +59,7 @@ class InfoBarSpec {
+   // Returns true if the infobar may be shown in the given browser. Only
+   // consulted for InfoBarScope::kGlobal.
+   using BrowserFilter = base::RepeatingCallback<bool(BrowserWindowInterface*)>;
++  using IconProvider = base::RepeatingCallback<ui::ImageModel(bool dark_mode)>;
+ 
+   class Builder;
+ 
+@@ -88,6 +89,7 @@ class InfoBarSpec {
+   const gfx::VectorIcon* icon() const { return icon_; }
+   const gfx::VectorIcon* dark_mode_icon() const { return dark_mode_icon_; }
+   int icon_id() const { return icon_id_; }
++  const IconProvider& icon_provider() const { return icon_provider_; }
+   bool expire_on_navigation() const { return expire_on_navigation_; }
+   bool should_hide_in_fullscreen() const { return should_hide_in_fullscreen_; }
+   bool should_animate() const { return should_animate_; }
+@@ -125,6 +127,7 @@ class InfoBarSpec {
+   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
+   raw_ptr<const gfx::VectorIcon> dark_mode_icon_ = nullptr;
+   int icon_id_ = 0;
++  IconProvider icon_provider_;
+   bool expire_on_navigation_ = true;
+   bool should_hide_in_fullscreen_ = false;
+   bool should_animate_ = true;
+@@ -155,6 +158,8 @@ class InfoBarSpec::Builder {
+   Builder& SetIcon(const gfx::VectorIcon& icon);
+   Builder& SetDarkModeIcon(const gfx::VectorIcon& icon);
+   Builder& SetIconId(int icon_id);
++  // 정적 vector·resource 아이콘보다 우선하며 배너 바탕의 명암이 바뀌면 다시 호출한다.
++  Builder& SetIconProvider(IconProvider provider);
+ 
+   Builder& SetScope(InfoBarScope scope);
+   Builder& SetPriority(InfoBarDelegate::InfobarPriority priority);
+diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
+index b607106562..ce0fb68650 100644
+--- a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
++++ b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
+@@ -23,6 +23,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h"
+ #include "chrome/browser/ui/pdf/infobar/pdf_infobar_prefs.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/common/buildflags.h"
+@@ -33,7 +34,6 @@
+ #include "components/infobars/core/infobar.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/tabs/public/tab_interface.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -166,7 +166,7 @@ void PdfInfoBarController::RegisterInfoBarSpec() {
+       infobars::InfoBarSpec::Builder(
+           infobars::InfoBarDelegate::PDF_INFOBAR_DELEGATE)
+           .SetMessageText(l10n_util::GetStringUTF16(IDS_PDF_INFOBAR_TEXT))
+-          .SetIcon(vector_icons::kProductRefreshIcon)
++          .SetIconProvider(base::BindRepeating(&yee::branding::ProductLogoIcon))
+           .SetScope(infobars::InfoBarScope::kTab)
+           .AddOkButton(
+               l10n_util::GetStringUTF16(
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
+index fb432004e4..1a89aea03e 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
++++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
+@@ -18,7 +18,6 @@ source_set("pin_infobar") {
+   deps = [
+     "//chrome/browser:browser_public_dependencies",
+     "//components/infobars/core",
+-    "//components/vector_icons",
+     "//ui/gfx:native_ui_types",
+   ]
+ 
+@@ -42,8 +41,8 @@ source_set("impl") {
+     "//chrome/browser/ui:ui_features",
+     "//chrome/browser/ui/browser_window",
+     "//chrome/browser/ui/tabs:tab_strip",
++    "//chrome/browser/ui/views/yee:product_logo",
+     "//chrome/common:constants",
+-    "//components/omnibox/browser:vector_icons",
+     "//components/prefs",
+     "//components/tabs:public",
+     "//ui/base",
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
+index 35201dd0ad..54b9d7e602 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
++++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
+@@ -26,9 +26,7 @@
+ #include "chrome/common/buildflags.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+-#include "components/omnibox/browser/vector_icons.h"
+ #include "components/tabs/public/tab_interface.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/navigation_handle.h"
+ #include "content/public/browser/web_contents.h"
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
+index 5c382d1ec4..6f2af07762 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
++++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
+@@ -12,13 +12,11 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/infobars/confirm_infobar_creator.h"
+ #include "chrome/browser/ui/ui_features.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+-#include "components/omnibox/browser/vector_icons.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "ui/base/l10n/l10n_util.h"
+-#include "ui/base/ui_base_features.h"
+ 
+ #if BUILDFLAG(IS_WIN)
+ #include "chrome/browser/win/taskbar_manager.h"
+@@ -52,11 +50,8 @@ infobars::InfoBarDelegate::InfoBarIdentifier PinInfoBarDelegate::GetIdentifier()
+   return PIN_INFOBAR_DELEGATE;
+ }
+ 
+-const gfx::VectorIcon& PinInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel PinInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ std::u16string PinInfoBarDelegate::GetMessageText() const {
+diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.h b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.h
+index 3135fb5d3f..289fdbab3b 100644
+--- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.h
++++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.h
+@@ -30,7 +30,7 @@ class PinInfoBarDelegate : public ConfirmInfoBarDelegate {
+ 
+   // InfoBarDelegate:
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
++  ui::ImageModel GetIcon() const override;
+ 
+   // ConfirmInfoBarDelegate:
+   std::u16string GetMessageText() const override;
+diff --git a/chrome/browser/ui/infobars/BUILD.gn b/chrome/browser/ui/infobars/BUILD.gn
+index de9bbe6b7e..665f43c14e 100644
+--- a/chrome/browser/ui/infobars/BUILD.gn
++++ b/chrome/browser/ui/infobars/BUILD.gn
+@@ -17,7 +17,6 @@ source_set("infobars") {
+     "//chrome/browser/ssl",
+     "//chrome/browser/ui/page_info",
+     "//components/infobars/core",
+-    "//components/omnibox/browser:vector_icons",
+     "//components/strings:components_strings",
+     "//components/vector_icons",
+     "//components/version_info",
+@@ -27,6 +26,9 @@ source_set("infobars") {
+   ]
+ 
+   if (is_win || is_mac) {
+-    deps += [ "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar" ]
++    deps += [
++      "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar",
++      "//chrome/browser/ui/views/yee:product_logo",
++    ]
+   }
+ }
+diff --git a/chrome/browser/ui/infobars/browser_infobar_registry.cc b/chrome/browser/ui/infobars/browser_infobar_registry.cc
+index cbbb7b5775..8151953b06 100644
+--- a/chrome/browser/ui/infobars/browser_infobar_registry.cc
++++ b/chrome/browser/ui/infobars/browser_infobar_registry.cc
+@@ -34,7 +34,7 @@
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+ #include "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.h"
+-#include "components/omnibox/browser/vector_icons.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #endif
+ 
+ namespace infobars {
+@@ -128,9 +128,8 @@ void RegisterInfoBars() {
+                     infobars::InfoBarDelegate::PIN_INFOBAR_DELEGATE)
+                     .SetMessageText(
+                         default_browser::PinInfoBarController::GetMessageText())
+-                    .SetIcon(features::IsRoundedIconsEnabled()
+-                                 ? omnibox::kChromeProductIcon
+-                                 : vector_icons::kProductRefreshIcon)
++                    .SetIconProvider(base::BindRepeating(
++                        &yee::branding::ProductLogoIcon))
+                     .SetScope(infobars::InfoBarScope::kGlobal)
+                     .AddOkButton(
+                         default_browser::PinInfoBarController::GetButtonLabel(),
+diff --git a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
+index 70ba390cf8..8bb3e8fd49 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
++++ b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
+@@ -35,14 +35,13 @@ source_set("session_restore_infobar") {
+     "//chrome/browser/ui/tabs:tab_strip",
+     "//chrome/browser/ui/tabs:tab_strip_model_observer",
+     "//chrome/browser/ui/views/infobars",
++    "//chrome/browser/ui/views/yee:product_logo",
+     "//chrome/common",
+     "//components/content_settings/core/browser",
+     "//components/infobars/content",
+     "//components/infobars/core",
+-    "//components/omnibox/browser:vector_icons",
+     "//components/prefs",
+     "//components/tabs:public",
+-    "//components/vector_icons",
+     "//content/public/browser",
+     "//ui/base",
+     "//url",
+diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
+index 04bb056354..d0cd196a19 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
++++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
+@@ -14,17 +14,14 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_manager.h"
+ #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_prefs.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+ #include "components/infobars/core/infobar_manager.h"
+-#include "components/omnibox/browser/vector_icons.h"
+ #include "components/prefs/pref_service.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "ui/base/l10n/l10n_util.h"
+-#include "ui/base/ui_base_features.h"
+-#include "ui/gfx/vector_icon_types.h"
+ 
+ namespace session_restore_infobar {
+ 
+@@ -140,11 +137,8 @@ SessionRestoreInfoBarDelegate::GetIdentifier() const {
+       SESSION_RESTORE_INFOBAR_DELEGATE;
+ }
+ 
+-const gfx::VectorIcon& SessionRestoreInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel SessionRestoreInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ bool SessionRestoreInfoBarDelegate::ShouldExpire(
+diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
+index b4cef54f99..7c73008360 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
++++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
+@@ -70,7 +70,7 @@ class SessionRestoreInfoBarDelegate : public ConfirmInfoBarDelegate {
+ 
+   // ConfirmInfoBarDelegate:
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
++  ui::ImageModel GetIcon() const override;
+   bool ShouldExpire(const NavigationDetails& details) const override;
+   std::u16string GetMessageText() const override;
+   std::u16string GetLinkText() const override;
+diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
+index b257bd38c8..c28e384909 100644
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -172,6 +172,7 @@ source_set("impl") {
+     "//components/startup_metric_utils",
+     "//components/translate/core/common",
+     "//components/vector_icons",
++    "//components/yee_branding",
+     "//content/public/browser",
+     "//content/public/common",
+     "//google_apis",
+@@ -305,7 +306,10 @@ source_set("impl") {
+         "startup_launch_infobar_delegate.cc",
+         "startup_launch_infobar_manager_impl.cc",
+       ]
+-      deps += [ "//chrome/browser/startup" ]
++      deps += [
++        "//chrome/browser/startup",
++        "//chrome/browser/ui/views/yee:product_logo",
++      ]
+     }
+ 
+     if (is_win && is_chrome_branded) {
+diff --git a/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc b/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
+index 76f2f624f9..aeea0f3ce1 100644
+--- a/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
++++ b/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
+@@ -11,17 +11,15 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/startup/startup_launch_manager.h"
+ #include "chrome/browser/ui/chrome_pages.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/common/webui_url_constants.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/infobars/core/confirm_infobar_delegate.h"
+ #include "components/infobars/core/infobar.h"
+-#include "components/omnibox/browser/vector_icons.h"
+ #include "components/prefs/pref_service.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "ui/base/l10n/l10n_util.h"
+-#include "ui/base/ui_base_features.h"
+ #include "ui/base/ui_base_types.h"
+ 
+ using InfoBarType = StartupLaunchInfoBarManager::InfoBarType;
+@@ -47,11 +45,8 @@ StartupLaunchInfoBarDelegate::GetIdentifier() const {
+   return STARTUP_LAUNCH_INFOBAR_DELEGATE;
+ }
+ 
+-const gfx::VectorIcon& StartupLaunchInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel StartupLaunchInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ bool StartupLaunchInfoBarDelegate::ShouldExpire(
+diff --git a/chrome/browser/ui/startup/startup_launch_infobar_delegate.h b/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
+index 4c3e07af3b..a321861eb1 100644
+--- a/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
++++ b/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
+@@ -37,7 +37,7 @@ class StartupLaunchInfoBarDelegate : public ConfirmInfoBarDelegate {
+  private:
+   // ConfirmInfoBarDelegate:
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
++  ui::ImageModel GetIcon() const override;
+   bool ShouldExpire(const NavigationDetails& details) const override;
+   std::u16string GetMessageText() const override;
+   int GetButtons() const override;
+diff --git a/chrome/browser/ui/cocoa/BUILD.gn b/chrome/browser/ui/cocoa/BUILD.gn
+index 4ce5c7aef0..38009bd3b0 100644
+--- a/chrome/browser/ui/cocoa/BUILD.gn
++++ b/chrome/browser/ui/cocoa/BUILD.gn
+@@ -196,6 +196,7 @@ source_set("cocoa") {
+     sources += [ "keystone_infobar_delegate.cc" ]
+     deps += [
+       "//chrome/browser/infobars",
++      "//chrome/browser/ui/views/yee:product_logo",
+       "//chrome/browser/updater",
+       "//components/infobars/content",
+     ]
+diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
+index 86d85f1594..480357e2ae 100644
+--- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
++++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
+@@ -14,12 +14,12 @@
+ #include "chrome/browser/ui/browser.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/browser/updater/updater.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+-#include "chrome/grit/theme_resources.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+ #include "components/prefs/pref_service.h"
+@@ -84,8 +84,8 @@ KeystonePromotionInfoBarDelegate::GetIdentifier() const {
+   return KEYSTONE_PROMOTION_INFOBAR_DELEGATE_MAC;
+ }
+ 
+-int KeystonePromotionInfoBarDelegate::GetIconId() const {
+-  return IDR_PRODUCT_LOGO_32;
++ui::ImageModel KeystonePromotionInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ bool KeystonePromotionInfoBarDelegate::ShouldExpire(
+diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
+index 4d176cc36f..a18f9143d4 100644
+--- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
++++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
+@@ -37,7 +37,7 @@ class KeystonePromotionInfoBarDelegate : public ConfirmInfoBarDelegate {
+ 
+   // ConfirmInfoBarDelegate
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  int GetIconId() const override;
++  ui::ImageModel GetIcon() const override;
+   bool ShouldExpire(const NavigationDetails& details) const override;
+   std::u16string GetMessageText() const override;
+   std::u16string GetButtonLabel(InfoBarButton button) const override;

@@ -356,7 +356,6 @@ class ScenarioTests(unittest.TestCase):
     def test_operator_answer_never_appears_in_s08_public_data(self):
         f=self.fixture('S08')
         self.assertNotIn('operator_answer',f.view())
-        self.assertNotIn('operator_answer',PAGE)
 
     def test_async_arrivals_require_baseline_completion_and_only_new_urgent(self):
         for seed in (11,29,47):

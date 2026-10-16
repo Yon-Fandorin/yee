@@ -123,16 +123,20 @@ class ReceiptTests(unittest.TestCase):
     def config(self):return argparse.Namespace(bridge='/unused',timeout=1,request_timeout=1,compact=True,_transcript=None)
 
     def test_bad_or_unsettled_snapshots_never_authorize_a_delta_baseline(self):
-        for change in ({'truncated':True},{'execution_settled':False},{'receipt_persisted':False},
+        for change in ({'ok':False,'error':'not attached'},
+                       {'truncated':True},{'execution_settled':False},{'receipt_persisted':False},
                        {'partial_effect_possible':True},{'revision':True},
                        {'document':'wrong-header-doc'},{'snapshot':'page @first-doc rev=1 delta\nbase_rev=99\n'}):
             with self.subTest(change=change):
                 flags=[]
                 def execute(c):
-                    flags.append(c.full);return 0,{**page('first-doc',1),**change}
+                    flags.append(c.full)
+                    response=page('first-doc',len(flags))
+                    if len(flags)==1:response.update(change)
+                    return (0 if response['ok'] else 1),response
                 worker=m.Adapter(self.config(),execute)
-                anyio.run(worker.call,{'action':'observe'});anyio.run(worker.call,{'action':'observe'})
-                self.assertEqual(flags,[True,True])
+                for _ in range(3):anyio.run(worker.call,{'action':'observe'})
+                self.assertEqual(flags,[True,True,False])
 
     def test_connection_abort_does_not_commit_a_partly_returned_compound_baseline(self):
         flags=[]

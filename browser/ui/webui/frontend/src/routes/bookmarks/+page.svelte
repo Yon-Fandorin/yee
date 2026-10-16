@@ -2,6 +2,7 @@
 	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { currentPageURL } from '#lib/navigation.ts';
 	import Bookmark from '@lucide/svelte/icons/bookmark';
 	import Folder from '@lucide/svelte/icons/folder';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -20,7 +21,7 @@
 	import BookmarkDeletionDialog from './components/BookmarkDeletionDialog.svelte';
 	let model = $state<BookmarksModel | null>(null);
 	function navigate(id: string, replace = false) {
-		const url = new URL(page.url.href);
+		const url = new URL(currentPageURL().href);
 		url.searchParams.set('id', id);
 		if (!replace) url.searchParams.delete('q');
 		url.hash = '';
@@ -28,15 +29,15 @@
 	}
 	function setQuery(value: string) {
 		model?.setQuery(value);
-		const url = new URL(page.url.href);
+		const url = new URL(currentPageURL().href);
 		if (value) url.searchParams.set('q', value);
 		else url.searchParams.delete('q');
 		void goto(url, { shallow: true, replace: true, state: page.state });
 	}
 	$effect(() => {
 		const state = model;
-		const id = page.url.searchParams.get('id') ?? '';
-		const query = page.url.searchParams.get('q') ?? '';
+		const id = currentPageURL().searchParams.get('id') ?? '';
+		const query = currentPageURL().searchParams.get('q') ?? '';
 		untrack(() => state?.syncLocation(id, query));
 	});
 	onMount(() => {

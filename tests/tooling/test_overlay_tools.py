@@ -241,6 +241,11 @@ class OverlayToolsTest(unittest.TestCase):
         theme = self.src / 'chrome/app/theme/chromium'
         theme.mkdir(parents=True)
         (theme / 'logo.png').write_bytes(b'original')
+        individual_assets = [self.src / value for value in self.catalog['generated_roots']
+                             if Path(value).suffix]
+        for asset in individual_assets:
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_bytes(b'original generated asset')
         git(self.src, 'add', '.')
         git(self.src, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
             'commit', '-qm', 'owned sources fixture')
@@ -248,12 +253,16 @@ class OverlayToolsTest(unittest.TestCase):
         for binding in self.catalog['source_roots']:
             (self.src / binding['destination'] / 'fixture.cc').write_text('changed source\n')
         (theme / 'logo.png').write_bytes(b'changed')
+        for asset in individual_assets:
+            asset.write_bytes(b'changed generated asset')
         diff = git(self.src, 'diff', 'HEAD', '--', '.',
                    *shell_exclusions(self.catalog, self.overlay)).decode()
         self.assertIn('shell.cc', diff)
         for path in ('brand.cc', 'version.cc', 'windows.bat', *[b['destination'] for b in self.catalog['source_roots']]):
             self.assertNotIn(path, diff)
         self.assertNotIn('logo.png', diff)
+        for asset in individual_assets:
+            self.assertNotIn(asset.relative_to(self.src).as_posix(), diff)
 
 
 if __name__ == '__main__':

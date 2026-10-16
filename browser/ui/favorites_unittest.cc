@@ -151,7 +151,7 @@ class FavoritesDragGeometryTest : public views::ViewsTestBase {
     widget_ = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
     tab_strip_ = widget_->SetContentsView(std::make_unique<views::View>());
     widget_->SetBounds(gfx::Rect(100, 100, 320, 600));
-    widget_->Show();
+    widget_->ShowInactive();
   }
 
   void TearDown() override {

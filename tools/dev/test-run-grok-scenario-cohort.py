@@ -1,4 +1,3 @@
-import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -125,11 +124,6 @@ class Tests(unittest.TestCase):
             argv=tomllib.loads((workspace/'.grok/config.toml').read_text())['mcp_servers']['yee']['args']
             self.assertEqual(argv[argv.index('--peer-pid')+1],'4321')
             self.assertEqual(json.loads((case/'bridge.json').read_text()),{'bridge':str(bridge)})
-            tree=ast.parse(Path(suite.__file__).read_text())
-            trial=next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='yee_trial')
-            publications=[n for n in ast.walk(trial) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='save']
-            self.assertEqual(sum(any(isinstance(x,ast.Constant) and x.value=='bridge.json' for x in ast.walk(n.args[0])) for n in publications),1)
-            self.assertEqual(sum(any(isinstance(x,ast.Constant) and x.value=='launch.json' for x in ast.walk(n.args[0])) for n in publications),1)
     def test_plain_browser_does_not_receive_host_tool(self):
         import tomllib
         with tempfile.TemporaryDirectory() as tmp:

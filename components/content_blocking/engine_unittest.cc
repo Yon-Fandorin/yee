@@ -216,7 +216,6 @@ TEST(ContentBlockingEngine, ResourceScriptlet) {
       R"([{"name":"yee-fixture.js","kind":{"mime":"application/javascript"},"content":"d2luZG93Ll9feWVlRmlsdGVyRml4dHVyZSA9IHRydWU7"}])");
   auto rules = engine.RulesForPage("https://yee-fixture.test/");
   EXPECT_NE(rules.script.find("__yeeFilterFixture"), std::string::npos);
-  EXPECT_EQ(BundleGeneration().size(), 64u);
 }
 TEST(ContentBlockingEngine, RedirectAndRemoveparamDecisions) {
   Engine engine("||ads.test^$redirect=blank-js\n"

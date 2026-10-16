@@ -68,6 +68,14 @@ class BrandConfigTest(unittest.TestCase):
             original = next(line for line in UPSTREAM_BRANDING.splitlines() if line.startswith(key + "="))
             self.assertIn(original + "\n", text)
 
+    def test_string_policy_is_a_confined_existing_input(self):
+        policy = self.repo / 'branding/strings.json'
+        policy.write_text('{"schema_version": 1}')
+        self.assertEqual(self.brand(strings_policy='branding/strings.json').strings_policy, policy.resolve())
+        for path in ('../strings.json', '/tmp/strings.json', 'branding/missing.json'):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.brand(strings_policy=path)
+
     def test_url_scheme_follows_brand_rename_and_can_be_overridden(self):
         for name, expected in (("Orbit", "orbit"), ("Nova", "nova")):
             self.config.write_text(json.dumps({"name": name, "logo_source": "assets/brand/logo.png",
@@ -168,6 +176,19 @@ class BrandConfigTest(unittest.TestCase):
                          "Orbit & Co")
         with self.assertRaises(ValueError):
             branding.load_brand(self.config, self.repo)
+
+    def test_brand_palette_and_package_are_shared_optional_inputs(self):
+        manifest = self.repo / 'assets/brand/manifest.json'
+        manifest.write_text('{}')
+        brand = self.brand(logo_assets_manifest='assets/brand/manifest.json',
+                           logo_palette={'primary': '#242824', 'secondary': '#438578'})
+        self.assertEqual(brand.logo_assets_manifest, manifest.resolve())
+        self.assertEqual(brand.logo_palette['secondary'], '#438578')
+        for palette in ({'primary': 'red'}, {'unknown': '#123456'}, [], {'primary': '#123'}):
+            with self.subTest(palette=palette), self.assertRaises(ValueError):
+                self.brand(logo_palette=palette)
+        with self.assertRaises(ValueError):
+            self.brand(logo_assets_manifest='../outside.json')
 
     def test_legacy_comment_marker_is_removed_for_version_compatibility(self):
         self.branding_path.write_text(branding.LEGACY_BRANDING_MARKER + "\n"

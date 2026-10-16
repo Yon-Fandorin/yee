@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "base/functional/callback_forward.h"
+#include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "ui/gfx/geometry/point.h"
 
 namespace views {
@@ -28,6 +29,7 @@ inline constexpr int kSidebarFooterMenuViewId = 92104;
 inline constexpr int kSidebarFooterWorkspaceMarkViewId = 92108;
 inline constexpr int kSidebarFooterMenuActionIconViewId = 92109;
 inline constexpr int kSidebarFooterChevronViewId = 92111;
+inline constexpr int kSidebarFooterMemoryToggleViewId = 92112;
 
 enum class SidebarFooterScreen {
   kRoot,
@@ -76,6 +78,7 @@ struct SidebarContextItem {
   std::u16string workspace_name;
   std::u16string account_name;
   bool account_name_is_placeholder = false;
+  bool is_local_context = false;
 };
 
 struct SidebarFooterModel {
@@ -104,7 +107,8 @@ std::unique_ptr<views::View> CreateSidebarFooterView(
     SidebarFooterModel model,
     SidebarContextSelectedCallback context_selected_callback,
     SidebarFooterBrowserActionCallback browser_action_callback,
-    SidebarMemoryChangedCallback memory_changed_callback);
+    SidebarMemoryChangedCallback memory_changed_callback,
+    SidebarPopupLockCallback acquire_popup_lock = {});
 
 void SetSidebarFooterVisible(views::View& view, bool visible);
 bool IsSidebarFooterPositionInWindowCaption(const views::View& view,

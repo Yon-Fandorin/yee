@@ -13,7 +13,11 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/views/yee/webui/frontend_resources.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
+#include "chrome/browser/ui/views/yee/webui/theme_handler.h"
+#include "chrome/grit/chrome_unscaled_resources.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "content/public/browser/web_ui.h"
+#include "content/public/browser/web_ui_message_handler.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/template_expressions.h"
@@ -48,6 +52,8 @@ content::WebUIDataSource* CreatePageDataSource(
     std::vector<std::string> document_paths) {
   auto* source = content::WebUIDataSource::CreateAndAdd(
       Profile::FromWebUI(web_ui), std::string(host));
+  source->AddResourcePath("brand-logo.svg", IDR_PRODUCT_LOGO_SVG);
+  web_ui->AddMessageHandler(CreateThemeHandler());
   // Svelte uses this policy for compiler-generated static HTML templates.
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::TrustedTypes,

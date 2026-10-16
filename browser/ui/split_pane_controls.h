@@ -27,16 +27,18 @@ inline constexpr int kSidePanelResizeGutterViewId = 92020;
 // Adds a hover/focus-only marker to Chromium's native Sidebar resize delegate.
 // Native resizing, keyboard commands, and state stay intact.
 std::unique_ptr<views::ResizeArea>
-CreateSidebarResizeArea(views::ResizeAreaDelegate* delegate);
-gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect& sidebar,
-                                   int resize_area_width);
+CreateSidebarResizeArea(views::ResizeAreaDelegate *delegate);
+gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect &sidebar,
+                                     int resize_area_width);
 std::unique_ptr<views::ViewTargeter>
-CreateSidebarResizeAreaTargeter(views::ResizeArea& resize_area);
+CreateSidebarResizeAreaTargeter(views::ResizeArea &resize_area);
+// 시각적 여백이 생겨도 원래 가장자리 hover 영역은 이어진다.
+void SetSidebarFlyoutHitTestInsets(views::View &sidebar, int top, int bottom);
 
 // A bounded diagonal corridor, not a halo over the whole page.
-bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point& point,
-                                             const gfx::Rect& controls,
-                                             const gfx::Rect& divider);
+bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point &point,
+                                             const gfx::Rect &controls,
+                                             const gfx::Rect &divider);
 
 struct SidePanelResizeCallbacks {
   base::RepeatingCallback<void(int, bool)> resize;

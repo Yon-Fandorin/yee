@@ -2,180 +2,96 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string] $ChromiumSrc,
-
     [switch] $CheckOnly
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-
-if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    throw 'The PowerShell brand asset installer is supported on Windows only.'
-}
-
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$yeeRoot = Split-Path -Parent $scriptDir
-. (Join-Path $scriptDir 'brand-config.ps1')
+. (Join-Path $PSScriptRoot 'brand-config.ps1')
 $brand = Get-YeeBrandConfig
+$repoRoot = $script:ProductBrandRepoRoot
 $chromiumPath = [System.IO.Path]::GetFullPath($ChromiumSrc)
-$logoSource = $brand.LogoSource
-$themeRoot = Join-Path $chromiumPath 'chrome\app\theme\chromium'
-$brandingFile = Join-Path $themeRoot 'BRANDING'
-$windowsIcon = Join-Path $themeRoot 'win\chromium.ico'
-
-if (-not [System.IO.Path]::IsPathRooted($ChromiumSrc)) {
-    throw "Chromium src path must be absolute: $ChromiumSrc"
+if (-not [System.IO.Path]::IsPathRooted($ChromiumSrc) -or
+    -not (Test-Path -LiteralPath (Join-Path $chromiumPath 'chrome/app/theme/chromium/BRANDING') -PathType Leaf)) {
+    throw 'Expected an absolute Chromium source checkout.'
 }
-if (-not (Test-Path -LiteralPath $brandingFile -PathType Leaf)) {
-    throw "Not a Chromium src checkout: $chromiumPath"
+if (-not $brand.LogoAssetsManifest) { throw 'Set logo_assets_manifest and generate the brand package first.' }
+$packageRoot = Split-Path -Parent $brand.LogoAssetsManifest
+$manifest = Get-Content -LiteralPath $brand.LogoAssetsManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+$sourceHash = (Get-FileHash -LiteralPath $brand.LogoSource -Algorithm SHA256).Hash.ToLowerInvariant()
+$generatorHash = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'generate-brand-assets.py') -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($manifest.schema_version -ne 1) { throw 'Unsupported brand asset package schema.' }
+if ($manifest.product_name -cne $brand.Name -or $manifest.short_name -cne $brand.ShortName -or
+    $manifest.source_sha256 -ne $sourceHash -or $manifest.generator_sha256 -ne $generatorHash -or
+    @($manifest.palette.PSObject.Properties).Count -ne $brand.LogoPalette.Count) {
+    throw 'Brand asset package is stale; regenerate it on macOS with generate-brand-assets.py.'
 }
-if (-not (Test-Path -LiteralPath $logoSource -PathType Leaf)) {
-    throw "$($brand.Name) logo source is missing: $logoSource"
+foreach ($property in $manifest.palette.PSObject.Properties) {
+    if (-not $brand.LogoPalette.ContainsKey($property.Name) -or
+        $brand.LogoPalette[$property.Name] -cne $property.Value) {
+        throw 'Brand asset palette is stale; regenerate the package.'
+    }
 }
-if (-not (Test-Path -LiteralPath (Split-Path -Parent $windowsIcon) -PathType Container)) {
-    throw "Chromium Windows theme directory is missing: $(Split-Path -Parent $windowsIcon)"
+$catalog = Get-Content -LiteralPath (Join-Path $repoRoot 'build/overlay.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+function Get-ConfinedAssetPath {
+    param([string] $Root, [string] $Relative)
+    if ([string]::IsNullOrWhiteSpace($Relative) -or $Relative -match '[\\:*?\[\]\x00\r\n]' -or
+        [System.IO.Path]::IsPathRooted($Relative) -or
+        ($Relative.Split('/') | Where-Object { $_ -in @('', '.', '..') })) {
+        throw "Expected a literal relative asset path: $Relative"
+    }
+    $path = [System.IO.Path]::GetFullPath((Join-Path $Root $Relative))
+    $prefix = [System.IO.Path]::GetFullPath($Root) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $path.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Asset path escapes its root: $Relative"
+    }
+    $part = $path
+    while ($part -and $part -ne $Root) {
+        if (Test-Path -LiteralPath $part) {
+            if ($part -ne $path -and -not (Test-Path -LiteralPath $part -PathType Container)) {
+                throw "Asset destination parent is not a directory: $Relative"
+            }
+            if ((Get-Item -LiteralPath $part -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                throw "Asset path traverses a link: $Relative"
+            }
+        }
+        $part = Split-Path -Parent $part
+    }
+    return $path
 }
-
-try {
-    Add-Type -AssemblyName System.Drawing
-} catch {
-    throw "System.Drawing is required to generate Windows brand assets: $($_.Exception.Message)"
+$plan = @()
+$destinations = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+if (-not $manifest.files.Count) { throw 'Brand package contains no outputs.' }
+foreach ($entry in $manifest.files) {
+    $source = Get-ConfinedAssetPath -Root $packageRoot -Relative $entry.source
+    $destination = Get-ConfinedAssetPath -Root $chromiumPath -Relative $entry.destination
+    $owned = @($catalog.generated_roots | Where-Object {
+        $entry.destination -ceq $_ -or $entry.destination.StartsWith($_ + '/', [System.StringComparison]::Ordinal)
+    })
+    if (-not $owned.Count -or -not $destinations.Add($entry.destination)) {
+        throw "Unowned or duplicate asset destination: $($entry.destination)"
+    }
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.sha256) {
+        throw "Missing or modified package asset: $source"
+    }
+    if (Test-Path -LiteralPath $destination) {
+        if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) { throw "Asset destination is not a file: $destination" }
+        if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant() -ceq $entry.sha256) { continue }
+    }
+    $plan += [pscustomobject]@{ Source = $source; Destination = $destination }
 }
-
-function New-YeeMasterBitmap {
-    param([Parameter(Mandatory = $true)][string] $SourcePath)
-
-    $source = [System.Drawing.Image]::FromFile($SourcePath)
-    try {
-        $cropSize = [Math]::Min($brand.LogoCropSize, [Math]::Min($source.Width, $source.Height))
-        $sourceX = [Math]::Floor(($source.Width - $cropSize) / 2)
-        $sourceY = [Math]::Floor(($source.Height - $cropSize) / 2)
-        $master = New-Object System.Drawing.Bitmap 1024, 1024, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        $graphics = [System.Drawing.Graphics]::FromImage($master)
+if (-not $CheckOnly) {
+    foreach ($item in $plan) {
+        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $item.Destination)) | Out-Null
+        $temporary = $item.Destination + '.yee.tmp'
         try {
-            $graphics.Clear([System.Drawing.Color]::Transparent)
-            $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-            $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-            $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-            $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-            $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-            $sourceRectangle = New-Object System.Drawing.Rectangle $sourceX, $sourceY, $cropSize, $cropSize
-            $destinationRectangle = New-Object System.Drawing.Rectangle 0, 0, 1024, 1024
-            $graphics.DrawImage($source, $destinationRectangle, $sourceRectangle, [System.Drawing.GraphicsUnit]::Pixel)
+            Copy-Item -LiteralPath $item.Source -Destination $temporary -Force
+            Move-Item -LiteralPath $temporary -Destination $item.Destination -Force
         } finally {
-            $graphics.Dispose()
+            if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force }
         }
-        return $master
-    } finally {
-        $source.Dispose()
     }
 }
-
-function New-YeePngBytes {
-    param(
-        [Parameter(Mandatory = $true)][System.Drawing.Image] $Master,
-        [Parameter(Mandatory = $true)][int] $Size
-    )
-
-    $bitmap = New-Object System.Drawing.Bitmap $Size, $Size, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    try {
-        $graphics.Clear([System.Drawing.Color]::Transparent)
-        $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-        $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-        $graphics.DrawImage($Master, 0, 0, $Size, $Size)
-
-        $stream = New-Object System.IO.MemoryStream
-        try {
-            $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-            # Keep PowerShell's pipeline from enumerating the byte array. ICO
-            # assembly needs each rendered PNG to remain one byte[] value.
-            return ,$stream.ToArray()
-        } finally {
-            $stream.Dispose()
-        }
-    } finally {
-        $graphics.Dispose()
-        $bitmap.Dispose()
-    }
-}
-
-function Write-YeePng {
-    param(
-        [Parameter(Mandatory = $true)][System.Drawing.Image] $Master,
-        [Parameter(Mandatory = $true)][int] $Size,
-        [Parameter(Mandatory = $true)][string] $Destination
-    )
-
-    $bytes = New-YeePngBytes -Master $Master -Size $Size
-    [System.IO.File]::WriteAllBytes($Destination, $bytes)
-}
-
-function Write-YeeIcon {
-    param(
-        [Parameter(Mandatory = $true)][System.Drawing.Image] $Master,
-        [Parameter(Mandatory = $true)][int[]] $Sizes,
-        [Parameter(Mandatory = $true)][string] $Destination
-    )
-
-    $images = @()
-    foreach ($size in $Sizes) {
-        $images += ,(New-YeePngBytes -Master $Master -Size $size)
-    }
-
-    $temporaryIcon = "$Destination.yee.tmp"
-    $stream = [System.IO.File]::Open($temporaryIcon, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
-    $writer = New-Object System.IO.BinaryWriter $stream
-    try {
-        $writer.Write([uint16] 0)
-        $writer.Write([uint16] 1)
-        $writer.Write([uint16] $Sizes.Count)
-
-        $offset = 6 + (16 * $Sizes.Count)
-        for ($index = 0; $index -lt $Sizes.Count; $index++) {
-            $sizeByte = if ($Sizes[$index] -ge 256) { 0 } else { $Sizes[$index] }
-            $writer.Write([byte] $sizeByte)
-            $writer.Write([byte] $sizeByte)
-            $writer.Write([byte] 0)
-            $writer.Write([byte] 0)
-            $writer.Write([uint16] 1)
-            $writer.Write([uint16] 32)
-            $writer.Write([uint32] $images[$index].Length)
-            $writer.Write([uint32] $offset)
-            $offset += $images[$index].Length
-        }
-
-        foreach ($image in $images) {
-            $writer.Write($image)
-        }
-    } finally {
-        $writer.Dispose()
-        $stream.Dispose()
-    }
-
-    Move-Item -LiteralPath $temporaryIcon -Destination $Destination -Force
-}
-
-$master = New-YeeMasterBitmap -SourcePath $logoSource
-try {
-    if ($CheckOnly) {
-        $probe = New-YeePngBytes -Master $master -Size 16
-        if ($probe.Length -eq 0) {
-            throw "The $($brand.Name) logo could not be rendered."
-        }
-        Write-Host "$($brand.Name) Windows brand assets can be generated from $logoSource"
-        return
-    }
-
-    foreach ($size in @(16, 24, 48, 64, 128, 256)) {
-        Write-YeePng -Master $master -Size $size -Destination (Join-Path $themeRoot "product_logo_$size.png")
-    }
-    Write-YeeIcon -Master $master -Sizes @(16, 24, 32, 48, 64, 128, 256) -Destination $windowsIcon
-} finally {
-    $master.Dispose()
-}
-
-Write-Host "Installed $($brand.Name) Windows app icon and product logos in $chromiumPath"
+$action = if ($CheckOnly) { 'pending' } else { 'installed' }
+Write-Host "$($brand.Name) brand assets: $($manifest.files.Count) verified, $($plan.Count) $action"

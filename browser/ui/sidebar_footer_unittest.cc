@@ -11,14 +11,14 @@
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
-#include "base/time/time.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
-#include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node_data.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
@@ -49,59 +49,26 @@ gfx::Insets FooterSurfaceInsetsForTesting() {
       kSidebarMetrics.sidebar_footer_surface_horizontal_inset());
 }
 
-TEST(SidebarFooterPolicyTest, RootContainsOnlyApprovedDestinations) {
-  EXPECT_EQ(kSidebarFooterRootScreens[0], SidebarFooterScreen::kContext);
-  EXPECT_EQ(kSidebarFooterRootScreens[1], SidebarFooterScreen::kBrowserTools);
-  EXPECT_EQ(kSidebarFooterRootScreens[2], SidebarFooterScreen::kMemory);
-}
-
-TEST(SidebarFooterPolicyTest, DetailScreensReturnToRoot) {
-  EXPECT_EQ(ParentSidebarFooterScreen(SidebarFooterScreen::kContext),
-            SidebarFooterScreen::kRoot);
-  EXPECT_EQ(ParentSidebarFooterScreen(SidebarFooterScreen::kBrowserTools),
-            SidebarFooterScreen::kRoot);
-  EXPECT_EQ(ParentSidebarFooterScreen(SidebarFooterScreen::kMemory),
-            SidebarFooterScreen::kRoot);
-}
-
-TEST(SidebarFooterPolicyTest, BrowserToolsContainOnlyCuratedShortcuts) {
-  EXPECT_EQ(kSidebarFooterBrowserToolsActions[0],
-            SidebarFooterBrowserAction::kReopenClosedTab);
-  EXPECT_EQ(kSidebarFooterBrowserToolsActions[1],
-            SidebarFooterBrowserAction::kDownloads);
-  EXPECT_EQ(kSidebarFooterBrowserToolsActions[2],
-            SidebarFooterBrowserAction::kHistory);
-  EXPECT_EQ(kSidebarFooterBrowserToolsActions[3],
-            SidebarFooterBrowserAction::kTabsFromOtherDevices);
-  EXPECT_EQ(kSidebarFooterBrowserToolsActions[4],
-            SidebarFooterBrowserAction::kManageExtensions);
-}
-
 TEST(SidebarFooterPolicyTest, LocalFallbackDoesNotInventRemoteTenant) {
   const SidebarFooterModel model =
       CreateLocalSidebarFooterModel(u"Yongjun Kim");
 
   ASSERT_EQ(model.contexts.size(), 1u);
   EXPECT_EQ(model.selected_context_index, 0u);
-  EXPECT_EQ(model.contexts[0].tenant_name, u"Local");
-  EXPECT_EQ(model.contexts[0].workspace_name, u"Personal");
+  EXPECT_EQ(model.contexts[0].tenant_name,
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL));
+  EXPECT_TRUE(model.contexts[0].is_local_context);
+  EXPECT_EQ(model.contexts[0].workspace_name,
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_PERSONAL));
   EXPECT_EQ(model.contexts[0].account_name, u"Yongjun Kim");
   EXPECT_FALSE(model.contexts[0].account_name_is_placeholder);
   EXPECT_FALSE(model.memory_available);
-}
 
-TEST(SidebarFooterPolicyTest, EmptyAccountGetsExplicitLocalLabel) {
-  const SidebarFooterModel model = CreateLocalSidebarFooterModel({});
-
-  ASSERT_EQ(model.contexts.size(), 1u);
-  EXPECT_EQ(model.contexts[0].account_name, u"Local profile");
-  EXPECT_TRUE(model.contexts[0].account_name_is_placeholder);
-}
-
-TEST(SidebarFooterPolicyTest, HoverMotionMatchesNativeTabRow) {
-  EXPECT_EQ(base::Milliseconds(
-                kSidebarMetrics.sidebar_row_hover_animation_duration_ms),
-            TabView::kGlowHoverAnimationDuration);
+  const SidebarFooterModel empty_account = CreateLocalSidebarFooterModel({});
+  ASSERT_EQ(empty_account.contexts.size(), 1u);
+  EXPECT_EQ(empty_account.contexts[0].account_name,
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
+  EXPECT_TRUE(empty_account.contexts[0].account_name_is_placeholder);
 }
 
 class SidebarFooterViewTest : public ChromeViewsTestBase {
@@ -113,7 +80,14 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     footer_ = widget_->SetContentsView(CreateSidebarFooterView(
         CreateLocalSidebarFooterModel(u"Yongjun Kim"),
         SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
-        SidebarMemoryChangedCallback()));
+        SidebarMemoryChangedCallback(),
+        base::BindRepeating(
+            [](int* locks) {
+              ++*locks;
+              return base::ScopedClosureRunner(
+                  base::BindOnce([](int* locks) { --*locks; }, locks));
+            },
+            &popup_locks_)));
     widget_->Show();
   }
 
@@ -121,6 +95,8 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     CloseBubble();
     footer_ = nullptr;
     widget_.reset();
+    base::RunLoop().RunUntilIdle();
+    EXPECT_EQ(0, popup_locks_);
     ChromeViewsTestBase::TearDown();
   }
 
@@ -152,7 +128,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
 
   views::Widget* widget() { return widget_.get(); }
 
-  void ExpectFooterSurface(bool paint_background, bool paint_outline) {
+  void ExpectFooterSurface(bool paint_background) {
     EXPECT_EQ(paint_background, footer_->background() != nullptr);
     if (paint_background) {
       EXPECT_NE(0u, SkColorGetA(footer_->background()->color().ResolveToSkColor(
@@ -164,37 +140,41 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
 
     ASSERT_TRUE(footer_->GetBorder());
     EXPECT_EQ(FooterSurfaceInsetsForTesting(), footer_->GetInsets());
-    EXPECT_EQ(paint_outline, !footer_->GetBorder()->GetMinimumSize().IsEmpty());
-    if (paint_outline) {
-      EXPECT_NE(0u, SkColorGetA(footer_->GetBorder()->color().ResolveToSkColor(
-                        footer_->GetColorProvider())));
-    }
+    EXPECT_TRUE(footer_->GetBorder()->GetMinimumSize().IsEmpty());
   }
 
   raw_ptr<views::View> footer_ = nullptr;
+  int popup_locks_ = 0;
 
- private:
+private:
   std::unique_ptr<views::Widget> widget_;
 };
 
-TEST_F(SidebarFooterViewTest, BubbleTracksFooterWidthAndHasAccessibleTitle) {
+TEST_F(SidebarFooterViewTest, BubbleUsesContentWidthAndTracksAnchorPosition) {
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   EXPECT_EQ(menu->GetWidget()->ownership(),
             views::Widget::InitParams::CLIENT_OWNS_WIDGET);
-  ASSERT_EQ(menu->children().size(), 3u);
-  for (views::View* const row : menu->children()) {
+  ASSERT_EQ(menu->children().size(), 4u);
+  for (int id :
+       {kSidebarFooterRootContextViewId, kSidebarFooterRootBrowserToolsViewId,
+        kSidebarFooterRootMemoryViewId}) {
+    views::View* const row = menu->GetViewByID(id);
+    ASSERT_TRUE(row);
     EXPECT_EQ(row->GetPreferredSize().height(),
-              kSidebarMetrics.sidebar_footer_root_row_height);
+              kSidebarMetrics.sidebar_footer_menu_row_height);
     const std::optional<gfx::RRectF> highlight =
         views::HighlightPathGenerator::GetRoundRectForView(row);
     ASSERT_TRUE(highlight.has_value());
-    EXPECT_FLOAT_EQ(highlight->GetSimpleRadius(), 8.0f);
+    EXPECT_FLOAT_EQ(highlight->GetSimpleRadius(),
+                    kSidebarMetrics.sidebar_footer_menu_corner_radius);
   }
-  EXPECT_EQ(menu->GetPreferredSize().width(), footer_->width());
+  const int menu_width = menu->GetPreferredSize().width();
+  EXPECT_GE(menu_width, kSidebarMetrics.sidebar_footer_menu_min_width);
+  EXPECT_LE(menu_width, kSidebarMetrics.sidebar_footer_menu_max_width);
   EXPECT_EQ(menu->GetWidget()->widget_delegate()->GetAccessibleWindowTitle(),
-            u"Workspace and account menu");
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_MENU_TITLE));
   views::BubbleDialogDelegate* const bubble_delegate =
       menu->GetWidget()->widget_delegate()->AsBubbleDialogDelegate();
   ASSERT_TRUE(bubble_delegate);
@@ -202,11 +182,129 @@ TEST_F(SidebarFooterViewTest, BubbleTracksFooterWidthAndHasAccessibleTitle) {
   expected_anchor.Offset(0, -kSidebarMetrics.sidebar_footer_menu_gap);
   EXPECT_EQ(bubble_delegate->GetAnchorRect(), expected_anchor);
 
-  footer_->SetBoundsRect(gfx::Rect(0, 0, 300, footer_->height()));
-  EXPECT_EQ(menu->GetPreferredSize().width(), footer_->width());
+  for (int sidebar_width : {160, 300, 400}) {
+    footer_->SetBoundsRect(gfx::Rect(0, 0, sidebar_width, footer_->height()));
+    EXPECT_EQ(menu->GetPreferredSize().width(), menu_width);
+    expected_anchor = footer_->GetBoundsInScreen();
+    expected_anchor.Offset(0, -kSidebarMetrics.sidebar_footer_menu_gap);
+    EXPECT_EQ(bubble_delegate->GetAnchorRect(), expected_anchor);
+  }
 }
 
-TEST_F(SidebarFooterViewTest, StateHighlightSharesTheFooterCornerRadius) {
+TEST_F(SidebarFooterViewTest, CompactMenuKeepsActionTitlesVisible) {
+  footer_->SetBoundsRect(gfx::Rect(0, 0, 184, footer_->height()));
+  ui::AXNodeData trigger_data;
+  footer_->GetViewAccessibility().GetAccessibleNodeData(&trigger_data);
+  const std::u16string trigger_name =
+      trigger_data.GetString16Attribute(ax::mojom::StringAttribute::kName);
+  EXPECT_NE(trigger_name.find(u"Yongjun Kim"), std::u16string::npos);
+  EXPECT_EQ(trigger_name.find(u"Local ·"), std::u16string::npos);
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  EXPECT_GT(menu->GetPreferredSize().width(), footer_->width());
+  views::View* const tools =
+      menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
+  views::View* const memory = menu->GetViewByID(kSidebarFooterRootMemoryViewId);
+  ASSERT_TRUE(tools);
+  ASSERT_TRUE(memory);
+  EXPECT_EQ(tools->parent(), memory->parent());
+  EXPECT_EQ(tools->x(), memory->x());
+  EXPECT_LE(tools->bounds().bottom(), memory->y());
+  for (int id :
+       {kSidebarFooterRootBrowserToolsViewId, kSidebarFooterRootMemoryViewId}) {
+    auto* row = static_cast<HoverButton*>(menu->GetViewByID(id));
+    ASSERT_TRUE(row);
+    EXPECT_GT(row->title()->width(), 0);
+    EXPECT_GE(row->title()->width(), row->title()->GetPreferredSize().width());
+    ui::AXNodeData row_data;
+    row->GetViewAccessibility().GetAccessibleNodeData(&row_data);
+    EXPECT_EQ(row_data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+              row->title()->GetText());
+  }
+}
+
+TEST_F(SidebarFooterViewTest, PointerOpenDoesNotPaintASelectedCard) {
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  views::View* const initial_action =
+      menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
+  ASSERT_TRUE(initial_action);
+  EXPECT_FALSE(initial_action->background());
+  views::FocusRing* const focus_ring = views::FocusRing::Get(initial_action);
+  ASSERT_TRUE(focus_ring);
+  EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
+  auto* button = static_cast<views::Button*>(initial_action);
+  button->SetState(views::Button::STATE_HOVERED);
+  EXPECT_TRUE(initial_action->background());
+  button->SetState(views::Button::STATE_NORMAL);
+  EXPECT_FALSE(initial_action->background());
+}
+
+TEST_F(SidebarFooterViewTest, ArrowNavigationPreservesPopupWidth) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  const int width = menu->GetPreferredSize().width();
+  menu->GetViewByID(kSidebarFooterRootContextViewId)->RequestFocus();
+  ui::KeyEvent down(ui::EventType::kKeyPressed, ui::VKEY_DOWN, ui::EF_NONE);
+  EXPECT_TRUE(menu->OnKeyPressed(down));
+  views::View* const tools =
+      menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
+  ASSERT_TRUE(tools);
+  EXPECT_TRUE(tools->HasFocus());
+  ASSERT_TRUE(views::FocusRing::Get(tools));
+  EXPECT_TRUE(views::FocusRing::Get(tools)->ShouldPaintForTesting());
+  EXPECT_FALSE(tools->background());
+  EXPECT_TRUE(menu->OnKeyPressed(down));
+  views::View* const memory = menu->GetViewByID(kSidebarFooterRootMemoryViewId);
+  ASSERT_TRUE(memory);
+  EXPECT_TRUE(memory->HasFocus());
+  ui::KeyEvent up(ui::EventType::kKeyPressed, ui::VKEY_UP, ui::EF_NONE);
+  EXPECT_TRUE(menu->OnKeyPressed(up));
+  EXPECT_TRUE(tools->HasFocus());
+  ui::KeyEvent back(ui::EventType::kKeyPressed, ui::VKEY_LEFT, ui::EF_NONE);
+  for (int id :
+       {kSidebarFooterRootBrowserToolsViewId, kSidebarFooterRootContextViewId,
+        kSidebarFooterRootMemoryViewId}) {
+    SCOPED_TRACE(id);
+    Click(menu->GetViewByID(id));
+    EXPECT_EQ(menu->GetPreferredSize().width(), width);
+    EXPECT_TRUE(menu->OnKeyPressed(back));
+    EXPECT_TRUE(menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId));
+    EXPECT_EQ(menu->GetPreferredSize().width(), width);
+  }
+}
+
+TEST_F(SidebarFooterViewTest, LongNamesKeepThePopupBoundedAndAccessible) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  footer_ = nullptr;
+  auto model = CreateLocalSidebarFooterModel(std::u16string(120, u'a'));
+  model.contexts[0].workspace_name = std::u16string(160, u'W');
+  const std::u16string workspace_name = model.contexts[0].workspace_name;
+  footer_ = widget()->SetContentsView(CreateSidebarFooterView(
+      std::move(model), SidebarContextSelectedCallback(),
+      SidebarFooterBrowserActionCallback(), SidebarMemoryChangedCallback()));
+  footer_->SetBoundsRect(gfx::Rect(0, 0, 160, 50));
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  EXPECT_EQ(menu->GetPreferredSize().width(),
+            kSidebarMetrics.sidebar_footer_menu_max_width);
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+  ASSERT_EQ(menu->children().size(), 3u);
+  auto* const context = static_cast<HoverButton*>(menu->children()[2]);
+  EXPECT_GT(context->title()->width(), 0);
+  ui::AXNodeData data;
+  context->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_NE(data.GetString16Attribute(ax::mojom::StringAttribute::kName)
+                .find(workspace_name),
+            std::u16string::npos);
+}
+
+TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   const std::optional<gfx::RRectF> highlight =
       views::HighlightPathGenerator::GetRoundRectForView(footer_);
 
@@ -214,36 +312,31 @@ TEST_F(SidebarFooterViewTest, StateHighlightSharesTheFooterCornerRadius) {
   EXPECT_TRUE(highlight->HasRoundedCorners());
   EXPECT_FLOAT_EQ(highlight->GetSimpleRadius(),
                   kSidebarMetrics.sidebar_footer_corner_radius);
-}
-
-TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
-  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
-      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
-  auto* const button = static_cast<views::Button*>(footer_.get());
+  auto *const button = static_cast<views::Button *>(footer_.get());
   ASSERT_TRUE(footer_->GetColorProvider());
 
   button->SetState(views::Button::STATE_NORMAL);
-  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
+  ExpectFooterSurface(/*paint_background=*/false);
 
   button->SetState(views::Button::STATE_HOVERED);
-  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/false);
-  views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
+  ExpectFooterSurface(/*paint_background=*/true);
+  views::FocusRing *const focus_ring = views::FocusRing::Get(footer_);
   ASSERT_TRUE(focus_ring);
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
 
   button->SetState(views::Button::STATE_NORMAL);
-  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
+  ExpectFooterSurface(/*paint_background=*/false);
   footer_->RequestFocus();
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
-  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
+  ExpectFooterSurface(/*paint_background=*/false);
   footer_->GetFocusManager()->SetFocusedView(nullptr);
   footer_->RequestFocusWithReason(
       views::FocusManager::FocusChangeReason::kFocusTraversal);
-  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
+  ExpectFooterSurface(/*paint_background=*/true);
   EXPECT_EQ(focus_ring->GetColorId(), ui::kColorSysStateFocusRing);
   EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
 
-  views::InkDropHost* const ink_drop_host = views::InkDrop::Get(footer_);
+  views::InkDropHost *const ink_drop_host = views::InkDrop::Get(footer_);
   ASSERT_TRUE(ink_drop_host);
   std::unique_ptr<views::InkDrop> ink_drop = ink_drop_host->CreateInkDrop();
   ASSERT_TRUE(ink_drop);
@@ -252,7 +345,9 @@ TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
   EXPECT_FALSE(ink_drop->IsHighlightFadingInOrVisible());
 }
 
-TEST_F(SidebarFooterViewTest, IdentityHierarchyUsesOneTonalMark) {
+TEST_F(SidebarFooterViewTest, WorkspaceMarkAppearsOnlyInFooter) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   const auto* const footer_button =
       static_cast<const HoverButton*>(footer_.get());
   ASSERT_TRUE(footer_->GetColorProvider());
@@ -261,18 +356,26 @@ TEST_F(SidebarFooterViewTest, IdentityHierarchyUsesOneTonalMark) {
 
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
-  ASSERT_EQ(menu->children().size(), 3u);
+  ASSERT_EQ(menu->children().size(), 4u);
 
-  views::View* const context_mark =
-      menu->children()[0]->GetViewByID(kSidebarFooterWorkspaceMarkViewId);
-  ASSERT_TRUE(context_mark);
-  EXPECT_TRUE(context_mark->background());
-  for (size_t index : {1u, 2u}) {
-    views::View* const action_icon = menu->children()[index]->GetViewByID(
-        kSidebarFooterMenuActionIconViewId);
+  views::View* const footer_mark =
+      footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId);
+  ASSERT_TRUE(footer_mark);
+  views::View* const chevron =
+      footer_->GetViewByID(kSidebarFooterChevronViewId);
+  ASSERT_TRUE(chevron);
+  EXPECT_EQ(footer_, chevron->parent());
+  EXPECT_TRUE(footer_mark->background());
+  EXPECT_FALSE(menu->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
+  for (int id :
+       {kSidebarFooterRootBrowserToolsViewId, kSidebarFooterRootMemoryViewId}) {
+    views::View* const action_icon =
+        menu->GetViewByID(id)->GetViewByID(kSidebarFooterMenuActionIconViewId);
     ASSERT_TRUE(action_icon);
     EXPECT_FALSE(action_icon->background());
   }
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+  EXPECT_FALSE(menu->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
 }
 
 TEST_F(SidebarFooterViewTest, AccessibilityReportsPopupAndCurrentContext) {
@@ -292,21 +395,18 @@ TEST_F(SidebarFooterViewTest, AccessibilityReportsPopupAndCurrentContext) {
   EXPECT_TRUE(trigger_data.HasState(ax::mojom::State::kExpanded));
   EXPECT_FALSE(trigger_data.HasState(ax::mojom::State::kCollapsed));
 
-  Click(menu->children()[0]);
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
   ASSERT_EQ(menu->children().size(), 3u);
+  ui::AXNodeData back_data;
+  menu->children()[0]->GetViewAccessibility().GetAccessibleNodeData(&back_data);
+  EXPECT_EQ(
+      back_data.GetString16Attribute(ax::mojom::StringAttribute::kDescription),
+      l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_BACK));
   ui::AXNodeData context_data;
   menu->children()[2]->GetViewAccessibility().GetAccessibleNodeData(
       &context_data);
   EXPECT_TRUE(
       context_data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
-}
-
-TEST_F(SidebarFooterViewTest, TriggerUsesOnlyWorkspaceMarkAndDisclosure) {
-  EXPECT_TRUE(footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
-  views::View* const chevron =
-      footer_->GetViewByID(kSidebarFooterChevronViewId);
-  ASSERT_TRUE(chevron);
-  EXPECT_EQ(footer_, chevron->parent());
 }
 
 TEST_F(SidebarFooterViewTest, WorkspaceMarkPreservesSupplementaryCodePoints) {
@@ -328,9 +428,18 @@ TEST_F(SidebarFooterViewTest, WorkspaceMarkPreservesSupplementaryCodePoints) {
 
 TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
   ASSERT_TRUE(OpenBubble());
+  EXPECT_NE(
+      views::InkDropState::ACTIVATED,
+      views::InkDrop::Get(footer_)->GetInkDrop()->GetTargetInkDropState());
+  EXPECT_EQ(1, popup_locks_);
   Click(footer_);
+  // 닫기 콜백 이후에도 실제 Widget을 삭제할 때까지 잠금을 유지한다.
+  EXPECT_EQ(1, popup_locks_);
+  widget()->ThemeChanged();
   base::RunLoop().RunUntilIdle();
+  widget()->ThemeChanged();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_EQ(0, popup_locks_);
 }
 
 TEST_F(SidebarFooterViewTest,
@@ -352,10 +461,33 @@ TEST_F(SidebarFooterViewTest,
   footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
   focus_target->SetBoundsRect(gfx::Rect(0, 50, 240, 20));
 
-  views::View* const menu = OpenBubble();
+  views::FocusManager *const focus_manager = footer_->GetFocusManager();
+  ASSERT_TRUE(focus_manager);
+  // 현재 포커스와 비활성 창에 저장된 포커스 모두 닫힌 Footer를 복원하면 안
+  // 된다.
+  for (bool stored_only : {false, true}) {
+    SCOPED_TRACE(stored_only);
+    views::View *const menu = OpenBubble();
+    ASSERT_TRUE(menu);
+    focus_manager->SetFocusedViewWithReason(
+        footer_, views::FocusManager::FocusChangeReason::kFocusRestore);
+    if (stored_only) {
+      focus_manager->StoreFocusedView(/*clear_native_focus=*/false);
+    }
+    ASSERT_EQ(stored_only ? nullptr : footer_, focus_manager->GetFocusedView());
+    ASSERT_EQ(footer_, focus_manager->GetStoredFocusView());
+    menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+    base::RunLoop().RunUntilIdle();
+    EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+    EXPECT_FALSE(footer_->HasFocus());
+    EXPECT_EQ(nullptr, focus_manager->GetStoredFocusView());
+    EXPECT_FALSE(focus_manager->RestoreFocusedView());
+  }
+
+  views::View *const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
-  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
+  ExpectFooterSurface(/*paint_background=*/true);
   footer_->GetFocusManager()->SetFocusedViewWithReason(
       focus_target, views::FocusManager::FocusChangeReason::kDirectFocusChange);
   menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
@@ -364,11 +496,12 @@ TEST_F(SidebarFooterViewTest,
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_FALSE(footer_->HasFocus());
   EXPECT_TRUE(focus_target->HasFocus());
-  ExpectFooterSurface(/*paint_background=*/false, /*paint_outline=*/false);
+  EXPECT_EQ(focus_target, focus_manager->GetStoredFocusView());
+  ExpectFooterSurface(/*paint_background=*/false);
 }
 
 TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
-  views::View* const menu = OpenBubble();
+  views::View *const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   footer_->GetFocusManager()->SetFocusedView(nullptr);
@@ -381,47 +514,36 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
   ASSERT_TRUE(footer_->GetFocusManager());
   EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
             footer_->GetFocusManager()->focus_change_reason());
-  views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
+  views::FocusRing *const focus_ring = views::FocusRing::Get(footer_);
   ASSERT_TRUE(focus_ring);
   EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
-  ExpectFooterSurface(/*paint_background=*/true, /*paint_outline=*/true);
-}
-
-TEST_F(SidebarFooterViewTest, ThemeChangeAfterCloseHasNoDanglingBubble) {
-  ASSERT_TRUE(OpenBubble());
-
-  Click(footer_);
-  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
-
-  // The Browser Widget can receive a ThemeChanged notification in the same
-  // task that closes an anchored bubble and again after native teardown. Both
-  // paths must be safe and leave no observer owned by a detached delegate.
-  widget()->ThemeChanged();
-  base::RunLoop().RunUntilIdle();
-  widget()->ThemeChanged();
-
-  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  ExpectFooterSurface(/*paint_background=*/true);
 }
 
 TEST_F(SidebarFooterViewTest,
        ThemeChangeAfterNativeTeardownHasNoDanglingBubble) {
-  views::View* const menu = OpenBubble();
+  views::View *const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
 
-  // CloseNow bypasses the synchronous Close callback. FooterBubble's native
-  // teardown observer must still detach the anchor before GetWidget() becomes
-  // null.
+  // CloseNow는 정상 닫기 콜백을 건너뛰어도 anchor와 잠금을 정리해야 한다.
+  EXPECT_EQ(1, popup_locks_);
   menu->GetWidget()->CloseNow();
-  widget()->ThemeChanged();
-  base::RunLoop().RunUntilIdle();
-
+  EXPECT_EQ(0, popup_locks_);
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  widget()->ThemeChanged();
 
-  // Native teardown releases the client-owned wrapper as well as detaching
-  // the anchor, so the footer can immediately create and close a fresh menu.
-  ASSERT_TRUE(OpenBubble());
+  // 이전 팝업의 지연 삭제 전에 키보드로 다시 열어도 새 팝업은 유지한다.
+  ui::KeyEvent key(ui::EventType::kKeyReleased, ui::VKEY_RETURN, ui::EF_NONE);
+  views::test::ButtonTestApi(static_cast<views::Button*>(footer_))
+      .NotifyClick(key);
+  ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_EQ(1, popup_locks_);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_EQ(1, popup_locks_);
   CloseBubble();
+  EXPECT_EQ(0, popup_locks_);
   widget()->ThemeChanged();
 }
 
@@ -445,17 +567,21 @@ TEST_F(SidebarFooterViewTest, BrowserToolsDispatchOnlyCuratedActions) {
        ++index) {
     views::View* menu = OpenBubble();
     ASSERT_TRUE(menu);
-    ASSERT_EQ(menu->children().size(), 3u);
-    Click(menu->children()[1]);
-    ASSERT_EQ(menu->children().size(), 6u);
-    Click(menu->children()[index + 1]);
+    ASSERT_EQ(menu->children().size(), 4u);
+    Click(menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId));
+    ASSERT_EQ(menu->children().size(), 7u);
+    Click(menu->children()[index + 2]);
     base::RunLoop().RunUntilIdle();
     EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   }
 
-  EXPECT_EQ(received_actions, std::vector<SidebarFooterBrowserAction>(
-                                  kSidebarFooterBrowserToolsActions.begin(),
-                                  kSidebarFooterBrowserToolsActions.end()));
+  EXPECT_EQ(received_actions,
+            (std::vector<SidebarFooterBrowserAction>{
+                SidebarFooterBrowserAction::kReopenClosedTab,
+                SidebarFooterBrowserAction::kDownloads,
+                SidebarFooterBrowserAction::kHistory,
+                SidebarFooterBrowserAction::kTabsFromOtherDevices,
+                SidebarFooterBrowserAction::kManageExtensions}));
 }
 
 TEST_F(SidebarFooterViewTest, MemoryChangeLeavesTheViewThroughCallback) {
@@ -478,10 +604,9 @@ TEST_F(SidebarFooterViewTest, MemoryChangeLeavesTheViewThroughCallback) {
 
   views::View* menu = OpenBubble();
   ASSERT_TRUE(menu);
-  ASSERT_EQ(menu->children().size(), 3u);
-  Click(menu->children()[2]);
-  ASSERT_EQ(menu->children().size(), 3u);
-  Click(menu->children()[2]);
+  ASSERT_EQ(menu->children().size(), 4u);
+  Click(menu->GetViewByID(kSidebarFooterRootMemoryViewId));
+  Click(menu->GetViewByID(kSidebarFooterMemoryToggleViewId));
   EXPECT_TRUE(memory_enabled);
 }
 

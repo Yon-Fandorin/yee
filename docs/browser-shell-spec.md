@@ -209,7 +209,8 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   만들지 않는다.
 - Omnibox는 Rest에서 Browser Surface Header와 같은 resolved color를 사용하고
   상시 outline을 그리지 않는다. Hover에서만 해당 표면의 최대 대비색을 약 2%
-  혼합하며, 편집·키보드 focus는 suggestions가 열린 동안에도 유지되는 native focus
+  혼합한다. 사용자 테마는 hover에 6%, focus에 18%의 약한 색조를 더하되
+  주소줄 배경은 페이지 색을 유지하고 글자·포커스 대비를 보정한다. 편집·키보드 focus는 suggestions가 열린 동안에도 유지되는 native focus
   ring으로 구분한다. 주소·제목·중립 control은 고정 theme 색을 사용하지 않고 resolved
   surface에서 primary(읽기 대비), secondary(비텍스트 가시 대비), disabled 역할색을
   계산한다. 위험·보안·제품 상태의 의미 색은 이 중립 팔레트보다 우선한다.
@@ -222,7 +223,8 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   shadow로 표시한다.
 - Address suggestions의 중립 배경·텍스트·아이콘도 열리는 시점의 같은 resolved
   surface에서 계산한다. hover는 6%, 키보드 선택은 14% tint로 구분하고,
-  두 상태 모두 읽기 대비를 확보할 수 있는 tint 방향을 선택한다. 팝업 글자·아이콘은
+  두 상태 모두 읽기 대비를 확보할 수 있는 tint 방향을 선택한다. 사용자 테마색을
+  hover·선택에 각각 6%·10% 더하며 대비가 부족하면 중립 상태 쪽으로 보정한다. 팝업 글자·아이콘은
   기본·hover·선택 배경 모두에서 대비를 보장하는 공통 역할색을 사용한다.
   팝업의 위험·보안 상태색과 고대비 모드는 Chromium의
   native 팔레트를 유지한다. 자세한 계약은 아래 Address suggestions 절을 따른다.
@@ -263,6 +265,8 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 - Traffic lights: 왼쪽, Close → Minimize → Zoom
 - Traffic lights는 Sidebar Header의 Window Controls Safe Area에 두고 Shell
   Controls와 겹치지 않는다.
+- 접힌 Sidebar의 hover 패널은 Title Bar 아래6 DIP 간격에서 시작한다. 창 버튼은
+  패널 바깥에 남고 Create·Agent는 패널의 첫 줄에 표시한다.
 - Sidebar를 접은 Split에서도 첫 Pane Header의 탐색 컨트롤은 같은 native
   Window Controls Safe Area 뒤에서 시작한다. Pane Card 배경과 곡률은 창
   왼쪽 gutter까지 유지하고 컨트롤만 safe edge 안쪽으로 정렬한다.

@@ -5,17 +5,19 @@
 		icon,
 		title,
 		description,
+		variant = 'grouped',
 		children
 	}: {
-		icon: IconName;
+		icon?: IconName;
 		title: string;
 		description?: string;
+		variant?: 'grouped' | 'plain';
 		children?: Snippet;
 	} = $props();
 </script>
 
-<div class="settings-row">
-	<span class="row-icon"><Icon name={icon} /></span>
+<div class="settings-row" class:plain={variant === 'plain'}>
+	{#if icon}<span class="row-icon"><Icon name={icon} /></span>{/if}
 	<div class="row-label">
 		<strong>{title}</strong>
 		{#if description}<span>{description}</span>{/if}
@@ -31,6 +33,12 @@
 			gap: 12px;
 			min-height: 64px;
 			padding: 14px 16px;
+		}
+		.settings-row.plain {
+			min-height: 0;
+			padding: 18px 0;
+			gap: 28px;
+			border-bottom: 1px solid var(--border);
 		}
 		.row-icon {
 			display: grid;
@@ -56,11 +64,16 @@
 		.row-label > span {
 			color: var(--muted-foreground);
 			font-size: 12px;
+			line-height: 1.6;
 		}
 		@media (max-width: 540px) {
 			.settings-row {
 				padding: 13px 12px;
 				gap: 10px;
+			}
+			.settings-row.plain {
+				flex-wrap: wrap;
+				gap: 12px;
 			}
 		}
 	}

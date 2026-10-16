@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Icon from '#lib/components/Icon.svelte';
+	import BrandMark from '#lib/components/BrandMark.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import { nativeSettingsUrl, productName, t } from '#lib/i18n.ts';
@@ -9,7 +10,7 @@
 
 <aside class="navigation">
 	<a class="brand" href="/" aria-label={t('settingsHome')}
-		><span class="brand-mark"><Icon name="settings" size={17} /></span><span>{productName}</span></a
+		><span class="brand-mark"><BrandMark /></span><span>{productName}</span></a
 	>
 	<p class="nav-heading">{t('settingsTitle')}</p>
 	<nav aria-label={t('settingsTitle')}>

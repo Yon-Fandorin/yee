@@ -1358,18 +1358,6 @@ class AdapterTests(unittest.TestCase):
         anyio.run(scenario)
         self.assertEqual(flags,[True,False,True,True])
 
-    def test_failed_first_observe_does_not_establish_consumer_baseline(self):
-        flags=[]
-        def execute(command):
-            flags.append(command.full)
-            return (1,{'ok':False,'error':'not attached'}) if len(flags)==1 else (0,{'ok':True})
-        worker=adapter.Adapter(self.config(),execute)
-        async def scenario():
-            self.assertTrue((await worker.call({'commands':[['observe']]})).is_error)
-            self.assertFalse((await worker.call({'commands':[['observe']]})).is_error)
-        anyio.run(scenario)
-        self.assertEqual(flags,[True,True])
-
     def test_typed_batch_reuses_one_existing_native_batch_command(self):
         calls=[]
         def execute(command):

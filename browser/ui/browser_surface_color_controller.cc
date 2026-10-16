@@ -16,6 +16,7 @@
 #include "base/task/bind_post_task.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/theme_tint.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
@@ -654,8 +655,16 @@ void BrowserSurfaceColorController::PublishPresentation(
     ++popup_revision_;
   }
   presentation_ = ResolveBrowserSurfacePresentation(
-      *presented_color_, source_id_, revision_, popup_revision_);
+      *presented_color_, source_id_, revision_, popup_revision_,
+      ResolveThemeAccent(*web_contents()));
   presentation_changed_callbacks_.Notify();
+}
+
+void BrowserSurfaceColorController::OnColorProviderChanged() {
+  // 페이지 바탕이 같아도 단일·분할 Header와 열린 팝업에 현재 테마를 다시 반영한다.
+  if (presented_color_) {
+    PublishPresentation(/*popup_policy_changed=*/true);
+  }
 }
 
 void BrowserSurfaceColorController::CommitPageMetadataColorIfReady() {

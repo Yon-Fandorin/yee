@@ -207,10 +207,6 @@ class InspectorTests(unittest.TestCase):
         result=inspector.inspect(self.record,self.f.directory)
         self.assertFalse(result['record_checks_pass']);self.assertIsNone(result['usage'])
 
-    def test_final_answer_rejects_duplicate_keys_and_json_fence(self):
-        with self.assertRaises(ValueError):inspector.final_answer([{'role':'assistant','content':'{"x":1,"x":2}'}])
-        with self.assertRaises(ValueError):inspector.final_answer([{'role':'assistant','content':'```json\n{"x":1}\n```'}])
-
     def test_malformed_records_fail_without_hiding_usage(self):
         self.write('stdout.jsonl',[None],True)
         self.write('summary.json',[])

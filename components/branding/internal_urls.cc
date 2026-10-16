@@ -12,6 +12,22 @@ namespace yee::branding {
 namespace {
 constexpr char kWebUIScheme[] = "chrome";
 constexpr std::u16string_view kWebUIPrefix = u"chrome://";
+
+bool IsProductExtensionsRoute(const GURL& url) {
+  if (url.path() != "/") {
+    return false;
+  }
+  auto query = url.parsed_for_possibly_invalid_spec().query;
+  url::Component key;
+  url::Component value;
+  while (url::ExtractQueryKeyValue(url.spec(), &query, &key, &value)) {
+    const auto name = std::string_view(url.spec()).substr(key.begin, key.len);
+    if (name != "id" && name != "q") {
+      return false;
+    }
+  }
+  return true;
+}
 }  // namespace
 
 const char* InternalURLScheme() {
@@ -36,6 +52,8 @@ GURL CanonicalInternalURL(const GURL& url) {
     replacements.SetHostStr(kProductHistoryHost);
   } else if (url.host() == "bookmarks") {
     replacements.SetHostStr(kProductBookmarksHost);
+  } else if (url.host() == "extensions" && IsProductExtensionsRoute(url)) {
+    replacements.SetHostStr(kProductExtensionsHost);
   }
   return url.ReplaceComponents(replacements);
 }
@@ -43,7 +61,8 @@ GURL CanonicalInternalURL(const GURL& url) {
 GURL DisplayInternalURL(const GURL& url) {
   if (!url.is_valid() || !url.SchemeIs(kWebUIScheme) ||
       url.host() == "settings" || url.host() == "downloads" ||
-      url.host() == "history" || url.host() == "bookmarks") {
+      url.host() == "history" || url.host() == "bookmarks" ||
+      url.host() == "extensions") {
     return url;
   }
   GURL::Replacements replacements;
@@ -56,6 +75,8 @@ GURL DisplayInternalURL(const GURL& url) {
     replacements.SetHostStr("history");
   } else if (url.host() == kProductBookmarksHost) {
     replacements.SetHostStr("bookmarks");
+  } else if (url.host() == kProductExtensionsHost) {
+    replacements.SetHostStr("extensions");
   }
   return url.ReplaceComponents(replacements);
 }
@@ -74,6 +95,10 @@ GURL HistoryURL() {
 
 GURL BookmarksURL() {
   return GURL(std::string(kWebUIScheme) + "://" + kProductBookmarksHost + "/");
+}
+
+GURL ExtensionsURL() {
+  return GURL(std::string(kWebUIScheme) + "://" + kProductExtensionsHost + "/");
 }
 
 std::u16string DisplayInternalURLText(const GURL& url,

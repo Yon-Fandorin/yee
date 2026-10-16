@@ -12,8 +12,11 @@
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
+#include "base/i18n/rtl.h"
 #include "base/memory/raw_ptr.h"
 #include "base/notreached.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "cc/paint/paint_flags.h"
@@ -48,6 +51,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
+#include "ui/views/cascading_property.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/painter.h"
@@ -61,7 +65,15 @@ namespace {
 
 constexpr char kAgentStatusDemoSwitch[] = "yee-agent-status-demo";
 constexpr char kAgentStatusSwitch[] = "yee-agent-status";
-constexpr char kDisableYeeShellScaffoldSwitch[] = "disable-yee-shell-scaffold";
+
+class BrowserSurfaceControlColor : public views::CascadingProperty<SkColor> {
+ public:
+  explicit BrowserSurfaceControlColor(SkColor color) : color_(color) {}
+  SkColor GetValue(const views::View* view) const override { return color_; }
+
+ private:
+  const SkColor color_;
+};
 
 // Restore the pilot's original material strength while keeping both layers
 // theme-derived. Native tint at 38%/72% plus Yee's 22/255 surface tint yields
@@ -401,7 +413,7 @@ class YeeCombinedSurfaceOutlineView : public views::View {
 };
 
 class YeeSidePanelSurfaceView : public views::View {
- public:
+public:
   YeeSidePanelSurfaceView() {
     SetID(yee::kSidePanelSurfaceViewId);
     SetPaintToLayer();
@@ -414,6 +426,11 @@ class YeeSidePanelSurfaceView : public views::View {
   YeeSidePanelSurfaceView& operator=(const YeeSidePanelSurfaceView&) = delete;
   ~YeeSidePanelSurfaceView() override = default;
 
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    SchedulePaint();
+  }
+
   void OnPaint(gfx::Canvas* canvas) override {
     const gfx::Rect local_bounds = GetLocalBounds();
     if (local_bounds.IsEmpty()) {
@@ -423,7 +440,7 @@ class YeeSidePanelSurfaceView : public views::View {
     cc::PaintFlags fill;
     fill.setAntiAlias(true);
     fill.setStyle(cc::PaintFlags::kFill_Style);
-    fill.setColor(GetColorProvider()->GetColor(kColorToolbar));
+    fill.setColor(GetColorProvider()->GetColor(kColorSidePanelBackground));
     canvas->DrawRoundRect(gfx::RectF(local_bounds),
                           yee::kSidebarMetrics.content_corner_radius, fill);
     PaintBrowserSurfaceOutline(canvas, local_bounds,
@@ -587,13 +604,43 @@ class YeeShellToolbarButton : public ToolbarButton {
   ~YeeShellToolbarButton() override = default;
 };
 
+class SidebarCreateMenuModel : public ui::SimpleMenuModel {
+ public:
+  SidebarCreateMenuModel(Delegate* delegate,
+                         yee::SidebarPopupLockCallback acquire_popup_lock)
+      : SimpleMenuModel(delegate),
+        acquire_popup_lock_(std::move(acquire_popup_lock)) {}
+
+  void MenuWillShow() override {
+    if (acquire_popup_lock_) {
+      popup_lock_ = acquire_popup_lock_.Run();
+    }
+    SimpleMenuModel::MenuWillShow();
+  }
+
+  void MenuWillClose() override {
+    // 메뉴 명령은 닫기 통지 이후 실행될 수 있다. 이번 메뉴의 잠금만 다음
+    // 작업까지 보유하므로 곧바로 다시 열어도 새 잠금을 해제하지 않는다.
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::DoNothingWithBoundArgs(std::move(popup_lock_)));
+    SimpleMenuModel::MenuWillClose();
+  }
+
+ private:
+  yee::SidebarPopupLockCallback acquire_popup_lock_;
+  base::ScopedClosureRunner popup_lock_;
+};
+
 class YeeShellAddButton : public ui::SimpleMenuModel::Delegate,
                           public YeeShellToolbarButton {
  public:
-  explicit YeeShellAddButton(yee::ShellCreateCallback callback)
+  YeeShellAddButton(yee::ShellCreateCallback callback,
+                    yee::SidebarPopupLockCallback acquire_popup_lock)
       : YeeShellToolbarButton(base::BindRepeating(&YeeShellAddButton::OpenMenu,
                                                   base::Unretained(this)),
-                              std::make_unique<ui::SimpleMenuModel>(this)),
+                              std::make_unique<SidebarCreateMenuModel>(
+                                  this,
+                                  std::move(acquire_popup_lock))),
         callback_(std::move(callback)) {
     auto* const menu = static_cast<ui::SimpleMenuModel*>(menu_model());
     menu->AddItemWithIcon(
@@ -649,8 +696,9 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
   };
 
   explicit YeeAgentToolbarButton(PressedCallback callback)
-      : YeeShellToolbarButton(base::BindRepeating(&YeeAgentToolbarButton::Pressed,
-                                                 base::Unretained(this))),
+      : YeeShellToolbarButton(
+            base::BindRepeating(&YeeAgentToolbarButton::Pressed,
+                                base::Unretained(this))),
         fallback_callback_(std::move(callback)) {
     activity_subscription_ = yee::SubscribeBridgeActivity(base::BindRepeating(
         &YeeAgentToolbarButton::RefreshWait, base::Unretained(this)));
@@ -801,11 +849,14 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
 };
 
 class YeeSidebarHeaderActionsView : public views::View {
- public:
-  YeeSidebarHeaderActionsView(yee::ShellCreateCallback create_callback,
-                              views::Button::PressedCallback agent_callback) {
+public:
+  YeeSidebarHeaderActionsView(
+      yee::ShellCreateCallback create_callback,
+      views::Button::PressedCallback agent_callback,
+      yee::SidebarPopupLockCallback acquire_popup_lock) {
     SetID(yee::kSidebarHeaderActionsViewId);
-    auto add_button = yee::CreateShellAddButton(std::move(create_callback));
+    auto add_button = yee::CreateShellAddButton(std::move(create_callback),
+                                                std::move(acquire_popup_lock));
     add_button->SetVectorIcon(kAddIcon);
     add_button->SetID(yee::kSidebarHeaderCreateViewId);
     add_button_ = AddChildView(std::move(add_button));
@@ -814,28 +865,47 @@ class YeeSidebarHeaderActionsView : public views::View {
     agent_button->SetID(yee::kSidebarHeaderAgentViewId);
     agent_button_ = AddChildView(std::move(agent_button));
   }
-  YeeSidebarHeaderActionsView(const YeeSidebarHeaderActionsView&) = delete;
-  YeeSidebarHeaderActionsView& operator=(const YeeSidebarHeaderActionsView&) =
-      delete;
+  YeeSidebarHeaderActionsView(const YeeSidebarHeaderActionsView &) = delete;
+  YeeSidebarHeaderActionsView &
+  operator=(const YeeSidebarHeaderActionsView &) = delete;
   ~YeeSidebarHeaderActionsView() override = default;
 
-  void SetLeadingExclusion(int leading_exclusion) {
+  void SetLeadingExclusion(int leading_exclusion, int leading_offset,
+                           int top_inset) {
     leading_exclusion = std::max(0, leading_exclusion);
-    if (leading_exclusion_ == leading_exclusion) {
+    leading_offset = std::max(0, leading_offset);
+    top_inset = std::clamp(top_inset, 0, yee::kSidebarMetrics.titlebar_height);
+    if (leading_exclusion_ == leading_exclusion &&
+        leading_offset_ == leading_offset && top_inset_ == top_inset) {
       return;
     }
+    const bool preferred_size_changed =
+        leading_exclusion_ != leading_exclusion || top_inset_ != top_inset;
     leading_exclusion_ = leading_exclusion;
-    InvalidateLayout();
+    leading_offset_ = leading_offset;
+    top_inset_ = top_inset;
+    if (preferred_size_changed) {
+      PreferredSizeChanged();
+    } else {
+      InvalidateLayout();
+    }
   }
 
   void SetControlsVisible(bool visible) {
-    add_button_->SetVisible(visible);
-    agent_button_->SetVisible(visible);
+    if (controls_requested_visible_ == visible) {
+      return;
+    }
+    controls_requested_visible_ = visible;
+    if (!visible) {
+      add_button_->SetVisible(false);
+      agent_button_->SetVisible(false);
+    }
+    InvalidateLayout();
   }
 
   bool IsPositionInWindowCaption(const gfx::Point& point) const {
-    for (const ToolbarButton* button : {add_button_, agent_button_}) {
-      if (button && button->GetVisible() && button->bounds().Contains(point)) {
+    for (ToolbarButton* button : {add_button_, agent_button_}) {
+      if (button && button->GetVisible() && IsHitInView(button, point)) {
         return false;
       }
     }
@@ -846,45 +916,57 @@ class YeeSidebarHeaderActionsView : public views::View {
     const int control_size = yee::kSidebarMetrics.shell_control_size;
     const int control_margin =
         yee::kSidebarMetrics.shell_control_horizontal_margin;
-    int x =
-        std::max(leading_exclusion_,
-                 yee::kSidebarMetrics.sidebar_header_controls_leading_inset());
-    const int y = std::max(0, (height() - control_size) / 2);
+    const int minimum_x =
+        std::max(leading_exclusion_ - leading_offset_,
+                 yee::kSidebarMetrics.sidebar_header_controls_leading_inset()) +
+        control_margin;
+    const int stride = control_size + 2 * control_margin;
+    const int agent_x =
+        width() - yee::kSidebarMetrics.sidebar_header_controls_leading_inset() -
+        control_margin - control_size;
+    const int create_x = agent_x - stride;
+    const int y = std::clamp(
+        std::max(yee::kSidebarMetrics.sidebar_header_control_top_padding,
+                 yee::kSidebarMetrics.browser_surface_header_center_y() -
+                     top_inset_ - control_size / 2),
+        0, std::max(0, height() - control_size));
 
-    for (ToolbarButton* button : {add_button_, agent_button_}) {
-      x += control_margin;
-      const gfx::Rect leading_bounds(x, y, control_size, control_size);
-      button->SetBoundsRect(GetMirroredRect(leading_bounds));
-      x += control_size + control_margin;
+    add_button_->SetBounds(create_x, y, control_size, control_size);
+    agent_button_->SetBounds(agent_x, y, control_size, control_size);
+    const bool controls_fit =
+        create_x >= minimum_x &&
+        GetLocalBounds().Contains(add_button_->bounds()) &&
+        GetLocalBounds().Contains(agent_button_->bounds()) &&
+        agent_x >= add_button_->bounds().right() + 2 * control_margin;
+    // 좁아지는 패널에서 아이콘이 반쪽으로 잘려 나타나지 않게 한 묶음으로
+    // 표시한다.
+    for (ToolbarButton *button : {add_button_, agent_button_}) {
+      button->SetVisible(controls_requested_visible_ && controls_fit);
     }
   }
 
-  gfx::Size CalculatePreferredSize(const views::SizeBounds&) const override {
-    const int controls_width =
-        2 * (yee::kSidebarMetrics.shell_control_size +
-             2 * yee::kSidebarMetrics.shell_control_horizontal_margin);
-    return gfx::Size(
-        yee::kSidebarMetrics.sidebar_header_controls_leading_inset() +
-            controls_width,
-        yee::kSidebarMetrics.titlebar_height);
+  gfx::Size CalculatePreferredSize(const views::SizeBounds &) const override {
+    return gfx::Size(yee::GetSidebarHeaderMinimumWidth(leading_exclusion_),
+                     yee::kSidebarMetrics.titlebar_height - top_inset_);
   }
 
- private:
+private:
   raw_ptr<ToolbarButton> add_button_ = nullptr;
   raw_ptr<ToolbarButton> agent_button_ = nullptr;
   int leading_exclusion_ = 0;
+  int leading_offset_ = 0;
+  int top_inset_ = 0;
+  bool controls_requested_visible_ = true;
 };
 
-}  // namespace
+} // namespace
 
 namespace yee {
 
-SidebarItemColors ResolveSidebarItemColors(
-    const ui::ColorProvider& color_provider,
-    SidebarItemVisualState state,
-    double hover_progress,
-    bool frame_active,
-    bool persistent_surface) {
+SidebarItemColors
+ResolveSidebarItemColors(const ui::ColorProvider &color_provider,
+                         SidebarItemVisualState state, double hover_progress,
+                         bool frame_active, bool persistent_surface) {
   hover_progress = std::clamp(hover_progress, 0.0, 1.0);
 
   int fill_alpha =
@@ -912,14 +994,16 @@ SidebarItemColors ResolveSidebarItemColors(
       }
       break;
     case SidebarItemVisualState::kActive:
-      fill_alpha = kSidebarMetrics.favorites_cell_active_fill_alpha;
+      fill_alpha = persistent_surface
+                       ? kSidebarMetrics.favorites_cell_active_fill_alpha
+                       : kSidebarMetrics.sidebar_row_active_fill_alpha;
       stroke_alpha = kSidebarMetrics.favorites_cell_active_stroke_alpha;
       break;
     case SidebarItemVisualState::kDragging:
       fill_alpha = kSidebarMetrics.favorites_cell_drag_fill_alpha;
       stroke_alpha = kSidebarMetrics.favorites_cell_drag_stroke_alpha;
       break;
-  }
+    }
 
   if (!frame_active) {
     fill_alpha = static_cast<int>(std::lround(fill_alpha * 0.78));
@@ -981,11 +1065,6 @@ SidebarItemColors ResolveSidebarItemColors(
   };
 }
 
-bool IsShellEnabled() {
-  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
-      kDisableYeeShellScaffoldSwitch);
-}
-
 bool UsesExpandedSidebarPresentation() {
   return IsShellEnabled();
 }
@@ -1035,16 +1114,17 @@ BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
   };
 }
 
-SkColor ResolveBrowserSurfaceFocusStrokeColor(SkColor surface_color) {
+SkColor ResolveBrowserSurfaceFocusStrokeColor(
+    SkColor surface_color,
+    std::optional<SkColor> theme_accent) {
   surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  const SkColor dark_endpoint = SK_ColorBLACK;
-  const SkColor endpoint =
-      color_utils::GetContrastRatio(dark_endpoint, surface_color) >=
-              color_utils::kMinimumVisibleContrastRatio
-          ? dark_endpoint
-          : SK_ColorWHITE;
-  const SkColor preferred = color_utils::AlphaBlend(
+  const SkColor endpoint = color_utils::PickContrastingColor(
+      SK_ColorBLACK, SK_ColorWHITE, surface_color);
+  SkColor preferred = color_utils::AlphaBlend(
       endpoint, surface_color, kHeaderFocusStrokePreferredOpacity);
+  if (theme_accent) {
+    preferred = color_utils::AlphaBlend(*theme_accent, preferred, 0.18f);
+  }
   return color_utils::BlendForMinContrast(
              preferred, surface_color, endpoint,
              color_utils::kMinimumVisibleContrastRatio)
@@ -1056,6 +1136,17 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
     SkColor focus_stroke_color) {
   return std::make_unique<YeeOmniboxBackground>(background_color,
                                                 focus_stroke_color);
+}
+
+void SetBrowserSurfaceControlBackground(views::View& view,
+                                        std::optional<SkColor> surface) {
+  if (surface) {
+    views::SetCascadingProperty(
+        &view, views::kCascadingBackgroundColor,
+        std::make_unique<BrowserSurfaceControlColor>(*surface));
+  } else {
+    view.ClearProperty(views::kCascadingBackgroundColor);
+  }
 }
 
 SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic) {
@@ -1071,40 +1162,80 @@ BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
     SkColor surface,
     uint64_t source_id,
     uint64_t revision,
-    uint64_t popup_revision) {
+    uint64_t popup_revision,
+    std::optional<SkColor> theme_accent) {
   surface = SkColorSetA(surface, SK_AlphaOPAQUE);
   const BrowserSurfaceHeaderColors colors =
       ResolveBrowserSurfaceHeaderColors(surface);
   const SkColor endpoint = color_utils::GetColorWithMaxContrast(surface);
-  const SkColor text_endpoint = color_utils::PickContrastingColor(
-      SK_ColorBLACK, SK_ColorWHITE, surface);
+  const SkColor text_endpoint =
+      color_utils::PickContrastingColor(SK_ColorBLACK, SK_ColorWHITE, surface);
   SkColor tint_endpoint = endpoint;
   if (color_utils::GetContrastRatio(
           text_endpoint,
           color_utils::AlphaBlend(tint_endpoint, surface,
                                   kOmniboxPopupSelectedOpacity)) <
       color_utils::kMinimumReadableContrastRatio) {
-    tint_endpoint = text_endpoint == SK_ColorBLACK ? SK_ColorWHITE : SK_ColorBLACK;
+    tint_endpoint =
+        text_endpoint == SK_ColorBLACK ? SK_ColorWHITE : SK_ColorBLACK;
   }
-  const SkColor popup_hover = color_utils::AlphaBlend(
-      tint_endpoint, surface, kOmniboxPopupHoverOpacity);
-  const SkColor popup_selected = color_utils::AlphaBlend(
+  SkColor popup_hover = color_utils::AlphaBlend(tint_endpoint, surface,
+                                                kOmniboxPopupHoverOpacity);
+  SkColor popup_selected = color_utils::AlphaBlend(
       tint_endpoint, surface, kOmniboxPopupSelectedOpacity);
+  SkColor location_hover = color_utils::AlphaBlend(endpoint, surface, 0.02f);
+  if (theme_accent) {
+    const SkColor neutral_hover = popup_hover;
+    const SkColor neutral_selected = popup_selected;
+    location_hover =
+        color_utils::AlphaBlend(*theme_accent, location_hover, 0.06f);
+    popup_hover = color_utils::AlphaBlend(*theme_accent, popup_hover, 0.06f);
+    popup_selected =
+        color_utils::AlphaBlend(*theme_accent, popup_selected, 0.10f);
+    popup_hover = color_utils::BlendForMinContrast(
+                      popup_hover, text_endpoint, neutral_hover,
+                      color_utils::kMinimumReadableContrastRatio)
+                      .color;
+    popup_selected = color_utils::BlendForMinContrast(
+                         popup_selected, text_endpoint, neutral_selected,
+                         color_utils::kMinimumReadableContrastRatio)
+                         .color;
+  }
+  for (SkColor ink : {colors.primary, colors.secondary}) {
+    location_hover = color_utils::BlendForMinContrast(
+                         location_hover, ink, surface,
+                         color_utils::kMinimumReadableContrastRatio)
+                         .color;
+  }
+  // 편집 중에도 페이지 바탕을 유지하므로 focus 선과 선택 텍스트도 같은 바탕의
+  // 대비 계약을 따른다.
+  SkColor focus_stroke =
+      ResolveBrowserSurfaceFocusStrokeColor(surface, theme_accent);
+  for (SkColor background :
+       {surface, location_hover, popup_hover, popup_selected}) {
+    focus_stroke = color_utils::BlendForMinContrast(
+                       focus_stroke, background, text_endpoint,
+                       color_utils::kMinimumVisibleContrastRatio)
+                       .color;
+  }
+  const SkColor editor_selection_background = focus_stroke;
+  const SkColor editor_selection_foreground =
+      ResolveBrowserSurfaceHeaderColors(editor_selection_background).primary;
   // Protect the strongest state by adjusting popup ink, not by washing the
   // state fills out to white/black. Share this ink across popup rows and native
   // answer/chip children so moving selection never changes text polarity.
   auto selected_colors = colors;
   for (SkColor background : {popup_hover, popup_selected}) {
-    selected_colors.primary = color_utils::BlendForMinContrast(
-                                  selected_colors.primary, background,
-                                  text_endpoint,
-                                  color_utils::kMinimumReadableContrastRatio)
-                                  .color;
-    selected_colors.secondary = color_utils::BlendForMinContrast(
-                                    selected_colors.secondary, background,
-                                    text_endpoint,
-                                    color_utils::kMinimumReadableContrastRatio)
-                                    .color;
+    selected_colors.primary =
+        color_utils::BlendForMinContrast(
+            selected_colors.primary, background, text_endpoint,
+            color_utils::kMinimumReadableContrastRatio)
+            .color;
+    selected_colors.secondary =
+        color_utils::BlendForMinContrast(
+            selected_colors.secondary, background, text_endpoint,
+            color_utils::kMinimumReadableContrastRatio)
+            .color;
   }
   return {
       .palette_mode = BrowserSurfacePresentation::PaletteMode::kCustomSurface,
@@ -1115,8 +1246,10 @@ BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
       .primary = colors.primary,
       .secondary = colors.secondary,
       .disabled = colors.disabled,
-      .location_hover = color_utils::AlphaBlend(endpoint, surface, 0.02f),
-      .focus_stroke = ResolveBrowserSurfaceFocusStrokeColor(surface),
+      .location_hover = location_hover,
+      .focus_stroke = focus_stroke,
+      .editor_selection_background = editor_selection_background,
+      .editor_selection_foreground = editor_selection_foreground,
       .header_separator = ResolveSurfaceSeparatorColor(surface),
       .resting_divider =
           color_utils::AlphaBlend(endpoint, surface, kRestingSeparatorOpacity),
@@ -1151,13 +1284,16 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
       SkColorSetA(endpoint, 0x0F)};
   mixer[kColorOmniboxBubbleOutline] = {presentation.popup_outline};
+  mixer[kColorOmniboxResultsFocusIndicator] = {presentation.focus_stroke};
   mixer[kColorOmniboxResultsChipBackground] = {presentation.popup_hover};
 
   mixer[kColorOmniboxText] = {presentation.popup_selected_primary};
   mixer[kColorOmniboxTextDimmed] = {presentation.popup_selected_secondary};
-  mixer[kColorOmniboxResultsTextSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsTextSelected] = {
+      presentation.popup_selected_primary};
   mixer[kColorOmniboxResultsTextAnswer] = {presentation.popup_selected_primary};
-  mixer[kColorOmniboxResultsTextDimmed] = {presentation.popup_selected_secondary};
+  mixer[kColorOmniboxResultsTextDimmed] = {
+      presentation.popup_selected_secondary};
   mixer[kColorOmniboxResultsTextDimmedSelected] = {
       presentation.popup_selected_secondary};
   mixer[kColorOmniboxResultsTextSecondary] = {
@@ -1165,12 +1301,15 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   mixer[kColorOmniboxResultsTextSecondarySelected] = {
       presentation.popup_selected_secondary};
   mixer[kColorOmniboxResultsUrl] = {presentation.popup_selected_primary};
-  mixer[kColorOmniboxResultsUrlSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsUrlSelected] = {
+      presentation.popup_selected_primary};
   mixer[kColorOmniboxKeywordSelected] = {presentation.popup_selected_primary};
-  mixer[kColorOmniboxKeywordSeparator] = {presentation.popup_selected_secondary};
+  mixer[kColorOmniboxKeywordSeparator] = {
+      presentation.popup_selected_secondary};
 
   mixer[kColorOmniboxResultsIcon] = {presentation.popup_selected_primary};
-  mixer[kColorOmniboxResultsIconSelected] = {presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsIconSelected] = {
+      presentation.popup_selected_primary};
   mixer[kColorOmniboxResultsButtonIcon] = {presentation.popup_selected_primary};
   mixer[kColorOmniboxResultsButtonIconSelected] = {
       presentation.popup_selected_primary};
@@ -1297,8 +1436,7 @@ std::unique_ptr<views::View> CreateSplitPaneEmphasisView() {
   return std::make_unique<YeeSplitPaneEmphasisView>();
 }
 
-void UpdateSplitPaneEmphasisView(views::View& view,
-                                 bool visible,
+void UpdateSplitPaneEmphasisView(views::View &view, bool visible,
                                  bool emphasized) {
   CHECK_EQ(view.GetID(), kSplitPaneEmphasisViewId);
   static_cast<YeeSplitPaneEmphasisView&>(view).SetState(visible, emphasized);
@@ -1351,8 +1489,10 @@ std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
 }
 
 std::unique_ptr<ToolbarButton> CreateShellAddButton(
-    ShellCreateCallback callback) {
-  return std::make_unique<YeeShellAddButton>(std::move(callback));
+    ShellCreateCallback callback,
+    SidebarPopupLockCallback acquire_popup_lock) {
+  return std::make_unique<YeeShellAddButton>(std::move(callback),
+                                             std::move(acquire_popup_lock));
 }
 
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
@@ -1362,26 +1502,38 @@ std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
 
 std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
     ShellCreateCallback create_callback,
-    views::Button::PressedCallback agent_callback) {
+    views::Button::PressedCallback agent_callback,
+    SidebarPopupLockCallback acquire_popup_lock) {
   return std::make_unique<YeeSidebarHeaderActionsView>(
-      std::move(create_callback), std::move(agent_callback));
+      std::move(create_callback), std::move(agent_callback),
+      std::move(acquire_popup_lock));
 }
 
-void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
-                                             int leading_exclusion) {
-  static_cast<YeeSidebarHeaderActionsView&>(view).SetLeadingExclusion(
-      leading_exclusion);
+int GetSidebarHeaderMinimumWidth(int leading_exclusion) {
+  return std::max(leading_exclusion,
+                  kSidebarMetrics.sidebar_header_controls_leading_inset()) +
+         2 * (kSidebarMetrics.shell_control_size +
+              2 * kSidebarMetrics.shell_control_horizontal_margin) +
+         kSidebarMetrics.sidebar_header_controls_leading_inset();
 }
 
-void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible) {
-  auto& actions = static_cast<YeeSidebarHeaderActionsView&>(view);
+void SetSidebarHeaderActionsLeadingExclusion(views::View &view,
+                                             int leading_exclusion,
+                                             int leading_offset,
+                                             int top_inset) {
+  static_cast<YeeSidebarHeaderActionsView &>(view).SetLeadingExclusion(
+      leading_exclusion, leading_offset, top_inset);
+}
+
+void SetSidebarHeaderActionsControlsVisible(views::View &view, bool visible) {
+  auto &actions = static_cast<YeeSidebarHeaderActionsView &>(view);
   actions.SetControlsVisible(visible);
 }
 
-bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
-                                                   const gfx::Point& point) {
-  return static_cast<const YeeSidebarHeaderActionsView&>(view)
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View &view,
+                                                   const gfx::Point &point) {
+  return static_cast<const YeeSidebarHeaderActionsView &>(view)
       .IsPositionInWindowCaption(point);
 }
 
-}  // namespace yee
+} // namespace yee

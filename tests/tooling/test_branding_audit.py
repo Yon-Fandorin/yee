@@ -128,11 +128,38 @@ class BrandingAuditTest(unittest.TestCase):
         text = '// Yee comment\nconst char* path = "chrome/browser/Yee/header.h";\n'
         text += 'LOG(INFO) << "Yee internal diagnostic";\n'
         text += 'SetText(u"YEE Agent needs input");\nSetText("yee:// displayed literal");\n'
+        text += 'SetTooltipText(u"Yee site controls");\n'
+        identifiers = (
+            '"yee.content_blocking.disabled_sites"',
+            '"yee.content_blocking.blocked_domains"',
+            '"chrome://yee-content-blocking"',
+            '"data-yee-cb-"',
+            '"yee-settings"',
+            '"yee-downloads"',
+            '"yee-history"',
+            '"yee-bookmarks"',
+            '"yee-extensions"',
+            '"yee-baseline-list-dir"',
+            '"yee-baseline-list-generation"',
+            '"yee-baseline-list-handle"',
+            '"yee-community-filter-dir"',
+            '"yee-content-blocking-test-rules"',
+        )
+        text += ''.join(f'const char* identifier_{index} = {literal};\n'
+                        for index, literal in enumerate(identifiers))
+        text += ('constexpr auto annotation =\n'
+                 '    net::DefineNetworkTrafficAnnotation("fixture_annotation", R"(\n'
+                 '      semantics { sender: "Yee content blocking" }\n'
+                 '      policy { setting: "Runs with Yee content blocking enabled." }\n'
+                 '    )");\n'
+                 'SetText(R"(Yee displayed raw literal)");\n')
         hits, ignored = auditor.scan_cpp_text(text, "fixture.cc")
         self.assertEqual([hit["category"] for hit in hits],
-                         ["developer_message", "display_candidate", "display_candidate"])
-        self.assertEqual(hits[-1]["line"], 5)
-        self.assertEqual(ignored, {"comments": 1, "internal_identifier": 1})
+                         ["developer_message", "display_candidate", "display_candidate",
+                          "display_candidate", "developer_message", "display_candidate"])
+        self.assertEqual(hits[2]["line"], 5)
+        self.assertEqual(hits[3]["literal"], 'u"Yee site controls"')
+        self.assertEqual(ignored, {"comments": 1, "internal_identifier": 1 + len(identifiers)})
 
     def test_patch_context_does_not_count_existing_literal_as_new(self):
         patch = self.repo / "patches/0001-integrate-yee-shell.patch"
@@ -159,7 +186,7 @@ class BrandingAuditTest(unittest.TestCase):
                 self.assertFalse(report["complete"])
 
     def test_cli_default_and_strict_are_read_only_and_never_claim_completion(self):
-        for filename in ("audit-branding.py", "brand_config.py"):
+        for filename in ("audit-branding.py", "brand_config.py", "brand_strings.py"):
             shutil.copy(OVERLAY / filename, self.overlay / filename)
         before = self.snapshot()
         command = [sys.executable, "-B", str(self.overlay / "audit-branding.py"), str(self.src), "--json"]

@@ -1,0 +1,45 @@
+{
+  "name": "Yee 이음매듭 발전안",
+  "viewBox": "0 0 128 128",
+  "fill": "currentColor",
+  "variants": [
+    {
+      "id": "01",
+      "file": "yee-ieum-knot-01-refined.svg",
+      "basis": "../final/yee-ieum-knot-01.svg",
+      "status": "candidate"
+    },
+    {
+      "id": "02",
+      "file": "yee-ieum-knot-02-refined.svg",
+      "basis": "../final/yee-ieum-knot-02.svg",
+      "status": "selected_product_geometry"
+    }
+  ],
+  "colour_candidates": [
+    {
+      "id": "04",
+      "status": "current",
+      "palette": {
+        "primary": "#242824",
+        "secondary": "#438578",
+        "dark_primary": "#F5F6F2",
+        "dark_secondary": "#8BC4B3",
+        "background": "#F7F9F5",
+        "dark_background": "#202724"
+      }
+    },
+    {
+      "id": "05",
+      "status": "candidate",
+      "palette": {
+        "primary": "#B84A3A",
+        "secondary": "#438578",
+        "dark_primary": "#DD8B78",
+        "dark_secondary": "#8BC4B3",
+        "background": "#F7F9F5",
+        "dark_background": "#202724"
+      }
+    }
+  ]
+}

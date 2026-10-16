@@ -30,9 +30,10 @@ Favorites에도 `FAVORITES` 라벨을 두지 않는다. 아이콘 독이 곧 그
 Favorites와 Tab 목록 사이에 1px 구분선을 두지 않는다. 독 칸의 dimmed 카드가
 영역을 나눈다.
 
-Title Bar의 New Tab과 Agent Control은 Sidebar Header에 남기되 Sidebar 본문 안에
-다시 두지 않는다. 펼친 Sidebar에서는 두 컨트롤을 하나의 묶음으로 취급해 플랫폼
-창 버튼 다음에 불필요한 왼쪽 여백 없이 정렬한다. Sidebar Toggle은 Browser
+New Tab과 Agent Control은 Sidebar Header가 소유하며 Sidebar 본문에 중복으로
+두지 않는다. 고정 Sidebar에서는 두 컨트롤을 창 버튼과 같은 높이에 두고,
+hover 패널에서는 툴바 아래의 패널 첫 줄에 둔다. 두 컨트롤은 오른쪽 조작 열에서
+하나의 묶음으로 정렬한다. Sidebar Toggle은 Browser
 Surface Header의 첫 컨트롤로 옮긴다. 이 묶음은 `ToolbarView`가 아니라 Sidebar
 Header가 한 번만 소유한다. 따라서 분할 상태에서 공용 Toolbar가 사라지고 native
 Omnibox가 active Pane Header로 이동해도 New Tab과 Agent는 펼친 Sidebar에 그대로
@@ -49,9 +50,20 @@ Omnibox가 active Pane Header로 이동해도 New Tab과 Agent는 펼친 Sidebar
 접힌 8 DIP는 Chromium 기본 56 DIP 아이콘 레일이 아니다. 펼쳐 고정했거나
 hover로 드러난 동안에는 펼친 표현 계약을 쓴다 (`UsesExpandedSidebarPresentation`).
 
-Sidebar Flyout은 페이지 위에 뜨는 유리 면이다. 페이지 폭을 바꾸지 않는다.
-가장자리에서 안쪽으로 떠서 네 모서리가 둥글고, Browser Content 프레임보다
-큰 반지름을 쓴다. Edge Rail과 플라이아웃은 하나의 hover 대상이다.
+Sidebar Flyout은 페이지 위에 뜨는 독립 패널이다. 페이지 폭을 바꾸지 않는다.
+창 버튼이 있는 48 DIP Title Bar 아래에서 6 DIP 떨어져 시작한다. 왼쪽·아래는
+12 DIP 안쪽으로 떠서 네 모서리에 Browser Content와 같은 12 DIP 반지름을 쓴다.
+접힌 Edge Rail도 Title Bar 아래에서 시작하며 창 버튼 영역은 hover 대상에서 제외한다.
+전체 화면에서 Toolbar가 숨겨지면 상단 외곽도 12 DIP를 사용한다.
+Edge Rail과 플라이아웃 사이의 이동 통로는 하나의 hover 대상이다.
+목록의 행 높이·아이콘·좌우 inset과 Header·Footer는 고정 Sidebar와 같다.
+임시 패널은 배경 흐림 없이 불투명한 native 바탕에 프레임색을 은은하게 남긴다.
+native 모서리를 따라 이어지는 한 겹의 가는 중성색 윤곽과 부드러운 그림자로 고정
+Sidebar보다 위에 뜬 면을 구분한다. 윤곽은 native 중성 Outline 색을 사용해 밝고 어두운
+배경을 따른다. 고정과 hover는 같은 글자 역할을 쓰고 대비를 유지한다.
+Header의 Create 메뉴와 Footer 팝업을 조작하는 동안에는 현재 펼침 상태를 유지한다.
+팝업이 닫히면 원래 hover·포커스 조건으로 돌아간다. hover에서 고정으로 전환하거나
+도중에 접힘으로 되돌려도 폭과 불투명도가 중간 프레임에서 갑자기 바뀌지 않는다.
 
 ## 스펙과 native
 
@@ -85,12 +97,21 @@ constant에 다시 적지 않는다.
 - Expanded Sidebar의 Tab ScrollView는 마지막 행에서 끝나지 않고 남은 세로
   공간 전체를 채운다. 마지막 Tab 아래의 빈 공간도 목록 끝 드롭 타깃이다.
 - Tab 행 32, 행 간격 2, 아이콘 16, Group 헤더 높이도 32
+- Tab 행 곡률은 6 DIP이고, 평평한 선택 면은 지속 Favorite 카드보다 옅게 표시한다.
+  Header의 Create·Agent는 오른쪽에 한 묶음으로 두며 Agent·Tab 닫기·Footer
+  disclosure의 중심은 같은 열이다. Footer와 Tab 제목의 시작 열도 같다.
+- hover 패널은 상단 54 DIP, 가로·하단 12 DIP 외곽을 쓴다. 본문 카드는 원래
+  윤곽과 그림자를 유지하고 불투명 패널이 더 높은 native layer에서 겹친 부분을
+  가린다. 접힌 8 DIP 가장자리 target도 Title Bar 아래에 둔다. Header는42 DIP로
+  줄여 Create·Agent를 패널 안에서 위아래6 DIP 간격으로 배치한다. 첫 Tab과
+  조작의 화면 기준 높이는 고정 상태보다48 DIP 내려간다. 고정/hover 두 전환
+  트랙에서 위치와 높이를 연속 계산하고 창 버튼 영역까지 hit target을 넓히지 않는다.
 - Favorites 칸 최소 32, 상하 padding 8, 칸 간격 8, 독 좌우 inset 8 / 상단
   inset 0. Favorite 독은 Sidebar Header 바로 아래에서 시작하고 Favorite이 없는
   평상시 Tab 목록만 상단 8 DIP 여백을 유지한다. Favorite과 Tab 행의 좌우
   정렬선은 같다.
 - Footer 지속 행은 50 DIP이고 Sidebar 좌우 inset 8을 공유한다. Tab ScrollView는
-  Footer 위까지의 남은 공간을 채우며 Footer를 덮지 않는다.
+  Footer 위까지의 남은 공간을 채우며 Footer를 덮지 않는다. 계정 표식은 20 DIP다.
 - Sidebar 분할바는 10 DIP resize target과 4 × 24 DIP 손잡이를 사용한다.
   손잡이는 Tab 행의 실제 trailing 경계와 Browser Surface 사이에 중앙 정렬한다.
   Tab 행 inset 8 DIP와 Content Gutter 6 DIP를 포함해 양옆 간격은 각각 5 DIP다.

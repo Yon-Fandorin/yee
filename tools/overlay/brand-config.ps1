@@ -7,7 +7,7 @@ function Get-YeeBrandConfig {
     $repoRoot = $script:ProductBrandRepoRoot
     $config = Get-Content -LiteralPath $script:ProductBrandConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($property in $config.PSObject.Properties.Name) {
-        if ($property -notin @('name', 'short_name', 'logo_source', 'logo_crop_size', 'provisional', 'internal_url_scheme')) {
+        if ($property -notin @('name', 'short_name', 'logo_source', 'logo_crop_size', 'provisional', 'internal_url_scheme', 'logo_assets_manifest', 'logo_palette', 'strings_policy')) {
             throw "brand.json contains an unknown field: $property"
         }
     }
@@ -42,15 +42,54 @@ function Get-YeeBrandConfig {
         (-not $SkipAssetValidation -and -not (Test-Path -LiteralPath $logoSource -PathType Leaf))) {
         throw 'logo_source must identify a file inside the repository.'
     }
-    if ($config.logo_crop_size -isnot [int] -and $config.logo_crop_size -isnot [long]) {
+    $cropSize = if ($config.PSObject.Properties['logo_crop_size']) { $config.logo_crop_size } else { 1024 }
+    if ($cropSize -isnot [int] -and $cropSize -isnot [long]) {
         throw 'logo_crop_size must be a positive integer.'
     }
-    if ($config.logo_crop_size -le 0) { throw 'logo_crop_size must be a positive integer.' }
+    if ($cropSize -le 0) { throw 'logo_crop_size must be a positive integer.' }
+    $assetsManifest = $null
+    if ($config.PSObject.Properties['logo_assets_manifest']) {
+        $value = $config.logo_assets_manifest
+        if ($value -isnot [string] -or [string]::IsNullOrWhiteSpace($value) -or [System.IO.Path]::IsPathRooted($value)) {
+            throw 'logo_assets_manifest must be a repository-relative file path.'
+        }
+        $assetsManifest = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $value))
+        if (-not $assetsManifest.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+            (-not $SkipAssetValidation -and -not (Test-Path -LiteralPath $assetsManifest -PathType Leaf))) {
+            throw 'logo_assets_manifest must identify a file inside the repository.'
+        }
+    }
+    $palette = @{}
+    if ($config.PSObject.Properties['logo_palette']) {
+        if ($config.logo_palette -isnot [pscustomobject]) { throw 'logo_palette must be a colour object.' }
+        foreach ($property in $config.logo_palette.PSObject.Properties) {
+            if ($property.Name -notin @('primary', 'secondary', 'dark_primary', 'dark_secondary', 'background', 'dark_background') -or
+                $property.Value -isnot [string] -or $property.Value -cnotmatch '^#[0-9A-Fa-f]{6}$') {
+                throw 'logo_palette must contain named six-digit hexadecimal colours.'
+            }
+            $palette[$property.Name] = $property.Value
+        }
+    }
+    $stringsPolicy = $null
+    if ($config.PSObject.Properties['strings_policy']) {
+        $value = $config.strings_policy
+        if ($value -isnot [string] -or [string]::IsNullOrWhiteSpace($value) -or [System.IO.Path]::IsPathRooted($value)) {
+            throw 'strings_policy must be a repository-relative file path.'
+        }
+        $stringsPolicy = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $value))
+        if (-not $stringsPolicy.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $stringsPolicy -PathType Leaf)) {
+            throw 'strings_policy must identify a file inside the repository.'
+        }
+    }
     return [pscustomobject]@{
         Name = $config.name
         ShortName = $shortName
         LogoSource = $logoSource
-        LogoCropSize = $config.logo_crop_size
+        LogoCropSize = $cropSize
+        LogoAssetsManifest = $assetsManifest
+        LogoPalette = $palette
+        StringsPolicy = $stringsPolicy
         Provisional = $provisional
         InternalUrlScheme = $scheme
     }

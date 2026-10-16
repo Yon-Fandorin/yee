@@ -1,5 +1,9 @@
 # 내부 페이지
 
+[전체 주소 목록](internal-pages-inventory.md)은 등록된 WebUI와 설정 세부 경로를,
+[리디자인 후보](internal-pages-redesign.md)는 사용자 화면의 이관 우선순위를 정리한다.
+이 문서는 구현한 화면의 주소·소유 경계·동작을 설명한다.
+
 ## 주소
 
 | 사용자 주소 | 실제 WebUI | 원래 화면 |
@@ -8,13 +12,17 @@
 | `브랜드://downloads` | `chrome://yee-downloads/` | `chrome://downloads/` |
 | `브랜드://history` | `chrome://yee-history/` | `chrome://history/` |
 | `브랜드://bookmarks` | `chrome://yee-bookmarks/` | `chrome://bookmarks/` |
+| `브랜드://extensions` | `chrome://yee-extensions/` | `chrome://extensions/` |
 
 브랜드 접두어는 `branding/brand.json`에서 생성한다. 실제 WebUI host와 저장 주소는
 브랜드 변경에도 유지한다. 원래 Chromium 주소는 원래 화면을 열며 주소창 표시와
-복사도 `chrome://`를 유지한다. 일반 설정·다운로드·방문 기록·북마크 메뉴는 제품
+복사도 `chrome://`를 유지한다. 일반 설정·다운로드·방문 기록·북마크·확장 관리 메뉴는 제품
 화면을 연다. 다른 기기의 탭 등 방문 기록의 세부 경로는 원래 Chromium 화면을
 연다. `브랜드://history/syncedTabs`도 `chrome://history/syncedTabs`로 연결한다.
 설정의 세부 기능은 [설정 문서](settings.md)를 따른다.
+
+확장 관리의 제품 주소는 루트의 `?id=`·`?q=`를 사용한다. 단축키·개발자 진단·
+확장 옵션 등 다른 경로와 쿼리는 원래 Chromium 화면으로 연결한다.
 
 ## 공통 프런트엔드
 
@@ -28,6 +36,10 @@
 지우기를 공유한다. 목록·폴더·삭제 범위와 native 연결은 기능 route가 소유한다.
 버튼·체크박스·툴팁·메뉴·확인창·편집창·선택 입력은 공통 UI 컴포넌트를 사용한다.
 외부 폰트·이미지·CDN은 사용하지 않는다.
+
+목록·상세 화면 안의 이동은 SvelteKit의 shallow navigation을 사용한다.
+현재 주소는 공통 `currentPageURL()`이 `page.shallow.url`과 `page.url`에서
+읽는다. 검색어·선택 항목과 브라우저 뒤로·앞으로 이동은 이 주소를 따른다.
 
 ## 다운로드
 
@@ -90,6 +102,27 @@ WebUI를 추가하고 타입 선언은 Chromium 소유 파일에서 빌드 시 �
 페이지가 닫히면 event 구독과 타이머를 정리한다. 페이지 안의 폴더 탐색은
 브라우저 Tab Sidebar의 예약된 북마크 영역을 활성화하지 않는다.
 
+## 확장 프로그램
+
+`browser/ui/extensions/`는 Chromium `ExtensionsUI`를 상속하고 기존
+`chrome.developerPrivate`·`chrome.management` API를 사용한다. 설치 목록·
+검색·사용 여부·상세 정보·사이트 접근·시크릿과 파일 접근 설정을 제공한다.
+정책·보안 경고·변경 가능 여부는 native 응답을 따르며 별도 저장소를 만들지 않는다.
+
+변경 알림은 하나의 상태 조회 흐름에 모은다. 조회 도중 새 알림이 오면 이전
+응답을 버리고 최신 응답을 받은 뒤 조작을 다시 허용한다. 상세 화면은 확장 ID로
+구분해 이전 확장 프로그램의 입력창이 다른 항목에 재사용되지 않도록 한다.
+페이지가 닫히면 알림 구독과 예약된 조회를 정리한다.
+
+전체 사이트 요청은 클릭·특정 사이트·전체 사이트 모드와 허용 사이트 목록으로,
+유한한 사이트 요청은 전체 허용 스위치와 개별 사이트 스위치로 표시한다.
+전체 허용 중에는 개별 스위치를 변경할 수 없다. 향상된 사이트 제어가 활성화된
+빌드는 프로필 전체의 사이트 제한과 함께 처리하는 원래 관리 화면으로 연결한다.
+
+삭제·재활성화와 확장 옵션은 기존 native API와 확인 절차를 사용한다.
+단축키·개발자 기능·오류·복구는 원래 확장 관리 화면에서 처리한다. 게스트 제한을
+유지하며 시크릿에서 확장 관리를 열면 원래 화면과 같이 일반 프로필로 이동한다.
+
 ## 검증
 
 `InternalURLsTest`는 제품·원래 주소의 구분과 경로·쿼리·fragment 보존을 검사한다.
@@ -99,6 +132,9 @@ WebUI를 추가하고 타입 선언은 Chromium 소유 파일에서 빌드 시 �
 사용한 검색·추가 조회·동일 날짜 방문 삭제·native 삭제 정책을 검사한다.
 `BookmarksBrowserTest`는 실제 bookmark model을 사용한 편집·이동·삭제·실행
 취소·native 주소 복원·관리되는 노드와 실시간 편집 정책을 검사한다.
+`ExtensionsBrowserTest`는 실제 extension service로 목록·검색·상태 변경·
+상세 주소 이동·사이트 권한·삭제 확인·관리 정책·게스트 제한과 기존 private API
+동작을 검사한다.
 
 `./tools/dev/test-internal-pages.sh`는 자동 기능 검사를 기본적으로 창 없이
 실행한다. `--no-build`는 이미 빌드한 테스트 바이너리를 사용한다. 창이 필요한

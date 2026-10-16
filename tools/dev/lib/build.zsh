@@ -2,6 +2,7 @@
 
 sync_yee_branding() {
   "$YEE_ROOT/tools/overlay/install-branding.sh" "$CHROMIUM_SRC"
+  "$YEE_ROOT/tools/overlay/install-brand-assets.sh" "$CHROMIUM_SRC"
 }
 
 sync_yee_ui_sources() {

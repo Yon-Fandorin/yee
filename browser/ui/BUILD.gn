@@ -6,6 +6,66 @@ assert(is_win || is_mac || is_linux || is_chromeos)
 
 import("//testing/test.gni")
 
+source_set("shell_features") {
+  public = [ "shell_features.h" ]
+  sources = [ "shell_features.cc" ]
+  deps = [ "//base" ]
+}
+
+source_set("side_panel_colors") {
+  public = [ "side_panel_colors.h" ]
+  sources = [ "side_panel_colors.cc" ]
+  deps = [
+    ":shell_features",
+    "//chrome/browser/ui/color:color_headers",
+    "//ui/color",
+  ]
+}
+
+source_set("customization") {
+  public = [ "customization.h" ]
+  sources = [ "customization.cc" ]
+  public_deps = [ "//content/public/browser" ]
+  deps = [
+    ":shell_features",
+    "webui:strings",
+  ]
+}
+
+source_set("theme_tint") {
+  public = [ "theme_tint.h" ]
+  sources = [ "theme_tint.cc" ]
+  public_deps = [ "//skia" ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/themes",
+    "//content/public/browser",
+    "//ui/color",
+  ]
+}
+
+source_set("product_logo") {
+  public = [ "product_logo.h" ]
+  sources = [ "product_logo.cc" ]
+  public_deps = [ "//ui/base" ]
+  deps = [ "//components/resources:components_scaled_resources" ]
+}
+
+source_set("default_browser_prompt") {
+  public = [ "default_browser_prompt.h" ]
+  sources = [
+    "brand.h",
+    "default_browser_prompt.cc",
+  ]
+  public_deps = [ "//ui/base" ]
+  deps = [
+    ":product_logo",
+    "//base",
+    "//base/version_info",
+    "webui:strings",
+  ]
+}
+
 source_set("multi_contents_geometry") {
   public = [ "multi_contents_geometry.h" ]
   sources = [ "multi_contents_geometry.cc" ]
@@ -120,6 +180,7 @@ source_set("yee_ui") {
     "page_viewport_migration.h",
     "page_viewport_hosts.h",
     "sidebar_footer.h",
+    "sidebar_presentation.h",
     "sidebar_sections.h",
     "site_controls.h",
     "split_pane_controls.h",
@@ -138,6 +199,7 @@ source_set("yee_ui") {
     "group_mark_signals.cc",
     "page_viewport_hosts.cc",
     "sidebar_footer.cc",
+    "sidebar_presentation.cc",
     "sidebar_sections.cc",
     "site_controls.cc",
     "split_pane_controls.cc",
@@ -148,6 +210,7 @@ source_set("yee_ui") {
 
   public_deps = [
     ":agent_bridge_prompt",
+    ":shell_features",
     ":agent_browser_contract",
     ":agent_tab_activity",
     ":browser_surface_transition",
@@ -160,6 +223,8 @@ source_set("yee_ui") {
   ]
 
   deps = [
+    ":theme_tint",
+    "webui:strings",
     "//base",
     "//base/version_info",
     "//cc/paint",
@@ -195,6 +260,7 @@ test("site_controls_browsertests") {
   sources = [
     "bookmarks/bookmarks_browsertest.cc",
     "downloads/downloads_browsertest.cc",
+    "extensions/extensions_browsertest.cc",
     "history/history_browsertest.cc",
     "internal_urls_browsertest.cc",
     "site_controls_browsertest.cc",
@@ -205,13 +271,17 @@ test("site_controls_browsertests") {
     ":yee_ui",
     "bookmarks",
     "downloads",
+    "extensions",
     "history",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
     "//chrome/browser/autocomplete",
     "//chrome/browser/download:impl",
+    "//chrome/browser/extensions:test_support",
     "//chrome/browser/history",
+    "//chrome/browser/policy",
+    "//chrome/browser/policy:test_support",
     "//chrome/browser/profiles:profile_io_data",
     "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui/bookmarks",
@@ -227,16 +297,21 @@ test("site_controls_browsertests") {
     "//components/bookmarks/common",
     "//components/bookmarks/managed",
     "//components/bookmarks/test",
+    "//components/crx_file",
     "//components/download/public/common:public",
     "//components/history/core/browser",
     "//components/history/core/common",
     "//components/history/core/test",
     "//components/omnibox/browser",
+    "//components/policy/core/common:test_support",
     "//components/prefs",
     "//components/sessions",
     "//components/split_tabs",
     "//components/yee_branding",
     "//content/test:test_support",
+    "//extensions/browser",
+    "//extensions/common",
+    "//extensions:test_support",
     "//net:test_support",
     "//testing/gtest",
     "//ui/views:test_support",

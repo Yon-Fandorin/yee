@@ -11,6 +11,7 @@
 | 화면 배치와 용어 | [셸 명세](browser-shell-spec.md), [레이아웃 용어](browser-shell-layout-glossary.md) |
 | 사이드바의 제품 결정 | [Sidebar 문서](sidebar/README.md) |
 | 설정 화면과 연결 경로 | [Yee 설정](settings.md) |
+| 내부 페이지와 이관 범위 | [구현](internal-pages.md), [전체 목록](internal-pages-inventory.md), [리디자인 후보](internal-pages-redesign.md) |
 | 주소·도구 영역 테스트 | [Header 문서](header/README.md) |
 | 이름·로고 변경 | [제품 브랜딩](product-branding.md), [브랜딩 적용 범위](branding-coverage.md) |
 | Brave에서 참고한 구조 | [Brave 브랜딩 분석](brave-branding-analysis.md) |

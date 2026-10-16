@@ -10,8 +10,11 @@
 | --- | --- |
 | `apply.sh`, `apply.ps1` | 패치·소스·브랜딩·아이콘 적용 |
 | `install-yee-ui-sources.*` | 등록된 제품 소스 디렉터리 복사 |
-| `install-branding.*` | 제품 이름 설정과 관련 패치 적용 |
-| `install-brand-assets.*` | 로고에서 플랫폼별 아이콘 생성 |
+| `install-branding.*` | 제품 이름 설정·번역 생성과 관련 패치 적용 |
+| `brand_strings.py` | 고정 upstream에서 제품 문구와 모든 기존 XTB 번역 생성 |
+| `generate-brand-assets.py` | 설정의 SVG·배색·이름에서 desktop 로고 묶음 생성 |
+| `install-brand-assets.*` | 같은 로고 묶음의 해시·경로를 검증하고 적용 |
+| `audit_logo_assets.py` | GRIT·네이티브·공통 WebUI·삽화의 독립 로고 경로와 적용 상태 검사 |
 | `audit-branding.py` | 브랜딩 적용 대상과 남은 문구 점검 |
 | `regenerate-shell-patch.py` | 실제 변경 내역에서 `0001` 다시 만들기 |
 | `vendor-yee-adblock.py` | 외부 Rust 원본 확인과 빌드 파일 생성 |
@@ -33,7 +36,7 @@
 ```
 
 파일을 수정하지 않고 패치·소스·브랜딩 적용 가능 여부를 확인한다.
-아이콘 생성과 macOS 아이콘 생성 도구의 컴파일도 생략한다.
+로고 묶음 적용도 생략한다. `install-brand-assets.* --check`로 생성 자산을 별도 검증한다.
 브라우저 빌드나 실행은 수행하지 않는다.
 
 ## 실제 적용
@@ -54,8 +57,13 @@
 제품 소스 영역의 루트 README는 복사하지 않는다.
 등록된 소스 안의 원본 README와 숨김 파일은 유지하며 `.DS_Store`와 `__pycache__`는 제외한다.
 
-기본 적용에는 아이콘 생성도 포함된다.
-macOS는 `sips`와 ICNS 생성 도구, Windows는 `System.Drawing`을 사용한다.
+기본 적용에는 브랜드 로고 묶음도 포함된다.
+macOS에서 이름·원본·배색·생성기가 달라지면 묶음을 재생성한다.
+실제 `apply.sh`는 체크아웃에 쓰기 전에 에셋 도구의 `--prepare`로 묶음을
+필요시 재생성한 뒤 검증한다. 뒤의 `--install-prepared`는 재생성 없이 다시 검증하고 설치한다.
+`--check`는 오래된 묶음을 실패로 보고하며 파일을 생성하거나 설치하지 않는다.
+생성에는 Xcode, CairoSVG와 Pillow가 필요하다. Windows는 같은 묶음을 복사하며
+추가 이미지 렌더러가 필요 없다. 문구 생성에는 빌드용 Python을 사용한다. 생성법은 [로고 자산](../../assets/brand/README.md)에 있다.
 브라우저 빌드와 실행은 [개발 도구](../dev/README.md)의 별도 단계다.
 
 ## 이름·로고 설정과 점검
@@ -68,12 +76,16 @@ macOS는 `sips`와 ICNS 생성 도구, Windows는 `System.Drawing`을 사용한�
 ./tools/overlay/install-branding.sh "$PWD/.local-build/chromium/src" --check
 python3 tools/overlay/audit-branding.py "$PWD/.local-build/chromium/src"
 python3 tools/overlay/audit-branding.py "$PWD/.local-build/chromium/src" --json
+python3 tools/overlay/audit_logo_assets.py "$PWD/.local-build/chromium/src"
 ```
 
 점검 도구는 [`surfaces.json`](../../branding/surfaces.json)의 목록과 Chromium 문구
 파일(GRD·GRDP), 직접 작성한 UI의 고정 이름, 생성된 이름 설정을 확인한다.
 실제 앱 화면이나 모든 번역·아이콘을 테스트하지는 않는다.
 `--require-complete`는 남은 작업과 수행하지 않은 테스트를 실패로 보고한다.
+로고 감사는 생성 목록과 별도로 새 탭·버전 파비콘, 제품 벡터의 최신/이전 분기,
+공통 WebUI 표식, 검토한 배너·OS 이미지 경로를 조사한다. 누락 또는 미적용이면
+실패하며, `--json`으로 파일별 소비 경로를 볼 수 있다. 실제 앱 검수는 별도다.
 
 변경 절차는 [제품 브랜딩](../../docs/product-branding.md),
 남은 작업은 [브랜딩 적용 범위](../../docs/branding-coverage.md)에 있다.

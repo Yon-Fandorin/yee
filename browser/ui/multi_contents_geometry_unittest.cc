@@ -86,6 +86,18 @@ TEST(MultiContentsGeometryTest, SupportedFloorClampsWithoutChangingRatio) {
   EXPECT_GE(below_floor.start.width(), 0);
   EXPECT_GE(below_floor.end.width(), 0);
   EXPECT_DOUBLE_EQ(0.95, input.start_ratio);
+
+  input.axis = PaneSplitAxis::kVertical;
+  input.available_space = gfx::Rect(0, 0, 900, 500);
+  input.minimums = {200, 200};
+  const CurrentPaneGeometry vertical = ComputeCurrentPaneGeometry(input);
+  EXPECT_EQ(292, vertical.start.height());
+  EXPECT_EQ(8, vertical.divider.height());
+  EXPECT_EQ(200, vertical.end.height());
+  EXPECT_EQ(input.available_space.x(), vertical.start.x());
+  EXPECT_EQ(input.available_space.y(), vertical.start.y());
+  EXPECT_EQ(input.available_space.width(), vertical.end.width());
+  EXPECT_EQ(input.available_space.bottom(), vertical.end.bottom());
 }
 
 TEST(MultiContentsGeometryTest, ExternalFlowRequiresOneFreshExactIdentity) {

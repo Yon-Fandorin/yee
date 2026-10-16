@@ -10,6 +10,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 from brand_config import REPO_ROOT, load_brand, product_parts
+from brand_strings import Replacements, check_inputs as check_string_inputs
 
 
 MANIFEST_PATH = REPO_ROOT / "branding/surfaces.json"
@@ -23,6 +24,21 @@ CPP_TOKEN = re.compile(
 PRESERVED_LITERAL_IDENTIFIERS = {
     '"disable-yee-shell-scaffold"',
     '"yee-content-blocking-disabled-sites"',
+    '"yee-theme-accent-changed"',
+    '"yee.content_blocking.disabled_sites"',
+    '"yee.content_blocking.blocked_domains"',
+    '"chrome://yee-content-blocking"',
+    '"data-yee-cb-"',
+    '"yee-settings"',
+    '"yee-downloads"',
+    '"yee-history"',
+    '"yee-bookmarks"',
+    '"yee-extensions"',
+    '"yee-baseline-list-dir"',
+    '"yee-baseline-list-generation"',
+    '"yee-baseline-list-handle"',
+    '"yee-community-filter-dir"',
+    '"yee-content-blocking-test-rules"',
 }
 
 
@@ -37,7 +53,8 @@ def message_text(node):
 def scan_strings(src, roots):
     candidates, errors, files, visited, active = [], [], [], set(), set()
 
-    def visit(path, conditions=()):
+    def visit(path, conditions=(), base=None):
+        base = base or path.parent
         resolved = path.resolve()
         if not resolved.is_relative_to(src.resolve()):
             errors.append({"source": str(path), "error": "part escapes Chromium source"})
@@ -46,7 +63,7 @@ def scan_strings(src, roots):
         if resolved in active:
             errors.append({"source": relative, "error": "cyclic part reference"})
             return
-        context_key = (resolved, conditions)
+        context_key = (resolved, conditions, base.resolve())
         if context_key in visited:
             return
         visited.add(context_key)
@@ -62,7 +79,9 @@ def scan_strings(src, roots):
             if node.tag == "part":
                 filename = node.get("file")
                 if filename:
-                    visit(resolved.parent / filename, context)
+                    # 재귀적으로 포함한 part 안에서도 루트 GRD 디렉터리를
+                    # 기준으로 GRIT part 경로를 해석한다.
+                    visit(base / filename, context, base)
                 else:
                     errors.append({"source": relative, "error": "part has no file"})
                 return
@@ -134,7 +153,8 @@ def scan_cpp_text(text, source, line_map=None):
         if (token in PRESERVED_LITERAL_IDENTIFIERS or
                 re.search(r"(?:#include|--yee-|yee::|chrome/browser/|\.app/|/MacOS/|yee-agent-bridge|yee-agent-status|yee-signal)", token)):
             category = "internal_identifier"
-        elif re.search(r"(?:D?V?LOG\(|TRACE_EVENT|<<)", context):
+        elif (re.search(r"(?:D?V?LOG\(|TRACE_EVENT|<<)", context)
+              or re.search(r"\bnet::DefineNetworkTrafficAnnotation\s*\(", context)):
             category = "developer_message"
         else:
             category = "display_candidate"
@@ -239,11 +259,24 @@ def audit(chromium_src, *, repo_root=REPO_ROOT, manifest_path=MANIFEST_PATH, con
         surfaces.append(surface)
     strings = scan_strings(src, manifest["string_roots"])
     review_strings(strings["candidates"], surfaces)
+    string_inputs = check_string_inputs(src, brand)
+    if brand.strings_policy:
+        policy = json.loads(brand.strings_policy.read_text(encoding='utf-8'))
+        replacements = Replacements(policy, brand)
+        for candidate in strings["candidates"]:
+            identifier = candidate["message_id"]
+            if (replacements.preserved.search(identifier)
+                    or identifier in policy.get('attribution_message_ids', [])
+                    or replacements.text(candidate["text"]) == candidate["text"]):
+                candidate["review"] = "preserved"
+                candidate["reason"] = "Declared string policy preserves upstream attribution, external products or technical URLs."
     owned_ui = scan_owned_ui(repo_root)
     inputs = check_product_inputs(src, brand)
     for surface in surfaces:
         if surface.get("input_check") == "product_inputs":
             surface["input_application"] = "applied" if inputs["applied"] else "not_applied"
+        elif surface.get("input_check") == "brand_strings":
+            surface["input_application"] = "applied" if string_inputs["applied"] else "not_applied"
         else:
             surface["input_application"] = "not_checked"
         # Reading source cannot attest that a built application uses it.
@@ -263,13 +296,15 @@ def audit(chromium_src, *, repo_root=REPO_ROOT, manifest_path=MANIFEST_PATH, con
                 "fixed_working_name_display_candidates": fixed_display,
                 "scan_errors": strings["errors"] + owned_ui["errors"],
                 "product_inputs_not_applied": not inputs["applied"],
+                "brand_strings_not_applied": not string_inputs["applied"],
                 "provisional_brand": brand.provisional,
                 "runtime_not_verified": True}
     return {"schema_version": 1, "chromium_src": str(src), "brand": brand.metadata(),
             "provisional_brand": brand.provisional,
             "complete": not any(blockers.values()), "runtime_verification": "not_verified",
             "notice": "Read-only source inventory. It neither proves all branding surfaces are inventoried nor validates a built application.",
-            "product_inputs": inputs, "surfaces": surfaces, "strings": strings,
+            "product_inputs": inputs, "brand_strings": string_inputs,
+            "surfaces": surfaces, "strings": strings,
             "owned_ui": owned_ui, "blockers": blockers}
 
 

@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/common.zsh"
 
 build_tests=true
 test_ui="${YEE_TEST_UI:-off}"
-test_filter='HistoryBrowserTest.*:BookmarksBrowserTest.*:DownloadsBrowserTest.*:InternalURLsBrowserTest.ProductAndNativeSettingsRoutes'
+test_filter='ExtensionsBrowserTest.*:HistoryBrowserTest.*:BookmarksBrowserTest.*:DownloadsBrowserTest.*:InternalURLsBrowserTest.ProductAndNativeSettingsRoutes'
 for argument in "$@"; do
   case "$argument" in
     --no-build) build_tests=false ;;
