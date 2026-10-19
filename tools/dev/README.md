@@ -219,6 +219,12 @@ Pages·콘텐츠 차단 fixture·YouTube 관찰·Yee Agent 시험 실행은 해�
 `--window-position`으로 시작 위치만 지정하며 검사별 창 크기와 배율은 그대로 적용한다.
 Python·JavaScript 검사는 `ui-test-window-args.sh`를 통해 같은 모니터 선택을 사용한다.
 
+macOS `interactive` gate의 전체화면 메뉴막대 검사는 실제 시스템 포인터를 화면
+상단으로 옮겨 AppKit의 노출·숨김을 확인한다. 이 검사를 실행하는 터미널이나 IDE에
+시스템 설정의 손쉬운 사용 권한이 미리 있어야 한다. 검사는 권한을 자동 요청하거나
+시스템 설정을 바꾸지 않으며, 권한이 없으면 해당 전제를 명시하고 실패한다.
+포인터는 case 전체가 끝나거나 실패한 뒤 원래 위치로 돌아온다.
+
 ### 콘텐츠 차단 검증
 
 콘텐츠 차단과 Site Controls는 다음 명령으로 확인한다.

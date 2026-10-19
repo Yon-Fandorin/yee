@@ -5112,6 +5112,19 @@ index 1a465bdac4..992ea6d14e 100644
    tab_strip_set_ = false;
    static_cast<BrowserTabStripController*>(tab_strip_->controller())->Reset();
    tab_strip_->Reset();
+diff --git a/chrome/browser/ui/views/frame/immersive_mode_controller_mac.h b/chrome/browser/ui/views/frame/immersive_mode_controller_mac.h
+index 18ab7eecac..6e07b5f1c8 100644
+--- a/chrome/browser/ui/views/frame/immersive_mode_controller_mac.h
++++ b/chrome/browser/ui/views/frame/immersive_mode_controller_mac.h
+@@ -111,6 +111,8 @@ class ImmersiveModeControllerMac : public ImmersiveModeController,
+ 
+   BrowserView* browser_view() { return browser_view_; }
+ 
++  double menu_bar_reveal_amount_for_testing() const { return reveal_amount_; }
++
+  private:
+   friend class RevealedLock;
+ 
 diff --git a/chrome/browser/ui/views/frame/immersive_mode_controller_mac.mm b/chrome/browser/ui/views/frame/immersive_mode_controller_mac.mm
 index fdbb4cf741..949a7238e7 100644
 --- a/chrome/browser/ui/views/frame/immersive_mode_controller_mac.mm
@@ -5181,10 +5194,10 @@ index fdbb4cf741..949a7238e7 100644
    // If the browser window is closing the native view is removed. Don't attempt
    // to move children.
 diff --git a/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm b/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
-index 8c3f4767c6..f42420207f 100644
+index 8c3f4767c6..be21714f3d 100644
 --- a/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
 +++ b/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
-@@ -2,33 +2,70 @@
+@@ -2,33 +2,76 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -5198,9 +5211,14 @@ index 8c3f4767c6..f42420207f 100644
  #include <tuple>
  
  #include "base/apple/foundation_util.h"
++#include "base/apple/scoped_cftyperef.h"
++#include "base/check.h"
 +#include "base/command_line.h"
 +#include "base/containers/span.h"
 +#include "base/files/file_util.h"
++#include "base/functional/bind.h"
++#include "base/functional/callback_helpers.h"
++#include "base/i18n/rtl.h"
  #import "base/mac/mac_util.h"
 +#include "base/test/run_until.h"
 +#include "base/test/scoped_run_loop_timeout.h"
@@ -5249,6 +5267,7 @@ index 8c3f4767c6..f42420207f 100644
 +#include "ui/compositor/compositor.h"
 +#include "ui/compositor/layer.h"
 +#include "ui/compositor/test/test_utils.h"
++#include "ui/display/screen.h"
 +#include "ui/events/keycodes/keyboard_codes.h"
 +#include "ui/gfx/animation/animation_test_api.h"
 +#include "ui/gfx/codec/png_codec.h"
@@ -5256,7 +5275,7 @@ index 8c3f4767c6..f42420207f 100644
  #include "ui/views/bubble/bubble_dialog_delegate_view.h"
  #import "ui/views/cocoa/native_widget_mac_ns_window_host.h"
  #include "ui/views/interaction/element_tracker_views.h"
-@@ -36,6 +73,7 @@
+@@ -36,6 +79,7 @@
  #include "ui/views/widget/any_widget_observer.h"
  #include "ui/views/widget/native_widget_mac.h"
  #include "ui/views/widget/widget.h"
@@ -5264,22 +5283,21 @@ index 8c3f4767c6..f42420207f 100644
  
  class ScopedAlwaysShowToolbar {
   public:
-@@ -69,6 +107,48 @@ class ImmersiveModeControllerMacInteractiveTest : public InProcessBrowserTest {
+@@ -69,6 +113,63 @@ class ImmersiveModeControllerMacInteractiveTest : public InProcessBrowserTest {
          views::NativeWidgetMacNSWindowHost::kMovedContentNSView);
    }
  
 +  // 본문은 macOS 전체화면 캡처의 잘림을 피하고 실제 합성 프레임을 저장한다.
-+  void CaptureWidgetIfRequested(views::Widget& widget, std::string_view name) {
++  void CaptureWidgetIfRequested(views::Widget& widget,
++                                std::string_view name,
++                                SkColor* shell_color = nullptr) {
 +    const auto directory =
 +        base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +            "yee-sidebar-capture-dir");
-+    if (directory.empty()) {
++    if (directory.empty() && !shell_color) {
 +      return;
 +    }
 +    auto* const compositor = widget.GetCompositor();
-+    compositor->ScheduleFullRedraw();
-+    ASSERT_TRUE(
-+        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
 +    base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
 +    auto request = std::make_unique<viz::CopyOutputRequest>(
 +        viz::CopyOutputRequest::ResultFormat::RGBA,
@@ -5288,9 +5306,25 @@ index 8c3f4767c6..f42420207f 100644
 +    request->set_area(gfx::Rect(compositor->size()));
 +    compositor->root_layer()->RequestCopyOfOutput(std::move(request));
 +    compositor->ScheduleFullRedraw();
++    ASSERT_TRUE(
++        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
 +    auto result = readback.Take();
 +    ASSERT_TRUE(result && !result->IsEmpty());
 +    auto pixels = result->ScopedAccessSkBitmap();
++    if (shell_color) {
++      // 두 native 창의 조작 없는 leading 여백을 실제 합성 결과로 비교한다.
++      const auto& bitmap = pixels.GetOutScopedBitmap();
++      int x = static_cast<int>(yee::kSidebarMetrics.content_gutter *
++                               compositor->device_scale_factor());
++      ASSERT_LT(x, bitmap.width());
++      if (base::i18n::IsRTL()) {
++        x = bitmap.width() - 1 - x;
++      }
++      *shell_color = bitmap.getColor(x, bitmap.height() / 2);
++    }
++    if (directory.empty()) {
++      return;
++    }
 +    const auto png = gfx::PNGCodec::EncodeBGRASkBitmap(
 +        pixels.GetOutScopedBitmap(), /*discard_transparency=*/false);
 +    ASSERT_TRUE(png);
@@ -5313,13 +5347,14 @@ index 8c3f4767c6..f42420207f 100644
    // Convenience function to get the NSWindow from the browser window.
    NSWindow* browser_window() {
      return browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
-@@ -307,35 +387,446 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
+@@ -307,35 +408,579 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
  // with vertical tabs enabled, and that proper connections are maintained.
  IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
                         ToggleFullscreenWithVerticalTabstrip) {
 +  gfx::ScopedAnimationDurationScaleMode no_animation(
 +      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
 +  ScopedAlwaysShowToolbar scoped_always_show(browser(), false);
++  base::ScopedClosureRunner restore_pointer;
    BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
 +  const auto capture_url =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -5503,6 +5538,138 @@ index 8c3f4767c6..f42420207f 100644
 +            }));
 +            RunScheduledLayouts();
 +          }
++        }
++
++        // 앱 내부 NSEvent만으로는 macOS 메뉴막대가 열리지 않는다.
++        // 실제 시스템 포인터를 사용하고 검사 후 원위치로 돌려놓는다.
++        ASSERT_TRUE(ActivateBrowserAndWaitForSpace());
++        page->Focus();
++        ASSERT_TRUE(CGPreflightPostEventAccess())
++            << "시스템 메뉴막대 검사는 실행 호스트의 손쉬운 사용 이벤트 "
++               "전송 권한이 필요합니다. tools/dev/README.md를 확인하세요.";
++        const auto move_system_pointer = [](CGPoint point) {
++          // AppKit이 읽는 NSEvent 위치 mock도 실제 포인터와 맞춘다.
++          CHECK(ui_controls::SendMouseMove(static_cast<int>(point.x),
++                                           static_cast<int>(point.y)));
++          CHECK_EQ(kCGErrorSuccess, CGWarpMouseCursorPosition(point));
++          base::apple::ScopedCFTypeRef<CGEventRef> event(
++              CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, point,
++                                      kCGMouseButtonLeft));
++          CHECK(event);
++          CGEventPost(kCGHIDEventTap, event.get());
++        };
++        // 후속 검사까지 끝난 뒤 복구해야 원래의 상단 포인터가 메뉴를
++        // 다시 열어 같은 case의 상태를 바꾸지 않는다.
++        if (!restore_pointer) {
++          base::apple::ScopedCFTypeRef<CGEventRef> pointer(
++              CGEventCreate(nullptr));
++          ASSERT_TRUE(pointer);
++          restore_pointer.ReplaceClosure(base::BindOnce(
++              move_system_pointer, CGEventGetLocation(pointer.get())));
++        }
++        const gfx::Point content_center = browser_view->multi_contents_view()
++                                              ->GetBoundsInScreen()
++                                              .CenterPoint();
++        move_system_pointer(
++            CGPointMake(content_center.x(), content_center.y()));
++        auto* const immersive = static_cast<ImmersiveModeControllerMac*>(
++            ImmersiveModeController::From(browser()));
++        ASSERT_TRUE(base::test::RunUntil([&]() {
++          return immersive->menu_bar_reveal_amount_for_testing() == 0 &&
++                 (always_show || !immersive->IsRevealed());
++        }));
++        // pref 전환의 native 창 원점과 실제 표시 프레임까지 기다린다.
++        auto* main_compositor = browser_view->GetWidget()->GetCompositor();
++        main_compositor->ScheduleFullRedraw();
++        ASSERT_TRUE(ui::WaitForNextFrameToBePresented(main_compositor,
++                                                      base::Seconds(5)));
++        RunScheduledLayouts();
++        const gfx::Rect display_bounds =
++            display::Screen::Get()
++                ->GetDisplayNearestWindow(
++                    browser_view->GetWidget()->GetNativeWindow())
++                .bounds();
++        auto* const external_top = browser_view->top_container();
++        auto* const external_root = external_top->parent();
++        const int hidden_menu_y = external_root->GetBoundsInScreen().y();
++        const gfx::Rect hidden_sidebar = region->GetBoundsInScreen();
++        const gfx::Rect hidden_contents =
++            browser_view->multi_contents_view()->bounds();
++        const gfx::Rect hidden_page =
++            browser_view->contents_web_view()->bounds();
++        auto* const footer = region->sidebar_footer_for_testing();
++        ASSERT_TRUE(footer);
++        const gfx::Rect hidden_footer = footer->GetBoundsInScreen();
++        move_system_pointer(
++            CGPointMake(display_bounds.x() + 20, display_bounds.y()));
++        // 노치 화면은 메뉴막대 높이 보정이 0이어도 실제 노출량은 보고한다.
++        ASSERT_TRUE(base::test::RunUntil([&]() {
++          return immersive->menu_bar_reveal_amount_for_testing() == 1 &&
++                 immersive->IsRevealed();
++        })) << "display="
++            << display_bounds.ToString() << ", hidden menu y=" << hidden_menu_y
++            << ", revealed root="
++            << external_root->GetBoundsInScreen().ToString();
++        RunScheduledLayouts();
++        {
++          SCOPED_TRACE(
++              testing::Message()
++              << "top=" << external_top->bounds().ToString()
++              << ", root=" << external_root->GetBoundsInScreen().ToString()
++              << ", body=" << browser_view->GetBoundsInScreen().ToString());
++          EXPECT_TRUE(
++              external_root->GetLocalBounds().Contains(external_top->bounds()));
++          auto* const location = browser_view->GetLocationBarView();
++          EXPECT_EQ(location->GetLocalBounds(), location->GetVisibleBounds());
++          auto* fill =
++              external_root->GetViewByID(yee::kBrowserSurfaceFillViewId);
++          ASSERT_TRUE(fill);
++          gfx::Rect header_fill = fill->GetBoundsInScreen();
++          header_fill.set_height(
++              yee::kSidebarMetrics.browser_surface_header_height());
++          EXPECT_TRUE(external_root->GetBoundsInScreen().Contains(header_fill));
++          // 다른 native 창의 가림은 GetVisibleBounds에 나타나지 않는다.
++          EXPECT_GE(region->GetBoundsInScreen().y(),
++                    external_root->GetBoundsInScreen().bottom());
++          EXPECT_EQ(hidden_sidebar.bottom(),
++                    region->GetBoundsInScreen().bottom());
++          if (!collapsed) {
++            EXPECT_EQ(hidden_footer, footer->GetBoundsInScreen());
++          }
++          EXPECT_EQ(hidden_contents,
++                    browser_view->multi_contents_view()->bounds());
++          EXPECT_EQ(hidden_page, browser_view->contents_web_view()->bounds());
++        }
++        std::string capture_prefix =
++            always_show ? "fullscreen-fixed-menu" : "fullscreen-autohide-menu";
++        if (collapsed) {
++          capture_prefix += "-collapsed";
++        }
++        SkColor header_shell = SK_ColorTRANSPARENT;
++        SkColor body_shell = SK_ColorTRANSPARENT;
++        ASSERT_NO_FATAL_FAILURE(CaptureWidgetIfRequested(
++            *overlay_widget, capture_prefix + "-header",
++            collapsed ? nullptr : &header_shell));
++        ASSERT_NO_FATAL_FAILURE(CaptureWidgetIfRequested(
++            *browser_view->GetWidget(), capture_prefix + "-body",
++            collapsed ? nullptr : &body_shell));
++        if (!collapsed) {
++          EXPECT_EQ(SK_AlphaOPAQUE, SkColorGetA(header_shell));
++          EXPECT_EQ(body_shell, header_shell);
++        }
++        move_system_pointer(
++            CGPointMake(content_center.x(), content_center.y()));
++        ASSERT_TRUE(base::test::RunUntil([&]() {
++          return immersive->menu_bar_reveal_amount_for_testing() == 0 &&
++                 external_root->GetBoundsInScreen().y() == hidden_menu_y;
++        }));
++        RunScheduledLayouts();
++        EXPECT_EQ(hidden_sidebar, region->GetBoundsInScreen());
++        EXPECT_EQ(hidden_contents,
++                  browser_view->multi_contents_view()->bounds());
++        EXPECT_EQ(hidden_page, browser_view->contents_web_view()->bounds());
++        if (!collapsed) {
++          EXPECT_EQ(hidden_footer, footer->GetBoundsInScreen());
 +        }
 +        EXPECT_EQ(overlay_widget, browser_view->top_container()->GetWidget());
 +        auto* const background = browser_view->top_container()
@@ -5762,7 +5929,7 @@ index 8c3f4767c6..f42420207f 100644
  }
  
  // Tests that the browser does not crash when toggling between vertical and
-@@ -496,23 +987,36 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
+@@ -496,23 +1141,36 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
  // tollerate the system destroying the overlay widget before the Browser widget.
  IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
                         HandlesOverlayWidgetDestruction) {
@@ -5907,10 +6074,19 @@ index 263ca8ae6d..9082add241 100644
    // Note: when `SideBySide` feature is disabled, this separator is also
    // used when not overlaid. Once the feature is fully rolled out, we can
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_layout_impl.cc
-index c3f7d222dc..caba508295 100644
+index c3f7d222dc..5c2df77d61 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_layout_impl.cc
-@@ -189,6 +189,23 @@ gfx::Rect BrowserViewLayoutImpl::GetBoundsWithExclusion(
+@@ -4,6 +4,8 @@
+ 
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_impl.h"
+ 
++#include <algorithm>
++
+ #include "base/functional/bind.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/ui/browser.h"
+@@ -189,6 +191,26 @@ gfx::Rect BrowserViewLayoutImpl::GetBoundsWithExclusion(
  gfx::Rect BrowserViewLayoutImpl::GetTopContainerBoundsInParent(
      const gfx::Rect& local_bounds,
      const BrowserLayoutParams& parent_params) const {
@@ -5922,10 +6098,13 @@ index c3f7d222dc..caba508295 100644
 +    if (delegate().GetBrowserWindowState() ==
 +            WindowState::kFullscreenWithToolbar &&
 +        bounds.height() > 0) {
-+      // AppKit accessory와 본문 NSView 사이의 실제 원점 차이를 사용한다.
-+      bounds.set_y(views().browser_view->GetBoundsInScreen().y() -
-+                   bounds.height() -
-+                   views().top_container->parent()->GetBoundsInScreen().y());
++      // 고정 행은 본문 경계에 잇되 메뉴막대가 accessory를 내릴 때는
++      // AppKit의 이동을 따른다. 음수 보정은 Header를 창 밖으로 잘라 낸다.
++      const auto* host = views().top_container->parent();
++      const int aligned_y = views().browser_view->GetBoundsInScreen().y() -
++                            bounds.height() - host->GetBoundsInScreen().y();
++      bounds.set_y(std::clamp(aligned_y, 0,
++                              std::max(0, host->height() - bounds.height())));
 +    }
 +    return bounds;
 +  }
@@ -5934,7 +6113,7 @@ index c3f7d222dc..caba508295 100644
    // Calculate the dimensions of the container.
    int top = local_bounds.y();
    const int height = local_bounds.height();
-@@ -234,9 +251,17 @@ void BrowserViewLayoutImpl::Layout(views::View* host) {
+@@ -234,9 +256,17 @@ void BrowserViewLayoutImpl::Layout(views::View* host) {
  
    DoPreLayoutComputations(params);
  
@@ -5955,7 +6134,7 @@ index c3f7d222dc..caba508295 100644
      // In slide/immersive mode, animating the top container is handled by
      // someone else, but there are adjustments that are needed to be made.
      ProposedLayout top_container_layout;
-@@ -261,14 +286,20 @@ void BrowserViewLayoutImpl::Layout(views::View* host) {
+@@ -261,14 +291,20 @@ void BrowserViewLayoutImpl::Layout(views::View* host) {
      // See https://crbug.com/519626620 for more information.
      const auto new_params =
          delegate().GetBrowserLayoutParams(/*use_browser_bounds=*/true);
@@ -5978,7 +6157,7 @@ index c3f7d222dc..caba508295 100644
    dialog_bottom_ = GetDialogBottom(layout);
    std::move(layout).ApplyLayout(host, [this](views::View* view, bool visible) {
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 8a35c869b1..d054b2b01d 100644
+index 8a35c869b1..33c02bd7af 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -22,6 +22,7 @@
@@ -6569,7 +6748,7 @@ index 8a35c869b1..d054b2b01d 100644
        // The overall width during an expand must change monotonically.
        if (vertical_tab_strip_animation.current_motion ==
            TabStripAnimations::kExpand) {
-@@ -756,13 +716,30 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -756,13 +716,49 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          last_vertical_tab_strip_width_ = vertical_tab_strip_width;
        }
  
@@ -6585,6 +6764,25 @@ index 8a35c869b1..d054b2b01d 100644
 +            *views().vertical_tab_strip_layout_config;
 +        gfx::Rect available_bounds = browser_params.visual_client_area;
 +        available_bounds.Inset(config.insets);
++#if BUILDFLAG(IS_MAC)
++        // 외부 accessory의 불투명 바탕이 덮는 상단만 Sidebar에서 비운다.
++        // 본문 배분은 유지하고 기존 Flyout 여백은 이 경계 아래에 더한다.
++        auto* const top = views().top_container.get();
++        auto* const immersive = delegate().GetImmersiveModeController();
++        if (uses_yee_browser_surface_geometry &&
++            !IsParentedTo(top, views().browser_view) && top->height() > 0 &&
++            immersive && immersive->IsRevealed()) {
++          const gfx::Rect browser_bounds =
++              views().browser_view->GetBoundsInScreen();
++          gfx::Rect overlap = top->parent()->GetBoundsInScreen();
++          overlap.Intersect(browser_bounds);
++          if (!overlap.IsEmpty()) {
++            available_bounds.Inset(gfx::Insets().set_top(
++                std::min(overlap.bottom() - browser_bounds.y(),
++                         available_bounds.height())));
++          }
++        }
++#endif
 +        available_bounds.Inset(
 +            gfx::Insets()
 +                .set_top(vertical_tab_strip_animation.flyout_geometry.top_inset)
@@ -6607,7 +6805,7 @@ index 8a35c869b1..d054b2b01d 100644
  
        if (layout_data_->window_state == WindowState::kFullscreenWithToolbar &&
            layout_data_->separator_info.adjust_for_missing_separator) {
-@@ -779,10 +756,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -779,10 +775,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
          clip_content_for_animation =
@@ -6623,7 +6821,7 @@ index 8a35c869b1..d054b2b01d 100644
          unclipped_contents_region.Inset(gfx::Insets::TLBR(
              0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
        } else {
-@@ -795,12 +773,25 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -795,12 +792,25 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
                      layout_data_->tab_strip_type == TabStripType::kVertical);
    }
  
@@ -6650,7 +6848,7 @@ index 8a35c869b1..d054b2b01d 100644
              layout_data_->vertical_tab_strip_animation.expand_on_hover_width >
                  0.0f);
    }
-@@ -809,7 +800,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -809,7 +819,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    if (IsParentedTo(views().vertical_tab_strip_top_corner,
                     views().browser_view)) {
      gfx::Rect corner_bounds;
@@ -6662,7 +6860,7 @@ index 8a35c869b1..d054b2b01d 100644
          layout_data_->tab_strip_type == TabStripType::kVertical &&
          vertical_tab_strip_animation.top_corner > 0.0;
  
-@@ -832,7 +827,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -832,7 +846,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    if (IsParentedTo(views().vertical_tab_strip_bottom_corner,
                     views().browser_view)) {
      gfx::Rect corner_bounds;
@@ -6674,7 +6872,7 @@ index 8a35c869b1..d054b2b01d 100644
          layout_data_->tab_strip_type == TabStripType::kVertical &&
          vertical_tab_strip_animation.bottom_corner > 0.0;
      if (bottom_corner_visible) {
-@@ -882,27 +881,80 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -882,27 +900,80 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      layout.AddChild(views().organizer_panel_container, organizer_panel_bounds);
    }
  
@@ -6766,7 +6964,7 @@ index 8a35c869b1..d054b2b01d 100644
        top_container_layout.bounds.Outset(
            gfx::Outsets::TLBR(0, collapsed_vertical_tab_strip_adjustment, 0, 0));
        for (auto& [child, child_layout] : top_container_layout.children) {
-@@ -933,112 +985,216 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -933,112 +1004,216 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          main_background_bounds.y() > browser_params.visual_client_area.y()) {
        main_background_bounds.Outset(gfx::Outsets::TLBR(1, 0, 0, 0));
      }
@@ -7068,7 +7266,7 @@ index 8a35c869b1..d054b2b01d 100644
    if (IsParentedTo(views().infobar_container, views().browser_view)) {
      gfx::Rect infobar_bounds;
      if (infobar_visible) {
-@@ -1046,60 +1202,67 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1046,60 +1221,67 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        // the toolbar-height side panel shadow box. This is because they only
        // slide down when they are visually adjacent to the toolbar/bookmarks
        // bar.
@@ -7171,7 +7369,7 @@ index 8a35c869b1..d054b2b01d 100644
  
    // Lay out contents container. The contents container contains the multi-
    // contents view when multi-contents are enabled. The checks here are to
-@@ -1111,25 +1274,112 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1111,25 +1293,112 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // for the combination of minimum-sized contents pane and minimum-sized side
    // panel may exceed the width of the window. In this case, the contents pane
    // slides under the side panel.
@@ -7299,7 +7497,7 @@ index 8a35c869b1..d054b2b01d 100644
      if (clip_content_for_animation) {
        // Vertical span is whatever it is, minus any shadow overlay insets.
        unclipped_contents_region.set_y(contents_layout.bounds.y());
-@@ -1154,23 +1404,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1154,23 +1423,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
            unclipped_contents_region.InsetsFrom(contents_layout.bounds);
  
        // Set the target size of the contents.
@@ -7381,7 +7579,7 @@ index 8a35c869b1..d054b2b01d 100644
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state) &&
-@@ -1202,8 +1505,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1202,8 +1524,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      int toolbar_height = 0;
      int caption_button_width = 0;
  
@@ -7399,7 +7597,7 @@ index 8a35c869b1..d054b2b01d 100644
        // Calculate the toolbar height adjacent to the tabstrip. This will be
        // zero if the toolbar is in e.g. an immersive mode overlay, or is not
        // aligned with the tabstrip (which can happen in collapsed mode with
-@@ -1218,7 +1528,9 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1218,7 +1547,9 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      views().vertical_tab_strip_region_view->SetToolbarHeightForLayout(
          std::max(0, toolbar_height));
      views().vertical_tab_strip_region_view->SetCaptionButtonWidthForLayout(
@@ -7410,7 +7608,7 @@ index 8a35c869b1..d054b2b01d 100644
  
      const int padding =
          GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
-@@ -1262,6 +1574,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1262,6 +1593,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          transition_button_opacity);
    }
  
@@ -7487,7 +7685,7 @@ index 8a35c869b1..d054b2b01d 100644
    return layout;
  }
  
-@@ -1269,77 +1651,167 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
+@@ -1269,77 +1670,167 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
      ProposedLayout& layout,
      BrowserLayoutParams params,
      bool needs_exclusion) const {
@@ -7710,7 +7908,7 @@ index 8a35c869b1..d054b2b01d 100644
    // The top container always draws an opaque background in tabbed browser mode
    // to avoid cracking between visual elements.
    background->SetVisible(true);
-@@ -1379,14 +1851,25 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
+@@ -1379,14 +1870,25 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
  }
  
  void BrowserViewTabbedLayoutImpl::OnLayoutParamsChanged(
@@ -7742,7 +7940,7 @@ index 8a35c869b1..d054b2b01d 100644
  }
  
  void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
-@@ -1403,34 +1886,259 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
+@@ -1403,34 +1905,271 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
  void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
      const BrowserLayoutParams& params) {
    layout_data_ = std::make_unique<TransientLayoutData>(params);
@@ -7944,11 +8142,23 @@ index 8a35c869b1..d054b2b01d 100644
 +                              : gfx::Rect();
 +      auto* browser_view =
 +          static_cast<BrowserView*>(views().browser_view.get());
-+      // AppKit이 본문의 원점을 바꾼 뒤에도 같은 물리적 경계에 면을 잇는다.
++      // 가로 배분은 현재 본문의 Content Column을 그대로 따른다.
 +      surface.Offset(browser_view->GetBoundsInScreen().OffsetFromOrigin() -
 +                     top->parent()->GetBoundsInScreen().OffsetFromOrigin());
++      if (top->height() > 0 && !surface.IsEmpty()) {
++        // 본문에 맞는 기존 좌표는 native 1 DIP 보정까지 그대로 유지한다.
++        // 메뉴막대가 바탕을 host 밖으로 밀어낸 경우에만 로컬 여백을 쓴다.
++        const int last_header_y = std::max(
++            0, top->parent()->height() -
++                   yee::kSidebarMetrics.browser_surface_header_height());
++        if (surface.y() < 0 || surface.y() > last_header_y) {
++          surface.set_y(
++              std::min(yee::kSidebarMetrics.content_gutter, last_header_y));
++        }
++      }
 +      yee::UpdateImmersiveHeaderBackdrop(
-+          *top->parent(), surface, browser_view->GetYeeHeaderPresentation());
++          *top->parent(), *browser_view, surface,
++          browser_view->GetYeeHeaderPresentation());
 +      if (auto* sidebar = views().vertical_tab_strip_region_view.get()) {
 +        if (auto* header = sidebar->sidebar_header_actions();
 +            header && header->parent() == top) {
@@ -8009,7 +8219,7 @@ index 8a35c869b1..d054b2b01d 100644
      auto* const vertical_tabs_background =
          views()
              .vertical_tab_strip_region_view->background()
-@@ -1438,7 +2146,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1438,7 +2177,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      CHECK(vertical_tabs_background)
          << "Expected vertical tab strip to have a CustomCornersBackground.";
  
@@ -8023,7 +8233,7 @@ index 8a35c869b1..d054b2b01d 100644
        if (!is_fullscreen(layout_data_->window_state)) {
          frame_color.opacity = 0.0f;
        }
-@@ -1494,6 +2207,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1494,6 +2238,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
  
@@ -8049,7 +8259,7 @@ index 8a35c869b1..d054b2b01d 100644
      vertical_tabs_background->SetCorners(vertical_tabs_corners);
  
      // When the organizer panel is animating open or closed and does not appear
-@@ -1525,7 +2257,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1525,7 +2288,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          views().vertical_tab_strip_region_view->shadow_frame();
      if (vertical_tabs_bottom_corner_amount > 0.0) {
        shadow_frame->SetShadowCornerRadius(vertical_tabs_bottom_corner_size);
@@ -8060,7 +8270,7 @@ index 8a35c869b1..d054b2b01d 100644
        shadow_frame->SetShadowVisible(true);
      } else {
        shadow_frame->SetShadowVisible(false);
-@@ -1551,8 +2285,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1551,8 +2316,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_outline.top = true;
      }
      if (animation.expand_on_hover_width > 0.0) {
@@ -8076,7 +8286,7 @@ index 8a35c869b1..d054b2b01d 100644
      vertical_tabs_background->SetOutline(vertical_tabs_outline);
  
      // Cut the vertical tab strip out of the top container.
-@@ -1582,9 +2323,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1582,9 +2354,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
        // Has to be done after most other adjustments to ensure the correct
        // outline path.
@@ -8091,7 +8301,7 @@ index 8a35c869b1..d054b2b01d 100644
        vertical_tabs_background->SetUseBackgroundBlur(use_blur_background);
        if (use_blur_background) {
          // The opacity of the backdrop needs to fade over the entire animation
-@@ -1595,6 +2338,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1595,6 +2369,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
              views().vertical_tab_strip_region_view, blur_background_opacity);
        }
      }
@@ -8103,7 +8313,7 @@ index 8a35c869b1..d054b2b01d 100644
    } else if (layout_data_->tab_strip_type == TabStripType::kHorizontal &&
               !is_fullscreen(layout_data_->window_state) && in_glass_mode()) {
      frame_color.opacity = 0.0f;
-@@ -1604,6 +2352,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1604,6 +2383,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().toolbar->background()->AsA<CustomCornersBackground>();
    CHECK(toolbar_background)
        << "Expected toolbar to have a CustomCornersBackground.";
@@ -8114,7 +8324,7 @@ index 8a35c869b1..d054b2b01d 100644
  
    // Set toolbar corners.
    CustomCornersBackground::Corners toolbar_corners;
-@@ -1651,6 +2403,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1651,6 +2434,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().top_container->background()->AsA<CustomCornersBackground>();
    CHECK(top_container_background)
        << "Expected top container to have a CustomCornersBackground.";
@@ -8127,7 +8337,7 @@ index 8a35c869b1..d054b2b01d 100644
  
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
-@@ -1674,29 +2432,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1674,29 +2463,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    // Clip the side panel so it doesn't run off the edge of the browser or into
    // the vertical tab strip.
    if (IsParentedToAndVisible(views().side_panel, views().browser_view)) {
@@ -8166,7 +8376,7 @@ index 8a35c869b1..d054b2b01d 100644
    }
  
    if (views().main_background_region &&
-@@ -1744,10 +2488,66 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1744,10 +2519,66 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            main_background->GetWindowCorner(/*upper=*/false);
      }
  

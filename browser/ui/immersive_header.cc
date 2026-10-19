@@ -30,7 +30,8 @@ class YeeImmersiveHeaderBackdrop : public views::View {
   METADATA_HEADER(YeeImmersiveHeaderBackdrop, views::View)
 
  public:
-  YeeImmersiveHeaderBackdrop() {
+  explicit YeeImmersiveHeaderBackdrop(views::View& shell_source)
+      : shell_source_(&shell_source) {
     SetID(yee::kImmersiveHeaderBackdropViewId);
     SetCanProcessEventsWithinSubtree(false);
     fill_ = AddChildView(yee::CreateBrowserSurfaceFillView(std::nullopt));
@@ -58,17 +59,19 @@ class YeeImmersiveHeaderBackdrop : public views::View {
 
   void OnPaintBackground(gfx::Canvas* canvas) override {
     // AppKit accessory 자체의 흰 바탕을 가리고 본문의 shell 색을 이어 준다.
-    canvas->FillRect(GetLocalBounds(), yee::ResolveShellBackgroundColor(
-                                           *GetColorProvider(),
-                                           GetWidget()->ShouldPaintAsActive()));
+    canvas->FillRect(GetLocalBounds(),
+                     yee::ResolveShellBackgroundColor(
+                         *shell_source_->GetColorProvider(),
+                         shell_source_->GetWidget()->ShouldPaintAsActive()));
   }
 
  protected:
   void AddedToWidget() override {
     views::View::AddedToWidget();
     paint_as_active_subscription_ =
-        GetWidget()->RegisterPaintAsActiveChangedCallback(base::BindRepeating(
-            &views::View::SchedulePaint, base::Unretained(this)));
+        shell_source_->GetWidget()->RegisterPaintAsActiveChangedCallback(
+            base::BindRepeating(&views::View::SchedulePaint,
+                                base::Unretained(this)));
   }
 
   void RemovedFromWidget() override {
@@ -83,6 +86,7 @@ class YeeImmersiveHeaderBackdrop : public views::View {
 
   raw_ptr<views::View> fill_;
   raw_ptr<views::View> outline_;
+  raw_ptr<views::View> shell_source_;
   std::optional<yee::BrowserSurfacePresentation> presentation_;
   base::CallbackListSubscription paint_as_active_subscription_;
 };
@@ -131,13 +135,14 @@ void SetSidebarHeaderHost(views::View& sidebar,
 
 void UpdateImmersiveHeaderBackdrop(
     views::View& host,
+    views::View& shell_source,
     const gfx::Rect& surface_bounds,
     std::optional<BrowserSurfacePresentation> presentation) {
   auto* backdrop = static_cast<YeeImmersiveHeaderBackdrop*>(
       host.GetViewByID(kImmersiveHeaderBackdropViewId));
   if (!backdrop) {
-    backdrop =
-        host.AddChildViewAt(std::make_unique<YeeImmersiveHeaderBackdrop>(), 0);
+    backdrop = host.AddChildViewAt(
+        std::make_unique<YeeImmersiveHeaderBackdrop>(shell_source), 0);
   }
   backdrop->SetVisible(true);
   backdrop->SetBoundsRect(host.GetLocalBounds());

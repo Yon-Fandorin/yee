@@ -182,8 +182,10 @@ SkColor ResolveShellPaintColor(const views::View& view) {
       yee::ResolveShellBackgroundColor(*color_provider, is_active);
 
   const ui::NativeTheme* const native_theme = view.GetNativeTheme();
-  const bool use_glass = is_active && features::IsGlassFrameEnabled() &&
-                         native_theme &&
+  // macOS 전체화면에는 native glass가 없으므로 공통 불투명 바탕을 쓴다.
+  const bool fullscreen = widget && widget->IsFullscreen();
+  const bool use_glass = is_active && !fullscreen &&
+                         features::IsGlassFrameEnabled() && native_theme &&
                          !native_theme->prefers_reduced_transparency();
   return use_glass ? SkColorSetA(shell_color, kGlassSurfaceTintAlpha)
                    : shell_color;

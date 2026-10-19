@@ -27,6 +27,7 @@ void SetSidebarHeaderHost(views::View& sidebar,
 // 두 창에 나뉜 동일한 Browser Surface의 바탕과 윤곽을 이어 그린다.
 void UpdateImmersiveHeaderBackdrop(
     views::View& host,
+    views::View& shell_source,
     const gfx::Rect& surface_bounds,
     std::optional<BrowserSurfacePresentation> presentation);
 
