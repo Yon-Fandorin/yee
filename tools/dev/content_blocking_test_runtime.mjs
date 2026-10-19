@@ -1,5 +1,17 @@
 // Lifecycle helpers for the native fixture; dependencies are injectable in tests.
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+export function uiTestWindowArgs() {
+  // macOS 밖에서는 셸이나 모니터 도구를 요구하지 않는다.
+  if (process.platform !== 'darwin') return [];
+  const script = fileURLToPath(new URL('./ui-test-window-args.sh', import.meta.url));
+  return execFileSync('/bin/zsh', [script], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit']
+  }).split(/\r?\n/).filter(Boolean);
+}
+
 export const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 export async function connectCDP(url, Socket = globalThis.WebSocket, timeout = 15000) {
   const socket = new Socket(url);

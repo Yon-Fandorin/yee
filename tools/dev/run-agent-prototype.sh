@@ -36,6 +36,7 @@ done
 /usr/bin/swift -module-cache-path "$LOCAL_BUILD_ROOT/swift-module-cache" \
   "$SCRIPT_DIR/check-ui-session.swift"
 require_integrated_yee_app_current
+prepare_ui_test_display
 gracefully_quit_yee
 BRIDGE_DIR="$(mktemp -d /private/tmp/yee-agent.XXXXXX)"
 PROFILE_DIR="$BRIDGE_DIR/profile"
@@ -43,6 +44,7 @@ if [[ -n "${YEE_TEST_SIDEBAR_WIDTH:-}" ]]; then
   python3 "$SCRIPT_DIR/prepare-agent-test-profile.py" "$BRIDGE_DIR" "$YEE_TEST_SIDEBAR_WIDTH"
 fi
 /usr/bin/open -n "$YEE_APP_DIR" --args \
+  "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
   "${launch_window_args[@]}" \
   "--user-data-dir=$PROFILE_DIR" \
   "--yee-agent-bridge=$BRIDGE_DIR" \

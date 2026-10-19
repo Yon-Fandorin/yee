@@ -9,6 +9,8 @@ import tempfile
 import threading
 import time
 
+from ui_test_display import ui_test_window_args
+
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / '.local-build/chromium/src/out/YeePilot/Yee.app/Contents/MacOS/Yee'
 FIXTURE = ROOT / 'tests/fixtures/content-blocking/updated-lists.html'
@@ -40,10 +42,11 @@ def seed(store, name):
 
 subprocess.run(['zsh', '-c', 'set -e; source "$1"; require_integrated_yee_app_current',
                 'yee-list-preflight', str(ROOT / 'tools/dev/common.zsh')], check=True)
-shutdown()
 reports = []
 for mode, expected in [('current', 'b'), ('corrupt-current', 'a'),
                        ('corrupt-state', 'a'), ('bundled-fallback', 'none')]:
+    window_args = ui_test_window_args()
+    shutdown()
     with tempfile.TemporaryDirectory(prefix='yee-baseline-update-') as temporary:
         profile = Path(temporary).resolve() / 'profile'; profile.mkdir()
         store = profile / 'YeeContentBlockingLists'
@@ -84,7 +87,7 @@ for mode, expected in [('current', 'b'), ('corrupt-current', 'a'),
         threading.Thread(target=server.serve_forever, daemon=True).start()
         url = f'http://yee-fixture.test:{server.server_port}/fixture?expected={expected}'
         with tempfile.TemporaryFile(mode='w+') as diagnostics:
-            process = subprocess.Popen([str(APP), '--user-data-dir=' + str(profile),
+            process = subprocess.Popen([str(APP), *window_args, '--user-data-dir=' + str(profile),
                 '--no-first-run', '--no-default-browser-check', '--no-proxy-server',
                 '--disable-background-networking', '--disable-component-update',
                 '--disable-sync', '--disable-extensions', '--remote-debugging-port=0',

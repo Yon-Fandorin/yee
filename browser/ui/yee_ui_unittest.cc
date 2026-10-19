@@ -384,6 +384,10 @@ TEST(YeeSurfaceGeometryTest, SplitAndSingleHeadersShareMetricsContract) {
   EXPECT_EQ(0, hidden.bottom_inset);
   EXPECT_EQ(0, ResolveSidebarFlyoutGeometry(1.0, 0.0, true).top_inset);
   EXPECT_EQ(12, ResolveSidebarFlyoutGeometry(0.0, 1.0, false).top_inset);
+  const auto external = ResolveSidebarFlyoutGeometry(0.0, 1.0, false, true);
+  EXPECT_EQ(flyout.top_inset,
+            kSidebarMetrics.titlebar_height + external.top_inset);
+  EXPECT_EQ(flyout.hit_test_top_inset, external.hit_test_top_inset);
   EXPECT_EQ(42, kSidebarMetrics.browser_surface_header_height());
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
             kSidebarMetrics.split_pane_header_height);
@@ -528,6 +532,20 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_EQ(kSidebarMetrics.content_corner_radius -
                 kSidebarMetrics.browser_surface_outline_width,
             frame.decoration.infobar_top_corner_radius);
+
+  // 외부 Header는 본문 행을 더하지 않고 같은 카드의 위쪽을 이어 준다.
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/false,
+      /*header_participates=*/false, /*header_height=*/42,
+      /*header_above_content_height=*/42});
+  input.native_notice_flow_allocation = gfx::Rect(250, 0, 944, 794);
+  input.native_body_allocation = input.native_notice_flow_allocation;
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_EQ(0, frame.header_bounds.bottom());
+  EXPECT_EQ(0, frame.multi_contents_bounds.y());
+  EXPECT_EQ(-42, frame.decoration.combined_outline_bounds.y());
+  EXPECT_EQ(42, frame.decoration.combined_header_separator_offset);
+  EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
 
   input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
       gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/true,

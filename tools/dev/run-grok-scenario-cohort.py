@@ -28,6 +28,7 @@ from agent_scenario_auth import publish as publish_auth
 from browser_trial_handoff import publish, respond
 from recorded_mcp_session import RecordedSession
 from yee_browser_transcript import Transcript
+from ui_test_display import ui_test_window_args
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -329,6 +330,7 @@ async def aside_trial(root, case, args, fixture, prompt, run_model=None):
 
 async def yee_trial(root,case,args,fixture,prompt,run_model=None):
     executable = yee_executable(args.yee_app)
+    window_args = ui_test_window_args()
     bridge=Path('/private/tmp/yee-agent.'+uuid.uuid4().hex[:12]);bridge.mkdir(mode=0o700)
     save(case/'bridge.json',{'bridge':str(bridge)})
     browser_process = None
@@ -363,7 +365,7 @@ async def yee_trial(root,case,args,fixture,prompt,run_model=None):
         if args.yee_app is None:
             subprocess.run(['/bin/zsh','-c','source tools/dev/common.zsh\nrequire_integrated_yee_app_current'],cwd=REPO,check=True)
         browser_log = (case/'yee-browser.stderr').open('wb')
-        browser_process = subprocess.Popen([str(executable), '--user-data-dir='+str(bridge/'profile'),
+        browser_process = subprocess.Popen([str(executable), *window_args, '--user-data-dir='+str(bridge/'profile'),
             '--yee-agent-bridge='+str(bridge), '--no-first-run', '--no-default-browser-check',
             '--force-device-scale-factor=1', '--window-size=1658,954', *urls],
             stdout=browser_log, stderr=subprocess.STDOUT)

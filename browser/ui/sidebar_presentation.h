@@ -57,9 +57,11 @@ struct SidebarFlyoutGeometry {
 };
 
 // 창 버튼 아래에서 열며 페이지 폭과 native caption 기준선은 유지한다.
-SidebarFlyoutGeometry ResolveSidebarFlyoutGeometry(double pinned,
-                                                   double hover,
-                                                   bool toolbar_visible);
+SidebarFlyoutGeometry ResolveSidebarFlyoutGeometry(
+    double pinned,
+    double hover,
+    bool toolbar_visible,
+    bool toolbar_above_content = false);
 
 SkColor ResolveSidebarFlyoutColor(const ui::ColorProvider& colors, bool active);
 

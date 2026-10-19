@@ -34,6 +34,7 @@ YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:Page
 INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState:*TopContainerBackground*'
 FLYOUT_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation'
 INTERACTIVE_FILTER+=":$FLYOUT_FILTER"
+INTERACTIVE_FILTER+=':ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip:ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren:ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction'
 # Keep transition and compositor regressions in the ordinary checkpoint gate,
 # including the combined states that isolated open/close tests cannot cover.
 TRANSITION_TESTS=(
@@ -85,8 +86,10 @@ fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Running focused applied BrowserView and Side Panel layout tests."
+  prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
+    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
@@ -94,8 +97,10 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
     --ui-test-action-timeout=10000
 
   print "Running transition and hard-clip regressions in RTL at 125% scale."
+  prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
+    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$TRANSITION_FILTER:$RENDERER_LIFECYCLE_FILTER:$PHYSICAL_RESIZE_FILTER:$FLYOUT_FILTER" \
     --force-ui-direction=rtl \
     --force-device-scale-factor=1.25 \
@@ -107,8 +112,10 @@ fi
 
 if [[ "$MODE" == "browser" || "$MODE" == "all" ]]; then
   print "Running the explicit browser-level Side Panel and overlay lifecycle gate."
+  prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/browser_tests" \
+    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$BROWSER_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0

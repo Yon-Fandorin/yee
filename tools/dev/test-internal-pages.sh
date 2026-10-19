@@ -42,6 +42,8 @@ if [[ "$test_ui" == off ]]; then
   browser_test_args=(--headless --allow-chrome-scheme-url --disable-gpu)
 else
   print "Running Internal Pages with visible windows; tests may take focus."
+  prepare_ui_test_display
+  browser_test_args=("${YEE_UI_TEST_WINDOW_ARGS[@]}")
   gracefully_quit_yee
 fi
 

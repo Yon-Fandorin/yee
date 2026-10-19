@@ -1,5 +1,18 @@
 # Runtime helpers; loaded by common.zsh.
 
+prepare_ui_test_display() {
+  typeset -ga YEE_UI_TEST_WINDOW_ARGS=()
+  [[ "$(uname -s)" == Darwin ]] || return 0
+
+  local display_args
+  mkdir -p "$LOCAL_BUILD_ROOT/swift-module-cache"
+  display_args="$(xcrun swift -module-cache-path "$LOCAL_BUILD_ROOT/swift-module-cache" \
+    "$COMMON_DIR/ui-test-display.swift")" || return $?
+  if [[ -n "$display_args" ]]; then
+    YEE_UI_TEST_WINDOW_ARGS=("${(@f)display_args}")
+  fi
+}
+
 integrated_yee_app_is_current() {
   local unbundled_framework="${1:-$YEE_UNBUNDLED_FRAMEWORK_BIN}"
   local bundled_framework="${2:-$YEE_BUNDLED_FRAMEWORK_BIN}"

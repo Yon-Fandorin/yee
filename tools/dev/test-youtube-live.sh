@@ -18,6 +18,7 @@ if [[ "${2:-}" != "--no-build" ]]; then
   build_regression_targets "YouTube live playback" \
     chrome/browser/ui/views/yee:site_controls_browsertests
 fi
+prepare_ui_test_display
 gracefully_quit_yee
 REPORT_DIR="$LOCAL_BUILD_ROOT/youtube-live"
 mkdir -p "$REPORT_DIR"
@@ -32,6 +33,7 @@ if [[ -n "${YEE_LIVE_YOUTUBE_VIDEO:-}" ]]; then
   REPORT_NAME="$REPORT_NAME-$YEE_LIVE_YOUTUBE_VIDEO"
 fi
 "$YEE_OUT_DIR/site_controls_browsertests" \
+  "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
   --gtest_filter='YouTubeLiveBrowserTest.DISABLED_MidrollObservation' \
   --gtest_also_run_disabled_tests \
   --test-launcher-jobs=1 --test-launcher-retry-limit=0 \

@@ -9,7 +9,7 @@ import {promisify} from 'node:util';
 import net from 'node:net';
 import http from 'node:http';
 import {gzip} from 'node:zlib';
-import {connectCDP, closeOwnedBrowser, pause, requireShutdown} from './content_blocking_test_runtime.mjs';
+import {connectCDP, closeOwnedBrowser, pause, requireShutdown, uiTestWindowArgs} from './content_blocking_test_runtime.mjs';
 import {sanitizeTraceEvent} from './performance_trace.mjs';
 import {classifyProfileScript, summarizeCPUWindow} from './performance_cpu.mjs';
 
@@ -259,6 +259,7 @@ async function processSnapshot(session) {
     rssKiB:rss.get(p.id)??null})),rssMeaning:'Resident size per process; shared pages may be counted more than once.'};
 }
 async function launch(label, app, mode, profile, performanceCase=false) {
+  const windowArgs = uiTestWindowArgs();
   if(app===yeeApp) await promisify(execFile)('zsh', ['-c',
     'source "$1"; require_integrated_yee_app_current', 'yee-live-review', path.join(root,'tools/dev/common.zsh')]);
   const {stdout} = await promisify(execFile)('python3',
@@ -272,7 +273,7 @@ async function launch(label, app, mode, profile, performanceCase=false) {
   const port = reservation.address().port;
   await new Promise(resolve=>reservation.close(resolve));
   const log = await fs.open(path.join(directory, 'browser.log'), 'w');
-  const args = ['-W', '-n', app, '--args', `--user-data-dir=${profile}`, '--no-first-run',
+  const args = ['-W', '-n', app, '--args', ...windowArgs, `--user-data-dir=${profile}`, '--no-first-run',
     '--no-default-browser-check', '--hide-crash-restore-bubble', `--remote-debugging-port=${port}`,
     ...(performanceCase&&ignorePerformanceOcclusion?['--disable-backgrounding-occluded-windows']:[]),
     ...(mode === 'off' ? ['--disable-features=YeeContentBlocking'] : []), 'about:blank'];

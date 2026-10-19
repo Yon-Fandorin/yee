@@ -25,7 +25,7 @@ class DevelopmentToolsTest(unittest.TestCase):
         shutil.copytree(ROOT / 'tools/dev/lib', self.dev / 'lib')
         for name in ('common.zsh', 'build.sh', 'build-ui.sh',
                      'test-header.sh', 'test-sidebar.sh',
-                     'browser_bundle_executables.py'):
+                     'browser_bundle_executables.py', 'ui-test-display.swift'):
             shutil.copy(ROOT / 'tools/dev' / name, self.dev / name)
         self.overlay = self.repo / 'tools/overlay'
         self.overlay.mkdir(parents=True)
@@ -120,6 +120,10 @@ class DevelopmentToolsTest(unittest.TestCase):
     def test_native_gates_require_explicit_interaction_and_do_not_repeat_header_cases(self):
         """기본 실행은 단위 검사만, 실제 입력과 Header 중복은 명시한 범위만 실행한다."""
         self.write_tool(self.dev / 'test-run-preflight.sh', 'exit 0\n')
+        self.write_tool(self.bin / 'uname', 'print Darwin\n')
+        self.write_tool(self.bin / 'xcrun',
+                        'print "display-probe" >> "$YEE_TEST_LOG"\n'
+                        'print -r -- --window-position=1776,-1395\n')
         for binary in ('yee_layout_unittests', 'yee_header_unittests', 'interactive_ui_tests'):
             self.write_tool(self.out / binary,
                             'printf "run:%s\\n" "${0:t}" >> "$YEE_TEST_LOG"\n'
@@ -140,6 +144,10 @@ class DevelopmentToolsTest(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual([event.removeprefix('run:') for event in self.events()
                                       if event.startswith('run:')], expected)
+                    visible_runs = expected.count('interactive_ui_tests')
+                    self.assertEqual(self.events().count('display-probe'), visible_runs)
+                    self.assertEqual(self.events().count('arg:--window-position=1776,-1395'),
+                                     visible_runs)
                     if arguments == ('interactive', '--no-build'):
                         filters[name] = next(event.removeprefix('arg:--gtest_filter=')
                                              for event in self.events()

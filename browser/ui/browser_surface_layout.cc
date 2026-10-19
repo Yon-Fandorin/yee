@@ -24,8 +24,13 @@ ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
   result.split = input.split;
   result.content_column_bounds = input.content_column_bounds;
   result.surface_seed_bounds = input.content_column_bounds;
-  result.surface_seed_bounds.Inset(input.surface_insets);
-  if (!input.split && input.header_participates &&
+  gfx::Insets insets = input.surface_insets;
+  if (!input.split && input.header_above_content_height > 0) {
+    insets.set_top(-input.header_above_content_height);
+  }
+  result.surface_seed_bounds.Inset(insets);
+  if (!input.split &&
+      (input.header_participates || input.header_above_content_height > 0) &&
       !result.surface_seed_bounds.IsEmpty()) {
     result.header_bounds = gfx::Rect(
         result.surface_seed_bounds.x(), result.surface_seed_bounds.y(),

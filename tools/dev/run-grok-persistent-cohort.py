@@ -159,6 +159,7 @@ async def run(args):
     verify_full();save(root/'full-freeze.json',full_freeze)
     save(root/'plan.json',{'schema':'yee.actual-persistent-cohort.v1','browser':browser,'seed':args.seed,'model':'grok-4.6','reasoning_effort':'high','cases':[[browser,f'S{i:02}'] for i in range(1,13)],'timeout_seconds':240,'requested_turn_cap':12,'turn_cap_enforcement':'usage audit; ACP provider cap not verified','approval_wait_comparison_seconds':0,'model_retries':0,'no_best_of':True,'initial_setup_included':True,'started_monotonic_ns':started,'yee_app':str(args.yee_app)})
     executable=c.yee_executable(args.yee_app);bridge=None;process=None;browser_log=None;actor=None;actor_events=None;actor_err=None
+    window_args=c.ui_test_window_args() if browser=='yee' else []
     prompts=[];failed=False
     owner_trace=Transcript(str(root/'aside-owner-global.jsonl')) if browser=='aside' else None
     owner_err=new_file(root/'aside-owner.stderr') if browser=='aside' else None
@@ -189,7 +190,7 @@ async def run(args):
                     save(case/'bridge.json',{'bridge':str(bridge)})
                     if process is None:
                         browser_log=new_file(root/'yee-browser.stderr','wb')
-                        process=subprocess.Popen([str(executable),'--user-data-dir='+str(bridge/'profile'),'--yee-agent-bridge='+str(bridge),'--no-first-run','--no-default-browser-check','--force-device-scale-factor=1','--window-size=1658,954',c.ORIGIN+'/'],stdout=browser_log,stderr=subprocess.STDOUT)
+                        process=subprocess.Popen([str(executable),*window_args,'--user-data-dir='+str(bridge/'profile'),'--yee-agent-bridge='+str(bridge),'--no-first-run','--no-default-browser-check','--force-device-scale-factor=1','--window-size=1658,954',c.ORIGIN+'/'],stdout=browser_log,stderr=subprocess.STDOUT)
                     else:
                         save(case/'launch.json',{'bridge':str(bridge),'peer_pid':process.pid,'executable':str(executable),'pid_source':'same_direct_child_for_entire_cohort'})
                         await c.ui_step(root,case,'yee_reload_task',expected_url=c.ORIGIN+'/')

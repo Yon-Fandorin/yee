@@ -53,8 +53,10 @@ fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Interactive Sidebar regressions open real Yee windows and may take focus."
+  prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
+    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \

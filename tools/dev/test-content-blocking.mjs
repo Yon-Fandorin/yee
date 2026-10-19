@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
-import {closeOwnedBrowser, connectCDP, pause, requireShutdown} from './content_blocking_test_runtime.mjs';
+import {closeOwnedBrowser, connectCDP, pause, requireShutdown, uiTestWindowArgs} from './content_blocking_test_runtime.mjs';
 
 const root = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const executable = process.argv[2];
@@ -61,16 +61,16 @@ async function prepareShutdownHelper() {
 const evidence = [];
 let passed = false, failure;
 try {
-  await requireYeeShutdown();
   const shutdownHelper = await prepareShutdownHelper();
   for (const mode of ['off', 'on', 'site-exception']) {
+    const windowArgs = uiTestWindowArgs();
     await requireYeeShutdown();
     requests = [];
     const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'yee-blocking-'));
     const log = await fs.open(path.join(profile, 'browser.log'), 'w');
     const extra = mode === 'off' ? ['--disable-features=YeeContentBlocking'] :
       mode === 'site-exception' ? ['--yee-content-blocking-disabled-sites=yee-fixture.test'] : [];
-    const browser = spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run',
+    const browser = spawn(executable, [...windowArgs, `--user-data-dir=${profile}`, '--no-first-run',
       '--no-default-browser-check', '--remote-debugging-port=0', '--no-proxy-server',
       '--disable-background-networking', '--disable-component-update',
       '--yee-content-blocking-test-rules',

@@ -20,13 +20,15 @@ namespace yee {
 
 SidebarFlyoutGeometry ResolveSidebarFlyoutGeometry(double pinned,
                                                    double hover,
-                                                   bool toolbar_visible) {
+                                                   bool toolbar_visible,
+                                                   bool toolbar_above_content) {
   pinned = std::clamp(pinned, 0.0, 1.0);
   hover = std::clamp(hover, 0.0, 1.0);
   const int caption_height =
       toolbar_visible ? kSidebarMetrics.titlebar_height : 0;
-  const int top_gap = toolbar_visible ? kSidebarMetrics.content_gutter
-                                      : kSidebarMetrics.sidebar_flyout_inset;
+  const int top_gap = (toolbar_visible || toolbar_above_content)
+                          ? kSidebarMetrics.content_gutter
+                          : kSidebarMetrics.sidebar_flyout_inset;
   return {
       .leading_offset =
           base::ClampRound(kSidebarMetrics.sidebar_flyout_inset * hover),

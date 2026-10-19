@@ -42,6 +42,7 @@
 | 분할 생성·제거 중 Chromium의 focus 정책이 popup을 닫는 동작은 우회하지 않고, popup 색·anchor는 단일과 안정화된 각 분할 상태에서 별도로 검증 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
+| macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
 
 ## 3. 실제 화면에서만 확인할 것
 

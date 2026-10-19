@@ -55,6 +55,13 @@ Sidebar Flyout은 페이지 위에 뜨는 독립 패널이다. 페이지 폭을 
 12 DIP 안쪽으로 떠서 네 모서리에 Browser Content와 같은 12 DIP 반지름을 쓴다.
 접힌 Edge Rail도 Title Bar 아래에서 시작하며 창 버튼 영역은 hover 대상에서 제외한다.
 전체 화면에서 Toolbar가 숨겨지면 상단 외곽도 12 DIP를 사용한다.
+macOS immersive 전체화면에서도 일반 창의 Sidebar Column·Content Column과
+하나의 Browser Surface를 유지한다. native overlay 창은 Sidebar Header와 Toolbar의 표시·입력을
+함께 소유한다. Toolbar 항상 표시 상태에서는 본문이 상단 카드의 바탕·윤곽을
+이어 받고 Header 행을 중복 예약하지 않는다. 숨김 상태에서 잠시 드러나는 Toolbar는
+본문 위에 겹친다. Sidebar hover 패널에서는 같은 Header를 패널 안으로 옮기며,
+전체화면 해제 시 기존 Header parent와 합성 순서를 복구한다. 분할에서는 각 Pane Header가
+주소줄을 소유하므로 빈 상단 native 행을 예약하지 않고 팝업도 본문 창에 연결한다.
 Edge Rail과 플라이아웃 사이의 이동 통로는 하나의 hover 대상이다.
 목록의 행 높이·아이콘·좌우 inset과 Header·Footer는 고정 Sidebar와 같다.
 임시 패널은 배경 흐림 없이 불투명한 native 바탕에 프레임색을 은은하게 남긴다.

@@ -211,6 +211,14 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 검사를 중복 실행하지 않으므로 두 영역을 바꿨을 때 각각의 gate를 선택한다. 실제
 hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 대체하지 않는다.
 
+macOS에서 회전된 모니터가 연결되어 있으면 표시형 UI 검사·Site Controls·Internal
+Pages·콘텐츠 차단 fixture·YouTube 관찰·Yee Agent 시험 실행은 해당 모니터의 작업 영역
+안에 창을 연다. `run-agent-prototype.sh`의 격리된 시험 창도 같은 배치를 쓴다.
+전체화면도 그 창이 있는 모니터에서 시작한다. 각 브라우저 실행 직전에 현재 회전값과
+작업 영역을 읽으며 회전된 모니터가 없으면 기본 배치를 사용한다.
+`--window-position`으로 시작 위치만 지정하며 검사별 창 크기와 배율은 그대로 적용한다.
+Python·JavaScript 검사는 `ui-test-window-args.sh`를 통해 같은 모니터 선택을 사용한다.
+
 ### 콘텐츠 차단 검증
 
 콘텐츠 차단과 Site Controls는 다음 명령으로 확인한다.

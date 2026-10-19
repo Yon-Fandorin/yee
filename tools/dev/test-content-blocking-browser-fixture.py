@@ -8,12 +8,15 @@ import signal
 import subprocess
 import tempfile
 
+from ui_test_display import ui_test_window_args
+
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--yee', action='store_true', help='Use the newly built, visible Yee app')
 parser.add_argument('--response-only', action='store_true', help='Focus on body readers, clone and error semantics')
 options = parser.parse_args()
 yee_executable = ROOT / '.local-build/chromium/src/out/YeePilot/Yee.app/Contents/MacOS/Yee'
+window_args = ui_test_window_args() if options.yee else []
 if options.yee:
     subprocess.run(['zsh', '-c', 'set -e; source "$1"; require_integrated_yee_app_current; gracefully_quit_yee',
                     'yee-web-api-fixture', str(ROOT / 'tools/dev/common.zsh')], check=True)
@@ -126,6 +129,7 @@ with tempfile.TemporaryDirectory(prefix="yee-blocking-fixture-") as directory:
                     json.dumps(scripts).replace('<', '\\u003c') + ';</script><script>' +
                     probe.replace('</script', '<\\/script') + '</script>')
     command = [str(yee_executable) if options.yee else '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+               *window_args,
                *([] if options.yee else ['--headless=new', '--disable-gpu', '--no-sandbox']), '--no-first-run',
                '--no-default-browser-check', '--disable-background-networking',
                '--disable-component-update', '--disable-sync', '--disable-extensions',

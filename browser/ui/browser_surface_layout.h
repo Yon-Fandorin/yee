@@ -25,6 +25,8 @@ struct BrowserSurfaceSeedInput {
   bool split = false;
   bool header_participates = false;
   int header_height = 0;
+  // 별도 native Header 아래에서 시작하는 본문은 같은 카드를 위로 연결한다.
+  int header_above_content_height = 0;
 };
 
 struct ResolvedBrowserSurfaceSeed {
