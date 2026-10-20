@@ -17,12 +17,18 @@
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/native_theme/native_theme_base.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
 namespace {
+
+class SurfaceTestNativeTheme final : public ui::NativeThemeBase {
+ public:
+  ~SurfaceTestNativeTheme() override = default;
+};
 
 void SetSidebarPaletteForTesting(ui::ColorProvider& provider, bool dark) {
   provider.SetColorForTesting(
@@ -159,17 +165,14 @@ TEST(YeeSurfaceColorTest, FocusFollowsTextPolarityOnChromaticPages) {
 TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
   ui::ColorProviderManager& manager = ui::ColorProviderManager::Get();
   const size_t cache_size = manager.color_provider_cache_size_for_testing();
-  const auto expected_custom_colors = [](SkColor surface) {
-    const BrowserSurfacePresentation presentation =
-        ResolveBrowserSurfacePresentation(surface, 0, 0, 0);
-    const SkColor hover_overlay = SkColorSetA(
-        color_utils::GetColorWithMaxContrast(presentation.surface), 0x0F);
+  const auto expected_custom_colors = [](const BrowserSurfacePresentation&
+                                             presentation) {
     return std::array<std::pair<ui::ColorId, SkColor>, 26>{
         {{kColorOmniboxResultsBackground, presentation.surface},
          {kColorOmniboxResultsBackgroundHovered, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundSelected, presentation.popup_selected},
          {kColorOmniboxResultsBackgroundIph, presentation.popup_hover},
-         {kColorOmniboxResultsBackgroundHoverOverlay, hover_overlay},
+         {kColorOmniboxResultsBackgroundHoverOverlay, presentation.popup_hover},
          {kColorOmniboxBubbleOutline, presentation.popup_outline},
          {kColorOmniboxResultsFocusIndicator, presentation.focus_stroke},
          {kColorOmniboxResultsChipBackground, presentation.popup_hover},
@@ -204,7 +207,8 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
        {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x7E, 0x7E, 0x7E),
         SkColorSetRGB(0x2A, 0x64, 0x91)}) {
     const BrowserSurfacePresentation presentation =
-        ResolveBrowserSurfacePresentation(surface, 0, 0, 0);
+        ResolveBrowserSurfacePresentation(surface, 0, 0, 0,
+                                          SkColorSetRGB(0xAD, 0x32, 0x94));
     ui::ColorProviderKey key;
     ui::ColorProviderKey native_key = key;
     native_key.color_mode = color_utils::IsDark(surface)
@@ -214,7 +218,8 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
         manager.CreateUncachedColorProvider(native_key);
     std::unique_ptr<ui::ColorProvider> provider =
         CreateBrowserSurfaceOmniboxPopupColorProvider(key, presentation);
-    for (const auto& [color_id, expected] : expected_custom_colors(surface)) {
+    for (const auto& [color_id, expected] :
+         expected_custom_colors(presentation)) {
       EXPECT_EQ(expected, provider->GetColor(color_id));
     }
     // Security warnings are semantic Chromium state, not Yee presentation.
@@ -260,6 +265,21 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
              ui::ColorProviderKey::ForcedColors::kSystem;
          return std::array{high_contrast, forced_colors};
        }()) {
+    SurfaceTestNativeTheme theme;
+    theme.set_forced_colors(key.forced_colors);
+    theme.set_preferred_contrast(
+        key.contrast_mode == ui::ColorProviderKey::ContrastMode::kHigh
+            ? ui::NativeTheme::PreferredContrast::kMore
+            : ui::NativeTheme::PreferredContrast::kCustom);
+    EXPECT_TRUE(ShouldUseNativeBrowserSurfaceColors(theme));
+    // 강제 색의 낮은 대비도 시스템 팔레트를 보존한다. 일반 낮은 대비는
+    // 기존 페이지색을 사용한다.
+    if (key.forced_colors != ui::ColorProviderKey::ForcedColors::kNone) {
+      theme.set_preferred_contrast(ui::NativeTheme::PreferredContrast::kLess);
+      EXPECT_TRUE(ShouldUseNativeBrowserSurfaceColors(theme));
+      theme.set_forced_colors(ui::ColorProviderKey::ForcedColors::kNone);
+      EXPECT_FALSE(ShouldUseNativeBrowserSurfaceColors(theme));
+    }
     std::unique_ptr<ui::ColorProvider> native =
         manager.CreateUncachedColorProvider(key);
     std::unique_ptr<ui::ColorProvider> provider =

@@ -54,7 +54,14 @@ class InlineProductIconGenerationTest(unittest.TestCase):
         paths = generator.paths_from(ET.parse(source).getroot())
         expected_geometry = [path.attrib['d'] for path in paths]
         chromium = ROOT / '.local-build/chromium/src'
-        outputs = generator.embedded_logos(chromium, paths)
+        upstream_blobs = generator.upstream_input_blobs(chromium)
+        outputs = generator.embedded_logos(chromium, paths, upstream_blobs)
+        manifest = ROOT / 'assets/brand/generated/manifest.json'
+        package = json.loads(manifest.read_text(encoding='utf-8'))
+        self.assertEqual(package['upstream_inputs'], upstream_blobs)
+        for relative, generated in outputs.items():
+            self.assertEqual((manifest.parent / 'files' / relative).read_bytes(),
+                             generated.encode('utf-8'), relative)
         product_group = re.compile(r'<g id="chrome-product"[^>]*>.*?</g>', re.DOTALL)
         for relative in ('ui/webui/resources/cr_elements/icons.html.ts',
                          'chrome/browser/resources/settings/icons.html.ts',

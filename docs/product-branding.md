@@ -45,6 +45,7 @@ URL scheme으로 사용할 수 없는 이름은 `internal_url_scheme`에 영문 
 `primary` 또는 `secondary`를 사용한다. 단색 원본은 기본 `primary`를 따른다.
 `logo_assets_manifest`는 같은 원본·배색·제품명에서 생성한 desktop 자산 묶음이다.
 이름 변경은 워드마크도 갱신한다. SVG·배색·생성기 변경도 재생성 입력으로 추적한다.
+내장 표식이 사용하는 Chromium 원본의 `HEAD` blob도 추적하며, 원본이 바뀌면 macOS에서 재생성하고 Windows와 `--check`는 오래된 묶음을 거부한다.
 네이티브 벡터 생성기는 내용이 같은 선언·정의·검사 파일의 수정 시간을 유지한다.
 로고 경로만 바꿨을 때 같은 선언 헤더 때문에 전체 native UI를 다시 컴파일하지 않는다.
 `provisional`은 이름 확정 여부만 나타낸다. OS 등록이나 저장소 이전을

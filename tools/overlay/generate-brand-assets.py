@@ -19,6 +19,7 @@ import cairosvg
 from PIL import Image, ImageDraw, ImageFont
 
 from brand_config import REPO_ROOT, load_brand
+from brand_assets import upstream_input_blobs
 
 NS = '{http://www.w3.org/2000/svg}'
 ET.register_namespace('', NS[1:-1])
@@ -187,11 +188,13 @@ def replace_product_icon_groups(text, geometry, *, expected_count):
     return result
 
 
-def embedded_logos(src, paths):
+def embedded_logos(src, paths, upstream_blobs=None):
     """제품 표식 주변의 upstream 삽화와 아이콘을 유지한다."""
+    upstream_blobs = upstream_blobs or upstream_input_blobs(src)
+
     def upstream(path):
         return subprocess.check_output(
-            ['git', '-C', str(src), 'show', 'HEAD:' + path], text=True)
+            ['git', '-C', str(src), 'show', upstream_blobs[path]], text=True)
 
     geometry = ''.join(f'<path d="{escape(path.attrib["d"], quote=True)}"/>'
                        for path in paths)
@@ -251,6 +254,7 @@ def main():
     monochrome_icon = vector_icon(paths)
     palette = DEFAULT_PALETTE | brand.logo_palette
     vector_icon(paths, palette)
+    upstream_blobs = upstream_input_blobs(args.chromium_src)
     package = brand.logo_assets_manifest.parent
     manifest_files = []
 
@@ -292,7 +296,7 @@ def main():
     for destination, sizes in native_icons.items():
         output(destination, '\n'.join(vector_icon(paths, size=size) for size in sizes))
     output('ui/webui/resources/cr_components/searchbox/icons/chrome_product_cr23.svg', mono)
-    for destination, data in embedded_logos(args.chromium_src, paths).items():
+    for destination, data in embedded_logos(args.chromium_src, paths, upstream_blobs).items():
         output(destination, data)
     # 이 삽화에는 IDR_PRODUCT_LOGO_SVG 참조 대신 별도 Chromium 로고가 들어 있다.
     # 같은 벡터 경로에서 삽화를 생성한다.
@@ -431,7 +435,8 @@ for size in [16, 32] {
                 'generator_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 'source': brand.logo_source.relative_to(REPO_ROOT).as_posix(),
                 'source_sha256': hashlib.sha256(brand.logo_source.read_bytes()).hexdigest(),
-                'palette': brand.logo_palette, 'files': manifest_files}
+                'palette': brand.logo_palette, 'upstream_inputs': upstream_blobs,
+                'files': manifest_files}
     write_if_changed(brand.logo_assets_manifest, json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
     print(f'Generated {len(manifest_files)} {brand.name} assets: {brand.logo_assets_manifest}')
 

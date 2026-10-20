@@ -288,8 +288,8 @@ class YeeBrowserSurfaceFillView : public views::View {
     if (bounds.IsEmpty()) {
       return;
     }
-    const bool native_colors = GetNativeTheme()->preferred_contrast() ==
-                               ui::NativeTheme::PreferredContrast::kMore;
+    const bool native_colors =
+        yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
     const SkColor surface_color =
         presentation_.has_value() && !native_colors &&
                 presentation_->palette_mode ==
@@ -373,8 +373,7 @@ class YeeCombinedSurfaceOutlineView : public views::View {
         presentation_callback_.Run();
     const bool custom_colors =
         presentation.has_value() &&
-        GetNativeTheme()->preferred_contrast() !=
-            ui::NativeTheme::PreferredContrast::kMore &&
+        !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme()) &&
         presentation->palette_mode ==
             yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface;
     const SkColor separator_color =
@@ -1160,6 +1159,12 @@ SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic) {
       .color;
 }
 
+bool ShouldUseNativeBrowserSurfaceColors(const ui::NativeTheme& theme) {
+  return theme.preferred_contrast() ==
+             ui::NativeTheme::PreferredContrast::kMore ||
+         theme.forced_colors() != ui::ColorProviderKey::ForcedColors::kNone;
+}
+
 BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
     SkColor surface,
     uint64_t source_id,
@@ -1276,15 +1281,13 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
     const BrowserSurfacePresentation& presentation) {
   CHECK_EQ(presentation.palette_mode,
            BrowserSurfacePresentation::PaletteMode::kCustomSurface);
-  const SkColor endpoint =
-      color_utils::GetColorWithMaxContrast(presentation.surface);
   ui::ColorMixer& mixer = provider.AddMixer();
   mixer[kColorOmniboxResultsBackground] = {presentation.surface};
   mixer[kColorOmniboxResultsBackgroundHovered] = {presentation.popup_hover};
   mixer[kColorOmniboxResultsBackgroundSelected] = {presentation.popup_selected};
   mixer[kColorOmniboxResultsBackgroundIph] = {presentation.popup_hover};
   mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
-      SkColorSetA(endpoint, 0x0F)};
+      presentation.popup_hover};
   mixer[kColorOmniboxBubbleOutline] = {presentation.popup_outline};
   mixer[kColorOmniboxResultsFocusIndicator] = {presentation.focus_stroke};
   mixer[kColorOmniboxResultsChipBackground] = {presentation.popup_hover};

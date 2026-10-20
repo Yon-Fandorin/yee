@@ -1710,6 +1710,34 @@ index 9f151cf8e3..e1f92367c9 100644
  BASE_FEATURE_PARAM(bool,
                     kVerticalTabsExpandOnHoverDefaultEnabled,
                     &kVerticalTabsExpandOnHover,
+diff --git a/chrome/browser/ui/tabs/split_tab_highlight_controller.cc b/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
+index 04e3c67b24..63de920109 100644
+--- a/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
++++ b/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
+@@ -19,6 +19,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/interaction/browser_elements.h"
+ #include "chrome/browser/ui/location_bar/location_bar.h"
++#include "chrome/browser/ui/omnibox/omnibox_controller.h"
+ #include "chrome/browser/ui/views/device_chooser_content_view.h"
+ #include "chrome/browser/ui/views/file_system_access/file_system_access_restore_permission_bubble_view.h"
+ #include "chrome/browser/ui/views/page_info/page_info_bubble_view_base.h"
+@@ -122,8 +123,13 @@ void SplitTabHighlightController::OnActiveTabChange(
+         base::BindRepeating(&SplitTabHighlightController::OnTabWillDiscard,
+                             base::Unretained(this)));
+   }
+-  // Need to update the highlight because the omnibox focus state
+-  // event might have already been triggered before the active tab change.
++  // Toolbar 갱신 중 새 탭으로 보낸 팝업 알림은 이 구독보다 먼저 끝날 수 있다.
++  // 실제 팝업 상태를 읽어 이전 탭의 강조 상태를 남기지 않는다.
++  is_omnibox_popup_showing_ =
++      active_tab && browser_window_interface->GetFeatures()
++                        .location_bar()
++                        ->GetOmniboxController()
++                        ->IsPopupOpen();
+   UpdateHighlight();
+ }
+ 
 diff --git a/chrome/browser/ui/tabs/tab_data_browsertest.cc b/chrome/browser/ui/tabs/tab_data_browsertest.cc
 index bba72e28b5..94535e5885 100644
 --- a/chrome/browser/ui/tabs/tab_data_browsertest.cc
@@ -5194,7 +5222,7 @@ index fdbb4cf741..949a7238e7 100644
    // If the browser window is closing the native view is removed. Don't attempt
    // to move children.
 diff --git a/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm b/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
-index 8c3f4767c6..be21714f3d 100644
+index 8c3f4767c6..6819950751 100644
 --- a/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
 +++ b/chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm
 @@ -2,33 +2,76 @@
@@ -5347,7 +5375,7 @@ index 8c3f4767c6..be21714f3d 100644
    // Convenience function to get the NSWindow from the browser window.
    NSWindow* browser_window() {
      return browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
-@@ -307,35 +408,579 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
+@@ -307,35 +408,639 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
  // with vertical tabs enabled, and that proper connections are maintained.
  IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
                         ToggleFullscreenWithVerticalTabstrip) {
@@ -5355,6 +5383,16 @@ index 8c3f4767c6..be21714f3d 100644
 +      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
 +  ScopedAlwaysShowToolbar scoped_always_show(browser(), false);
 +  base::ScopedClosureRunner restore_pointer;
++  const auto move_system_pointer = [](CGPoint point) {
++    // AppKit이 읽는 NSEvent 위치 mock도 실제 포인터와 맞춘다.
++    CHECK(ui_controls::SendMouseMove(static_cast<int>(point.x),
++                                     static_cast<int>(point.y)));
++    CHECK_EQ(kCGErrorSuccess, CGWarpMouseCursorPosition(point));
++    base::apple::ScopedCFTypeRef<CGEventRef> event(CGEventCreateMouseEvent(
++        nullptr, kCGEventMouseMoved, point, kCGMouseButtonLeft));
++    CHECK(event);
++    CGEventPost(kCGHIDEventTap, event.get());
++  };
    BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
 +  const auto capture_url =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -5547,17 +5585,6 @@ index 8c3f4767c6..be21714f3d 100644
 +        ASSERT_TRUE(CGPreflightPostEventAccess())
 +            << "시스템 메뉴막대 검사는 실행 호스트의 손쉬운 사용 이벤트 "
 +               "전송 권한이 필요합니다. tools/dev/README.md를 확인하세요.";
-+        const auto move_system_pointer = [](CGPoint point) {
-+          // AppKit이 읽는 NSEvent 위치 mock도 실제 포인터와 맞춘다.
-+          CHECK(ui_controls::SendMouseMove(static_cast<int>(point.x),
-+                                           static_cast<int>(point.y)));
-+          CHECK_EQ(kCGErrorSuccess, CGWarpMouseCursorPosition(point));
-+          base::apple::ScopedCFTypeRef<CGEventRef> event(
-+              CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, point,
-+                                      kCGMouseButtonLeft));
-+          CHECK(event);
-+          CGEventPost(kCGHIDEventTap, event.get());
-+        };
 +        // 후속 검사까지 끝난 뒤 복구해야 원래의 상단 포인터가 메뉴를
 +        // 다시 열어 같은 case의 상태를 바꾸지 않는다.
 +        if (!restore_pointer) {
@@ -5574,16 +5601,6 @@ index 8c3f4767c6..be21714f3d 100644
 +            CGPointMake(content_center.x(), content_center.y()));
 +        auto* const immersive = static_cast<ImmersiveModeControllerMac*>(
 +            ImmersiveModeController::From(browser()));
-+        ASSERT_TRUE(base::test::RunUntil([&]() {
-+          return immersive->menu_bar_reveal_amount_for_testing() == 0 &&
-+                 (always_show || !immersive->IsRevealed());
-+        }));
-+        // pref 전환의 native 창 원점과 실제 표시 프레임까지 기다린다.
-+        auto* main_compositor = browser_view->GetWidget()->GetCompositor();
-+        main_compositor->ScheduleFullRedraw();
-+        ASSERT_TRUE(ui::WaitForNextFrameToBePresented(main_compositor,
-+                                                      base::Seconds(5)));
-+        RunScheduledLayouts();
 +        const gfx::Rect display_bounds =
 +            display::Screen::Get()
 +                ->GetDisplayNearestWindow(
@@ -5591,6 +5608,35 @@ index 8c3f4767c6..be21714f3d 100644
 +                .bounds();
 +        auto* const external_top = browser_view->top_container();
 +        auto* const external_root = external_top->parent();
++        const auto native_toolbar_matches_mode = [&]() {
++          const gfx::Rect root = external_root->GetBoundsInScreen();
++          if (immersive->menu_bar_reveal_amount_for_testing() != 0 ||
++              !browser_window().visible || !browser_window().onActiveSpace ||
++              GetMovedContentViewForWidget(overlay_widget) !=
++                  overlay_widget_content_view ||
++              !overlay_widget_content_view.window ||
++              NSIsEmptyRect(overlay_widget_content_view.frame) ||
++              root.IsEmpty()) {
++            return false;
++          }
++          if (always_show) {
++            return immersive->IsRevealed() &&
++                   NSContainsRect(overlay_widget_content_view.visibleRect,
++                                  overlay_widget_content_view.bounds);
++          }
++          // 숨긴 placeholder 창의 과거 Y는 AppKit 재배치 계약이 아니다.
++          // 실제 Toolbar가 잘리고 입력을 가로챌 창도 화면 밖인지 확인한다.
++          return !immersive->IsRevealed() &&
++                 NSIsEmptyRect(overlay_widget_content_view.visibleRect) &&
++                 !root.Intersects(display_bounds);
++        };
++        ASSERT_TRUE(base::test::RunUntil(native_toolbar_matches_mode));
++        // pref 전환의 native 창 원점과 실제 표시 프레임까지 기다린다.
++        auto* main_compositor = browser_view->GetWidget()->GetCompositor();
++        main_compositor->ScheduleFullRedraw();
++        ASSERT_TRUE(ui::WaitForNextFrameToBePresented(main_compositor,
++                                                      base::Seconds(5)));
++        RunScheduledLayouts();
 +        const int hidden_menu_y = external_root->GetBoundsInScreen().y();
 +        const gfx::Rect hidden_sidebar = region->GetBoundsInScreen();
 +        const gfx::Rect hidden_contents =
@@ -5659,10 +5705,35 @@ index 8c3f4767c6..be21714f3d 100644
 +        }
 +        move_system_pointer(
 +            CGPointMake(content_center.x(), content_center.y()));
-+        ASSERT_TRUE(base::test::RunUntil([&]() {
-+          return immersive->menu_bar_reveal_amount_for_testing() == 0 &&
-+                 external_root->GetBoundsInScreen().y() == hidden_menu_y;
-+        }));
++        const bool menu_hidden_again = base::test::RunUntil([&]() {
++          return native_toolbar_matches_mode() &&
++                 (!always_show ||
++                  external_root->GetBoundsInScreen().y() == hidden_menu_y);
++        });
++        if (!menu_hidden_again) {
++          CaptureWidgetIfRequested(*overlay_widget,
++                                   capture_prefix + "-hide-failed-header");
++          CaptureWidgetIfRequested(*browser_view->GetWidget(),
++                                   capture_prefix + "-hide-failed-body");
++        }
++        ASSERT_TRUE(menu_hidden_again)
++            << "menu reveal=" << immersive->menu_bar_reveal_amount_for_testing()
++            << ", toolbar revealed=" << immersive->IsRevealed()
++            << ", hidden y=" << hidden_menu_y
++            << ", display=" << display_bounds.ToString()
++            << ", browser visible=" << browser_window().visible
++            << ", browser active space=" << browser_window().onActiveSpace
++            << ", root=" << external_root->GetBoundsInScreen().ToString()
++            << ", moved view frame="
++            << NSStringFromRect(overlay_widget_content_view.frame).UTF8String
++            << ", moved view visible="
++            << NSStringFromRect(overlay_widget_content_view.visibleRect)
++                   .UTF8String
++            << ", native window="
++            << NSStringFromRect(overlay_widget_content_view.window.frame)
++                   .UTF8String
++            << ", active space="
++            << overlay_widget_content_view.window.onActiveSpace;
 +        RunScheduledLayouts();
 +        EXPECT_EQ(hidden_sidebar, region->GetBoundsInScreen());
 +        EXPECT_EQ(hidden_contents,
@@ -5732,22 +5803,38 @@ index 8c3f4767c6..be21714f3d 100644
 +    RunScheduledLayouts();
 +    const gfx::Rect page_bounds =
 +        browser_view->multi_contents_view()->GetBoundsInScreen();
-+    // 창을 강제 지정하면 Mac 도구는 NSView로 바로 보내 tracking을 건너뛴다.
-+    // 실제 창의 mouse-move 경로로 Edge Rail의 hover를 검증한다.
++    // 메뉴 검사와 같은 실제 포인터를 사용해 native tracking도 일치시킨다.
 +    ASSERT_TRUE(ActivateBrowserAndWaitForSpace());
-+    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-+        region->GetBoundsInScreen().CenterPoint()));
++    const gfx::Point edge_center = region->GetBoundsInScreen().CenterPoint();
++    move_system_pointer(CGPointMake(page_bounds.CenterPoint().x(),
++                                    page_bounds.CenterPoint().y()));
++    move_system_pointer(CGPointMake(edge_center.x(), edge_center.y()));
 +    {
 +      base::test::ScopedRunLoopTimeout hover_timeout(
 +          FROM_HERE, TestTimeouts::action_timeout());
-+      ASSERT_TRUE(base::test::RunUntil([&]() {
++      const bool expanded = base::test::RunUntil([&]() {
 +        RunScheduledLayouts();
 +        return region->is_expanded_on_hover() &&
 +               region->width() == region->uncollapsed_width() &&
 +               !BrowserAnimationController::From(browser())->IsAnimating(
 +                   TabStripAnimations::kVerticalTabStrip);
-+      })) << "bounds="
-+          << region->GetBoundsInScreen().ToString()
++      });
++      base::apple::ScopedCFTypeRef<CGEventRef> pointer(CGEventCreate(nullptr));
++      ASSERT_TRUE(pointer);
++      const CGPoint physical_pointer = CGEventGetLocation(pointer.get());
++      auto* const root = browser_view->GetWidget()->GetRootView();
++      gfx::Point edge_in_root = edge_center;
++      views::View::ConvertPointFromScreen(root, &edge_in_root);
++      auto* const handler = root->GetEventHandlerForPoint(edge_in_root);
++      ASSERT_TRUE(expanded)
++          << "physical pointer=" << physical_pointer.x << ","
++          << physical_pointer.y << ", mocked pointer="
++          << display::Screen::Get()->GetCursorScreenPoint().ToString()
++          << ", handler=" << (handler ? handler->GetClassName() : "none")
++          << ", region owns handler=" << (handler && region->Contains(handler))
++          << ", visible bounds=" << region->GetVisibleBounds().ToString()
++          << ", collapsed=" << sidebar->IsCollapsed()
++          << ", bounds=" << region->GetBoundsInScreen().ToString()
 +          << ", mouse_inside=" << region->IsMouseHovered()
 +          << ", active=" << browser_view->GetWidget()->IsActive()
 +          << ", paint_active="
@@ -5812,7 +5899,8 @@ index 8c3f4767c6..be21714f3d 100644
 +      EXPECT_TRUE(header->GetVisible());
 +      EXPECT_NEAR(tab_before_end,
 +                  browser_view->tab_strip_view()->GetBoundsInScreen().y(), 1);
-+      ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(page_bounds.CenterPoint()));
++      move_system_pointer(CGPointMake(page_bounds.CenterPoint().x(),
++                                      page_bounds.CenterPoint().y()));
 +    }
 +    sidebar->RequestCollapse(false);
 +    RunScheduledLayouts();
@@ -5929,7 +6017,7 @@ index 8c3f4767c6..be21714f3d 100644
  }
  
  // Tests that the browser does not crash when toggling between vertical and
-@@ -496,23 +1141,36 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
+@@ -496,23 +1201,36 @@ IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
  // tollerate the system destroying the overlay widget before the Browser widget.
  IN_PROC_BROWSER_TEST_F(ImmersiveModeControllerMacInteractiveTest,
                         HandlesOverlayWidgetDestruction) {
@@ -8566,10 +8654,10 @@ index 219734679c..71af6b6ea6 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..82a8aea264 100644
+index 243d80a02d..6d17f8fba4 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,212 @@
+@@ -2,83 +2,213 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -8612,6 +8700,7 @@ index 243d80a02d..82a8aea264 100644
 +#include "chrome/browser/ui/find_bar/find_bar_controller.h"
  #include "chrome/browser/ui/immersive/immersive_mode_controller.h"
  #include "chrome/browser/ui/layout_constants.h"
++#include "chrome/browser/ui/omnibox/omnibox_controller.h"
 +#include "chrome/browser/ui/read_anything/read_anything_immersive_overlay_view.h"
  #include "chrome/browser/ui/side_panel/side_panel_entry.h"
  #include "chrome/browser/ui/side_panel/side_panel_registry.h"
@@ -8787,7 +8876,7 @@ index 243d80a02d..82a8aea264 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -95,9 +224,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -95,9 +225,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    auto ReplaceAndShowSidePanel(
        SidePanelType type,
@@ -8800,7 +8889,7 @@ index 243d80a02d..82a8aea264 100644
            // Note: there is a registry at browser level and one per tab; we want
            // the tab-specific one.
            auto* const registry =
-@@ -120,6 +250,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -120,6 +251,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                /*default_content_width_callback=*/base::NullCallback())));
            browser()->GetFeatures().side_panel_ui()->Show(
                SidePanelEntry::Id::kCustomizeChrome);
@@ -8812,7 +8901,7 @@ index 243d80a02d..82a8aea264 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -349,6 +484,18 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +485,24 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -8825,13 +8914,19 @@ index 243d80a02d..82a8aea264 100644
 +            kVerticalTabStripCollapseButtonElementId,
 +            views::ElementTrackerViews::GetContextForView(browser_view),
 +            /*require_visible=*/true);
-+    EXPECT_EQ(1u, matching_views.size());
++    auto* const active = browser_view->multi_contents_view()
++                             ->GetActiveContentsContainerView();
++    EXPECT_EQ(1u, matching_views.size())
++        << "popup=" << browser_view->GetLocationBarView()
++                              ->GetOmniboxController()->IsPopupOpen()
++        << ", active header visible=" << active->mini_toolbar()->GetVisible()
++        << ", active header drawn=" << active->mini_toolbar()->IsDrawn();
 +  }
 +
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +513,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +520,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -8996,7 +9091,7 @@ index 243d80a02d..82a8aea264 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +878,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +885,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -9026,7 +9121,7 @@ index 243d80a02d..82a8aea264 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,6 +928,1662 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,6 +935,1718 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -9486,23 +9581,79 @@ index 243d80a02d..82a8aea264 100644
 +
 +  // 포인터를 페이지에 둔 채 키보드로 연다. 팝업이 포커스를 가져가도
 +  // 테스트 잠금 없이 사이드바와 anchor가 유지되어야 한다.
++  // Mac의 논리 focus만으로는 native 키 전달을 보장하지 않으므로 입력 전에
++  // 실제 창을 활성화한다. 팝업을 연 뒤에는 활성화 상태를 복구하지 않는다.
++  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  footer->RequestFocusWithReason(
 +      views::FocusManager::FocusChangeReason::kFocusTraversal);
-+  ASSERT_TRUE(footer->HasFocus());
++  ASSERT_TRUE(footer->HasFocus())
++      << "focusable=" << footer->IsFocusable()
++      << ", drawn=" << footer->IsDrawn()
++      << ", active=" << browser_view->GetWidget()->IsActive()
++      << ", expanded=" << region->is_expanded_on_hover();
 +  capture("keyboard-focus");
 +  ASSERT_TRUE(
 +      ui_test_utils::SendMouseMoveSync(viewport.CenterPoint(), native_window));
++  ASSERT_TRUE(footer->HasFocus())
++      << "active=" << browser_view->GetWidget()->IsActive()
++      << ", expanded=" << region->is_expanded_on_hover();
++  ASSERT_TRUE(browser_view->GetWidget()->IsActive());
++  ASSERT_TRUE(browser_view->GetWidget()->ShouldPaintAsActive());
++  ASSERT_TRUE(region->is_expanded_on_hover());
++  ASSERT_TRUE(footer->IsDrawn());
 +  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_SPACE, false,
 +                                              false, false, false));
 +  ASSERT_TRUE(base::test::RunUntil([&]() {
 +    views::View* menu = yee::GetSidebarFooterMenuForTesting(*footer);
 +    return menu && menu->GetWidget()->IsActive();
-+  }));
++  })) << "menu=" << yee::GetSidebarFooterMenuForTesting(*footer)
++      << ", footer_focus=" << footer->HasFocus()
++      << ", browser_active=" << browser_view->GetWidget()->IsActive()
++      << ", expanded=" << region->is_expanded_on_hover();
 +  RunScheduledLayouts();
 +  EXPECT_FALSE(
 +      region->Contains(browser_view->GetFocusManager()->GetFocusedView()));
 +  expect_revealed();
 +  capture("popup-open");
++  // 실제 native 키 전달에서도 하위 화면의 Escape는 전체 팝업을 닫지 않는다.
++  auto* const menu = yee::GetSidebarFooterMenuForTesting(*footer);
++  ASSERT_TRUE(menu);
++  const auto menu_window = menu->GetWidget()->GetNativeWindow();
++  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
++      menu_window, ui::VKEY_RETURN, false, false, false, false));
++  ASSERT_TRUE(base::test::RunUntil([&]() {
++    return yee::GetSidebarFooterMenuForTesting(*footer) == menu &&
++           !menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId);
++  }));
++  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
++      menu_window, ui::VKEY_ESCAPE, false, false, false, false));
++  ASSERT_TRUE(base::test::RunUntil([&]() {
++    return yee::GetSidebarFooterMenuForTesting(*footer) == menu &&
++           menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId);
++  }));
++  auto* const tools =
++      menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId);
++  const gfx::Point row_center = tools->GetBoundsInScreen().CenterPoint();
++  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(row_center, menu_window));
++  ASSERT_TRUE(tools->HasFocus());
++  ASSERT_TRUE(menu->GetWidget()->IsActive());
++  // macOS의 사용자 Home 키 바인딩과 별개인 native Tab 순회를 검수한다.
++  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
++      menu_window, ui::VKEY_TAB, false, false, false, false));
++  EXPECT_TRUE(menu->GetViewByID(yee::kSidebarFooterRootMemoryViewId)->HasFocus());
++  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
++      menu_window, ui::VKEY_TAB, false, true, false, false));
++  EXPECT_TRUE(tools->HasFocus());
++  EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
++            menu->GetFocusManager()->focus_change_reason());
++  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(row_center + gfx::Vector2d(1, 0),
++                                               menu_window));
++  EXPECT_TRUE(tools->HasFocus());
++  EXPECT_TRUE(tools->background());
++  EXPECT_EQ(views::FocusManager::FocusChangeReason::kDirectFocusChange,
++            menu->GetFocusManager()->focus_change_reason());
++  ASSERT_TRUE(
++      ui_test_utils::SendMouseMoveSync(viewport.CenterPoint(), native_window));
 +  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "yee-sidebar-capture-dir")) {
 +    // 누름 ripple이 끝난 실제 열린 상태도 별도로 검수한다.
@@ -10689,7 +10840,7 @@ index 243d80a02d..82a8aea264 100644
  enum class TopContainerBackgroundTestMode {
    kDefault,
    kTouch,
-@@ -658,11 +2613,24 @@ IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+@@ -658,11 +2676,24 @@ IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
    }
    RunScheduledLayouts();
  
@@ -10716,7 +10867,7 @@ index 243d80a02d..82a8aea264 100644
    CustomCornersBackground::ColorChoice expected;
    switch (GetParam()) {
      case TopContainerBackgroundTestMode::kDefault:
-@@ -790,6 +2758,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+@@ -790,6 +2821,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
          Do([this]() { RunScheduledLayouts(); }));
    }
  
@@ -10764,7 +10915,7 @@ index 243d80a02d..82a8aea264 100644
   private:
    const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
    GetContentsContainers() {
-@@ -819,6 +2828,701 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+@@ -819,6 +2891,701 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
        observation_{this};
  };
  
@@ -11466,7 +11617,7 @@ index 243d80a02d..82a8aea264 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -871,10 +3575,835 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +3638,835 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -12303,7 +12454,7 @@ index 243d80a02d..82a8aea264 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +4412,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +4475,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -12321,7 +12472,7 @@ index 243d80a02d..82a8aea264 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +4476,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +4539,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -12339,7 +12490,7 @@ index 243d80a02d..82a8aea264 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +4496,14 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +4559,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -12347,7 +12498,9 @@ index 243d80a02d..82a8aea264 100644
 -                  ClearResizeCounts(), ToggleVerticalTabStripCollapsed(false),
 -                  CheckResizeCounts(1U, 1U));
 +  RunTestSequence(
-+      EnterSplitView(), ToggleVerticalTabStripCollapsed(true), Do([this] {
++      EnterSplitView(),
++      Do([this] { ExpectOneVisibleVerticalTabStripToggle(); }),
++      ToggleVerticalTabStripCollapsed(true), Do([this] {
 +        RunScheduledLayouts();
 +        ExpectOneVisibleVerticalTabStripToggle();
 +      }),
@@ -13601,10 +13754,10 @@ index 91de47263b..8d07454e32 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index 959386b621..c2db9cf281 100644
+index 959386b621..83f48abadf 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-@@ -4,20 +4,35 @@
+@@ -4,20 +4,37 @@
  
  #include "chrome/browser/ui/views/frame/multi_contents_view.h"
  
@@ -13612,8 +13765,10 @@ index 959386b621..c2db9cf281 100644
 +#include <array>
 +#include <cstdint>
 +#include <optional>
++#include <utility>
 +
  #include "base/functional/bind.h"
++#include "base/logging.h"
  #include "base/numerics/clamped_math.h"
  #include "base/numerics/ranges.h"
 +#include "base/run_loop.h"
@@ -13640,7 +13795,7 @@ index 959386b621..c2db9cf281 100644
  #include "chrome/browser/ui/toolbar/app_menu_model.h"
  #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -32,17 +47,31 @@
+@@ -32,17 +49,33 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
@@ -13650,6 +13805,8 @@ index 959386b621..c2db9cf281 100644
 +#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 +#include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
 +#include "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 +#include "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h"
  #include "chrome/browser/ui/views/page_info/page_info_main_view.h"
  #include "chrome/browser/ui/views/side_panel/side_panel.h"
@@ -13672,19 +13829,22 @@ index 959386b621..c2db9cf281 100644
  #include "components/split_tabs/split_tab_visual_data.h"
  #include "components/tabs/public/split_tab_collection.h"
  #include "content/public/test/browser_test.h"
-@@ -57,7 +86,11 @@
+@@ -56,8 +89,14 @@
+ #include "ui/events/base_event_utils.h"
  #include "ui/events/event_modifiers.h"
  #include "ui/events/keycodes/keyboard_codes.h"
++#include "ui/gfx/color_utils.h"
  #include "ui/gfx/geometry/rect.h"
 +#include "ui/views/background.h"
 +#include "ui/views/controls/label.h"
++#include "ui/views/focus/focus_manager.h"
  #include "ui/views/test/views_test_utils.h"
 +#include "ui/views/view_utils.h"
 +#include "ui/views/widget/widget_delegate.h"
  
  #if BUILDFLAG(IS_MAC)
  #include "base/mac/mac_util.h"
-@@ -299,6 +332,198 @@ class MultiContentsViewUiTest
+@@ -299,6 +338,198 @@ class MultiContentsViewUiTest
                            }),
                   WaitForState(kSidePanelViewObserver, true));
    }
@@ -13883,7 +14043,7 @@ index 959386b621..c2db9cf281 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -422,6 +647,524 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -422,6 +653,629 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -14019,34 +14179,49 @@ index 959386b621..c2db9cf281 100644
 +  int rehost_sync_count = 0;
 +  uint64_t popup_revision_before_transition = 0;
 +
-+  const auto location_bar_matches =
-+      [this](const yee::BrowserSurfacePresentation& presentation) {
-+        LocationBarView* const view = location_bar();
-+        BrowserView* const browser_view =
-+            BrowserView::GetBrowserViewForBrowser(browser());
-+        return view->GetCompactShellPopupSurfaceColor() ==
-+                   presentation.surface &&
-+               view->GetBackgroundColorForTesting() == presentation.surface &&
-+               YeeAdjacentOmniboxLabelsMatchColors(
-+                   presentation.surface, presentation.primary,
-+                   presentation.primary, presentation.secondary) &&
-+               YeeRestingTextViewMatchesPresentation(
-+                   view->GetCompactShellRestingTextForTesting(),
-+                   presentation) &&
-+               YeeToolbarButtonMatchesPresentation(
-+                   browser_view->toolbar_button_provider()->GetBackButton(),
-+                   presentation) &&
-+               view->location_icon_view()->GetForegroundColor() ==
-+                   presentation.primary &&
-+               view->GetSecurityChipColorForTesting(security_state::NONE) ==
-+                   presentation.primary &&
-+               view->GetSecurityChipColorForTesting(
-+                   security_state::DANGEROUS) ==
-+                   yee::ResolveBrowserSurfaceSemanticColor(
-+                       presentation.surface,
-+                       view->GetColorProvider()->GetColor(
-+                           kColorOmniboxSecurityChipDangerous));
-+      };
++  const auto location_bar_matches = [this](
++                                        const yee::BrowserSurfacePresentation&
++                                            presentation) {
++    LocationBarView* const view = location_bar();
++    BrowserView* const browser_view =
++        BrowserView::GetBrowserViewForBrowser(browser());
++    const auto checks = std::to_array<std::pair<const char*, bool>>({
++        {"popup surface",
++         view->GetCompactShellPopupSurfaceColor() == presentation.surface},
++        {"background",
++         view->GetBackgroundColorForTesting() == presentation.surface},
++        {"adjacent labels", YeeAdjacentOmniboxLabelsMatchColors(
++                                presentation.surface, presentation.primary,
++                                presentation.primary, presentation.secondary)},
++        {"resting text",
++         YeeRestingTextViewMatchesPresentation(
++             view->GetCompactShellRestingTextForTesting(), presentation)},
++        {"back button",
++         YeeToolbarButtonMatchesPresentation(
++             browser_view->toolbar_button_provider()->GetBackButton(),
++             presentation)},
++        {"location icon", view->location_icon_view()->GetForegroundColor() ==
++                              presentation.primary},
++        {"security chip", view->GetSecurityChipColorForTesting(
++                              security_state::NONE) == presentation.primary},
++        {"danger chip",
++         view->GetSecurityChipColorForTesting(security_state::DANGEROUS) ==
++             yee::ResolveBrowserSurfaceSemanticColor(
++                 presentation.surface,
++                 view->GetColorProvider()->GetColor(
++                     kColorOmniboxSecurityChipDangerous))},
++    });
++    for (const auto& [name, matches] : checks) {
++      LOG_IF(ERROR, !matches)
++          << "Yee LocationBar mismatch: " << name << ", expected surface="
++          << color_utils::SkColorToRgbaString(presentation.surface)
++          << ", background="
++          << color_utils::SkColorToRgbaString(
++                 view->GetBackgroundColorForTesting());
++    }
++    return std::all_of(checks.begin(), checks.end(),
++                       [](const auto& check) { return check.second; });
++  };
 +
 +  RunTestSequence(
 +      Do([&]() {
@@ -14100,6 +14275,15 @@ index 959386b621..c2db9cf281 100644
 +                kColorOmniboxResultsBackground) != presentation_b->surface) {
 +          return false;
 +        }
++        // 색 전환은 논리상 열린 상태가 아니라 실제 표시된 팝업을 대상으로 한다.
++        if (!base::test::RunUntil([&]() {
++              auto* const current = YeeOmniboxPopupWidget(open_popup_view);
++              return current == open_popup && current && current->IsVisible() &&
++                     location_bar()->GetFocusManager()->GetFocusedView() ==
++                         location_bar()->omnibox_view();
++            })) {
++          return false;
++        }
 +        popup_rebuild_count =
 +            YeeOmniboxPopupProviderRebuildCount(open_popup_view);
 +        rehost_sync_count =
@@ -14125,18 +14309,84 @@ index 959386b621..c2db9cf281 100644
 +          "페이지 색상과 팝업 revision의 전환 완료를 기다린다"),
 +      Check([&]() {
 +        presentation_c = YeeSurfaceSourceForTab(1)->GetPresentation();
-+        return presentation_c.has_value() &&
-+               presentation_c->surface == kSurfaceC &&
-+               presentation_c->popup_revision ==
-+                   popup_revision_before_transition + 1 &&
-+               open_popup_view &&
-+               YeeOmniboxPopupProviderRebuildCount(open_popup_view) ==
-+                   popup_rebuild_count + 1 &&
-+               location_bar()->GetCompactShellRehostSyncCountForTesting() ==
-+                   rehost_sync_count &&
-+               open_popup->GetColorProvider()->GetColor(
-+                   kColorOmniboxResultsBackground) == kSurfaceC &&
-+               location_bar_matches(*presentation_c);
++        auto* const current_popup = YeeOmniboxPopupWidget(open_popup_view);
++        const bool matches =
++            presentation_c.has_value() &&
++            presentation_c->surface == kSurfaceC &&
++            presentation_c->popup_revision ==
++                popup_revision_before_transition + 1 &&
++            open_popup_view && current_popup == open_popup && current_popup &&
++            current_popup->IsVisible() &&
++            location_bar()->GetOmniboxController()->IsPopupOpen() &&
++            location_bar()->GetFocusManager()->GetFocusedView() ==
++                location_bar()->omnibox_view() &&
++            YeeOmniboxPopupProviderRebuildCount(open_popup_view) ==
++                popup_rebuild_count + 1 &&
++            location_bar()->GetCompactShellRehostSyncCountForTesting() ==
++                rehost_sync_count &&
++            current_popup->GetColorProvider()->GetColor(
++                kColorOmniboxResultsBackground) == kSurfaceC;
++        const bool location_matches =
++            presentation_c && location_bar_matches(*presentation_c);
++        LOG_IF(ERROR, !matches || !location_matches)
++            << "Yee visible popup transition: same widget="
++            << (current_popup == open_popup)
++            << ", visible=" << (current_popup && current_popup->IsVisible())
++            << ", open="
++            << location_bar()->GetOmniboxController()->IsPopupOpen()
++            << ", native editor focus="
++            << (location_bar()->GetFocusManager()->GetFocusedView() ==
++                location_bar()->omnibox_view())
++            << ", logical focus=" << location_bar()->HasFocus()
++            << ", rebuild=" << popup_rebuild_count << "->"
++            << YeeOmniboxPopupProviderRebuildCount(open_popup_view)
++            << ", rehost=" << rehost_sync_count << "->"
++            << location_bar()->GetCompactShellRehostSyncCountForTesting()
++            << ", popup background="
++            << color_utils::SkColorToRgbaString(
++                   current_popup ? current_popup->GetColorProvider()->GetColor(
++                                       kColorOmniboxResultsBackground)
++                                 : SK_ColorTRANSPARENT);
++        return matches && location_matches;
++      }),
++      Do([&]() {
++        auto* const presenter = open_popup_view->presenter();
++        if (!presenter) {
++          return;
++        }
++        ASSERT_TRUE(presenter->GetWebUIContent());
++        auto* const contents =
++            presenter->GetWebUIContent()->GetWrappedWebContents();
++        ASSERT_TRUE(contents);
++        ASSERT_TRUE(content::WaitForLoadStop(contents));
++        auto* const current_popup = YeeOmniboxPopupWidget(open_popup_view);
++        ASSERT_EQ(open_popup, current_popup);
++        ASSERT_TRUE(current_popup);
++        ASSERT_TRUE(current_popup->IsVisible());
++        // WebUI가 native hover 역할과 같은 보정된 색을 실제 행에 전달해야 한다.
++        const SkColor expected = presentation_c->popup_hover;
++        EXPECT_EQ(expected, current_popup->GetColorProvider()->GetColor(
++                                kColorOmniboxResultsBackgroundHovered));
++        EXPECT_TRUE(base::test::RunUntil([&]() {
++          return content::EvalJs(
++                     contents, content::JsReplace(
++                                   R"JS(
++            (() => {
++              const row = document.querySelector('omnibox-popup-app')?.shadowRoot
++                  ?.querySelector('cr-searchbox-dropdown')?.shadowRoot
++                  ?.querySelector('cr-searchbox-match');
++              if (!row) return false;
++              const probe = document.createElement('span');
++              probe.style.backgroundColor = getComputedStyle(row)
++                  .getPropertyValue('--color-searchbox-results-background-hovered');
++              const actual = probe.style.backgroundColor;
++              probe.style.backgroundColor = $1;
++              return !!actual && actual === probe.style.backgroundColor;
++            })()
++          )JS",
++                                   color_utils::SkColorToRgbaString(expected)))
++              .ExtractBool();
++        }));
 +      }),
 +      Do([&]() {
 +        rehost_sync_count =
@@ -14275,9 +14525,24 @@ index 959386b621..c2db9cf281 100644
 +               YeeOmniboxPopupMatchesLocationBar();
 +      }),
 +      Do([this]() { CloseYeeOmniboxPopup(); }),
-+      Do([this]() { tab_strip_model()->ActivateTabAt(1); }),
++      Do([this]() {
++        ASSERT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
++        // 새 탭 관찰 전에 알림이 끝나 이전 탭 상태만 남은 경우를 재현한다.
++        browser()->GetFeatures()
++            .split_tab_highlight_controller()
++            ->OnOmniboxPopupVisibilityChanged(true);
++        ASSERT_TRUE(browser()->GetFeatures()
++                        .split_tab_highlight_controller()
++                        ->ShouldHighlight());
++        tab_strip_model()->ActivateTabAt(1);
++      }),
 +      WaitForActiveTabChange(1), Check([this]() {
-+        return location_bar()->IsCompactShellSplitMode() &&
++        return !location_bar()->GetOmniboxController()->IsPopupOpen() &&
++               !browser()->GetFeatures()
++                    .split_tab_highlight_controller()
++                    ->ShouldHighlight() &&
++               multi_contents_view()->mini_toolbar_for_testing(1)->IsDrawn() &&
++               location_bar()->IsCompactShellSplitMode() &&
 +               location_bar()->parent() ==
 +                   multi_contents_view()->mini_toolbar_for_testing(1) &&
 +               YeeOmniboxPopupMatchesLocationBar();
@@ -14408,7 +14673,7 @@ index 959386b621..c2db9cf281 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -567,16 +1310,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -567,16 +1421,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -14434,7 +14699,7 @@ index 959386b621..c2db9cf281 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -671,9 +1413,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -671,9 +1524,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -14448,7 +14713,7 @@ index 959386b621..c2db9cf281 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -688,8 +1431,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -688,8 +1542,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -14463,7 +14728,7 @@ index 959386b621..c2db9cf281 100644
        }));
  }
  
-@@ -711,15 +1458,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -711,15 +1569,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -14483,7 +14748,7 @@ index 959386b621..c2db9cf281 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -735,8 +1480,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -735,8 +1591,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -14496,7 +14761,7 @@ index 959386b621..c2db9cf281 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -752,31 +1499,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -752,31 +1610,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -14549,7 +14814,7 @@ index 959386b621..c2db9cf281 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -796,8 +1544,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -796,8 +1655,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -14562,7 +14827,7 @@ index 959386b621..c2db9cf281 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -807,23 +1557,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -807,23 +1668,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -14602,7 +14867,7 @@ index 959386b621..c2db9cf281 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -867,12 +1618,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -867,12 +1729,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -14622,7 +14887,7 @@ index 959386b621..c2db9cf281 100644
                  }));
  }
  #endif
-@@ -880,11 +1634,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -880,11 +1745,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -14641,7 +14906,7 @@ index 959386b621..c2db9cf281 100644
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index d5f3d22b6e..542800c0e0 100644
+index d5f3d22b6e..38cc71a9f5 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,35 +7,55 @@
@@ -15109,8 +15374,8 @@ index d5f3d22b6e..542800c0e0 100644
 +    presentation = yee::ResolveBrowserSurfacePresentation(
 +        GetColorProvider()->GetColor(kColorToolbar), 0, 0, 0);
 +  }
-+  const bool native_colors = GetNativeTheme()->preferred_contrast() ==
-+                             ui::NativeTheme::PreferredContrast::kMore;
++  const bool native_colors =
++      yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
 +  if (native_colors) {
 +    presentation = yee::UseNativeBrowserSurfaceColors(*presentation);
 +    presentation->surface = GetColorProvider()->GetColor(kColorToolbar);
@@ -15200,7 +15465,7 @@ index d5f3d22b6e..542800c0e0 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -262,14 +710,41 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -262,14 +710,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -15226,8 +15491,7 @@ index d5f3d22b6e..542800c0e0 100644
 +        yee_presentation_->palette_mode ==
 +            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
 +        GetColorProvider() &&
-+        GetNativeTheme()->preferred_contrast() !=
-+            ui::NativeTheme::PreferredContrast::kMore) {
++        !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +      // 일반 오디오 표시는 Header 글자색을 따른다. 녹화·캡처 등 의미가 있는
 +      // 상태색은 유지하되 현재 pane 바탕에서 읽기 어려울 때만 대비를 보정한다.
 +      const SkColor icon_color =
@@ -15249,7 +15513,7 @@ index d5f3d22b6e..542800c0e0 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -285,7 +760,15 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -285,7 +759,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -15258,8 +15522,7 @@ index d5f3d22b6e..542800c0e0 100644
 +        uses_yee_browser_surface_geometry_ && yee_presentation_.has_value() &&
 +        yee_presentation_->palette_mode ==
 +            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
-+        GetNativeTheme()->preferred_contrast() !=
-+            ui::NativeTheme::PreferredContrast::kMore;
++        !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
 +    SkColor favicon_color = custom_colors
 +                                ? yee_presentation_->primary
 +                                : provider->GetColor(kColorBookmarkFavicon);
@@ -16589,7 +16852,7 @@ index d15829cb54..9f22daf65e 100644
  
    if (toolkit_views) {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 07fdd70a0b..b595b2b82c 100644
+index 07fdd70a0b..5092b87583 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -16696,7 +16959,7 @@ index 07fdd70a0b..b595b2b82c 100644
    ai_mode_hint_label->SetVisible(false);
    ai_mode_hint_label_ = AddChildView(std::move(ai_mode_hint_label));
  
-@@ -491,7 +512,140 @@ bool LocationBarView::IsInitialized() const {
+@@ -491,7 +512,139 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
  
@@ -16799,8 +17062,7 @@ index 07fdd70a0b..b595b2b82c 100644
 +  if (!presentation ||
 +      presentation->palette_mode !=
 +          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface ||
-+      GetNativeTheme()->preferred_contrast() ==
-+          ui::NativeTheme::PreferredContrast::kMore) {
++      yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +    return std::nullopt;
 +  }
 +  return presentation->surface;
@@ -16837,7 +17099,7 @@ index 07fdd70a0b..b595b2b82c 100644
    return ComputeBorderRadius(size());
  }
  
-@@ -508,8 +662,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
+@@ -508,8 +661,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
      gfx::Size size,
      SkBlendMode blend_mode,
      bool antialias,
@@ -16849,7 +17111,7 @@ index 07fdd70a0b..b595b2b82c 100644
    auto painter =
        stroke_color == SK_ColorTRANSPARENT
            ? views::Painter::CreateSolidRoundRectPainter(
-@@ -661,7 +816,10 @@ bool LocationBarView::HasFocus() const {
+@@ -661,7 +815,10 @@ bool LocationBarView::HasFocus() const {
  }
  
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -16861,7 +17123,7 @@ index 07fdd70a0b..b595b2b82c 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -688,7 +846,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -688,7 +845,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
  
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -16873,7 +17135,7 @@ index 07fdd70a0b..b595b2b82c 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -840,7 +1001,7 @@ void LocationBarView::Layout(PassKey) {
+@@ -840,7 +1000,7 @@ void LocationBarView::Layout(PassKey) {
  
    auto add_trailing_decoration = [&](View* view, int intra_item_padding,
                                       int edge_padding) {
@@ -16882,7 +17144,7 @@ index 07fdd70a0b..b595b2b82c 100644
        trailing_decorations.AddDecoration(
            vertical_padding, location_height, /*auto_collapse=*/false,
            /*max_fraction=*/0, intra_item_padding, edge_padding, view);
-@@ -851,6 +1012,9 @@ void LocationBarView::Layout(PassKey) {
+@@ -851,6 +1011,9 @@ void LocationBarView::Layout(PassKey) {
    // location bar, it should be positioned flush against the right edge of the
    // location bar.
    constexpr int kTrailingEdgePaddingForAim = 5;
@@ -16892,7 +17154,7 @@ index 07fdd70a0b..b595b2b82c 100644
    add_trailing_decoration(page_action_container_,
                            /*intra_item_padding=*/0,
                            /*edge_padding=*/
-@@ -964,6 +1128,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -964,6 +1127,10 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -16903,7 +17165,7 @@ index 07fdd70a0b..b595b2b82c 100644
    LayoutSuperclass<View>(this);
  }
  
-@@ -982,7 +1150,11 @@ void LocationBarView::OnThemeChanged() {
+@@ -982,7 +1149,11 @@ void LocationBarView::OnThemeChanged() {
    }
  
    RefreshBackground();
@@ -16916,7 +17178,7 @@ index 07fdd70a0b..b595b2b82c 100644
  }
  
  void LocationBarView::ChildPreferredSizeChanged(views::View* child) {
-@@ -999,6 +1171,10 @@ void LocationBarView::Update(WebContents* contents) {
+@@ -999,6 +1170,10 @@ void LocationBarView::Update(WebContents* contents) {
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
@@ -16927,22 +17189,21 @@ index 07fdd70a0b..b595b2b82c 100644
    location_icon_view_->Update(
        /*suppress_animations=*/contents, GetOmniboxController()->IsPopupOpen());
  
-@@ -1134,6 +1310,14 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
+@@ -1134,6 +1309,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
    // fall back to the usual omnibox text color to ensure UI consistency.
    // In either case, all IconLabelBubbleViews situated within the location bar
    // will inherit the selected "surrounding foreground color".
 +  if (compact_shell_mode_ && compact_shell_presentation_.has_value() &&
 +      compact_shell_presentation_->palette_mode ==
 +          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
-+      GetNativeTheme()->preferred_contrast() !=
-+          ui::NativeTheme::PreferredContrast::kMore) {
++      !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +    return ShouldShowKeywordBubble() ? compact_shell_presentation_->secondary
 +                                     : compact_shell_presentation_->primary;
 +  }
    const auto color_id = ShouldShowKeywordBubble()
                              ? kColorOmniboxKeywordSeparator
                              : kColorOmniboxActionIcon;
-@@ -1145,6 +1329,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
+@@ -1145,6 +1327,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
  }
  
  SkColor LocationBarView::GetIconLabelBubbleBackgroundColor() const {
@@ -16952,7 +17213,7 @@ index 07fdd70a0b..b595b2b82c 100644
    return GetColorProvider()->GetColor(kColorLocationBarBackground);
  }
  
-@@ -1297,6 +1484,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
+@@ -1297,6 +1482,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
  int LocationBarView::GetMinimumTrailingWidth() const {
    int trailing_width = IncrementalMinimumWidth(page_action_container_);
  
@@ -16961,7 +17222,7 @@ index 07fdd70a0b..b595b2b82c 100644
    for (ContentSettingImageView* content_setting_view : content_setting_views_) {
      trailing_width += IncrementalMinimumWidth(content_setting_view);
    }
-@@ -1305,13 +1494,14 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1305,33 +1492,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
  
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -16977,12 +17238,14 @@ index 07fdd70a0b..b595b2b82c 100644
    const double opacity = hover_animation_.GetCurrentValue();
    const bool is_caret_visible =
        GetOmniboxController()->edit_model()->is_caret_visible();
-@@ -1319,19 +1509,34 @@ void LocationBarView::RefreshBackground() {
+   const bool input_in_progress =
        GetOmniboxController()->edit_model()->user_input_in_progress();
-   const bool high_contrast = GetNativeTheme()->preferred_contrast() ==
-                              ui::NativeTheme::PreferredContrast::kMore;
+-  const bool high_contrast = GetNativeTheme()->preferred_contrast() ==
+-                             ui::NativeTheme::PreferredContrast::kMore;
++  const bool native_colors =
++      yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
 +  const yee::BrowserSurfacePresentation* const presentation =
-+      compact_shell_presentation_.has_value() && !high_contrast &&
++      compact_shell_presentation_.has_value() && !native_colors &&
 +              compact_shell_presentation_->palette_mode ==
 +                  yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface
 +          ? &*compact_shell_presentation_
@@ -17010,11 +17273,20 @@ index 07fdd70a0b..b595b2b82c 100644
      background_color_ =
          color_provider->GetColor(kColorOmniboxResultsBackground);
 -  } else if (input_in_progress && !high_contrast) {
-+  } else if (input_in_progress && !high_contrast && !compact_shell_mode_) {
++  } else if (input_in_progress && !native_colors && !compact_shell_mode_) {
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1354,18 +1559,74 @@ void LocationBarView::RefreshBackground() {
+@@ -1341,7 +1544,7 @@ void LocationBarView::RefreshBackground() {
+   }
+ 
+   SkColor border_color = SK_ColorTRANSPARENT;
+-  if (high_contrast) {
++  if (native_colors) {
+     // High contrast schemes get a border stroke even on a rounded omnibox.
+     border_color =
+         is_caret_visible
+@@ -1354,18 +1557,74 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
  
@@ -17093,7 +17365,7 @@ index 07fdd70a0b..b595b2b82c 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1377,6 +1638,81 @@ void LocationBarView::RefreshBackground() {
+@@ -1377,6 +1636,80 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -17102,10 +17374,10 @@ index 07fdd70a0b..b595b2b82c 100644
 +    return;
 +  }
 +
-+  const bool high_contrast = GetNativeTheme()->preferred_contrast() ==
-+                             ui::NativeTheme::PreferredContrast::kMore;
++  const bool native_colors =
++      yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
 +  const bool custom_colors =
-+      compact_shell_presentation_.has_value() && !high_contrast &&
++      compact_shell_presentation_.has_value() && !native_colors &&
 +      compact_shell_presentation_->palette_mode ==
 +          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface;
 +  const SkColor icon_color =
@@ -17143,8 +17415,7 @@ index 07fdd70a0b..b595b2b82c 100644
 +      compact_shell_presentation_.has_value() &&
 +      compact_shell_presentation_->palette_mode ==
 +          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
-+      GetNativeTheme()->preferred_contrast() !=
-+          ui::NativeTheme::PreferredContrast::kMore;
++      !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
 +
 +  if (visible && browser_) {
 +    content::WebContents* const contents =
@@ -17175,7 +17446,7 @@ index 07fdd70a0b..b595b2b82c 100644
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1457,7 +1793,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1457,7 +1790,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -17183,7 +17454,7 @@ index 07fdd70a0b..b595b2b82c 100644
    }
  }
  
-@@ -1484,10 +1819,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
+@@ -1484,10 +1816,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
                                  : features::IsRoundedIconsEnabled()
                                      ? kCloseIcon
                                      : kTabCloseNormalOldIcon;
@@ -17212,7 +17483,7 @@ index 07fdd70a0b..b595b2b82c 100644
    clear_all_button_->SetBorder(views::CreateEmptyBorder(
        GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING)));
  }
-@@ -1609,6 +1958,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1609,6 +1955,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -17225,7 +17496,7 @@ index 07fdd70a0b..b595b2b82c 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1645,9 +2000,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1645,9 +1997,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
@@ -17238,7 +17509,7 @@ index 07fdd70a0b..b595b2b82c 100644
  }
  
  int LocationBarView::GetDragOperationsForView(views::View* sender,
-@@ -1670,6 +2025,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1670,6 +2022,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -17249,7 +17520,7 @@ index 07fdd70a0b..b595b2b82c 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -1844,6 +2203,10 @@ void LocationBarView::OnChanged() {
+@@ -1844,6 +2200,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -17260,7 +17531,7 @@ index 07fdd70a0b..b595b2b82c 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2080,9 +2443,26 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2080,9 +2440,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -17268,8 +17539,7 @@ index 07fdd70a0b..b595b2b82c 100644
 +      compact_shell_presentation_.has_value() &&
 +      compact_shell_presentation_->palette_mode ==
 +          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
-+      GetNativeTheme()->preferred_contrast() !=
-+          ui::NativeTheme::PreferredContrast::kMore) {
++      !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +    return compact_shell_presentation_->primary;
 +  }
    ui::ColorId id = kColorOmniboxText;
@@ -17278,8 +17548,7 @@ index 07fdd70a0b..b595b2b82c 100644
 +    if (compact_shell_mode_ && compact_shell_presentation_.has_value() &&
 +        compact_shell_presentation_->palette_mode ==
 +            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
-+        GetNativeTheme()->preferred_contrast() !=
-+            ui::NativeTheme::PreferredContrast::kMore) {
++        !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +      return yee::ResolveBrowserSurfaceSemanticColor(
 +          compact_shell_presentation_->surface,
 +          GetColorProvider()->GetColor(id));
@@ -17287,7 +17556,7 @@ index 07fdd70a0b..b595b2b82c 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2099,6 +2479,12 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2099,6 +2474,12 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -17300,7 +17569,7 @@ index 07fdd70a0b..b595b2b82c 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2133,18 +2519,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2133,18 +2514,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -17354,7 +17623,7 @@ index 07fdd70a0b..b595b2b82c 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2242,7 +2657,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2242,7 +2652,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -18410,7 +18679,7 @@ index 11d7cf1f67..20f63d24af 100644
        // Set the request time to now when the popup is first shown. This ensures
        // that latency is measured from the user interaction to show, even if the
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-index 9fe0bd9af6..97b6a546a5 100644
+index 9fe0bd9af6..fb61966c3c 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 @@ -33,6 +33,7 @@
@@ -18435,7 +18704,7 @@ index 9fe0bd9af6..97b6a546a5 100644
  
    // Verify that the popup state manager callback is called when popup opens.
    UNCALLED_MOCK_CALLBACK(
-@@ -243,6 +247,78 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
+@@ -243,6 +247,88 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
    popup_view->presenter()->Hide();
  }
  
@@ -18471,6 +18740,10 @@ index 9fe0bd9af6..97b6a546a5 100644
 +    OmniboxPopupViewWebUITest,
 +    MultiWindowActivationRestartsAutocompleteWithoutStaleState) {
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
++  // 창 비활성화의 OnBlur 경로를 검사하려면 실제 주소 입력 focus가 필요하다.
++  location_bar()->FocusLocation(/*is_user_initiated=*/true,
++                                /*clear_focus_if_failed=*/false);
++  ASSERT_TRUE(omnibox_view()->HasFocus());
 +  CreatePopupForTestQuery();
 +  auto* popup_view = static_cast<OmniboxPopupViewWebUI*>(
 +      location_bar()->GetOmniboxPopupView());
@@ -18483,12 +18756,18 @@ index 9fe0bd9af6..97b6a546a5 100644
 +      base::test::RunUntil([&]() { return popup_widget->IsVisible(); }));
 +  ASSERT_EQ(controller()->popup_state_manager()->popup_state(),
 +            OmniboxPopupState::kClassic);
++  ASSERT_TRUE(omnibox_view()->HasFocus());
++  auto* const first_widget =
++      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
 +
 +  Browser* const second_browser = CreateBrowser(browser()->GetProfile());
 +  ASSERT_TRUE(second_browser);
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(second_browser));
++  views::test::WaitForWidgetActive(first_widget, false);
 +  ASSERT_TRUE(
 +      base::test::RunUntil([&]() { return !popup_widget->IsVisible(); }));
++  EXPECT_FALSE(omnibox_view()->HasFocus());
++  EXPECT_TRUE(controller()->autocomplete_controller()->result().empty());
 +  EXPECT_EQ(controller()->popup_state_manager()->popup_state(),
 +            OmniboxPopupState::kNone);
 +  EXPECT_FALSE(controller()->IsPopupOpen());
@@ -24467,7 +24746,7 @@ index 0fcdbfa57b..2c25d60149 100644
    std::optional<Button::ScopedAnchorHighlight> menu_anchor_higlight_;
  
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 09b381e46e..69c98e4e3f 100644
+index 09b381e46e..ab959bc300 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -19,9 +19,11 @@
@@ -24538,7 +24817,7 @@ index 09b381e46e..69c98e4e3f 100644
  
  // Returns whether `point` should be treated as part of the caption area in
  // `view`. Recursively traverses into icon containers to correctly handle
-@@ -305,6 +335,309 @@ ToolbarView::~ToolbarView() {
+@@ -305,6 +335,308 @@ ToolbarView::~ToolbarView() {
    }
  }
  
@@ -24704,8 +24983,7 @@ index 09b381e46e..69c98e4e3f 100644
 +  }
 +
 +  if (presentation.has_value() &&
-+      GetNativeTheme()->preferred_contrast() ==
-+          ui::NativeTheme::PreferredContrast::kMore) {
++      yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +    presentation = yee::UseNativeBrowserSurfaceColors(*presentation);
 +  }
 +  location_bar_view_->SetCompactShellSurfacePresentation(presentation);
@@ -24848,7 +25126,7 @@ index 09b381e46e..69c98e4e3f 100644
  void ToolbarView::Init() {
  #if defined(USE_AURA)
    // Avoid generating too many occlusion tracking calculation events before this
-@@ -1269,6 +1602,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
+@@ -1269,6 +1601,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
  
  bool ToolbarView::IsPositionInWindowCaption(
      const gfx::Point& test_point) const {
@@ -24859,7 +25137,7 @@ index 09b381e46e..69c98e4e3f 100644
    return IsPositionInWindowCaptionForView(this, test_point);
  }
  
-@@ -1419,6 +1756,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1419,6 +1755,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
              default_margin + overflow_button_->GetMinimumSize().width(), 0);
        }
    }
@@ -24876,7 +25154,7 @@ index 09b381e46e..69c98e4e3f 100644
    size.set_height(size.height() * size_animation_.GetCurrentValue());
    return size;
  }
-@@ -1439,10 +1786,11 @@ void ToolbarView::Layout(PassKey) {
+@@ -1439,10 +1785,11 @@ void ToolbarView::Layout(PassKey) {
    }
  
    if (display_mode_ == DisplayMode::kNormal) {
@@ -24889,7 +25167,7 @@ index 09b381e46e..69c98e4e3f 100644
      // Need to determine whether the overflow button should be visible, and only
      // update it if the visibility changes.
      const bool was_overflow_button_visible =
-@@ -1519,21 +1867,15 @@ void ToolbarView::InitLayout() {
+@@ -1519,21 +1866,15 @@ void ToolbarView::InitLayout() {
    // Shift previously flex-able elements' order by `kOrderOffset`.
    // This will cause them to be the first ones to drop out or shrink to minimum.
    // Order 1 - kOrderOffset will be assigned to new flex-able elements.
@@ -24915,7 +25193,7 @@ index 09b381e46e..69c98e4e3f 100644
  
    layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
  
-@@ -1633,7 +1975,7 @@ void ToolbarView::InitLayout() {
+@@ -1633,7 +1974,7 @@ void ToolbarView::InitLayout() {
            views::kFlexBehaviorKey,
            toolbar_webview_->GetFlexSpecification(
                toolbar_controller_->webui_toolbar_button_flex_order(),
@@ -24924,7 +25202,7 @@ index 09b381e46e..69c98e4e3f 100644
      } else {
        // If `toolbar_controller_` is nullptr, then the WebUI toolbar is managing
        // all controls, so don't need to worry about integrating with
-@@ -1704,6 +2046,10 @@ void ToolbarView::LayoutCommon() {
+@@ -1704,6 +2045,10 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
@@ -24935,7 +25213,7 @@ index 09b381e46e..69c98e4e3f 100644
    layout_manager_->SetInteriorMargin(interior_margin);
  
    // Extend buttons to the window edge if we're either in a maximized or
-@@ -1751,7 +2097,9 @@ void ToolbarView::LayoutCommon() {
+@@ -1751,7 +2096,9 @@ void ToolbarView::LayoutCommon() {
  
    if (toolbar_divider_ && extensions_container_) {
      views::ManualLayoutUtil(layout_manager_)
@@ -24946,7 +25224,7 @@ index 09b381e46e..69c98e4e3f 100644
    }
    // Cast button visibility is controlled externally.
  }
-@@ -1931,7 +2279,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
+@@ -1931,7 +2278,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
    return reload_;
  }
  
@@ -24954,7 +25232,7 @@ index 09b381e46e..69c98e4e3f 100644
  ToolbarButton* ToolbarView::GetDownloadButton() {
    return pinned_toolbar_actions_container_
               ? pinned_toolbar_actions_container_->GetButtonFor(
-@@ -1988,7 +2335,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
+@@ -1988,7 +2334,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
  
  void ToolbarView::OnShowHomeButtonChanged() {
    if (home_) {
@@ -24963,7 +25241,7 @@ index 09b381e46e..69c98e4e3f 100644
    }
  }
  
-@@ -2004,8 +2351,12 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2004,8 +2350,12 @@ void ToolbarView::OnTouchUiChanged() {
      layout_manager_->SetDefault(views::kMarginsKey,
                                  gfx::Insets::VH(0, default_margin));
      if (location_bar_view_) {
@@ -24978,7 +25256,7 @@ index 09b381e46e..69c98e4e3f 100644
      }
  
      LoadImages();
-@@ -2014,6 +2365,9 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2014,6 +2364,9 @@ void ToolbarView::OnTouchUiChanged() {
  }
  
  void ToolbarView::SetForwardButtonVisibility(bool visible) {

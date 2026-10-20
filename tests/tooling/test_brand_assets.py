@@ -58,6 +58,15 @@ class BrandAssetsTest(unittest.TestCase):
         (self.repo / 'build').mkdir()
         (self.repo / 'build/overlay.json').write_text(json.dumps({'generated_roots': ['chrome/app/theme/chromium']}))
         self.src.mkdir()
+        subprocess.run(['git', 'init', '-q', str(self.src)], check=True)
+        for relative in brand_assets.UPSTREAM_INPUTS:
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('upstream input fixture\n', encoding='utf-8')
+        self.commit_inputs()
+        # 작업 트리에 원본이 없어도 HEAD blob을 검증해야 한다.
+        for family in ('chrome', 'ui'):
+            shutil.rmtree(self.src / family)
         self.source = self.repo / 'assets/brand/mark.svg'
         self.source.write_text('<svg/>')
         file = self.package / 'mark.png'
@@ -66,10 +75,16 @@ class BrandAssetsTest(unittest.TestCase):
         self.data = {'schema_version': 1, 'product_name': 'Orbit', 'short_name': 'Orbit',
             'generator_sha256': brand_assets.digest(ROOT / 'tools/overlay/generate-brand-assets.py'),
             'source_sha256': brand_assets.digest(self.source), 'palette': {'primary': '#123456'},
+            'upstream_inputs': brand_assets.upstream_input_blobs(self.src),
             'files': [{'source': 'mark.png', 'destination': 'chrome/app/theme/chromium/product_logo_16.png',
                        'sha256': brand_assets.digest(file)}]}
         self.brand = SimpleNamespace(name='Orbit', short_name='Orbit', logo_source=self.source,
             logo_assets_manifest=self.manifest, logo_palette={'primary': '#123456'})
+
+    def commit_inputs(self):
+        subprocess.run(['git', '-C', str(self.src), 'add', *brand_assets.UPSTREAM_INPUTS], check=True)
+        subprocess.run(['git', '-C', str(self.src), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'upstream inputs'], check=True)
 
     def plan(self):
         self.manifest.write_text(json.dumps(self.data))
@@ -84,6 +99,8 @@ class BrandAssetsTest(unittest.TestCase):
         generator.write_text('''import hashlib
 import json
 from pathlib import Path
+import sys
+from brand_assets import upstream_input_blobs
 
 root = Path(__file__).resolve().parents[2]
 config = json.loads((root / 'branding/brand.json').read_text(encoding='utf-8'))
@@ -98,6 +115,7 @@ data = {'schema_version': 1, 'product_name': config['name'],
         'short_name': config.get('short_name', config['name']),
         'source_sha256': digest(root / config['logo_source']),
         'generator_sha256': digest(Path(__file__)), 'palette': config['logo_palette'],
+        'upstream_inputs': upstream_input_blobs(Path(sys.argv[1])),
         'files': [{'source': 'mark.png', 'destination': destination, 'sha256': digest(output)}]}
 manifest.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
 with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
@@ -124,14 +142,14 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
 
     def snapshot(self, root):
         return {path.relative_to(root).as_posix(): (path.read_bytes(), path.stat().st_mtime_ns)
-                for path in root.rglob('*') if path.is_file()}
+                for path in root.rglob('*') if path.is_file() and '.git' not in path.parts}
 
     @unittest.skipUnless(shutil.which('zsh'), 'zsh가 필요하다')
     def test_prepare_refreshes_each_stale_input_without_installing(self):
         self.prepare_cli()
         changes = [('product_name', 'Old Orbit'), ('short_name', 'OLD'),
                    ('source_sha256', '0' * 64), ('palette', {'primary': '#654321'}),
-                   ('generator_sha256', '0' * 64)]
+                   ('generator_sha256', '0' * 64), ('upstream_inputs', {})]
         runs = self.repo / 'generator-runs'
         for index, (key, value) in enumerate(changes, 1):
             with self.subTest(key=key):
@@ -152,6 +170,25 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
                 self.assertEqual(len(runs.read_text(encoding='utf-8').splitlines()), index)
                 target = self.src / self.data['files'][0]['destination']
                 self.assertEqual(target.read_bytes(), b'fresh generated asset')
+
+        # 제품 설정이 같아도 Chromium 원본이 바뀌면 검사·설치 전에 재생성한다.
+        for relative in brand_assets.UPSTREAM_INPUTS:
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('new upstream input fixture\n', encoding='utf-8')
+        self.commit_inputs()
+        checkout = self.snapshot(self.src)
+        for option in ('--check', '--install-prepared'):
+            rejected = self.run_cli(option)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn('Brand asset package is stale', rejected.stderr)
+            self.assertEqual(checkout, self.snapshot(self.src))
+        prepared = self.run_cli('--prepare')
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        self.assertEqual(checkout, self.snapshot(self.src))
+        self.assertEqual(json.loads(self.manifest.read_text())['upstream_inputs'],
+                         brand_assets.upstream_input_blobs(self.src))
+        self.assertEqual(len(runs.read_text().splitlines()), len(changes) + 1)
 
     @unittest.skipUnless(shutil.which('zsh'), 'zsh가 필요하다')
     def test_prepare_validates_generated_destinations_before_any_checkout_write(self):
@@ -181,6 +218,15 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
         target = self.src / self.data['files'][0]['destination']
         self.assertEqual(target.read_bytes(), b'fresh generated asset')
         self.assertEqual((self.repo / 'generator-runs').read_text(encoding='utf-8'), 'generated\n')
+        for relative in brand_assets.UPSTREAM_INPUTS:
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('new upstream input fixture\n', encoding='utf-8')
+        self.commit_inputs()
+        installed = self.run_cli()
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        self.assertEqual((self.repo / 'generator-runs').read_text(encoding='utf-8'),
+                         'generated\ngenerated\n')
 
     @unittest.skipUnless(shutil.which('zsh'), 'zsh가 필요하다')
     def test_utf8_metadata_and_webui_are_independent_of_the_default_locale(self):
@@ -213,7 +259,7 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
     def test_preview_is_read_only_and_install_is_idempotent(self):
         plan, count = self.plan()
         self.assertEqual(count, 1)
-        self.assertFalse(list(self.src.rglob('*')))
+        self.assertFalse(self.snapshot(self.src))
         brand_assets.install(plan)
         target = plan[0][1]
         stamp = target.stat().st_mtime_ns
@@ -233,7 +279,7 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
                 self.data[key] = saved
 
     @unittest.skipUnless(POWERSHELL, 'PowerShell 실행 파일이 필요하다')
-    def test_windows_installer_rejects_names_changed_only_in_case(self):
+    def test_windows_installer_rejects_stale_names_and_upstream_inputs(self):
         overlay = self.repo / 'tools/overlay'
         overlay.mkdir(parents=True)
         for name in ('brand-config.ps1', 'install-brand-assets.ps1', 'generate-brand-assets.py'):
@@ -269,12 +315,26 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
                 self.assertIn('Brand asset package is stale', stale.stderr)
                 self.assertFalse(target.exists())
                 self.data[key] = 'Orbit'
+        self.data['upstream_inputs'] = {}
+        stale = check()
+        self.assertNotEqual(stale.returncode, 0)
+        self.assertIn('Brand asset package is stale', stale.stderr)
+        self.data['upstream_inputs'] = brand_assets.upstream_input_blobs(self.src)
+        for relative in brand_assets.UPSTREAM_INPUTS:
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('new upstream input fixture\n', encoding='utf-8')
+        self.commit_inputs()
+        stale = check()
+        self.assertNotEqual(stale.returncode, 0)
+        self.assertIn('Brand asset package is stale', stale.stderr)
+        self.assertFalse(target.exists())
 
     def test_modified_asset_fails_before_any_output_is_written(self):
         (self.package / 'mark.png').write_bytes(b'modified')
         with self.assertRaisesRegex(ValueError, 'modified'):
             self.plan()
-        self.assertFalse(list(self.src.rglob('*')))
+        self.assertFalse(self.snapshot(self.src))
 
     def test_escape_unowned_and_duplicate_destinations_are_rejected(self):
         original = self.data['files'][0].copy()
@@ -287,7 +347,7 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
         self.data['files'] = [original.copy(), original.copy()]
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             self.plan()
-        self.assertFalse(list(self.src.rglob('*')))
+        self.assertFalse(self.snapshot(self.src))
 
     def test_symlink_destinations_and_file_parents_are_rejected(self):
         (self.src / 'chrome').symlink_to(self.package, target_is_directory=True)

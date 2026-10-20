@@ -11,17 +11,37 @@ import sys
 
 from brand_config import REPO_ROOT, load_brand
 
+UPSTREAM_INPUTS = (
+    'chrome/browser/resources/side_panel/customize_chrome/icons/mini_new_tab_page.svg',
+    'chrome/browser/resources/webui_toolbar/icons.ts',
+    'ui/webui/resources/cr_elements/icons.html.ts',
+    'chrome/browser/resources/settings/icons.html.ts',
+    'chrome/browser/resources/webui_browser/icons.html.ts',
+)
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def matches_inputs(manifest, brand):
+def upstream_input_blobs(chromium_src):
+    """설치된 생성 파일 대신 HEAD 원본의 Git blob을 갱신 입력으로 읽는다."""
+    try:
+        blobs = subprocess.check_output(
+            ['git', '-C', str(chromium_src), 'rev-parse',
+             *('HEAD:' + path for path in UPSTREAM_INPUTS)], text=True).splitlines()
+    except subprocess.CalledProcessError as error:
+        raise ValueError('Cannot inspect immutable Chromium brand asset inputs') from error
+    return dict(zip(UPSTREAM_INPUTS, blobs, strict=True))
+
+
+def matches_inputs(manifest, brand, chromium_src):
     return (manifest.get('product_name') == brand.name
             and manifest.get('short_name') == brand.short_name
             and manifest.get('source_sha256') == digest(brand.logo_source)
             and manifest.get('palette') == brand.logo_palette
-            and manifest.get('generator_sha256') == digest(Path(__file__).with_name('generate-brand-assets.py')))
+            and manifest.get('generator_sha256') == digest(Path(__file__).with_name('generate-brand-assets.py'))
+            and manifest.get('upstream_inputs') == upstream_input_blobs(chromium_src))
 
 
 def confined_file(root, value):
@@ -48,7 +68,7 @@ def asset_plan(brand, chromium_src, repo_root=REPO_ROOT):
     manifest = json.loads(brand.logo_assets_manifest.read_text(encoding='utf-8'))
     if manifest.get('schema_version') != 1:
         raise ValueError('Unsupported brand asset package schema')
-    if not matches_inputs(manifest, brand):
+    if not matches_inputs(manifest, brand, chromium_src):
         raise ValueError('Brand asset package is stale; run generate-brand-assets.py')
     catalog = json.loads((Path(repo_root) / 'build/overlay.json').read_text(encoding='utf-8'))
     owned = catalog['generated_roots']
@@ -113,7 +133,7 @@ def main():
             if manifest is None:
                 raise ValueError('Set logo_assets_manifest in branding/brand.json')
             data = json.loads(manifest.read_text(encoding='utf-8')) if manifest.is_file() else {}
-            if not matches_inputs(data, brand):
+            if not matches_inputs(data, brand, args.chromium_src):
                 subprocess.run([sys.executable, str(Path(__file__).with_name('generate-brand-assets.py')),
                                 str(args.chromium_src)], check=True)
         plan, count = asset_plan(brand, args.chromium_src)

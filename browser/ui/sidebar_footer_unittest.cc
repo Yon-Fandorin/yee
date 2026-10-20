@@ -18,6 +18,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node_data.h"
+#include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
 #include "ui/events/base_event_utils.h"
@@ -129,7 +130,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
   views::Widget* widget() { return widget_.get(); }
 
   void ExpectFooterSurface(bool paint_background) {
-    EXPECT_EQ(paint_background, footer_->background() != nullptr);
+    ASSERT_EQ(paint_background, footer_->background() != nullptr);
     if (paint_background) {
       EXPECT_NE(0u, SkColorGetA(footer_->background()->color().ResolveToSkColor(
                         footer_->GetColorProvider())));
@@ -224,9 +225,9 @@ TEST_F(SidebarFooterViewTest, CompactMenuKeepsActionTitlesVisible) {
 }
 
 TEST_F(SidebarFooterViewTest, PointerOpenDoesNotPaintASelectedCard) {
-  views::View* const menu = OpenBubble();
+  views::View* menu = OpenBubble();
   ASSERT_TRUE(menu);
-  views::View* const initial_action =
+  views::View* initial_action =
       menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
   ASSERT_TRUE(initial_action);
   EXPECT_FALSE(initial_action->background());
@@ -238,6 +239,17 @@ TEST_F(SidebarFooterViewTest, PointerOpenDoesNotPaintASelectedCard) {
   EXPECT_TRUE(initial_action->background());
   button->SetState(views::Button::STATE_NORMAL);
   EXPECT_FALSE(initial_action->background());
+
+  CloseBubble();
+  ui::KeyEvent key(ui::EventType::kKeyPressed, ui::VKEY_RETURN, ui::EF_NONE);
+  views::test::ButtonTestApi(static_cast<views::Button*>(footer_))
+      .NotifyClick(key);
+  menu = GetSidebarFooterMenuForTesting(*footer_);
+  ASSERT_TRUE(menu);
+  initial_action = menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
+  ASSERT_TRUE(initial_action);
+  EXPECT_TRUE(initial_action->HasFocus());
+  EXPECT_TRUE(views::FocusRing::Get(initial_action)->ShouldPaintForTesting());
 }
 
 TEST_F(SidebarFooterViewTest, ArrowNavigationPreservesPopupWidth) {
@@ -246,9 +258,13 @@ TEST_F(SidebarFooterViewTest, ArrowNavigationPreservesPopupWidth) {
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   const int width = menu->GetPreferredSize().width();
+  const auto send_key = [menu](ui::KeyboardCode code) {
+    ui::KeyEvent key(ui::EventType::kKeyPressed, code, ui::EF_NONE);
+    menu->GetWidget()->OnKeyEvent(&key);
+    EXPECT_TRUE(key.handled());
+  };
   menu->GetViewByID(kSidebarFooterRootContextViewId)->RequestFocus();
-  ui::KeyEvent down(ui::EventType::kKeyPressed, ui::VKEY_DOWN, ui::EF_NONE);
-  EXPECT_TRUE(menu->OnKeyPressed(down));
+  send_key(ui::VKEY_DOWN);
   views::View* const tools =
       menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId);
   ASSERT_TRUE(tools);
@@ -256,22 +272,62 @@ TEST_F(SidebarFooterViewTest, ArrowNavigationPreservesPopupWidth) {
   ASSERT_TRUE(views::FocusRing::Get(tools));
   EXPECT_TRUE(views::FocusRing::Get(tools)->ShouldPaintForTesting());
   EXPECT_FALSE(tools->background());
-  EXPECT_TRUE(menu->OnKeyPressed(down));
+  // 같은 행으로 포인터가 들어와도 이전 키보드 윤곽은 남지 않는다.
+  ui::MouseEvent entered(ui::EventType::kMouseEntered, gfx::Point(),
+                         gfx::Point(), ui::EventTimeForNow(), ui::EF_NONE,
+                         ui::EF_NONE);
+  tools->OnMouseEntered(entered);
+  EXPECT_TRUE(tools->HasFocus());
+  EXPECT_FALSE(views::FocusRing::Get(tools)->ShouldPaintForTesting());
+  send_key(ui::VKEY_HOME);
+  EXPECT_TRUE(views::FocusRing::Get(tools)->ShouldPaintForTesting());
+  ui::MouseEvent moved(ui::EventType::kMouseMoved, gfx::Point(2, 2),
+                       gfx::Point(2, 2), ui::EventTimeForNow(), ui::EF_NONE,
+                       ui::EF_NONE);
+  tools->OnMouseMoved(moved);
+  EXPECT_FALSE(views::FocusRing::Get(tools)->ShouldPaintForTesting());
+  EXPECT_TRUE(tools->background());
+  ui::MouseEvent pressed(ui::EventType::kMousePressed, gfx::Point(2, 2),
+                         gfx::Point(2, 2), ui::EventTimeForNow(),
+                         ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
+  EXPECT_TRUE(tools->OnMousePressed(pressed));
+  EXPECT_EQ(views::InkDropState::ACTION_PENDING,
+            views::InkDrop::Get(tools)->GetInkDrop()->GetTargetInkDropState());
+  tools->OnMouseCaptureLost();
+  EXPECT_EQ(views::InkDropState::HIDDEN,
+            views::InkDrop::Get(tools)->GetInkDrop()->GetTargetInkDropState());
+  tools->RequestFocusWithReason(
+      views::FocusManager::FocusChangeReason::kFocusTraversal);
+  ASSERT_TRUE(tools->HasFocus());
+  send_key(ui::VKEY_DOWN);
   views::View* const memory = menu->GetViewByID(kSidebarFooterRootMemoryViewId);
   ASSERT_TRUE(memory);
   EXPECT_TRUE(memory->HasFocus());
-  ui::KeyEvent up(ui::EventType::kKeyPressed, ui::VKEY_UP, ui::EF_NONE);
-  EXPECT_TRUE(menu->OnKeyPressed(up));
+  EXPECT_TRUE(views::FocusRing::Get(memory)->ShouldPaintForTesting());
+  send_key(ui::VKEY_UP);
   EXPECT_TRUE(tools->HasFocus());
-  ui::KeyEvent back(ui::EventType::kKeyPressed, ui::VKEY_LEFT, ui::EF_NONE);
+  const ui::Accelerator back(ui::VKEY_ESCAPE, ui::EF_NONE);
   for (int id :
        {kSidebarFooterRootBrowserToolsViewId, kSidebarFooterRootContextViewId,
         kSidebarFooterRootMemoryViewId}) {
     SCOPED_TRACE(id);
     Click(menu->GetViewByID(id));
     EXPECT_EQ(menu->GetPreferredSize().width(), width);
-    EXPECT_TRUE(menu->OnKeyPressed(back));
+    views::View* const back_row = menu->children()[0];
+    EXPECT_TRUE(back_row->HasFocus());
+    EXPECT_FALSE(views::FocusRing::Get(back_row)->ShouldPaintForTesting());
+    if (id == kSidebarFooterRootMemoryViewId) {
+      // 비활성 행만 남은 화면에서도 Tab은 같은 Back 행에 키보드 윤곽을 켠다.
+      menu->GetFocusManager()->AdvanceFocus(/*reverse=*/false);
+      EXPECT_TRUE(back_row->HasFocus());
+      EXPECT_TRUE(views::FocusRing::Get(back_row)->ShouldPaintForTesting());
+    }
+    EXPECT_TRUE(menu->GetFocusManager()->ProcessAccelerator(back));
+    ASSERT_EQ(menu, GetSidebarFooterMenuForTesting(*footer_));
     EXPECT_TRUE(menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId));
+    EXPECT_TRUE(views::FocusRing::Get(
+                    menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId))
+                    ->ShouldPaintForTesting());
     EXPECT_EQ(menu->GetPreferredSize().width(), width);
   }
 }
@@ -426,6 +482,47 @@ TEST_F(SidebarFooterViewTest, WorkspaceMarkPreservesSupplementaryCodePoints) {
   EXPECT_EQ(workspace_mark->GetText(), u"\U0001F680");
 }
 
+TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  footer_ = nullptr;
+  SidebarFooterModel model;
+  model.contexts = {
+      {.workspace_name = u"Workspace"},
+      {.workspace_name = u"Personal", .account_name = u"Account"}};
+  footer_ = widget()->SetContentsView(CreateSidebarFooterView(
+      std::move(model), SidebarContextSelectedCallback(),
+      SidebarFooterBrowserActionCallback(), SidebarMemoryChangedCallback()));
+  auto* trigger = static_cast<HoverButton*>(footer_.get());
+  views::View* const labels = trigger->title()->parent();
+  ASSERT_EQ(labels->children().size(), 2u);
+  auto* account = static_cast<views::Label*>(labels->children()[1]);
+
+  for (size_t index : {0u, 1u, 0u}) {
+    SCOPED_TRACE(index);
+    views::View* const menu = OpenBubble();
+    ASSERT_TRUE(menu);
+    Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+    Click(menu->children()[2 + index]);
+    base::RunLoop().RunUntilIdle();
+    EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+    EXPECT_EQ(index == 1u, account->GetVisible());
+    EXPECT_EQ(index == 1u ? u"Account" : u"", account->GetText());
+
+    // 폭 변경 후에도 native 자동 갱신이 계정의 접근성 이름을 지우지 않는다.
+    footer_->SetBoundsRect(gfx::Rect(0, 0, 160, 50));
+    footer_->DeprecatedLayoutImmediately();
+    ui::AXNodeData data;
+    footer_->GetViewAccessibility().GetAccessibleNodeData(&data);
+    const std::u16string name =
+        data.GetString16Attribute(ax::mojom::StringAttribute::kName);
+    EXPECT_NE(name.find(index == 1u ? u"Personal" : u"Workspace"),
+              std::u16string::npos);
+    EXPECT_EQ(index == 1u, name.find(u"Account") != std::u16string::npos);
+    footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
+  }
+}
+
 TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
   ASSERT_TRUE(OpenBubble());
   EXPECT_NE(
@@ -505,8 +602,8 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   footer_->GetFocusManager()->SetFocusedView(nullptr);
-  menu->GetWidget()->CloseWithReason(
-      views::Widget::ClosedReason::kEscKeyPressed);
+  EXPECT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
+      ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));

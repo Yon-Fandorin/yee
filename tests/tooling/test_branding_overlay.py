@@ -208,6 +208,18 @@ class BrandingOverlayTest(unittest.TestCase):
                        *options, check=check)
 
     def prepare_public_assets(self):
+        sys.path.insert(0, str(ROOT / "tools/overlay"))
+        try:
+            from brand_assets import UPSTREAM_INPUTS, upstream_input_blobs
+        finally:
+            sys.path.pop(0)
+        for relative in UPSTREAM_INPUTS:
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("upstream asset fixture\n", encoding="utf-8")
+        command("git", "add", *UPSTREAM_INPUTS, cwd=self.src)
+        command("git", "-c", "user.name=Branding fixture", "-c",
+                "user.email=fixture@example.invalid", "commit", "-qm", "Asset inputs", cwd=self.src)
         config_path = self.repo / "branding/brand.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
         config["logo_assets_manifest"] = "assets/brand/generated/manifest.json"
@@ -216,6 +228,8 @@ class BrandingOverlayTest(unittest.TestCase):
         generator.write_text('''from pathlib import Path
 import hashlib
 import json
+import sys
+from brand_assets import upstream_input_blobs
 
 repo = Path(__file__).resolve().parents[2]
 if (repo / 'fail-brand-generation').exists():
@@ -232,6 +246,7 @@ data = {'schema_version': 1, 'product_name': config['name'],
         'source_sha256': digest(repo / config['logo_source']),
         'generator_sha256': digest(Path(__file__)),
         'palette': config.get('logo_palette', {}),
+        'upstream_inputs': upstream_input_blobs(Path(sys.argv[1])),
         'files': [{'source': 'mark.png',
                    'destination': 'chrome/app/theme/chromium/product_logo_16.png',
                    'sha256': digest(output)}]}
@@ -246,6 +261,7 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
                     "source_sha256": hashlib.sha256((self.repo / "logo.png").read_bytes()).hexdigest(),
                     "generator_sha256": hashlib.sha256(generator.read_bytes()).hexdigest(),
                     "palette": {},
+                    "upstream_inputs": upstream_input_blobs(self.src),
                     "files": [{"source": "mark.png",
                                "destination": "chrome/app/theme/chromium/product_logo_16.png",
                                "sha256": hashlib.sha256(output.read_bytes()).hexdigest()}]}

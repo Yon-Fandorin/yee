@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_name": "Yee",
   "short_name": "Yee",
-  "generator_sha256": "08fd6f8154db2fb9ac0c03d0c9b8563c0304f9e4a299f57132c2b54b36d090c0",
+  "generator_sha256": "a785af9159388107bbd14377e459f329c9bd87a38123dd221f213b3e129334df",
   "source": "assets/brand/yee-logo.svg",
   "source_sha256": "ed92449cd7e02cc59ff4a279d3ac26adac83503c66126f8564faa39418d11ef6",
   "palette": {
@@ -12,6 +12,13 @@
     "dark_secondary": "#8BC4B3",
     "background": "#F7F9F5",
     "dark_background": "#202724"
+  },
+  "upstream_inputs": {
+    "chrome/browser/resources/side_panel/customize_chrome/icons/mini_new_tab_page.svg": "83221a8e6f90f48946640ef05ed159423d7fdee6",
+    "chrome/browser/resources/webui_toolbar/icons.ts": "341bd234851df4a8e0ee51d0b9fab6b34f114075",
+    "ui/webui/resources/cr_elements/icons.html.ts": "d3f4f9fb266581aaf26599a257db66aee86a75fd",
+    "chrome/browser/resources/settings/icons.html.ts": "d4f8b528ca3ce38a5e95990af483492e2486c74c",
+    "chrome/browser/resources/webui_browser/icons.html.ts": "06dfcf11fc081ce29cdff2660810644b35ef03fa"
   },
   "files": [
     {

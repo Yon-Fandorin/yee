@@ -32,6 +32,35 @@ foreach ($property in $manifest.palette.PSObject.Properties) {
         throw 'Brand asset palette is stale; regenerate the package.'
     }
 }
+# 생성된 작업 트리 파일이 아니라 생성기가 읽은 HEAD 원본 blob을 비교한다.
+$upstreamPaths = @(
+    'chrome/browser/resources/side_panel/customize_chrome/icons/mini_new_tab_page.svg',
+    'chrome/browser/resources/webui_toolbar/icons.ts',
+    'ui/webui/resources/cr_elements/icons.html.ts',
+    'chrome/browser/resources/settings/icons.html.ts',
+    'chrome/browser/resources/webui_browser/icons.html.ts'
+)
+$upstreamProperty = $manifest.PSObject.Properties['upstream_inputs']
+if (-not $upstreamProperty -or $upstreamProperty.Value -isnot [pscustomobject] -or
+    @($upstreamProperty.Value.PSObject.Properties).Count -ne $upstreamPaths.Count) {
+    throw 'Brand asset package is stale; regenerate it on macOS with generate-brand-assets.py.'
+}
+$upstreamSpecs = @($upstreamPaths | ForEach-Object { 'HEAD:' + $_ })
+$previousPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $upstreamBlobs = @(& git -C $chromiumPath rev-parse @upstreamSpecs 2>&1)
+    $gitExitCode = $LASTEXITCODE
+} finally { $ErrorActionPreference = $previousPreference }
+if ($gitExitCode -ne 0 -or $upstreamBlobs.Count -ne $upstreamPaths.Count) {
+    throw 'Cannot inspect immutable Chromium brand asset inputs.'
+}
+for ($index = 0; $index -lt $upstreamPaths.Count; $index++) {
+    $property = $upstreamProperty.Value.PSObject.Properties[$upstreamPaths[$index]]
+    if (-not $property -or $property.Value -cne $upstreamBlobs[$index]) {
+        throw 'Brand asset package is stale; regenerate it on macOS with generate-brand-assets.py.'
+    }
+}
 $catalog = Get-Content -LiteralPath (Join-Path $repoRoot 'build/overlay.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 function Get-ConfinedAssetPath {
     param([string] $Root, [string] $Relative)
