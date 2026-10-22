@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/generated_resources.h"
@@ -24,6 +25,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor_extra/shadow.h"
@@ -1185,8 +1187,7 @@ public:
         gfx::Size(kSidebarMetrics.resize_handle_thickness,
                   kSidebarMetrics.resize_handle_length));
     handle_->SetBoundsRect(marker);
-    UpdateSplitResizeHandleAppearance(*handle_, HasFocus() || IsMouseHovered(),
-                                      show_resting_marker_);
+    UpdateAppearance(HasFocus() || IsMouseHovered());
     // Window/Side Panel animation can shorten the gutter without another
     // mouse event. Never leave a transformed marker outside its new bounds.
     if (pointer_y_) {
@@ -1198,11 +1199,39 @@ public:
     }
   }
 
+protected:
+  virtual std::optional<SkColor> GetContrastSurface() const {
+    return std::nullopt;
+  }
+
+  void RefreshMarkerColor() {
+    const ui::ColorProvider* const colors = GetColorProvider();
+    if (!handle_->GetVisible() || !colors) {
+      return;
+    }
+    SkColor foreground = colors->GetColor(ui::kColorSysOnSurface);
+    const std::optional<SkColor> surface = GetContrastSurface();
+    if (surface &&
+        color_utils::GetContrastRatio(
+            color_utils::AlphaBlend(foreground, *surface,
+                                     kResizeHandleEmphasizedOpacity),
+            *surface) < color_utils::kMinimumVisibleContrastRatio) {
+      foreground = color_utils::GetColorWithMaxContrast(*surface);
+    }
+    handle_->SetBackground(views::CreateRoundedRectBackground(
+        foreground, kResizeHandleCornerRadius));
+    views::FocusRing::Get(handle_)->SetColorId(
+        surface ? std::make_optional(ResolveBrowserSurfaceFocusColorId(
+                      *colors, *surface, ui::kColorFocusableBorderFocused))
+                : std::nullopt);
+  }
+
 private:
   void UpdateAppearance(bool emphasized) {
     if (handle_->GetVisible()) {
       UpdateSplitResizeHandleAppearance(*handle_, emphasized,
                                         show_resting_marker_);
+      RefreshMarkerColor();
     }
   }
 
@@ -1270,7 +1299,8 @@ class SidePanelResizeGutterView : public SidebarResizeArea,
                                  public views::ResizeAreaDelegate {
 public:
   explicit SidePanelResizeGutterView(SidePanelResizeCallbacks callbacks)
-      : SidebarResizeArea(this), callbacks_(std::move(callbacks)) {
+      : SidebarResizeArea(this, /*show_resting_marker=*/false),
+        callbacks_(std::move(callbacks)) {
     SetID(kSidePanelResizeGutterViewId);
     SetVisible(false);
     SetFocusBehavior(FocusBehavior::ALWAYS);
@@ -1303,8 +1333,25 @@ public:
     callbacks_.set_keyboard_resized.Run(false);
   }
 
+  void SetPageSurfaceColor(SkColor color) {
+    page_surface_color_ = color;
+    RefreshMarkerColor();
+  }
+
+  void SetOnPageSurface(bool on_page) {
+    on_page_surface_ = on_page;
+    RefreshMarkerColor();
+  }
+
+protected:
+  std::optional<SkColor> GetContrastSurface() const override {
+    return on_page_surface_ ? page_surface_color_ : std::nullopt;
+  }
+
 private:
   SidePanelResizeCallbacks callbacks_;
+  std::optional<SkColor> page_surface_color_;
+  bool on_page_surface_ = false;
 };
 
 } // namespace
@@ -1313,6 +1360,25 @@ std::unique_ptr<views::ResizeArea>
 CreateSidebarResizeArea(views::ResizeAreaDelegate *delegate) {
   return std::make_unique<SidebarResizeArea>(delegate,
                                             /*show_resting_marker=*/false);
+}
+
+void UpdateSidePanelResizeGutterPresentation(
+    views::View& gutter,
+    const std::optional<BrowserSurfacePresentation>& presentation) {
+  CHECK_EQ(gutter.GetID(), kSidePanelResizeGutterViewId);
+  const bool custom_surface =
+      presentation &&
+      presentation->palette_mode ==
+          BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
+      !ShouldUseNativeBrowserSurfaceColors(*gutter.GetNativeTheme());
+  static_cast<SidePanelResizeGutterView&>(gutter).SetPageSurfaceColor(
+      custom_surface ? presentation->surface
+                     : gutter.GetColorProvider()->GetColor(kColorToolbar));
+}
+
+void SetSidePanelResizeGutterOnPageSurface(views::View& gutter, bool on_page) {
+  CHECK_EQ(gutter.GetID(), kSidePanelResizeGutterViewId);
+  static_cast<SidePanelResizeGutterView&>(gutter).SetOnPageSurface(on_page);
 }
 
 gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect &sidebar,

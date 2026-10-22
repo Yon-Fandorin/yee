@@ -8,14 +8,19 @@
 #include <utility>
 
 #include "base/command_line.h"
+#include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_command_line.h"
+#include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/omnibox/omnibox_controller.h"
 #include "chrome/browser/ui/tabs/tab_data.h"
 #include "chrome/browser/ui/views/infobars/confirm_infobar.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/product_logo.h"
 #include "chrome/browser/ui/views/yee/side_panel_colors.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -25,21 +30,25 @@
 #include "components/open_from_clipboard/fake_clipboard_recent_content.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_mixer.h"
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/color/color_recipe.h"
+#include "ui/compositor/canvas_painter.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/favicon_size.h"
 #include "ui/gfx/image/image_skia_rep.h"
 #include "ui/gfx/render_text.h"
 #include "ui/gfx/render_text_test_api.h"
+#include "ui/views/background.h"
 #include "ui/views/cascading_property.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/link.h"
+#include "ui/views/paint_info.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -87,6 +96,158 @@ views::Link* FindLink(views::View& root) {
 class YeeNativePresentationTest : public ChromeViewsTestBase {};
 
 class YeeTabIconPresentationTest : public ChromeViewsTestBase {};
+
+TEST_F(YeeNativePresentationTest,
+       SurfaceDecorationSurvivesIndependentWidgetsAndColorUpdates) {
+  base::test::ScopedFeatureList glass_feature;
+  glass_feature.InitAndEnableFeature(features::kGlassFrame);
+  auto presentation = ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1);
+  std::array<std::unique_ptr<views::Widget>, 2> widgets = {
+      CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET),
+      CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET)};
+  struct SurfaceViews {
+    raw_ptr<views::View> root;
+    raw_ptr<views::View> outline;
+    raw_ptr<views::View> fill;
+    raw_ptr<views::View> panel;
+  };
+  std::array<SurfaceViews, 2> surfaces;
+  for (size_t i = 0; i < widgets.size(); ++i) {
+    auto* const root =
+        widgets[i]->SetContentsView(std::make_unique<views::View>());
+    root->SetBackground(CreateShellBackground());
+    widgets[i]->SetBounds(gfx::Rect(0, 0, 240, 200));
+    widgets[i]->LayoutRootViewIfNecessary();
+    auto* outline =
+        root->AddChildView(CreateCombinedSurfaceOutlineView(base::BindRepeating(
+            [](const BrowserSurfacePresentation* value) {
+              return std::make_optional(*value);
+            },
+            &presentation)));
+    outline->SetBoundsRect(root->GetLocalBounds());
+    auto* fill = root->AddChildView(CreateBrowserSurfaceFillView(presentation));
+    fill->SetBoundsRect(gfx::Rect(10, 10, 220, 180));
+    auto* panel = root->AddChildView(CreateSidePanelSurfaceView());
+    panel->SetBoundsRect(gfx::Rect(20, 20, 200, 160));
+    panel->SetVisible(true);
+    surfaces[i] = {root, outline, fill, panel};
+  }
+  const int header_height = kSidebarMetrics.browser_surface_header_height();
+  const auto paint = [](views::View* view) {
+    // 레이어 없는 View는 부모 기준으로 그리므로 원점을 옮겨 로컬 픽셀을 읽는다.
+    const auto bounds = view->bounds();
+    view->SetPosition(gfx::Point());
+    SkBitmap bitmap;
+    {
+      ui::CanvasPainter painter(&bitmap, view->size(), 1.f, SK_ColorTRANSPARENT,
+                                false);
+      view->Paint(views::PaintInfo::CreateRootPaintInfo(painter.context(),
+                                                        view->size()));
+    }
+    view->SetBoundsRect(bounds);
+    return bitmap;
+  };
+
+  BrowserSurfaceFrameInput input;
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(0, 0, 240, 200), gfx::Insets(), /*split=*/false,
+      /*header_participates=*/true, header_height});
+  input.native_notice_flow_allocation =
+      gfx::Rect(0, header_height, 240, 200 - header_height);
+  input.native_body_allocation = input.native_notice_flow_allocation;
+  for (bool horizontal : {true, false, true}) {
+    input.mode = horizontal ? BrowserSurfaceMode::kConnectedTabs
+                            : BrowserSurfaceMode::kCard;
+    input.connected_side_panel_resize_gutter =
+        horizontal ? std::make_optional(
+                         gfx::Rect(79, header_height, 2, 200 - header_height))
+                   : std::nullopt;
+    for (bool panel_visible : {true, false}) {
+      input.side_panel_surface_visible = panel_visible;
+      const auto decoration = ResolveBrowserSurfaceFrame(input).decoration;
+      for (size_t i = 0; i < widgets.size(); ++i) {
+        SCOPED_TRACE(testing::Message()
+                     << i << ", " << horizontal << ", " << panel_visible);
+        auto [root, outline, fill, panel] = surfaces[i];
+        const SkColor shell = paint(root).getColor(0, 0);
+        presentation =
+            ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1);
+        UpdateBrowserSurfaceFillView(*fill, presentation);
+        // 두 Widget의 root는 정책을 공유하지 않는다. 그림자를 허용하는
+        // 결과에서도 sibling은 표시해 실제 장식이 전달된 정책만 따르는지
+        // 확인한다.
+        ApplyCombinedSurfaceDecoration(*outline, decoration);
+        ApplySidePanelSurfaceDecoration(*panel, decoration);
+        EXPECT_EQ(shell, paint(root).getColor(0, 0));
+        const auto shadow_layers =
+            outline->GetLayersInOrder(views::ViewLayer::kExclude);
+        ASSERT_EQ(1u, shadow_layers.size());
+        EXPECT_EQ(!horizontal && !panel_visible, shadow_layers[0]->visible());
+
+        const auto expect_shape = [&]() {
+          const SkBitmap border = paint(outline);
+          EXPECT_EQ(horizontal ? SK_AlphaTRANSPARENT : SK_AlphaOPAQUE,
+                    SkColorGetA(border.getColor(0, border.height() / 2)));
+          EXPECT_GT(
+              SkColorGetA(border.getColor(border.width() / 2, header_height)),
+              0u);
+          const int divider_x =
+              outline->GetMirroredRect(gfx::Rect(80, 0, 1, 1)).x();
+          EXPECT_EQ(horizontal, SkColorGetA(border.getColor(
+                                    divider_x, header_height + 10)) > 0);
+          if (horizontal) {
+            for (int x : {divider_x - 1, divider_x + 1}) {
+              EXPECT_EQ(SK_AlphaTRANSPARENT,
+                        SkColorGetA(border.getColor(x, header_height + 10)));
+            }
+            EXPECT_EQ(SK_AlphaTRANSPARENT, SkColorGetA(border.getColor(
+                                               divider_x, header_height - 2)));
+          }
+          for (views::View* surface : {fill, panel}) {
+            const SkBitmap image = paint(surface);
+            const bool square_top = horizontal && surface == panel;
+            EXPECT_EQ(square_top ? SK_AlphaOPAQUE : SK_AlphaTRANSPARENT,
+                      SkColorGetA(image.getColor(0, 0)));
+            EXPECT_EQ(square_top ? SK_AlphaOPAQUE : SK_AlphaTRANSPARENT,
+                      SkColorGetA(image.getColor(image.width() - 1, 0)));
+            EXPECT_EQ(SK_AlphaTRANSPARENT,
+                      SkColorGetA(image.getColor(0, image.height() - 1)));
+          }
+        };
+        expect_shape();
+        // 색상 콜백은 마지막으로 적용한 구조적 장식을 유지해야 한다.
+        presentation =
+            ResolveBrowserSurfacePresentation(SK_ColorBLACK, 1, 1, 1);
+        UpdateBrowserSurfaceFillView(*fill, presentation);
+        expect_shape();
+        EXPECT_EQ(!horizontal && !panel_visible, shadow_layers[0]->visible());
+        EXPECT_FALSE(widgets[i]->IsActive());
+      }
+    }
+  }
+  const auto restored_decoration = ResolveBrowserSurfaceFrame(input).decoration;
+  input.seed.split = true;
+  const auto split_decoration = ResolveBrowserSurfaceFrame(input).decoration;
+  for (const auto& surface : surfaces) {
+    ApplyCombinedSurfaceDecoration(*surface.outline, split_decoration);
+    ApplySidePanelSurfaceDecoration(*surface.panel, split_decoration);
+    const SkBitmap split_panel = paint(surface.panel);
+    EXPECT_EQ(SK_AlphaTRANSPARENT, SkColorGetA(split_panel.getColor(0, 0)));
+    EXPECT_GT(SkColorGetA(split_panel.getColor(0, split_panel.height() / 2)),
+              0u);
+    const SkBitmap split_border = paint(surface.outline);
+    EXPECT_EQ(SK_AlphaTRANSPARENT,
+              SkColorGetA(split_border.getColor(120, header_height)));
+    ApplyCombinedSurfaceDecoration(*surface.outline, restored_decoration);
+    ApplySidePanelSurfaceDecoration(*surface.panel, restored_decoration);
+    const SkBitmap restored_panel = paint(surface.panel);
+    EXPECT_EQ(SK_AlphaOPAQUE, SkColorGetA(restored_panel.getColor(0, 0)));
+    EXPECT_EQ(SK_AlphaOPAQUE, SkColorGetA(restored_panel.getColor(
+                                  restored_panel.width() - 1, 0)));
+    const SkBitmap restored_border = paint(surface.outline);
+    EXPECT_GT(SkColorGetA(restored_border.getColor(120, header_height)), 0u);
+  }
+}
 
 TEST_F(YeeNativePresentationTest,
        SidebarHeaderButtonsStayOutsideWindowCaption) {

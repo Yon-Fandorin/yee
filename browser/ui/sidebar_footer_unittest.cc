@@ -89,7 +89,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
                   base::BindOnce([](int* locks) { --*locks; }, locks));
             },
             &popup_locks_)));
-    widget_->Show();
+    widget_->ShowInactive();
   }
 
   void TearDown() override {
@@ -111,6 +111,8 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
   }
 
   views::View* OpenBubble() {
+    // 실제 팝업·focus 계약을 검사할 때만 owner를 활성화한다.
+    widget_->Show();
     Click(footer_);
     return GetSidebarFooterMenuForTesting(*footer_);
   }
@@ -359,6 +361,7 @@ TEST_F(SidebarFooterViewTest, LongNamesKeepThePopupBoundedAndAccessible) {
 }
 
 TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
+  widget()->Show();
   auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
       gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   const std::optional<gfx::RRectF> highlight =
@@ -480,6 +483,7 @@ TEST_F(SidebarFooterViewTest, WorkspaceMarkPreservesSupplementaryCodePoints) {
       footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
   ASSERT_TRUE(workspace_mark);
   EXPECT_EQ(workspace_mark->GetText(), u"\U0001F680");
+  EXPECT_FALSE(widget()->IsActive());
 }
 
 TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {

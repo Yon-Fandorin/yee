@@ -15,10 +15,10 @@ elif [[ "${2:-}" == "--no-build" ]]; then
   SKIP_BUILD=true
 fi
 
-if [[ "$MODE" != "fast" && "$MODE" != "interactive" && \
+if [[ "$MODE" != "fast" && "$MODE" != "horizontal" && "$MODE" != "interactive" && \
       "$MODE" != "browser" && "$MODE" != "all" ]]; then
   print -u2 \
-    "Usage: ./tools/dev/test-browser-surface-layout.sh [fast|interactive|browser|all] [--no-build]"
+    "Usage: ./tools/dev/test-browser-surface-layout.sh [fast|horizontal|interactive|browser|all] [--no-build]"
   exit 2
 fi
 
@@ -29,12 +29,15 @@ FAST_TARGETS=(
   'chrome/browser/ui/views/tabs/common:yee_layout_unittests'
   'chrome/browser/ui/views/yee:multi_contents_geometry_unittests'
 )
-NATIVE_FAST_FILTER='BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*'
+NATIVE_FAST_FILTER='BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsKeepPageAndFrameContrastSeparate:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
 YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
 INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState:*TopContainerBackground*'
 FLYOUT_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation'
+HORIZONTAL_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity'
+INTERACTIVE_FILTER+=":$HORIZONTAL_FILTER"
 INTERACTIVE_FILTER+=":$FLYOUT_FILTER"
 INTERACTIVE_FILTER+=':ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip:ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren:ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction'
+INTERACTIVE_FILTER+=':BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy:BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque'
 # Keep transition and compositor regressions in the ordinary checkpoint gate,
 # including the combined states that isolated open/close tests cannot cover.
 TRANSITION_TESTS=(
@@ -65,7 +68,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
   targets=()
   [[ "$MODE" == "fast" || "$MODE" == "all" ]] && \
     targets+=("${FAST_TARGETS[@]}")
-  [[ "$MODE" == "interactive" || "$MODE" == "all" ]] && \
+  [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]] && \
     targets+=(interactive_ui_tests)
   [[ "$MODE" == "browser" || "$MODE" == "all" ]] && \
     targets+=(browser_tests)
@@ -84,26 +87,44 @@ if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
     --test-launcher-retry-limit=0
 fi
 
-if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
-  print "Running focused applied BrowserView and Side Panel layout tests."
+if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]; then
+  default_filter="$INTERACTIVE_FILTER"
+  rtl_filter="$TRANSITION_FILTER:$RENDERER_LIFECYCLE_FILTER:$PHYSICAL_RESIZE_FILTER:$FLYOUT_FILTER:$HORIZONTAL_FILTER"
+  if [[ "$MODE" == "horizontal" ]]; then
+    default_filter="$HORIZONTAL_FILTER"
+    rtl_filter="$HORIZONTAL_FILTER"
+  fi
+  print "Running applied ${MODE} UI tests; native input requires window focus."
   prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
-    --gtest_filter="$INTERACTIVE_FILTER" \
+    --gtest_filter="$default_filter" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
     --ui-test-action-max-timeout=20000 \
     --ui-test-action-timeout=10000
 
-  print "Running transition and hard-clip regressions in RTL at 125% scale."
+  print "Running ${MODE} UI regressions in RTL at 125% scale."
   prepare_ui_test_display
   gracefully_quit_yee
   "$YEE_OUT_DIR/interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
-    --gtest_filter="$TRANSITION_FILTER:$RENDERER_LIFECYCLE_FILTER:$PHYSICAL_RESIZE_FILTER:$FLYOUT_FILTER" \
+    --gtest_filter="$rtl_filter" \
     --force-ui-direction=rtl \
     --force-device-scale-factor=1.25 \
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0 \
+    --ui-test-action-max-timeout=20000 \
+    --ui-test-action-timeout=10000
+
+  print "Checking the same horizontal contract with Chromium's unified tab strip."
+  prepare_ui_test_display
+  gracefully_quit_yee
+  "$YEE_OUT_DIR/interactive_ui_tests" \
+    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+    --enable-features=TabStripUnification \
+    --gtest_filter="$HORIZONTAL_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
     --ui-test-action-max-timeout=20000 \

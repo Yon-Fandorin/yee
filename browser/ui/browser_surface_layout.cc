@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/gfx/geometry/outsets.h"
 
@@ -16,6 +17,30 @@ bool UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type browser_type,
   return IsShellEnabled() &&
          browser_type == BrowserWindowInterface::Type::TYPE_NORMAL &&
          has_vertical_tab_strip;
+}
+
+BrowserSurfaceMode GetBrowserSurfaceMode(
+    const BrowserWindowInterface& browser) {
+  const auto* const state =
+      tabs::VerticalTabStripStateController::From(&browser);
+  return UsesYeeBrowserSurfaceGeometry(browser.GetType(), state != nullptr) &&
+                 !state->ShouldDisplayVerticalTabs()
+             ? BrowserSurfaceMode::kConnectedTabs
+             : BrowserSurfaceMode::kCard;
+}
+
+gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
+                                             int content_leading_inset,
+                                             int horizontal_tab_strip_advance) {
+  gfx::Rect result = client_bounds;
+  const int leading =
+      std::clamp(content_leading_inset - kSidebarMetrics.content_gutter, 0,
+                 client_bounds.width());
+  const int top =
+      std::clamp(horizontal_tab_strip_advance - kSidebarMetrics.content_gutter,
+                 0, client_bounds.height());
+  result.Inset(gfx::Insets::TLBR(top, leading, 0, 0));
+  return result;
 }
 
 ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
@@ -73,8 +98,32 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
   }
 
   result.decoration.combined_outline_bounds = result.main_surface_bounds;
+  result.decoration.mode = input.mode;
   result.decoration.combined_outline_visible =
       !result.split && !result.main_surface_bounds.IsEmpty();
+  result.decoration.draw_outer_outline =
+      result.decoration.combined_outline_visible &&
+      input.mode == BrowserSurfaceMode::kCard;
+  result.decoration.show_shadow =
+      result.decoration.draw_outer_outline && !input.side_panel_surface_visible;
+  result.decoration.side_panel_joins_header =
+      input.mode == BrowserSurfaceMode::kConnectedTabs &&
+      result.decoration.combined_outline_visible &&
+      !result.header_bounds.IsEmpty();
+  if (result.decoration.side_panel_joins_header &&
+      input.connected_side_panel_resize_gutter) {
+    gfx::Rect gutter = *input.connected_side_panel_resize_gutter;
+    gutter.Intersect(result.surface_seed_bounds);
+    if (!gutter.IsEmpty()) {
+      auto& bounds = result.decoration.combined_outline_bounds;
+      bounds.set_x(result.header_bounds.x());
+      bounds.set_width(result.header_bounds.width());
+      result.decoration.side_panel_divider_x =
+          gutter.CenterPoint().x() - bounds.x();
+      result.decoration.side_panel_gutter_on_page_surface =
+          bounds.Contains(*input.connected_side_panel_resize_gutter);
+    }
+  }
   if (result.split) {
     result.decoration.header_separator_owner =
         BrowserSurfaceHeaderSeparatorOwner::kSplitPane;

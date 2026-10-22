@@ -428,6 +428,9 @@
       <message name="IDS_YEE_WEBUI_EXTENSIONS_ALL_REQUESTED_SITES_DESCRIPTION" desc="extensionsAllRequestedSitesDescription: text in the extensions UI." meaning="extensionsAllRequestedSitesDescription">Turn off to choose individual sites below.</message>
       <message name="IDS_YEE_WEBUI_EXTENSIONS_NATIVE_SITE_ACCESS_DESCRIPTION" desc="extensionsNativeSiteAccessDescription: text in the extensions UI." meaning="extensionsNativeSiteAccessDescription">Manage site access in the extension manager for the current browser configuration.</message>
       <message name="IDS_YEE_WEBUI_CUSTOMIZATION_DESCRIPTION" desc="customizationDescription: theme behavior in the browser appearance panel." meaning="customizationDescription">Theme colors tint the sidebar and frame. The address bar follows each page; internal pages keep their own accent with subtle theme highlights.</message>
+      <message name="IDS_YEE_WEBUI_TAB_LAYOUT" desc="Label for the browser tab placement selector." meaning="tabLayout">Tab layout</message>
+      <message name="IDS_YEE_WEBUI_TAB_LAYOUT_TOP" desc="Tab layout option with horizontal tabs at the top of the window." meaning="tabLayoutTop">Top tabs</message>
+      <message name="IDS_YEE_WEBUI_TAB_LAYOUT_SIDE" desc="Tab layout option with vertical tabs in a sidebar." meaning="tabLayoutSide">Sidebar</message>
       <message name="IDS_YEE_WEBUI_FOOTER_LOCAL" desc="footerLocal: native sidebar workspace menu." meaning="footerLocal">Local</message>
       <message name="IDS_YEE_WEBUI_FOOTER_PERSONAL" desc="footerPersonal: native sidebar workspace menu." meaning="footerPersonal">Personal</message>
       <message name="IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE" desc="footerLocalProfile: native sidebar workspace menu." meaning="footerLocalProfile">Local profile</message>

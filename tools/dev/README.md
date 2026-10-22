@@ -202,6 +202,7 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 
 - `test-header.sh`, `test-sidebar.sh`: 기본값과 단독 `--no-build`는 단위 검사
 - `test-browser-surface-layout.sh fast`: 크기·위치 계산 테스트
+- `test-browser-surface-layout.sh horizontal`: 수평 탭 전환·그룹 요약·색상·분할·전체화면 확인
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
@@ -210,6 +211,15 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 명시적 `interactive` 검사는 필요한 창 활성화를 유지한다. Sidebar는 Header의 주소줄
 검사를 중복 실행하지 않으므로 두 영역을 바꿨을 때 각각의 gate를 선택한다. 실제
 hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 대체하지 않는다.
+수평 탭 수정 중에는 `fast`와 `horizontal`을 사용하고, 전체 레이아웃 checkpoint에서
+`interactive`를 실행한다. `horizontal`도 실제 입력을 사용하므로 포커스를 가져간다.
+같은 수평 시나리오를 기본·RTL 125%·통합 탭바 경로에서 실행하며 그룹의 접기/펴기와
+탭 추가/제거 후 favicon 요약 갱신, 전환 전후의 pin·group·활성 탭 보존을 확인한다.
+회전 모니터 지정은 창 위치를 정하며 macOS 앱 포커스를 격리하지는 않는다.
+탭 그룹 색상·mock clock 레이아웃 애니메이션·Footer 표식 검사는 `ShowInactive()`를
+사용한다. Footer는 팝업을 열거나 키보드 focus 상태를 검사할 때만 owner를 활성화한다.
+Agent pointer의 native 부모 창과 승인 대화상자, 실제 입력·전체화면 검사의 활성화는
+유지한다. native 창 표시 전제의 실패를 검사를 생략하거나 assertion을 줄여 해결하지 않는다.
 
 macOS에서 회전된 모니터가 연결되어 있으면 표시형 UI 검사·Site Controls·Internal
 Pages·콘텐츠 차단 fixture·YouTube 관찰·Yee Agent 시험 실행은 해당 모니터의 작업 영역

@@ -6,8 +6,10 @@
 #define CHROME_BROWSER_UI_VIEWS_YEE_SPLIT_PANE_CONTROLS_H_
 
 #include <memory>
+#include <optional>
 
 #include "base/functional/callback.h"
+#include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d_f.h"
@@ -17,7 +19,7 @@ class ResizeArea;
 class ResizeAreaDelegate;
 class View;
 class ViewTargeter;
-}
+}  // namespace views
 
 namespace yee {
 
@@ -47,6 +49,14 @@ struct SidePanelResizeCallbacks {
 };
 std::unique_ptr<views::View> CreateSidePanelResizeGutterView(
     SidePanelResizeCallbacks callbacks);
+// backing이 gutter를 덮을 때만 같은 snapshot을 쓴다.
+// 독립 카드와 분할 canvas는 native marker 색을 유지한다.
+void UpdateSidePanelResizeGutterPresentation(
+    views::View& gutter,
+    const std::optional<BrowserSurfacePresentation>& presentation);
+// resolved frame이 backing의 소유권을 전달한다. control은 sibling View에서
+// 이 정책을 다시 추론하지 않는다.
+void SetSidePanelResizeGutterOnPageSurface(views::View& gutter, bool on_page);
 gfx::Rect GetSidePanelResizeGutterBounds(const gfx::Rect& panel, bool leading);
 gfx::Rect ExcludeSidePanelResizeGutter(gfx::Rect bounds,
                                       const gfx::Rect& gutter, bool leading);
@@ -76,9 +86,10 @@ void UpdateSplitPaneControls(views::View& controls,
 gfx::Rect GetSplitPaneControlsBounds(views::View& controls,
                                      const gfx::Rect& parent_bounds);
 
-// Derives resize marker contrast from Yee's split canvas. Split and Side Panel
-// dividers keep the resting marker; the Sidebar opts into hover/focus only.
-void UpdateSplitResizeHandleAppearance(views::View& handle, bool emphasized,
+// 분할 canvas에서 resize marker 대비를 계산한다. 분할선은 기본 marker를
+// 유지하고 Sidebar·Side Panel은 hover·focus에서만 표시한다.
+void UpdateSplitResizeHandleAppearance(views::View& handle,
+                                       bool emphasized,
                                        bool show_resting_marker = true);
 void UpdateSplitResizeHandleAnchor(views::View& handle,
                                    const gfx::Vector2dF& offset,

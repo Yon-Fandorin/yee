@@ -1,0 +1,24 @@
+# Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
+import("//ui/webui/resources/tools/build_webui.gni")
+
+build_webui("build") {
+  grd_prefix = "yee_customization"
+  grd_resource_path_prefix = "yee"
+  generate_grdp = true
+  ts_files = [
+    "panel_styles.ts",
+    "tab_layout.html.ts",
+    "tab_layout.ts",
+  ]
+  css_files = [
+    "appearance.css",
+    "panel.css",
+    "tab_layout.css",
+  ]
+  ts_composite = true
+  ts_deps = [
+    "//third_party/lit/v3_0:build_ts",
+    "//ui/webui/resources/js:build_ts",
+  ]
+  webui_context_type = "trusted"
+}

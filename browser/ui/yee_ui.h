@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/color/color_id.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
@@ -34,9 +35,17 @@ class View;
 
 namespace yee {
 
+struct ResolvedBrowserSurfaceDecoration;
+
 inline constexpr int kCombinedSurfaceOutlineViewId = 92003;
 inline constexpr int kSidePanelSurfaceViewId = 92018;
 inline constexpr int kBrowserSurfaceFillViewId = 92019;
+
+// Header·그룹 chip·크기 조절 컨트롤이 공통 포커스 대비를 사용한다.
+ui::ColorId ResolveBrowserSurfaceFocusColorId(
+    const ui::ColorProvider& color_provider,
+    SkColor background,
+    ui::ColorId preferred);
 
 // Geometry owned by Yee's vertical sidebar presentation. Keeping these values
 // together lets Chromium's native tab and group views consume one stable
@@ -169,6 +178,11 @@ struct SidebarMetrics {
   int bookmarks_image_label_spacing = 6;
 
   int group_header_corner_radius = 8;
+  int horizontal_group_chip_height = 20;
+  int horizontal_group_capsule_top_inset = 4;
+  int horizontal_group_capsule_height = 32;
+  int horizontal_group_capsule_padding = 2;
+  float horizontal_group_tint_opacity = 0.12f;
   int group_header_horizontal_inset = 8;
   int group_mark_size = 8;
   int group_mark_slot_size = 16;
@@ -365,20 +379,23 @@ void UpdateBrowserSurfaceFillView(
 // shadow treatment.
 std::unique_ptr<views::View> CreateSidePanelSurfaceView();
 
-// Keeps the combined Browser Surface backing and boundary in single-tab
-// presentation. Split presentation suppresses that fill, outline, and shadow;
-// the transparent Split Canvas only lays out Pane Cards, which own their visual
-// boundaries.
+// 분할 구조가 바뀌면 다음 레이아웃의 최종 장식 적용 전에 공통 윤곽·그림자를
+// 숨긴다.
 void UpdateCombinedSurfaceOutlineView(views::View& view,
                                       bool split_presentation);
 
-// Applies the decoration portion of the resolved Browser Surface frame after
-// native layout has installed the frame's bounds. `header_separator_offset`
-// is local to the outline host and is zero when another owner paints the
-// boundary or when no Header participates.
-void UpdateCombinedSurfaceOutlineLayout(views::View& view,
-                                        bool split_presentation,
-                                        int header_separator_offset);
+// native 배치 후 계산된 Browser Surface 장식을 적용한다. 구분선 좌표는
+// 윤곽 호스트 기준이며, 그리기 단계에서 부모·형제의 구조로 정책을 추론하지
+// 않는다.
+void ApplyCombinedSurfaceDecoration(
+    views::View& view,
+    const ResolvedBrowserSurfaceDecoration& decoration);
+
+// Side Panel의 채움·경계에 같은 표면 모드를 적용한다.
+// native SidePanel이 공간 배분·가시성·입력·콘텐츠를 계속 소유한다.
+void ApplySidePanelSurfaceDecoration(
+    views::View& view,
+    const ResolvedBrowserSurfaceDecoration& decoration);
 
 // Split panes are independent cards aligned directly to Yee's Browser Surface.
 // Chromium continues to own split layout, resizing, and semantic highlights.

@@ -5,6 +5,8 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_LAYOUT_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_LAYOUT_H_
 
+#include <optional>
+
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/views/yee/multi_contents_geometry.h"
 #include "ui/gfx/geometry/insets.h"
@@ -17,6 +19,20 @@ namespace yee {
 // apps, standalone DevTools, and picture-in-picture windows.
 bool UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type browser_type,
                                    bool has_vertical_tab_strip);
+
+// 제품 모드는 전체화면의 탭바 노출 여부나 Header를 호스팅하는 Widget에
+// 영향을 받지 않는다.
+enum class BrowserSurfaceMode {
+  kCard,
+  kConnectedTabs,
+};
+
+BrowserSurfaceMode GetBrowserSurfaceMode(const BrowserWindowInterface& browser);
+
+// 수평 탭 행의 실제 높이를 먼저 배분하고 같은 Surface 여백을 한 번만 적용한다.
+gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
+                                             int content_leading_inset,
+                                             int horizontal_tab_strip_advance);
 
 struct BrowserSurfaceSeedInput {
   gfx::Rect content_column_bounds;
@@ -62,6 +78,12 @@ struct BrowserSurfaceFrameInput {
   // Native allocation for MCV after its minimum-width underlap rule. This may
   // be wider than the notice slot underneath an occluding Side Panel.
   gfx::Rect native_body_allocation;
+
+  // 수평 공용 Header는 페이지와 Side Panel을 함께 덮는다. native resize 영역은
+  // 유지하되 두 영역이 공유하는 Surface 안에 표시한다.
+  std::optional<gfx::Rect> connected_side_panel_resize_gutter = std::nullopt;
+  BrowserSurfaceMode mode = BrowserSurfaceMode::kCard;
+  bool side_panel_surface_visible = false;
 };
 
 enum class BrowserSurfaceHeaderSeparatorOwner {
@@ -75,11 +97,19 @@ enum class BrowserSurfaceHeaderSeparatorOwner {
 // consumes this value instead of inferring decoration from unrelated config
 // carriers or already-applied View bounds.
 struct ResolvedBrowserSurfaceDecoration {
+  BrowserSurfaceMode mode = BrowserSurfaceMode::kCard;
   gfx::Rect combined_outline_bounds;
+  // 연결 모드에서는 카드 윤곽·그림자 없이 구분선 호스트로만 표시할 수 있다.
   bool combined_outline_visible = false;
+  bool draw_outer_outline = false;
+  bool show_shadow = false;
+  // 공용 Header와 실제로 이어질 때만 Side Panel의 위쪽 윤곽을 생략한다.
+  bool side_panel_joins_header = false;
   BrowserSurfaceHeaderSeparatorOwner header_separator_owner =
       BrowserSurfaceHeaderSeparatorOwner::kNone;
   int combined_header_separator_offset = 0;
+  std::optional<int> side_panel_divider_x = std::nullopt;
+  bool side_panel_gutter_on_page_surface = false;
   bool show_native_multi_contents_separator = false;
   bool contain_infobar_shadow_horizontally = true;
   float infobar_top_corner_radius = 0.0f;

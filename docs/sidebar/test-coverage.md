@@ -11,6 +11,9 @@
 Chromium `unit_tests`를 빌드하지 않는다. 기존 Sidebar 필터의 검사는 모두 유지한다.
 계산·색상·직접 callback 검사는 창 활성화 없이 검사한다. native Footer의 popup·focus
 계약 검사는 실제 Widget을 표시하고 활성화할 수 있으므로 완전한 무창 검사는 아니다.
+Group Header 색상·mock clock 애니메이션은 `ShowInactive()`를 사용하고 검사 중에도
+Widget이 비활성인지 확인한다. Footer도 비활성으로 시작하며 popup·keyboard focus
+검사가 필요한 시점에만 활성화한다. 기존 실제 hover·키보드·popup 검사는 유지한다.
 
 | 계약 | 자동 검증 |
 | --- | --- |
@@ -107,3 +110,78 @@ theme 변경과 즉시 다시 열기에서 이전 anchor·잠금이 남지 않�
 한 번에 재정렬하는 drag는 native 제약과 미정 UX가 남은 계약이다. 기존
 unpinned split 묶음·다중 선택 drag 테스트를 이 기능들의 지원 근거로 간주하지
 않으며, 구현과 제품 결정 전에는 통과하는 테스트를 만들지 않는다.
+
+## 5. 수평 탭과의 전환
+
+`test-browser-surface-layout.sh horizontal`은 기존
+`YeeHorizontalTabsPreserveRowsColorsAndTabIdentity` 하나를 기본·RTL 125%·통합
+탭바 경로에서 실행한다. Header와 주소줄의 중복 여백, 그룹 접기/펴기 및 탭
+추가/제거 후 favicon 요약 갱신, toolbar/content Side Panel 좌우 배치에서
+Header의 전체 폭 유지와 패널이 그 아래에 배치되는지 확인한다.
+색이 있는 그룹의 내부 탭을 실제로 선택한 뒤 색상·포커스를 확인하며, 그룹
+소속 때문에 활성 탭의 색상 윤곽선이 되살아나지 않아야 한다. 그룹 공통 배경은
+탭바 안에 머물고 Header·Side Panel과 겹치지 않아야 한다.
+같은 검사에 `--yee-tabbar-capture-dir`를 주면 밝게·어둡게, 수평·세로,
+그룹 펼침·접힘, 패널 닫힘·toolbar/content 좌우의 40개 실제 창 화면을 저장한다.
+긴 한·영 혼합 이름 → 빈 이름 → 짧은 이름으로 같은 그룹을 바꾸며 일반 폭과
+최소 폭의 수평·세로 배치를 검사한다. 제목과 favicon·개수·native 조작 아이콘의
+겹침 및 잘림, 펼친 뒤 요약의 숨김, 한 줄 축약과 전체 접근성 이름을 확인한다.
+선택적 캡처에는 최소 폭의 이름·접힘 조합 12개가 추가된다.
+macOS에서는 분할 탭의 두 pane 활성화와 전체화면 진입·해제에서도 그룹 공통 배경의
+높이와 탭바 내부의 하단 여백을 확인한다. 컨테이너가 탭의 선호 높이보다 작아져도
+그룹 공통 배경이 경계에서 잘리지 않아야 한다. 선택적 캡처는 AppKit이 옮긴 전체화면
+상단을 해당 Widget의 compositor에서 따로 저장한다.
+통합 탭바의 고정·일반·그룹·분할 행은 공통 높이 계산을 사용해 부모의 제약을
+전달하고, 제약 없는 선호 크기 측정에서는 native 기본 높이를 보존한다.
+일반 창 캡처는 macOS material까지 포함하며, 시각적 합격 여부는 사람이 직접 확인한다.
+Header의 실제 배경을 그려 좌우 끝의 색도 검사하므로, bounds와 모서리 경로가
+맞더라도 배경이 꺼져 있는 경우는 통과하지 않는다.
+Side Panel·분할·패널을 연 전체화면과 가로/세로 전환에서
+탭 수·pin·group·활성 탭 보존을 확인한다. 테마 대비와 불투명 표면·단일 경계는
+별도의 작은 비활성 Widget 검사와 순수 색상 검사가 소유한다.
+수평 모드의 Header 바깥 상단과 main backing은 같은 곡률을 사용한다. 패널을 열면
+공통 backing이 resize gutter까지 채우고, 내부 경계는 1 DIP 선으로 표시한다.
+픽셀 검사는 선의 폭과 Header 위로 넘치지 않는지, 전환 뒤 사라지는지 확인한다.
+실제 Header clip은 자식 요소를 같은 윤곽 안에 두며, 세로 모드에서는 현재 크기의
+사각 clip으로 돌아간다. 세로 모드와 하단 곡률도 보존한다.
+
+실제 사이트 favicon, 맞춤설정의 탭 배치 선택과 native 버튼의 양방향 동기화,
+라이트/다크의 그룹 chip·선택 탭·주소줄 연결감은 새 프로세스의 실제 앱에서 확인한다.
+
+Side Panel 핸들의 기본 배경은 그리지 않고 hover·focus에서만 표시한다.
+기존 `SidePanelResizeGutterViewTest.KeyboardDelegatesAndMarkerSharesMetrics`는
+기본 배경의 투명도와 mouse exit 복귀를 비활성 Widget에서 확인한다.
+`YeeSidePanelGutterPhysicallyResizesBesideWebContents`는 수평·세로와 좌우 배치에서
+실제 포인터의 hover·drag 및 keyboard focus 표시를 확인한다.
+
+공통 Shell paint는 가로·세로에서 같은 glass/fallback 정책을 사용한다. 기존
+`SurfaceDecorationSurvivesIndependentWidgetsAndColorUpdates`는 창을 활성화하지 않고
+조상 정책을 공유하지 않는 두 Widget에 같은 장식을 적용한다. 모드 왕복, 색상 변경,
+구분선·모서리와 실제 그림자 레이어 및 Split의 임시 억제·복구를 확인한다.
+같은 수평 모드에서 단일→분할→단일로 바뀌면 Side Panel의 공용 Header 연결도
+해제·복구돼야 한다. 독립 패널은 둥근 상단과 윤곽을 유지하며, 같은 수평 통합
+사례가 실제 분할 상태의 좌우 Side Panel backing도 확인한다.
+native mac `GlassViewGeometryMatchesShellPolicy`는
+가로→세로→가로 전환에서 실제 material이 창 전체를 덮는지 확인한다.
+기존 `YeeSurfaceDecorationAndZOrderUseResolvedFrame`는 View와 compositor layer 모두
+outline < Side Panel gutter < Sidebar 순서이며 동적 panel 재부착 뒤에도 유지되는지
+확인한다. gutter는 find UI와 창 전체 scrim 아래에 둔다.
+
+연결된 Side Panel 핸들은 실제 backing이 gutter를 덮을 때만 같은 페이지 snapshot으로
+대비를 보정한다. 이 소유권은 `ResolvedBrowserSurfaceDecoration`이 계산해서 전달하며,
+핸들은 sibling View ID나 적용된 bounds를 다시 조회하지 않는다. 기존 geometry 사례는
+좌우 gutter의 완전한 포함과 부분 이탈을, marker 사례는 light/dark × 흰/검은 backing의
+합성 후 3:1 대비와 색 변경 중 표시 유지, 명시적인 native 색 복귀를 확인한다.
+기존 physical resize 사례는 다크 palette와 흰 페이지에서 수평 핸들의 대비를 확인하고
+세로로 돌아가면 native 색을 유지하는지 실제 hover 경로에서 확인한다.
+
+접힌 Group의 favicon 요약은 `TabGroupPreview`가 가로·세로 Header에서 공유한다.
+기존 `YeeHorizontalTabsPreserveRowsColorsAndTabIdentity` 사례는 두 방향에서
+접기/펼치기, 멤버 추가·제거·이동, 이미 접힌 상태의 favicon 갱신, `+N`과
+leading 첫 favicon이 앞에 그려지는 실제 overlap raster, 뒤 favicon의 경계가
+부분 투명도에서 불투명한 본체로 이어지는 feather를 함께 확인한다.
+RTL·125%와 unified strip에서도 같은 사례를 사용한다.
+기본·unified 수평 Group의 접힌 chip paint는 같은 owned background를 사용하며,
+펼친 그룹의 공통 배경도 같은 owner가 그린다. native Header의 입력·접근성과
+allocation은 유지한다. Header clip도 native가 계산한 현재 paint allowance를
+명시적으로 받고 이전 clip의 형태로 geometry를 추론하지 않는다.

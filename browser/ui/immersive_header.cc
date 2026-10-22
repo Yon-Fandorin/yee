@@ -47,13 +47,14 @@ class YeeImmersiveHeaderBackdrop : public views::View {
     outline_->SchedulePaint();
   }
 
-  void Update(const gfx::Rect& surface,
+  void Update(const yee::ResolvedBrowserSurfaceDecoration& decoration,
               std::optional<yee::BrowserSurfacePresentation> presentation) {
     UpdatePresentation(std::move(presentation));
-    fill_->SetBoundsRect(surface);
-    outline_->SetBoundsRect(surface);
-    yee::UpdateCombinedSurfaceOutlineLayout(
-        *outline_, false, yee::kSidebarMetrics.browser_surface_header_height());
+    fill_->SetBoundsRect(decoration.combined_outline_bounds);
+    fill_->SetVisible(decoration.combined_outline_visible);
+    outline_->SetBoundsRect(decoration.combined_outline_bounds);
+    outline_->SetVisible(decoration.combined_outline_visible);
+    yee::ApplyCombinedSurfaceDecoration(*outline_, decoration);
     SchedulePaint();
   }
 
@@ -136,7 +137,7 @@ void SetSidebarHeaderHost(views::View& sidebar,
 void UpdateImmersiveHeaderBackdrop(
     views::View& host,
     views::View& shell_source,
-    const gfx::Rect& surface_bounds,
+    const ResolvedBrowserSurfaceDecoration& decoration,
     std::optional<BrowserSurfacePresentation> presentation) {
   auto* backdrop = static_cast<YeeImmersiveHeaderBackdrop*>(
       host.GetViewByID(kImmersiveHeaderBackdropViewId));
@@ -146,7 +147,7 @@ void UpdateImmersiveHeaderBackdrop(
   }
   backdrop->SetVisible(true);
   backdrop->SetBoundsRect(host.GetLocalBounds());
-  backdrop->Update(surface_bounds, std::move(presentation));
+  backdrop->Update(decoration, std::move(presentation));
 }
 
 void ClearImmersiveHeaderBackdrop(views::View& host) {

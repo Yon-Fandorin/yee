@@ -4,13 +4,17 @@
 
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <utility>
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
+#include "chrome/grit/theme_resources.h"
+#include "chrome/test/base/test_theme_provider.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/color/color_id.h"
@@ -29,6 +33,40 @@ class SurfaceTestNativeTheme final : public ui::NativeThemeBase {
  public:
   ~SurfaceTestNativeTheme() override = default;
 };
+
+class HorizontalTabImageTheme final : public TestThemeProvider {
+ public:
+  bool HasCustomImage(int id) const override { return id == image_id; }
+  int image_id = 0;
+};
+
+TEST(YeeSurfaceColorTest, HorizontalGroupsAndMembersShareNativeThemeFallback) {
+  SurfaceTestNativeTheme native_theme;
+  native_theme.set_preferred_contrast(
+      ui::NativeTheme::PreferredContrast::kNoPreference);
+  native_theme.set_forced_colors(ui::ColorProviderKey::ForcedColors::kNone);
+  HorizontalTabImageTheme theme;
+  EXPECT_FALSE(ShouldUseNativeHorizontalTabTheme(native_theme, &theme));
+  for (int id : {IDR_THEME_TOOLBAR, IDR_THEME_FRAME, IDR_THEME_FRAME_INACTIVE,
+                 IDR_THEME_FRAME_INCOGNITO, IDR_THEME_FRAME_INCOGNITO_INACTIVE,
+                 IDR_THEME_TAB_BACKGROUND, IDR_THEME_TAB_BACKGROUND_INACTIVE,
+                 IDR_THEME_TAB_BACKGROUND_INCOGNITO,
+                 IDR_THEME_TAB_BACKGROUND_INCOGNITO_INACTIVE}) {
+    SCOPED_TRACE(id);
+    theme.image_id = id;
+    EXPECT_TRUE(ShouldUseNativeHorizontalTabTheme(native_theme, &theme));
+  }
+  theme.image_id = 0;
+  native_theme.set_preferred_contrast(
+      ui::NativeTheme::PreferredContrast::kMore);
+  EXPECT_TRUE(ShouldUseNativeHorizontalTabTheme(native_theme, &theme));
+  native_theme.set_preferred_contrast(
+      ui::NativeTheme::PreferredContrast::kNoPreference);
+  native_theme.set_forced_colors(ui::ColorProviderKey::ForcedColors::kSystem);
+  EXPECT_TRUE(ShouldUseNativeHorizontalTabTheme(native_theme, &theme));
+  native_theme.set_forced_colors(ui::ColorProviderKey::ForcedColors::kNone);
+  EXPECT_FALSE(ShouldUseNativeHorizontalTabTheme(native_theme, &theme));
+}
 
 void SetSidebarPaletteForTesting(ui::ColorProvider& provider, bool dark) {
   provider.SetColorForTesting(
@@ -51,6 +89,8 @@ TEST(YeeSurfaceColorTest, HeaderRolesRemainReadableOnLightAndDarkPages) {
               color_utils::kMinimumReadableContrastRatio);
     EXPECT_GE(color_utils::GetContrastRatio(colors.secondary, surface),
               color_utils::kMinimumReadableContrastRatio);
+    EXPECT_GT(color_utils::GetContrastRatio(colors.primary, surface),
+              color_utils::GetContrastRatio(colors.secondary, surface));
     EXPECT_LT(color_utils::GetContrastRatio(colors.disabled, surface),
               color_utils::GetContrastRatio(colors.primary, surface));
   }
@@ -452,6 +492,73 @@ TEST(YeeSurfaceGeometryTest, BrowserClassRoutingIsPerWindow) {
 #endif
 }
 
+TEST(YeeSurfaceGeometryTest, HorizontalTabsReserveOneRowBeforeTheSurface) {
+  const gfx::Rect client(11, 17, 1200, 900);
+  for (int advance : {0, 40, 52}) {
+    const gfx::Rect column = ResolveBrowserSurfaceContentColumn(
+        client, kSidebarMetrics.content_gutter, advance);
+    const auto seed = ResolveBrowserSurfaceSeed(
+        {column, gfx::Insets(kSidebarMetrics.content_gutter), false, true,
+         kSidebarMetrics.browser_surface_header_height()});
+    EXPECT_EQ(client.y() + std::max(kSidebarMetrics.content_gutter, advance),
+              seed.header_bounds.y());
+    EXPECT_EQ(client.bottom() - kSidebarMetrics.content_gutter,
+              seed.surface_seed_bounds.bottom());
+    EXPECT_EQ(client.x() + kSidebarMetrics.content_gutter,
+              seed.header_bounds.x());
+  }
+  EXPECT_TRUE(ResolveBrowserSurfaceContentColumn(client, 5000, 5000).IsEmpty());
+}
+
+TEST(YeeSurfaceColorTest, HorizontalTabsKeepPageAndFrameContrastSeparate) {
+  ui::ColorProvider colors;
+  SetSidebarPaletteForTesting(colors, false);
+  for (SkColor surface :
+       {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x13, 0x4E, 0x4A)}) {
+    const auto presentation =
+        ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+    const auto active =
+        ResolveHorizontalTabColors(colors, presentation, true, true, 1.0, true);
+    EXPECT_EQ(surface, active.background);
+    EXPECT_EQ(presentation.primary, active.foreground);
+    const auto active_split = ResolveHorizontalTabColors(
+        colors, presentation, true, true, 1.0, true, std::nullopt, true);
+    EXPECT_EQ(active.background, active_split.background);
+    EXPECT_EQ(active.foreground, active_split.foreground);
+    EXPECT_EQ(surface, ResolveHorizontalTabColors(colors, presentation, true,
+                                                  true, 1.0, true, SK_ColorBLUE)
+                           .background);
+    EXPECT_GE(
+        color_utils::GetContrastRatio(active.foreground, active.background),
+        color_utils::kMinimumReadableContrastRatio);
+    for (bool frame_active : {false, true}) {
+      for (bool selected : {false, true}) {
+        for (double hover : {0.0, 0.5, 1.0}) {
+          const auto tab = ResolveHorizontalTabColors(
+              colors, presentation, false, selected, hover, frame_active);
+          EXPECT_GE(
+              color_utils::GetContrastRatio(tab.foreground, tab.background),
+              color_utils::kMinimumReadableContrastRatio);
+          const auto grouped =
+              ResolveHorizontalTabColors(colors, presentation, false, selected,
+                                         hover, frame_active, SK_ColorBLUE);
+          EXPECT_NE(tab.background, grouped.background);
+          EXPECT_GE(color_utils::GetContrastRatio(grouped.foreground,
+                                                  grouped.background),
+                    color_utils::kMinimumReadableContrastRatio);
+          const auto split = ResolveHorizontalTabColors(
+              colors, presentation, false, selected, hover, frame_active,
+              std::nullopt, true);
+          EXPECT_NE(tab.background, split.background);
+          EXPECT_GE(
+              color_utils::GetContrastRatio(split.foreground, split.background),
+              color_utils::kMinimumReadableContrastRatio);
+        }
+      }
+    }
+  }
+}
+
 TEST(YeeSurfaceGeometryTest,
      SurfaceFrameKeepsNativePanelAllocationAndYeeGutters) {
   BrowserSurfaceFrameInput input;
@@ -467,6 +574,33 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_EQ(gfx::Rect(250, 6, 944, 42), frame.header_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.notice_flow_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.multi_contents_bounds);
+
+  input.mode = BrowserSurfaceMode::kConnectedTabs;
+  input.side_panel_surface_visible = true;
+  for (bool leading : {false, true}) {
+    const gfx::Rect body(leading ? 560 : 250, 48, 634, 746);
+    const gfx::Rect gutter(leading ? 550 : 884, 48, 10, 746);
+    input.native_notice_flow_allocation = body;
+    input.native_body_allocation = body;
+    input.connected_side_panel_resize_gutter = gutter;
+    const auto connected = ResolveBrowserSurfaceFrame(input);
+    EXPECT_EQ(body, connected.multi_contents_bounds);
+    EXPECT_EQ(body, connected.notice_flow_bounds);
+    EXPECT_EQ(connected.surface_seed_bounds,
+              connected.decoration.combined_outline_bounds);
+    EXPECT_EQ(gutter.CenterPoint().x() - connected.header_bounds.x(),
+              connected.decoration.side_panel_divider_x);
+    EXPECT_TRUE(connected.decoration.side_panel_gutter_on_page_surface);
+    input.connected_side_panel_resize_gutter->set_height(gutter.height() + 10);
+    EXPECT_FALSE(ResolveBrowserSurfaceFrame(input)
+                     .decoration.side_panel_gutter_on_page_surface);
+    input.connected_side_panel_resize_gutter.reset();
+    const auto restored = ResolveBrowserSurfaceFrame(input);
+    EXPECT_EQ(restored.main_surface_bounds,
+              restored.decoration.combined_outline_bounds);
+    EXPECT_FALSE(restored.decoration.side_panel_divider_x);
+    EXPECT_FALSE(restored.decoration.side_panel_gutter_on_page_surface);
+  }
 }
 
 TEST(YeeSurfaceGeometryTest,
@@ -539,6 +673,33 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_TRUE(frame.decoration.contain_infobar_shadow_horizontally);
   EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
 
+  // 모드와 패널 표시 여부는 명시적 입력이다. 호스팅 Widget이나 sibling View가
+  // 윤곽·그림자의 소유권을 다시 결정하면 안 된다.
+  for (const BrowserSurfaceMode mode :
+       {BrowserSurfaceMode::kCard, BrowserSurfaceMode::kConnectedTabs}) {
+    for (bool panel_visible : {false, true}) {
+      input.mode = mode;
+      input.side_panel_surface_visible = panel_visible;
+      const auto resolved = ResolveBrowserSurfaceFrame(input);
+      EXPECT_EQ(frame.header_bounds, resolved.header_bounds);
+      EXPECT_EQ(frame.main_surface_bounds, resolved.main_surface_bounds);
+      EXPECT_EQ(mode, resolved.decoration.mode);
+      EXPECT_TRUE(resolved.decoration.combined_outline_visible);
+      EXPECT_EQ(mode == BrowserSurfaceMode::kCard,
+                resolved.decoration.draw_outer_outline);
+      EXPECT_EQ(mode == BrowserSurfaceMode::kCard && !panel_visible,
+                resolved.decoration.show_shadow);
+      EXPECT_EQ(mode == BrowserSurfaceMode::kConnectedTabs,
+                resolved.decoration.side_panel_joins_header);
+      EXPECT_EQ(frame.decoration.header_separator_owner,
+                resolved.decoration.header_separator_owner);
+      EXPECT_EQ(frame.decoration.combined_header_separator_offset,
+                resolved.decoration.combined_header_separator_offset);
+    }
+  }
+  input.mode = BrowserSurfaceMode::kCard;
+  input.side_panel_surface_visible = false;
+
   input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
       gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/false,
       /*header_participates=*/false, /*header_height=*/42});
@@ -548,10 +709,15 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_TRUE(frame.decoration.combined_outline_visible);
   EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kNone,
             frame.decoration.header_separator_owner);
+  EXPECT_FALSE(frame.decoration.side_panel_joins_header);
   EXPECT_EQ(0, frame.decoration.combined_header_separator_offset);
   EXPECT_EQ(kSidebarMetrics.content_corner_radius -
                 kSidebarMetrics.browser_surface_outline_width,
             frame.decoration.infobar_top_corner_radius);
+  input.mode = BrowserSurfaceMode::kConnectedTabs;
+  EXPECT_FALSE(
+      ResolveBrowserSurfaceFrame(input).decoration.side_panel_joins_header);
+  input.mode = BrowserSurfaceMode::kCard;
 
   // 외부 Header는 본문 행을 더하지 않고 같은 카드의 위쪽을 이어 준다.
   input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
@@ -570,12 +736,23 @@ TEST(YeeSurfaceGeometryTest,
   input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
       gfx::Rect(244, 0, 956, 800), gfx::Insets(6), /*split=*/true,
       /*header_participates=*/false, /*header_height=*/42});
-  frame = ResolveBrowserSurfaceFrame(input);
-  EXPECT_FALSE(frame.decoration.combined_outline_visible);
-  EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kSplitPane,
-            frame.decoration.header_separator_owner);
-  EXPECT_EQ(0, frame.decoration.combined_header_separator_offset);
-  EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
+  for (const BrowserSurfaceMode mode :
+       {BrowserSurfaceMode::kCard, BrowserSurfaceMode::kConnectedTabs}) {
+    for (bool panel_visible : {false, true}) {
+      input.mode = mode;
+      input.side_panel_surface_visible = panel_visible;
+      frame = ResolveBrowserSurfaceFrame(input);
+      EXPECT_EQ(mode, frame.decoration.mode);
+      EXPECT_FALSE(frame.decoration.combined_outline_visible);
+      EXPECT_FALSE(frame.decoration.draw_outer_outline);
+      EXPECT_FALSE(frame.decoration.show_shadow);
+      EXPECT_FALSE(frame.decoration.side_panel_joins_header);
+      EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kSplitPane,
+                frame.decoration.header_separator_owner);
+      EXPECT_EQ(0, frame.decoration.combined_header_separator_offset);
+      EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
+    }
+  }
 }
 
 TEST(YeeSurfaceGeometryTest, SplitInsetsResolveBeforeMultiContentsApplication) {

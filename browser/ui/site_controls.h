@@ -9,6 +9,7 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -46,12 +47,14 @@ class SiteControlsButton : public views::ImageButton,
   ~SiteControlsButton() override;
 
   void Update(content::WebContents* contents, bool hide_for_omnibox_input);
-  void SetIconColor(std::optional<SkColor> color);
+  void SetSurfacePresentation(
+      std::optional<BrowserSurfacePresentation> presentation);
 
  private:
   void OnPressed();
   void OnBlockingStateChanged();
   void RefreshVisualState();
+  void StateChanged(ButtonState old_state) override;
   void Layout(PassKey) override;
   void OnThemeChanged() override;
   void WebContentsDestroyed() override;
@@ -60,7 +63,7 @@ class SiteControlsButton : public views::ImageButton,
   raw_ptr<views::Label> badge_ = nullptr;
   base::CallbackListSubscription helper_subscription_;
   base::CallbackListSubscription service_subscription_;
-  std::optional<SkColor> icon_color_;
+  std::optional<BrowserSurfacePresentation> presentation_;
   size_t blocked_count_ = 0;
 };
 

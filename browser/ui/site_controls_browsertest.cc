@@ -8,19 +8,28 @@
 #include <string>
 
 #include "base/command_line.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
+#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
@@ -34,10 +43,18 @@
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "ui/base/test/ui_controls.h"
+#include "ui/compositor/compositor.h"
+#include "ui/compositor/test/test_utils.h"
+#include "ui/gfx/canvas.h"
+#include "ui/gfx/color_utils.h"
+#include "ui/snapshot/snapshot.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/tabbed_pane/tabbed_pane.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -352,7 +369,8 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, ButtonOutlivesDestroyedTab) {
   destroyed.Wait();
   EXPECT_EQ(nullptr, detached_button.web_contents());
   EXPECT_FALSE(detached_button.GetVisible());
-  detached_button.SetIconColor(SK_ColorBLACK);
+  detached_button.SetSurfacePresentation(
+      ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1));
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 }
@@ -397,11 +415,130 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
     ASSERT_TRUE(badge);
     EXPECT_TRUE(badge->GetVisible());
     EXPECT_EQ(i % 2 ? u"2" : u"1", badge->GetText());
+    // 탭 전환에서 건수와 페이지 기반 전경색이 같은 탭을 따라야 한다.
+    const SkColor surface = i % 2 ? SK_ColorWHITE : SK_ColorBLACK;
+    auto* source =
+        BrowserSurfaceColorController::FromWebContents(button->web_contents());
+    ASSERT_TRUE(source);
+    source->SetPageSurfaceColorForTesting(surface);
+    button->GetWidget()->LayoutRootViewIfNecessary();
+    EXPECT_TRUE(button->GetLocalBounds().Contains(badge->bounds()));
+    EXPECT_GE(badge->x(), button->GetMinimumImageSize().width());
+    EXPECT_GE(badge->height(), badge->font_list().GetHeight());
+    gfx::Canvas canvas(badge->size(), 1.f, false);
+    badge->background()->Paint(&canvas, badge);
+    const auto center = badge->GetLocalBounds().CenterPoint();
+    EXPECT_GE(color_utils::GetContrastRatio(
+                  badge->GetEnabledColor(),
+                  canvas.GetBitmap().getColor(center.x(), center.y())),
+              color_utils::kMinimumReadableContrastRatio);
   }
   ASSERT_TRUE(OpenControls(SiteControlsSection::kProtection));
   browser()->tab_strip_model()->ActivateTabAt(0);
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
+
+  const auto capture_dir =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          "yee-header-capture-dir");
+  if (capture_dir.empty()) {
+    return;
+  }
+  // 선택적 캡처만 실제 native Header와 차단 helper를 사용한다.
+  // 일반 실행은 스크린샷 없이 탭별 건수 소유권을 검사한다.
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  auto* state = tabs::VerticalTabStripStateController::From(browser());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  while (first_helper->blocked_count() < 10) {
+    first_helper->RecordBlockedRequest();
+  }
+  const auto capture = [&](const std::string& name) {
+    view->GetWidget()->LayoutRootViewIfNecessary();
+    auto* compositor = view->GetWidget()->GetCompositor();
+    compositor->ScheduleFullRedraw();
+    ASSERT_TRUE(
+        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+    base::test::TestFuture<scoped_refptr<base::RefCountedMemory>> snapshot;
+    ui::GrabWindowSnapshotAsPNG(
+        view->GetWidget()->GetNativeWindow(),
+        gfx::Rect(view->GetWidget()->GetWindowBoundsInScreen().size()),
+        snapshot.GetCallback());
+    auto png = snapshot.Take();
+    ASSERT_TRUE(png && png->size());
+    ASSERT_TRUE(base::WriteFile(capture_dir.AppendASCII(name),
+                                static_cast<base::span<const uint8_t>>(*png)));
+  };
+  for (bool dark : {false, true}) {
+    theme->SetBrowserColorScheme(
+        dark ? ThemeService::BrowserColorScheme::kDark
+             : ThemeService::BrowserColorScheme::kLight);
+    const SkColor surface = dark ? SK_ColorBLACK : SK_ColorWHITE;
+    ASSERT_TRUE(
+        content::ExecJs(first, dark ? "document.body.style.background='black';"
+                                      "document.body.style.color='white'"
+                                    : "document.body.style.background='white';"
+                                      "document.body.style.color='black'"));
+    for (bool vertical : {false, true}) {
+      state->SetVerticalTabsEnabled(vertical);
+      auto* source = BrowserSurfaceColorController::FromWebContents(first);
+      ASSERT_TRUE(source);
+      source->SetPageSurfaceColorForTesting(surface);
+      view->GetWidget()->GetFocusManager()->ClearFocus();
+      const std::string name = std::string(dark ? "dark" : "light") +
+                               (vertical ? "-sidebar.png" : "-horizontal.png");
+      capture(name);
+    }
+  }
+  // 장식용 숫자 위의 native hover·클릭도 부모 버튼에 전달돼야 한다.
+  // 명시적으로 요청한 시각 검사에서만 실제 입력을 활성화한다.
+  ui_controls::EnableUIControls();
+  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  auto* button = Button();
+  auto* badge = FindView<views::Label>(button);
+  const auto native_window = view->GetWidget()->GetNativeWindow();
+  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+      view->GetLocationBarView()->GetBoundsInScreen().CenterPoint(),
+      native_window));
+  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+      badge->GetBoundsInScreen().CenterPoint(), native_window));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return button->GetState() == views::Button::STATE_HOVERED; }));
+  capture("dark-sidebar-hover.png");
+  ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
+      ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP, native_window));
+  EXPECT_TRUE(IsSiteControlsBubbleShowing());
+  for (views::Widget* widget :
+       views::Widget::GetAllOwnedWidgets(view->GetWidget()->GetNativeView())) {
+    if (FindView<views::TabbedPane>(widget->GetContentsView())) {
+      widget->CloseNow();
+    }
+  }
+  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+      view->GetLocationBarView()->GetBoundsInScreen().CenterPoint(),
+      native_window));
+  auto* focus = view->GetWidget()->GetFocusManager();
+  focus->SetKeyboardAccessible(true);
+  focus->SetFocusedViewWithReason(
+      button, views::FocusManager::FocusChangeReason::kFocusTraversal);
+  EXPECT_TRUE(views::FocusRing::Get(button)->ShouldPaintForTesting());
+  capture("dark-sidebar-focus.png");
+  focus->ClearFocus();
+  // 시스템 마우스 버튼을 누른 채 두지 않고 native 눌림 상태를 캡처한다.
+  button->SetState(views::Button::STATE_PRESSED);
+  capture("dark-sidebar-pressed.png");
+  button->SetState(views::Button::STATE_NORMAL);
+  Service()->SetEnabledForSite(first->GetVisibleURL(), false);
+  EXPECT_FALSE(badge->GetVisible());
+  capture("dark-sidebar-protection-off.png");
+  Service()->SetEnabledForSite(first->GetVisibleURL(), true);
+  while (first_helper->blocked_count() < 100) {
+    first_helper->RecordBlockedRequest();
+  }
+  EXPECT_EQ(u"99+", badge->GetText());
+  capture("dark-sidebar-99plus.png");
+  EXPECT_TRUE(button->GetLocalBounds().Contains(badge->bounds()));
+  theme->SetBrowserColorScheme(original_scheme);
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,

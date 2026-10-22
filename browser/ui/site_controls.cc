@@ -15,6 +15,7 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_bubble_delegate_view.h"
 #include "chrome/browser/ui/views/yee/brand.h"
+#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
@@ -29,14 +30,17 @@
 #include "ui/base/models/image_model.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_palette.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/tabbed_pane/tabbed_pane.h"
@@ -53,7 +57,9 @@ namespace {
 constexpr int kPanelWidth = 360;
 constexpr int kActionSize = 28;
 constexpr int kShieldIconSize = 18;
-constexpr int kBadgeHeight = 14;
+constexpr int kBadgeHeight = 18;
+constexpr int kBadgeGap = 3;
+constexpr int kButtonInset = 4;
 
 class SiteControlsBubble;
 SiteControlsBubble* g_site_controls_bubble = nullptr;
@@ -295,16 +301,20 @@ SiteControlsButton::SiteControlsButton(Browser* browser)
   SetMinimumImageSize(gfx::Size(kShieldIconSize, kShieldIconSize));
   SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
   SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
-                                                kActionSize / 2);
+  SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, kButtonInset)));
+  views::InstallRoundRectHighlightPathGenerator(
+      this, gfx::Insets(), kSidebarMetrics.shell_control_corner_radius);
 
   auto badge = std::make_unique<views::Label>();
-  badge->SetTextStyle(views::style::STYLE_BODY_5_EMPHASIS);
-  badge->SetEnabledColor(SK_ColorWHITE);
-  badge->SetBackground(views::CreateRoundedRectBackground(ui::kColorSysPrimary,
-                                                          kBadgeHeight / 2));
+  badge->SetFontList(
+      badge->font_list().DeriveWithWeight(gfx::Font::Weight::MEDIUM));
+  // 글자 대비는 실제 chip 배경과 짝을 이룬다. Label의 자동 가독성 보정이
+  // 이 색 조합을 덮어쓰지 않게 한다.
+  badge->SetAutoColorReadabilityEnabled(false);
+  badge->SetSubpixelRenderingEnabled(false);
   badge->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, 4)));
   badge->SetCanProcessEventsWithinSubtree(false);
+  badge->GetViewAccessibility().SetIsIgnored(true);
   badge->SetVisible(false);
   badge_ = AddChildView(std::move(badge));
   if (browser_) {
@@ -342,8 +352,12 @@ void SiteControlsButton::Update(content::WebContents* contents,
   OnBlockingStateChanged();
 }
 
-void SiteControlsButton::SetIconColor(std::optional<SkColor> color) {
-  icon_color_ = color;
+void SiteControlsButton::SetSurfacePresentation(
+    std::optional<BrowserSurfacePresentation> presentation) {
+  if (presentation_ == presentation) {
+    return;
+  }
+  presentation_ = std::move(presentation);
   RefreshVisualState();
 }
 
@@ -373,11 +387,52 @@ void SiteControlsButton::RefreshVisualState() {
       enabled = service->EnabledForSite(web_contents()->GetVisibleURL());
     }
   }
-  SkColor color = icon_color_.value_or(
-      GetColorProvider() ? GetColorProvider()->GetColor(ui::kColorIcon)
-                         : gfx::kPlaceholderColor);
+  const bool custom_surface =
+      presentation_ && GetNativeTheme() &&
+      !ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme()) &&
+      presentation_->palette_mode ==
+          BrowserSurfacePresentation::PaletteMode::kCustomSurface;
+  SkColor color =
+      custom_surface
+          ? presentation_->primary
+          : (GetColorProvider() ? GetColorProvider()->GetColor(ui::kColorIcon)
+                                : gfx::kPlaceholderColor);
+  if (GetColorProvider()) {
+    SkColor background =
+        GetColorProvider()->GetColor(ui::kColorSysSurfaceVariant);
+    if (custom_surface) {
+      background =
+          GetState() == STATE_PRESSED
+              ? presentation_->popup_selected
+              : (GetState() == STATE_HOVERED ? presentation_->popup_hover
+                                             : presentation_->location_hover);
+    }
+    const SkColor foreground = color_utils::BlendForMinContrast(
+                                   color, background, std::nullopt,
+                                   color_utils::kMinimumReadableContrastRatio)
+                                   .color;
+    badge_->SetBackgroundColor(background);
+    badge_->SetEnabledColor(foreground);
+    badge_->SetBackground(views::CreateRoundedRectBackground(background, 4));
+    if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+      SetBackground(views::CreateRoundedRectBackground(
+          background, kSidebarMetrics.shell_control_corner_radius));
+    } else {
+      SetBackground(nullptr);
+    }
+    views::FocusRing::Get(this)->SetColorId(
+        custom_surface ? std::make_optional(ResolveBrowserSurfaceFocusColorId(
+                             *GetColorProvider(), presentation_->surface,
+                             ui::kColorFocusableBorderFocused))
+                       : std::nullopt);
+  }
   if (!enabled) {
-    color = SkColorSetA(color, 0x66);
+    color =
+        custom_surface
+            ? presentation_->secondary
+            : (GetColorProvider()
+                   ? GetColorProvider()->GetColor(ui::kColorSysOnSurfaceVariant)
+                   : color);
   }
   SetImageModel(views::Button::STATE_NORMAL,
                 ui::ImageModel::FromVectorIcon(vector_icons::kShieldIcon, color,
@@ -391,10 +446,22 @@ void SiteControlsButton::RefreshVisualState() {
     accessible_name += u", " + base::NumberToString16(blocked_count_) +
                        u" network requests blocked";
   }
+  SetImageHorizontalAlignment(show_badge ? views::ImageButton::ALIGN_LEFT
+                                         : views::ImageButton::ALIGN_CENTER);
+  SetPreferredSize(gfx::Size(show_badge ? kButtonInset * 2 + kShieldIconSize +
+                                              kBadgeGap +
+                                              badge_->GetPreferredSize().width()
+                                        : kActionSize,
+                             kActionSize));
   SetTooltipText(accessible_name);
   GetViewAccessibility().SetName(accessible_name);
   InvalidateLayout();
   SchedulePaint();
+}
+
+void SiteControlsButton::StateChanged(ButtonState old_state) {
+  views::ImageButton::StateChanged(old_state);
+  RefreshVisualState();
 }
 
 void SiteControlsButton::Layout(PassKey) {
@@ -404,8 +471,9 @@ void SiteControlsButton::Layout(PassKey) {
   }
   gfx::Size badge_size = badge_->GetPreferredSize();
   badge_size.set_height(kBadgeHeight);
-  badge_->SetBounds(std::max(0, width() - badge_size.width()), 0,
-                    badge_size.width(), badge_size.height());
+  badge_->SetBounds(std::max(0, width() - kButtonInset - badge_size.width()),
+                    (height() - badge_size.height()) / 2, badge_size.width(),
+                    badge_size.height());
 }
 
 void SiteControlsButton::OnThemeChanged() {

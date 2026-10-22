@@ -26,8 +26,10 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/yee/agent_bridge.h"
 #include "chrome/browser/ui/views/yee/agent_bridge_state.h"
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/menu_source_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -47,6 +49,7 @@
 #include "ui/gfx/geometry/outsets.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -84,8 +87,8 @@ constexpr int kGlassSurfaceTintAlpha = 22;
 constexpr int kShellMenuIconSize = 16;
 constexpr float kRestingSeparatorOpacity = 0.34f;
 constexpr int kRestingOriginMaximumWidth = 180;
-constexpr float kHeaderPrimaryPreferredOpacity = 0.48f;
-constexpr float kHeaderSecondaryPreferredOpacity = 0.34f;
+constexpr float kHeaderPrimaryPreferredOpacity = 0.78f;
+constexpr float kHeaderSecondaryPreferredOpacity = 0.56f;
 constexpr float kHeaderDisabledOpacity = 0.28f;
 constexpr float kHeaderFocusStrokePreferredOpacity = 0.44f;
 constexpr float kOmniboxPopupHoverOpacity = 0.06f;
@@ -260,6 +263,18 @@ class YeeOmniboxBackground : public views::Background {
   std::unique_ptr<views::Painter> focus_painter_;
 };
 
+SkPath SidePanelSurfaceFillPath(const views::View& view, bool joins_header) {
+  const float radius = yee::kSidebarMetrics.content_corner_radius;
+  const float top_radius = joins_header ? 0.0f : radius;
+  const SkVector radii[4] = {{top_radius, top_radius},
+                             {top_radius, top_radius},
+                             {radius, radius},
+                             {radius, radius}};
+  SkRRect rect;
+  rect.setRectRadii(gfx::RectToSkRect(view.GetLocalBounds()), radii);
+  return SkPath::RRect(rect);
+}
+
 class YeeBrowserSurfaceFillView : public views::View {
  public:
   explicit YeeBrowserSurfaceFillView(
@@ -323,6 +338,7 @@ class YeeCombinedSurfaceOutlineView : public views::View {
         this, kBrowserSurfaceShadowElevation);
     view_shadow_->SetRoundedCornerRadius(
         yee::kSidebarMetrics.content_corner_radius);
+    UpdateShadowVisibility();
   }
   YeeCombinedSurfaceOutlineView(const YeeCombinedSurfaceOutlineView&) = delete;
   YeeCombinedSurfaceOutlineView& operator=(
@@ -341,18 +357,18 @@ class YeeCombinedSurfaceOutlineView : public views::View {
     }
   }
 
-  void SetLayoutDecoration(bool split_presentation,
-                           int header_separator_offset) {
-    SetSplitPresentation(split_presentation);
-    // Two adjacent cards need an unpainted shell gutter. The combined
-    // Surface shadow otherwise occupies the center of the six-DIP gap while
-    // the Side Panel animates or changes alignment.
-    UpdateShadowVisibility();
-    header_separator_offset = std::max(0, header_separator_offset);
-    if (header_separator_offset_ == header_separator_offset) {
+  void ApplyDecoration(
+      const yee::ResolvedBrowserSurfaceDecoration& decoration) {
+    const bool split_presentation =
+        decoration.header_separator_owner ==
+        yee::BrowserSurfaceHeaderSeparatorOwner::kSplitPane;
+    if (decoration_ == decoration &&
+        split_presentation_ == split_presentation) {
       return;
     }
-    header_separator_offset_ = header_separator_offset;
+    decoration_ = decoration;
+    split_presentation_ = split_presentation;
+    UpdateShadowVisibility();
     SchedulePaint();
   }
 
@@ -362,7 +378,7 @@ class YeeCombinedSurfaceOutlineView : public views::View {
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    if (split_presentation_) {
+    if (split_presentation_ || !decoration_.combined_outline_visible) {
       return;
     }
     const gfx::Rect surface_bounds = GetLocalBounds();
@@ -380,13 +396,18 @@ class YeeCombinedSurfaceOutlineView : public views::View {
         custom_colors
             ? presentation->header_separator
             : GetColorProvider()->GetColor(kColorToolbarContentAreaSeparator);
-    PaintBrowserSurfaceOutline(canvas, surface_bounds,
-                               yee::kSidebarMetrics.content_corner_radius,
-                               *GetColorProvider(), /*emphasized=*/false);
+    if (decoration_.draw_outer_outline) {
+      PaintBrowserSurfaceOutline(canvas, surface_bounds,
+                                 yee::kSidebarMetrics.content_corner_radius,
+                                 *GetColorProvider(), /*emphasized=*/false);
+    }
 
-    const float separator_y = header_separator_offset_;
-    if (!split_presentation_ && header_separator_offset_ > 0 &&
-        separator_y < surface_bounds.bottom()) {
+    const int header_separator_offset =
+        std::max(0, decoration_.combined_header_separator_offset);
+    const float separator_y = header_separator_offset;
+    if (decoration_.header_separator_owner ==
+            yee::BrowserSurfaceHeaderSeparatorOwner::kCombinedSurfaceOutline &&
+        header_separator_offset > 0 && separator_y < surface_bounds.bottom()) {
       const float horizontal_inset =
           yee::kSidebarMetrics.browser_surface_outline_width / 2.0f;
       canvas->DrawLine(
@@ -394,23 +415,27 @@ class YeeCombinedSurfaceOutlineView : public views::View {
           gfx::PointF(surface_bounds.right() - horizontal_inset, separator_y),
           separator_color);
     }
+    if (decoration_.side_panel_divider_x && header_separator_offset > 0) {
+      gfx::Rect divider(*decoration_.side_panel_divider_x,
+                        header_separator_offset,
+                        yee::kSidebarMetrics.browser_surface_outline_width,
+                        std::max(0, height() - header_separator_offset));
+      divider.Intersect(surface_bounds);
+      canvas->FillRect(GetMirroredRect(divider), separator_color);
+    }
   }
 
  private:
   void UpdateShadowVisibility() {
-    const views::View* const side_panel_surface =
-        parent() ? parent()->GetViewByID(yee::kSidePanelSurfaceViewId)
-                 : nullptr;
-    const bool side_panel_visible =
-        side_panel_surface && side_panel_surface->GetVisible();
-    view_shadow_->shadow()->layer()->SetVisible(!split_presentation_ &&
-                                                !side_panel_visible);
+    view_shadow_->shadow()->layer()->SetVisible(
+        !split_presentation_ && decoration_.combined_outline_visible &&
+        decoration_.show_shadow);
   }
 
   yee::BrowserSurfacePresentationCallback presentation_callback_;
   std::unique_ptr<views::ViewShadow> view_shadow_;
+  yee::ResolvedBrowserSurfaceDecoration decoration_;
   bool split_presentation_ = false;
-  int header_separator_offset_ = 0;
 };
 
 class YeeSidePanelSurfaceView : public views::View {
@@ -427,6 +452,15 @@ public:
   YeeSidePanelSurfaceView& operator=(const YeeSidePanelSurfaceView&) = delete;
   ~YeeSidePanelSurfaceView() override = default;
 
+  void ApplyDecoration(
+      const yee::ResolvedBrowserSurfaceDecoration& decoration) {
+    if (joins_header_ == decoration.side_panel_joins_header) {
+      return;
+    }
+    joins_header_ = decoration.side_panel_joins_header;
+    SchedulePaint();
+  }
+
   void OnThemeChanged() override {
     views::View::OnThemeChanged();
     SchedulePaint();
@@ -442,12 +476,16 @@ public:
     fill.setAntiAlias(true);
     fill.setStyle(cc::PaintFlags::kFill_Style);
     fill.setColor(GetColorProvider()->GetColor(kColorSidePanelBackground));
-    canvas->DrawRoundRect(gfx::RectF(local_bounds),
-                          yee::kSidebarMetrics.content_corner_radius, fill);
-    PaintBrowserSurfaceOutline(canvas, local_bounds,
-                               yee::kSidebarMetrics.content_corner_radius,
-                               *GetColorProvider(), /*emphasized=*/false);
+    canvas->DrawPath(SidePanelSurfaceFillPath(*this, joins_header_), fill);
+    if (!joins_header_) {
+      PaintBrowserSurfaceOutline(canvas, local_bounds,
+                                 yee::kSidebarMetrics.content_corner_radius,
+                                 *GetColorProvider(), /*emphasized=*/false);
+    }
   }
+
+ private:
+  bool joins_header_ = false;
 };
 
 class YeeSplitPaneEmphasisView : public views::View {
@@ -1088,6 +1126,23 @@ SkColor ResolveBrowserSurfaceHeaderColor(
   return SkColorSetA(*page_surface_color, SK_AlphaOPAQUE);
 }
 
+ui::ColorId ResolveBrowserSurfaceFocusColorId(
+    const ui::ColorProvider& color_provider,
+    SkColor background,
+    ui::ColorId preferred) {
+  const auto contrast = [&](ui::ColorId id) {
+    return color_utils::GetContrastRatio(color_provider.GetColor(id),
+                                         background);
+  };
+  if (contrast(preferred) >= color_utils::kMinimumVisibleContrastRatio) {
+    return preferred;
+  }
+  return contrast(ui::kColorSysOnSurface) >=
+                 contrast(ui::kColorSysInverseOnSurface)
+             ? ui::kColorSysOnSurface
+             : ui::kColorSysInverseOnSurface;
+}
+
 BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
     SkColor surface_color) {
   surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
@@ -1425,12 +1480,18 @@ void UpdateCombinedSurfaceOutlineView(views::View& view,
       split_presentation);
 }
 
-void UpdateCombinedSurfaceOutlineLayout(views::View& view,
-                                        bool split_presentation,
-                                        int header_separator_offset) {
+void ApplyCombinedSurfaceDecoration(
+    views::View& view,
+    const ResolvedBrowserSurfaceDecoration& decoration) {
   CHECK_EQ(view.GetID(), kCombinedSurfaceOutlineViewId);
-  static_cast<YeeCombinedSurfaceOutlineView&>(view).SetLayoutDecoration(
-      split_presentation, header_separator_offset);
+  static_cast<YeeCombinedSurfaceOutlineView&>(view).ApplyDecoration(decoration);
+}
+
+void ApplySidePanelSurfaceDecoration(
+    views::View& view,
+    const ResolvedBrowserSurfaceDecoration& decoration) {
+  CHECK_EQ(view.GetID(), kSidePanelSurfaceViewId);
+  static_cast<YeeSidePanelSurfaceView&>(view).ApplyDecoration(decoration);
 }
 
 gfx::RoundedCornersF ResolveSplitPaneRoundedCorners() {

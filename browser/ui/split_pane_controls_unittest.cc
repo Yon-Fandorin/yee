@@ -10,16 +10,24 @@
 #include "base/i18n/rtl.h"
 #include "base/test/bind.h"
 #include "base/time/time.h"
-#include "chrome/test/views/chrome_views_test_base.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
+#include "ui/gfx/canvas.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/layout/fill_layout.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_base.h"
 #include "ui/views/test/views_test_utils.h"
@@ -90,23 +98,36 @@ TEST(SidePanelResizeGutterTest, SharedGapStaysOutsideEitherCard) {
 class SidePanelResizeGutterViewTest : public ChromeViewsTestBase {};
 
 TEST_F(SidePanelResizeGutterViewTest, KeyboardDelegatesAndMarkerSharesMetrics) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   int amount = 0;
   bool finished = false;
   bool keyboard = false;
   auto widget = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
-  auto* gutter = widget->SetContentsView(CreateSidePanelResizeGutterView({
-      base::BindLambdaForTesting([&](int value, bool done) {
-        amount = value;
-        finished = done;
-      }),
-      base::BindRepeating([] {}),
-      base::BindLambdaForTesting([&](bool value) { keyboard = value; })}));
+  auto* root = widget->SetContentsView(std::make_unique<views::View>());
+  root->SetLayoutManager(std::make_unique<views::FillLayout>());
+  auto* gutter = root->AddChildView(CreateSidePanelResizeGutterView(
+      {base::BindLambdaForTesting([&](int value, bool done) {
+         amount = value;
+         finished = done;
+       }),
+       base::BindRepeating([] {}),
+       base::BindLambdaForTesting([&](bool value) { keyboard = value; })}));
   widget->SetBounds(gfx::Rect(0, 0, kSidebarMetrics.resize_gutter_width, 400));
   gutter->SetVisible(true);
   widget->ShowInactive();
-  views::test::RunScheduledLayout(gutter);
+  views::test::RunScheduledLayout(root);
   ASSERT_EQ(1u, gutter->children().size());
   views::View* const marker = gutter->children().front();
+  ASSERT_TRUE(gutter->background());
+  const auto resting_alpha = [&]() {
+    gfx::Canvas canvas(gutter->size(), 1.f, false);
+    gutter->background()->Paint(&canvas, gutter);
+    const auto center = gutter->GetLocalBounds().CenterPoint();
+    return SkColorGetA(canvas.GetBitmap().getColor(center.x(), center.y()));
+  };
+  EXPECT_EQ(SK_AlphaTRANSPARENT, resting_alpha());
+  EXPECT_FLOAT_EQ(0.f, marker->layer()->opacity());
   EXPECT_EQ(gfx::Size(kSidebarMetrics.resize_handle_thickness,
                        kSidebarMetrics.resize_handle_length), marker->size());
   EXPECT_EQ(gutter->GetLocalBounds().CenterPoint(),
@@ -124,11 +145,51 @@ TEST_F(SidePanelResizeGutterViewTest, KeyboardDelegatesAndMarkerSharesMetrics) {
                        gfx::Point(5, 390), ui::EventTimeForNow(), ui::EF_NONE,
                        ui::EF_NONE);
   gutter->OnMouseMoved(move);
+  EXPECT_GT(marker->layer()->opacity(), 0.f);
+  const auto marker_color = [&]() {
+    gfx::Canvas canvas(marker->size(), 1.f, false);
+    marker->background()->Paint(&canvas, marker);
+    const auto center = marker->GetLocalBounds().CenterPoint();
+    return canvas.GetBitmap().getColor(center.x(), center.y());
+  };
+  for (auto mode : {ui::ColorProviderKey::ColorMode::kLight,
+                    ui::ColorProviderKey::ColorMode::kDark}) {
+    widget->SetColorModeOverride(mode);
+    gutter->OnMouseMoved(move);
+    const float opacity = marker->layer()->opacity();
+    SetSidePanelResizeGutterOnPageSurface(*gutter, true);
+    for (SkColor surface : {SK_ColorBLACK, SK_ColorWHITE}) {
+      const auto presentation =
+          ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+      UpdateSidePanelResizeGutterPresentation(*gutter, presentation);
+      EXPECT_FLOAT_EQ(opacity, marker->layer()->opacity());
+      EXPECT_GE(color_utils::GetContrastRatio(
+                    color_utils::AlphaBlend(marker_color(), surface, opacity),
+                    surface),
+                color_utils::kMinimumVisibleContrastRatio);
+    }
+  }
+  // backing이 분리되면 layout이 색상 override를 명시적으로 해제한다.
+  const auto white = ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1);
+  SetSidePanelResizeGutterOnPageSurface(*gutter, false);
+  UpdateSidePanelResizeGutterPresentation(*gutter, white);
+  EXPECT_EQ(gutter->GetColorProvider()->GetColor(ui::kColorSysOnSurface),
+            marker_color());
   widget->SetBounds(gfx::Rect(0, 0, kSidebarMetrics.resize_gutter_width, 80));
-  views::test::RunScheduledLayout(gutter);
+  views::test::RunScheduledLayout(root);
   const gfx::RectF transformed_marker =
-      marker->layer()->GetTargetTransform().MapRect(gfx::RectF(marker->bounds()));
-  EXPECT_TRUE(gfx::RectF(gutter->GetLocalBounds()).Contains(transformed_marker));
+      marker->layer()->GetTargetTransform().MapRect(
+          gfx::RectF(marker->bounds()));
+  EXPECT_TRUE(
+      gfx::RectF(gutter->GetLocalBounds()).Contains(transformed_marker));
+
+  ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::Point(11, 90),
+                      gfx::Point(11, 90), ui::EventTimeForNow(), ui::EF_NONE,
+                      ui::EF_NONE);
+  gutter->OnMouseExited(exit);
+  EXPECT_FLOAT_EQ(0.f, marker->layer()->opacity());
+  EXPECT_EQ(SK_AlphaTRANSPARENT, resting_alpha());
+  EXPECT_FALSE(widget->IsActive());
 }
 
 class SplitPaneControlsTest : public ChromeViewsTestBase {

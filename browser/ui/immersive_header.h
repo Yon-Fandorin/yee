@@ -7,6 +7,7 @@
 
 #include <optional>
 
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "ui/gfx/geometry/rect.h"
 
@@ -28,7 +29,7 @@ void SetSidebarHeaderHost(views::View& sidebar,
 void UpdateImmersiveHeaderBackdrop(
     views::View& host,
     views::View& shell_source,
-    const gfx::Rect& surface_bounds,
+    const ResolvedBrowserSurfaceDecoration& decoration,
     std::optional<BrowserSurfacePresentation> presentation);
 
 // 전체화면 세션이 끝나면 이전 페이지의 임시 바탕을 남기지 않는다.
