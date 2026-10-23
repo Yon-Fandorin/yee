@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
-
 #include <algorithm>
 
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/gfx/geometry/outsets.h"
 
@@ -45,7 +44,8 @@ gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
 
 gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
                                              int controls_width,
-                                             bool leading) {
+                                             bool leading,
+                                             int horizontal_tab_strip_height) {
   const int edge_inset =
       kSidebarMetrics.content_gutter +
       kSidebarMetrics.browser_surface_header_control_edge_inset;
@@ -54,7 +54,12 @@ gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
   return gfx::Rect(
       leading ? frame_bounds.x() + edge_inset
               : frame_bounds.right() - edge_inset - width,
-      frame_bounds.y() + kSidebarMetrics.browser_surface_toolbar_top_inset(),
+      frame_bounds.y() +
+          (horizontal_tab_strip_height > 0
+               ? std::max(0, (horizontal_tab_strip_height -
+                              kSidebarMetrics.toolbar_height) /
+                                 2)
+               : kSidebarMetrics.browser_surface_toolbar_top_inset()),
       width, kSidebarMetrics.toolbar_height);
 }
 

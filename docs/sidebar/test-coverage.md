@@ -114,8 +114,9 @@ unpinned split 묶음·다중 선택 drag 테스트를 이 기능들의 지원 �
 ## 5. 수평 탭과의 전환
 
 `test-browser-surface-layout.sh horizontal`은 기존
-`YeeHorizontalTabsPreserveRowsColorsAndTabIdentity` 하나를 기본·RTL 125%·통합
-탭바 경로에서 실행한다. Header와 주소줄의 중복 여백, 그룹 접기/펴기 및 탭
+`YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`와 Windows 전용 이음새 검사를
+기본·RTL 125%·통합 탭바 경로에서 실행한다. Header와 주소줄의 중복 여백,
+그룹 접기/펴기 및 탭
 추가/제거 후 favicon 요약 갱신, toolbar/content Side Panel 좌우 배치에서
 Header의 전체 폭 유지와 패널이 그 아래에 배치되는지 확인한다.
 색이 있는 그룹의 내부 탭을 실제로 선택한 뒤 색상·포커스를 확인하며, 그룹
@@ -132,6 +133,11 @@ Windows 수평 모드에서는 검색·새 탭 버튼·드래그 여백과 창 �
 favicon 요약과 native 펼치기 아이콘을 포함하며, 모든 자식의 실제 경계를 검사한다.
 수평 창 버튼의 색상은 페이지 Header가 아닌 shell 탭 행을 기준으로 검사하고,
 밝은·어두운·유색 페이지로 바뀐 뒤에도 최소 아이콘 대비를 유지해야 한다.
+`YeeWindowsHorizontalActiveTabPaintJoinsHeader`는 Windows의 실제 선택 탭 아래쪽과
+본문 Header 위쪽을 비교한다. 일반·최대화와 밝은·어두운 창에서 탭 행과
+반대색인 Header 표면을 적용해 이음새의 합성 픽셀까지 검사한다. 탭 행 전체
+높이만 맞고 실제 탭 밑에 shell 바탕이 끼는 경우도 실패해야 한다. 같은 검사를 기본·RTL 125%·통합 탭바에서
+실행하며, 세로 Sidebar의 기존 창 버튼 조작 축은 유지한다.
 macOS에서는 분할 탭의 두 pane 활성화와 전체화면 진입·해제에서도 그룹 공통 배경의
 높이와 탭바 내부의 하단 여백을 확인한다. 컨테이너가 탭의 선호 높이보다 작아져도
 그룹 공통 배경이 경계에서 잘리지 않아야 한다. 선택적 캡처는 AppKit이 옮긴 전체화면

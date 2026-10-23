@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/ui/views/yee/yee_ui.h"
-
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -13,6 +11,7 @@
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
+#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/theme_resources.h"
 #include "chrome/test/base/test_theme_provider.h"
 #include "chrome/test/views/chrome_views_test_base.h"
@@ -574,6 +573,22 @@ TEST(YeeSurfaceGeometryTest, WindowControlsStayInsideTheRoundedHeader) {
             frame.right() - trailing.right());
   EXPECT_EQ(trailing.y(), leading.y());
   EXPECT_EQ(trailing.size(), leading.size());
+}
+
+TEST(YeeSurfaceGeometryTest, WindowControlsDoNotEnlargeHorizontalTabRow) {
+  const gfx::Rect frame(20, 30, 1100, 800);
+  for (int row_height : {41, 49}) {
+    for (bool leading : {false, true}) {
+      const gfx::Rect controls =
+          ResolveBrowserWindowControlsBounds(frame, 138, leading, row_height);
+      const gfx::Rect row(frame.x(), frame.y(), frame.width(), row_height);
+      EXPECT_TRUE(row.Contains(controls));
+      EXPECT_EQ(frame.y() + (row_height - kSidebarMetrics.toolbar_height) / 2,
+                controls.y());
+      EXPECT_EQ(kSidebarMetrics.toolbar_height, controls.height());
+      EXPECT_EQ(138, controls.width());
+    }
+  }
 }
 
 TEST(YeeSurfaceGeometryTest,

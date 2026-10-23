@@ -2549,7 +2549,7 @@ index ceb436c2d8..38828c0b8b 100644
  
    // Mirror for when caption buttons are on the "wrong" side.
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 5883589f63..389b79a0b8 100644
+index 5883589f63..07afa6495a 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 @@ -2,14 +2,13 @@
@@ -2787,7 +2787,7 @@ index 5883589f63..389b79a0b8 100644
    if (!frame_overlay_image.isNull()) {
      canvas->DrawImageInt(frame_overlay_image, 0, 0, frame_overlay_image.width(),
                           frame_overlay_image.height(), titlebar_rect.x(),
-@@ -880,21 +969,118 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+@@ -880,21 +969,119 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
    const gfx::Size preferred_size =
        caption_button_container_->GetPreferredSize();
  
@@ -2796,7 +2796,8 @@ index 5883589f63..389b79a0b8 100644
 +        caption_button_container_->GetVisible()
 +            ? yee::ResolveBrowserWindowControlsBounds(
 +                  GetLocalBounds(), preferred_size.width(),
-+                  CaptionButtonsOnLeadingEdge())
++                  CaptionButtonsOnLeadingEdge(),
++                  GetClientFrameElementInfo().tabstrip_preferred_height)
 +            : gfx::Rect());
 +    auto* const side_panel_surface =
 +        GetBrowserView()->GetViewByID(yee::kSidePanelSurfaceViewId);
@@ -9580,13 +9581,15 @@ index 219734679c..7afe3c2317 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..691b64dc47 100644
+index 243d80a02d..1ec7b5313b 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,321 @@
+@@ -2,83 +2,322 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
++#include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
++
 +#include <algorithm>
 +#include <array>
 +#include <cstdlib>
@@ -9650,7 +9653,7 @@ index 243d80a02d..691b64dc47 100644
 +#include "chrome/browser/ui/views/frame/contents_web_view.h"
  #include "chrome/browser/ui/views/frame/custom_corners_background.h"
  #include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
- #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
+-#include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  #include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 +#include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
@@ -9909,7 +9912,7 @@ index 243d80a02d..691b64dc47 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -95,9 +333,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -95,9 +334,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    auto ReplaceAndShowSidePanel(
        SidePanelType type,
@@ -9922,7 +9925,7 @@ index 243d80a02d..691b64dc47 100644
            // Note: there is a registry at browser level and one per tab; we want
            // the tab-specific one.
            auto* const registry =
-@@ -120,6 +359,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -120,6 +360,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                /*default_content_width_callback=*/base::NullCallback())));
            browser()->GetFeatures().side_panel_ui()->Show(
                SidePanelEntry::Id::kCustomizeChrome);
@@ -9934,7 +9937,7 @@ index 243d80a02d..691b64dc47 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -349,6 +593,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +594,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -9961,7 +9964,7 @@ index 243d80a02d..691b64dc47 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +630,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +631,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -10126,7 +10129,7 @@ index 243d80a02d..691b64dc47 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +995,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +996,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -10156,7 +10159,7 @@ index 243d80a02d..691b64dc47 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,142 +1045,3264 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,134 +1046,3367 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -10165,6 +10168,154 @@ index 243d80a02d..691b64dc47 100644
 -  kTouch,
 -  kImmersive,
 -};
++#if BUILDFLAG(IS_WIN)
++IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
++                       YeeWindowsHorizontalActiveTabPaintJoinsHeader) {
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const widget = view->GetWidget();
++  auto* const state = tabs::VerticalTabStripStateController::From(browser());
++  auto* const model = browser()->tab_strip_model();
++  auto* const theme =
++      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
++  const auto original_scheme = theme->GetBrowserColorScheme();
++  state->SetVerticalTabsEnabled(false);
++  auto* const source =
++      yee::BrowserSurfaceColorController::GetOrCreateForWebContents(
++          model->GetActiveWebContents());
++  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
++      view->GetBrowserViewLayoutForTesting());
++  const auto captures =
++      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
++          "yee-tabbar-capture-dir");
+ 
+-class BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest
+-    : public BrowserViewTabbedLayoutImplUiTest,
+-      public testing::WithParamInterface<TopContainerBackgroundTestMode> {
+- public:
+-  BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() = default;
+-  ~BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() override = default;
+-};
++  for (bool maximized : {false, true}) {
++    SCOPED_TRACE(maximized);
++    if (maximized) {
++      widget->Maximize();
++    } else if (widget->IsMaximized()) {
++      widget->Restore();
++    }
++    ASSERT_TRUE(base::test::RunUntil(
++        [&]() { return widget->IsMaximized() == maximized; }));
++    for (bool dark : {false, true}) {
++      SCOPED_TRACE(dark);
++      theme->SetBrowserColorScheme(
++          dark ? ThemeService::BrowserColorScheme::kDark
++               : ThemeService::BrowserColorScheme::kLight);
++      // 탭 행의 shell 바탕과 페이지 표면을 다르게 해서 얇은 틈도 드러낸다.
++      const SkColor surface =
++          dark ? SkColorSetRGB(242, 245, 250) : SkColorSetRGB(21, 24, 32);
++      source->SetPageSurfaceColorForTesting(surface);
++      RunScheduledLayouts();
++      // 모드 전환 뒤 새 collection의 실제 탭이 표시될 때까지 기다린다.
++      ASSERT_TRUE(base::test::RunUntil([&]() {
++        RunScheduledLayouts();
++        auto* active =
++            view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++        return active && active->IsDrawn() &&
++               !active->GetVisibleBounds().IsEmpty();
++      }));
++      auto* const tab =
++          view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++      ASSERT_TRUE(tab);
++      ASSERT_TRUE(tab->IsDrawn());
++      ASSERT_TRUE(layout->last_native_layout_for_testing());
++      const gfx::Rect tab_bounds = tab->GetBoundsInScreen();
++      const gfx::Rect header_bounds =
++          layout->last_native_layout_for_testing()->header_bounds +
++          view->GetBoundsInScreen().OffsetFromOrigin();
++      // region의 할당 높이가 아닌 실제 선택 탭의 아래쪽을 비교한다.
++      EXPECT_EQ(tab_bounds.bottom() -
++                    GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
++                header_bounds.y());
+ 
+-IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+-                       TopContainerBackground) {
+-  std::optional<ui::TouchUiController::TouchUiScoperForTesting> touch_ui_scoper;
+-  switch (GetParam()) {
+-    case TopContainerBackgroundTestMode::kTouch:
+-      touch_ui_scoper.emplace(true);
+-      break;
+-    case TopContainerBackgroundTestMode::kImmersive:
+-      ImmersiveModeController::From(browser())->SetEnabled(true);
+-      break;
+-    case TopContainerBackgroundTestMode::kDefault:
+-      break;
++      content::WaitForCopyableViewInFrame(
++          model->GetActiveWebContents()->GetPrimaryMainFrame());
++      auto* const compositor = widget->GetCompositor();
++      base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
++      auto request = std::make_unique<viz::CopyOutputRequest>(
++          viz::CopyOutputRequest::ResultFormat::RGBA,
++          viz::CopyOutputRequest::ResultDestination::kSystemMemory,
++          readback.GetCallback());
++      compositor->root_layer()->RequestCopyOfOutput(std::move(request));
++      compositor->ScheduleFullRedraw();
++      auto result = readback.Take();
++      ASSERT_TRUE(result);
++      ASSERT_FALSE(result->IsEmpty());
++      auto access = result->ScopedAccessSkBitmap();
++      const SkBitmap bitmap = access.GetOutScopedBitmap();
++      const gfx::Rect root_bounds = widget->GetRootView()->GetBoundsInScreen();
++      const int top = tab_bounds.bottom() - 2;
++      const int seam_width = std::max(1, tab_bounds.width() / 2);
++      const gfx::Rect seam_in_root(
++          tab_bounds.CenterPoint().x() - root_bounds.x() - seam_width / 2,
++          top - root_bounds.y(), seam_width, header_bounds.y() + 3 - top);
++      const gfx::Rect seam_pixels = gfx::ToEnclosingRect(gfx::ScaleRect(
++          gfx::RectF(seam_in_root), compositor->device_scale_factor()));
++      ASSERT_TRUE(
++          gfx::Rect(bitmap.width(), bitmap.height()).Contains(seam_pixels));
++      size_t different_pixels = 0;
++      for (int y = seam_pixels.y(); y < seam_pixels.bottom(); ++y) {
++        for (int x = seam_pixels.x(); x < seam_pixels.right(); ++x) {
++          if (bitmap.getColor(x, y) != surface) {
++            ++different_pixels;
++          }
++        }
++      }
++      EXPECT_EQ(0U, different_pixels)
++          << "선택 탭과 Header 사이에 다른 바탕이나 잘린 경계가 있음; tab="
++          << tab_bounds.ToString() << ", header=" << header_bounds.ToString();
++      if (!captures.empty()) {
++        CaptureYeeWindowFrame(widget,
++                              captures.AppendASCII(base::StringPrintf(
++                                  "seam-%s-%s.png", dark ? "dark" : "light",
++                                  maximized ? "maximized" : "restored")));
++      }
++    }
+   }
++  widget->Restore();
++  theme->SetBrowserColorScheme(original_scheme);
+   RunScheduledLayouts();
++}
++#endif
+ 
+-  auto* const top_container =
+-      BrowserView::GetBrowserViewForBrowser(browser())->top_container();
+-  auto* const background =
+-      top_container->background()->AsA<CustomCornersBackground>();
+-  ASSERT_NE(nullptr, background);
+-  CustomCornersBackground::ColorChoice expected;
+-  switch (GetParam()) {
+-    case TopContainerBackgroundTestMode::kDefault:
+-      expected = CustomCornersBackground::ToolbarTheme();
+-      break;
+-    case TopContainerBackgroundTestMode::kTouch:
+-    case TopContainerBackgroundTestMode::kImmersive:
+-#if BUILDFLAG(IS_CHROMEOS)
+-      // On ChromeOS in these modes, the top container contains the tabstrip, so
+-      // it must paint with the frame color.
+-      expected = ui::kColorFrameActive;
+-#else
+-      expected = CustomCornersBackground::ToolbarTheme();
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeHorizontalTabsPreserveRowsColorsAndTabIdentity) {
 +  auto* const state = tabs::VerticalTabStripStateController::From(browser());
@@ -10196,14 +10347,7 @@ index 243d80a02d..691b64dc47 100644
 +  RunScheduledLayouts();
 +  ASSERT_TRUE(yee::UsesHorizontalTabGroupCapsule(
 +      *view->tab_strip_view()->GetTabAnchorViewAt(1)));
- 
--class BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest
--    : public BrowserViewTabbedLayoutImplUiTest,
--      public testing::WithParamInterface<TopContainerBackgroundTestMode> {
-- public:
--  BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() = default;
--  ~BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() override = default;
--};
++
 +  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
 +      view->GetBrowserViewLayoutForTesting());
 +  ASSERT_TRUE(layout);
@@ -10212,7 +10356,8 @@ index 243d80a02d..691b64dc47 100644
 +      layout->last_native_layout_for_testing()->header_bounds;
 +#if BUILDFLAG(IS_WIN)
 +  gfx::Size full_header_window_size = view->GetWidget()->GetSize();
-+#endif
+ #endif
+-      break;
 +  const auto expect_rows = [&](bool has_panel) {
 +    RunScheduledLayouts();
 +    ASSERT_FALSE(view->ShouldDrawVerticalTabStrip());
@@ -10313,19 +10458,7 @@ index 243d80a02d..691b64dc47 100644
 +    }
 +  };
 +  expect_rows(false);
- 
--IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
--                       TopContainerBackground) {
--  std::optional<ui::TouchUiController::TouchUiScoperForTesting> touch_ui_scoper;
--  switch (GetParam()) {
--    case TopContainerBackgroundTestMode::kTouch:
--      touch_ui_scoper.emplace(true);
--      break;
--    case TopContainerBackgroundTestMode::kImmersive:
--      ImmersiveModeController::From(browser())->SetEnabled(true);
--      break;
--    case TopContainerBackgroundTestMode::kDefault:
--      break;
++
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -10476,7 +10609,9 @@ index 243d80a02d..691b64dc47 100644
 +      }
 +    }
    }
-   RunScheduledLayouts();
+-  EXPECT_EQ(expected, background->primary_color().color);
+-}
++  RunScheduledLayouts();
 +  // 뒤쪽 경계는 그룹 전체를 비활성 상태로 두고 확인한다.
 +  model->ActivateTabAt(0);
 +  RunScheduledLayouts();
@@ -10624,24 +10759,15 @@ index 243d80a02d..691b64dc47 100644
 +    RunScheduledLayouts();
 +    EXPECT_EQ(0, yee::GetTabGroupPreviewWidth(*group_header()));
  
--  auto* const top_container =
--      BrowserView::GetBrowserViewForBrowser(browser())->top_container();
--  auto* const background =
--      top_container->background()->AsA<CustomCornersBackground>();
--  ASSERT_NE(nullptr, background);
--  CustomCornersBackground::ColorChoice expected;
--  switch (GetParam()) {
--    case TopContainerBackgroundTestMode::kDefault:
--      expected = CustomCornersBackground::ToolbarTheme();
--      break;
--    case TopContainerBackgroundTestMode::kTouch:
--    case TopContainerBackgroundTestMode::kImmersive:
--#if BUILDFLAG(IS_CHROMEOS)
--      // On ChromeOS in these modes, the top container contains the tabstrip, so
--      // it must paint with the frame color.
--      expected = ui::kColorFrameActive;
--#else
--      expected = CustomCornersBackground::ToolbarTheme();
+-INSTANTIATE_TEST_SUITE_P(
+-    All,
+-    BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+-    testing::Values(TopContainerBackgroundTestMode::kDefault,
+-                    TopContainerBackgroundTestMode::kTouch
+-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+-                    ,
+-                    TopContainerBackgroundTestMode::kImmersive
+-#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
 +    // 같은 그룹을 긴 이름·빈 이름·짧은 이름으로 바꾼다. 제목의 선호 크기나
 +    // tooltip만 보지 않고 실제 할당된 배치를 검사한다.
 +    const gfx::Rect original_bounds =
@@ -10697,21 +10823,7 @@ index 243d80a02d..691b64dc47 100644
 +            EXPECT_LT(view->GetWidget()->GetSize().width(),
 +                      original_bounds.width());
 +          }
- #endif
--      break;
--  }
--  EXPECT_EQ(expected, background->primary_color().color);
--}
--
--INSTANTIATE_TEST_SUITE_P(
--    All,
--    BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
--    testing::Values(TopContainerBackgroundTestMode::kDefault,
--                    TopContainerBackgroundTestMode::kTouch
--#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
--                    ,
--                    TopContainerBackgroundTestMode::kImmersive
--#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
++#endif
 +          auto* const header = group_header();
 +          if (!header && !capture_directory.empty()) {
 +            CaptureYeeWindowFrame(
@@ -11047,6 +11159,7 @@ index 243d80a02d..691b64dc47 100644
 -                                        SidePanel::kOpenAnimationCompletedEvent)
 -                               .SetMustBeVisibleAtStart(false))),
 -        Do([this]() { RunScheduledLayouts(); }));
+-  }
 +  // 실제 보이는 전환 버튼이 수평 모드에서 접기 명령을 실행하지 않는다.
 +  // 실제 탭 포커스를 유지한 채 hierarchy를 정리한다. 늦은 blur가 정리된
 +  // collection node에 hover card 갱신을 요청하면 안 된다.
@@ -11080,7 +11193,15 @@ index 243d80a02d..691b64dc47 100644
 +  state->SetVerticalTabsEnabled(false);
 +  expect_rows(false);
 +  expect_colors();
-+
+ 
+-  auto ClearResizeCounts() {
+-    return Do([this]() {
+-      const auto& container_views = GetContentsContainers();
+-      for (ContentsContainerView* container : container_views) {
+-        auto* contents = container->contents_view();
+-        auto& data = resize_data_[contents];
+-        data.last_size = contents->size();
+-        data.count = 0U;
 +#if BUILDFLAG(IS_MAC)
 +  PrefService* const pref_service = browser()->GetProfile()->GetPrefs();
 +  const bool always_show =
@@ -11097,7 +11218,8 @@ index 243d80a02d..691b64dc47 100644
 +      if (host->IsDrawn() && !host->GetLocalBounds().IsEmpty() &&
 +          std::ranges::find(widgets, host->GetWidget()) == widgets.end()) {
 +        widgets.push_back(host->GetWidget());
-+      }
+       }
+-    });
 +    }
 +    for (auto* widget : widgets) {
 +      auto* const compositor = widget->GetCompositor();
@@ -11209,7 +11331,7 @@ index 243d80a02d..691b64dc47 100644
 +        view->tab_strip_view()->GetBoundsInScreen().Intersects(toolbar));
 +    EXPECT_GE(view->side_panel()->GetBoundsInScreen().y(), toolbar.bottom());
 +    EXPECT_EQ(active_handle, model->GetActiveTab()->GetHandle());
-   }
++  }
 +  if (!capture_directory.empty()) {
 +    // 두 캡처는 별도 native 호스트의 자료다. 앞의 직접 View paint는 각 호스트의
 +    // 로컬 정책을 증명하며 최종 합성 접합부까지 증명하지는 않는다.
@@ -11218,7 +11340,7 @@ index 243d80a02d..691b64dc47 100644
 +    CaptureYeeCompositorFrame(
 +        immersive_header->GetWidget(),
 +        capture_directory.AppendASCII("fullscreen-header-join-header.png"));
-+  }
+   }
 +  ui_test_utils::ToggleFullscreenModeAndWait(browser());
 +  native_fullscreen.WaitForEnterAndExitCount(1, 1);
 +  ASSERT_NO_FATAL_FAILURE(wait_for_header_frames());
@@ -11233,14 +11355,21 @@ index 243d80a02d..691b64dc47 100644
 +  expect_rows(false);
 +#endif
  
--  auto ClearResizeCounts() {
--    return Do([this]() {
--      const auto& container_views = GetContentsContainers();
--      for (ContentsContainerView* container : container_views) {
--        auto* contents = container->contents_view();
--        auto& data = resize_data_[contents];
--        data.last_size = contents->size();
--        data.count = 0U;
+-  template <typename... Args>
+-  auto CheckResizeCounts(Args&&... args) {
+-    return CheckResult(
+-               [this]() {
+-                 const auto& container_views = GetContentsContainers();
+-                 std::vector<size_t> counts;
+-                 for (ContentsContainerView* container : container_views) {
+-                   counts.push_back(
+-                       resize_data_[container->contents_view()].count);
+-                 }
+-                 return counts;
+-               },
+-               testing::ElementsAre(
+-                   testing::Matcher<size_t>(std::forward<Args>(args))...))
+-        .SetDescription("CheckResizeCounts()");
 +  chrome::NewSplitTab(browser(), split_tabs::SplitTabLayout::kSideBySide,
 +                      split_tabs::SplitTabCreatedSource::kToolbarButton);
 +  RunScheduledLayouts();
@@ -11288,8 +11417,7 @@ index 243d80a02d..691b64dc47 100644
 +          EXPECT_TRUE(
 +              paint.contains(icon_center.x() + dx, icon_center.y() + dy));
 +        }
-       }
--    });
++      }
 +      const auto colors = styling->CalculateTargetColors();
 +      EXPECT_GE(color_utils::GetContrastRatio(colors.foreground_color,
 +                                              colors.background_color),
@@ -11328,7 +11456,7 @@ index 243d80a02d..691b64dc47 100644
 +    EXPECT_GT(SkColorGetA(panel_paint.getColor(0, panel_paint.height() / 2)),
 +              0u);
 +    RunTestSequence(CloseSidePanel());
-   }
++  }
 +  browser()->GetProfile()->GetPrefs()->SetBoolean(
 +      prefs::kSidePanelHorizontalAlignment, panel_was_right_aligned);
 +  const gfx::Rect split_window = view->GetWidget()->GetWindowBoundsInScreen();
@@ -11339,22 +11467,7 @@ index 243d80a02d..691b64dc47 100644
 +  expect_split_capsules();
 +  view->GetWidget()->SetBounds(split_window);
 +  RunScheduledLayouts();
- 
--  template <typename... Args>
--  auto CheckResizeCounts(Args&&... args) {
--    return CheckResult(
--               [this]() {
--                 const auto& container_views = GetContentsContainers();
--                 std::vector<size_t> counts;
--                 for (ContentsContainerView* container : container_views) {
--                   counts.push_back(
--                       resize_data_[container->contents_view()].count);
--                 }
--                 return counts;
--               },
--               testing::ElementsAre(
--                   testing::Matcher<size_t>(std::forward<Args>(args))...))
--        .SetDescription("CheckResizeCounts()");
++
 +  if (!split_capture_directory.empty()) {
 +    auto* const theme =
 +        ThemeServiceFactory::GetForProfile(browser()->GetProfile());
@@ -11442,14 +11555,8 @@ index 243d80a02d..691b64dc47 100644
 +    theme->SetBrowserColorScheme(scheme);
 +    model->ActivateTabAt(split_indices.back());
 +    RunScheduledLayouts();
-   }
- 
--  auto ToggleVerticalTabStripCollapsed(bool should_be_collapsed) {
--    auto steps = Steps(
--        PressButton(kVerticalTabStripCollapseButtonElementId),
--        WaitForEvent(kTabStripRegionElementId,
--                     VerticalTabStripRegionView::kAnimationCompletedEvent),
--        Do([this]() { RunScheduledLayouts(); }),
++  }
++
 +#if BUILDFLAG(IS_MAC)
 +  // immersive 재부모화와 분할 rehosting을 함께 검사한다.
 +  // 이전에는 두 전환을 각각 확인했다.
@@ -13525,18 +13632,10 @@ index 243d80a02d..691b64dc47 100644
 +               testing::ElementsAre(
 +                   testing::Matcher<size_t>(std::forward<Args>(args))...))
 +        .SetDescription("CheckResizeCounts()");
-+  }
-+
-+  auto ToggleVerticalTabStripCollapsed(bool should_be_collapsed) {
-+    auto steps = Steps(
-+        PressButton(kVerticalTabStripCollapseButtonElementId),
-+        WaitForEvent(kTabStripRegionElementId,
-+                     VerticalTabStripRegionView::kAnimationCompletedEvent),
-+        Do([this]() { RunScheduledLayouts(); }),
-         CheckView(
-             kTabStripRegionElementId,
-             [](VerticalTabStripRegionView* region) {
-@@ -790,6 +4328,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+   }
+ 
+   auto ToggleVerticalTabStripCollapsed(bool should_be_collapsed) {
+@@ -790,6 +4440,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
          Do([this]() { RunScheduledLayouts(); }));
    }
  
@@ -13584,7 +13683,7 @@ index 243d80a02d..691b64dc47 100644
   private:
    const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
    GetContentsContainers() {
-@@ -819,6 +4398,716 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+@@ -819,6 +4510,716 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
        observation_{this};
  };
  
@@ -14301,7 +14400,7 @@ index 243d80a02d..691b64dc47 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -871,10 +5160,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +5272,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15260,7 +15359,7 @@ index 243d80a02d..691b64dc47 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +6119,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +6231,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15278,7 +15377,7 @@ index 243d80a02d..691b64dc47 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +6183,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +6295,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15296,7 +15395,7 @@ index 243d80a02d..691b64dc47 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +6203,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +6315,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -30171,7 +30270,7 @@ index a19395e462..9b4db83861 100644
    navigation.timestamp_ = entry->GetTimestamp();
    navigation.is_restored_ = entry->IsRestored();
 diff --git a/content/browser/child_process_launcher_helper.cc b/content/browser/child_process_launcher_helper.cc
-index 34a9ba1470..57f47c2728 100644
+index 34a9ba1470..32b2335137 100644
 --- a/content/browser/child_process_launcher_helper.cc
 +++ b/content/browser/child_process_launcher_helper.cc
 @@ -47,6 +47,18 @@
@@ -30193,15 +30292,16 @@ index 34a9ba1470..57f47c2728 100644
  namespace internal {
  
  namespace {
-@@ -343,6 +355,21 @@ void ChildProcessLauncherHelper::LaunchOnLauncherThread() {
+@@ -343,6 +355,27 @@ void ChildProcessLauncherHelper::LaunchOnLauncherThread() {
    PassPseudonymizationSaltSharedMemoryHandle(*command_line(), options_ptr,
                                               files_to_register.get());
  
 +  if (SharedMemoryProvider()) {
-+    shared_memory_regions_ = SharedMemoryProvider().Run(*command_line());
-+    for (auto& memory : shared_memory_regions_) {
-+      if (!memory.region.IsValid())
++    auto regions = SharedMemoryProvider().Run(*command_line());
++    for (auto& memory : regions) {
++      if (!memory.region.IsValid()) {
 +        continue;
++      }
 +      base::shared_memory::SharedMemorySwitch memory_switch(
 +          memory.switch_name, memory.rendezvous_key, memory.descriptor_key,
 +          memory.maximum_region_size);
@@ -30210,13 +30310,29 @@ index 34a9ba1470..57f47c2728 100644
 +      TransferSharedMemorySwitchDescriptor(memory_switch,
 +                                           files_to_register.get());
 +    }
++#if BUILDFLAG(IS_WIN)
++    // Windows launch는 원본 HANDLE을 빌리므로 비동기 생성까지 살아 있어야 한다.
++    // 다른 플랫폼은 AddToLaunchParameters가 복제한 핸들을 launch에 이전한다.
++    shared_memory_regions_ = std::move(regions);
++#endif
 +  }
 +
    auto track = GetChildProcessTracingTrack(child_process_id());
    command_line_->AppendSwitchASCII(switches::kTraceProcessTrackUuid,
                                     base::NumberToString(track.uuid));
+@@ -385,8 +418,9 @@ void ChildProcessLauncherHelper::PostLaunchOnLauncherThread(
+ #else
+   const bool launch_elevated = false;
+ #endif
+-  if (mojo_channel_)
++  if (mojo_channel_) {
+     mojo_channel_->RemoteProcessLaunchAttempted();
++  }
+ 
+   if (process.process.IsValid()) {
+     RecordHistogramsOnLauncherThread(base::TimeTicks::Now() -
 diff --git a/content/browser/child_process_launcher_helper.h b/content/browser/child_process_launcher_helper.h
-index 2115126485..0ffb5dc9da 100644
+index 2115126485..a76bd41b62 100644
 --- a/content/browser/child_process_launcher_helper.h
 +++ b/content/browser/child_process_launcher_helper.h
 @@ -7,6 +7,7 @@
@@ -30227,12 +30343,23 @@ index 2115126485..0ffb5dc9da 100644
  
  #include "base/memory/raw_ptr.h"
  #include "base/memory/read_only_shared_memory_region.h"
-@@ -368,6 +369,9 @@ class ChildProcessLauncherHelper
+@@ -60,7 +61,7 @@ class CommandLine;
+ class MachPortRendezvousServerIOS;
+ class ScopedTempDir;
+ #endif
+-}
++}  // namespace base
+ 
+ namespace content {
+ 
+@@ -368,6 +369,11 @@ class ChildProcessLauncherHelper
    std::optional<int> exit_code_;
  #endif
  
-+  // 비동기 자식 프로세스 생성이 끝날 때까지 provider 핸들을 보유한다.
++#if BUILDFLAG(IS_WIN)
++  // Windows 비동기 launch가 빌린 원본 provider 핸들의 수명을 보존한다.
 +  std::vector<ChildProcessSharedMemoryRegion> shared_memory_regions_;
++#endif
 +
    // Histogram shared memory region. Ownership of the memory region object is
    // shared with the process host which runs, and is destroyed, asynchronously.

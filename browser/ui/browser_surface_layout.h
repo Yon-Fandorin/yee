@@ -34,10 +34,13 @@ gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
                                              int content_leading_inset,
                                              int horizontal_tab_strip_advance);
 
-// 창 버튼을 기존 Header의 조작 축에 맞추고 카드의 곡률 안쪽에 배치한다.
-gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
-                                             int controls_width,
-                                             bool leading);
+// 수평 탭이 있으면 native 행 높이에 맞추고, 없으면 기존 Header의 조작 축을
+// 사용한다. 창 버튼이 탭 행을 늘리거나 카드의 곡률을 덮지 않게 한다.
+gfx::Rect ResolveBrowserWindowControlsBounds(
+    const gfx::Rect& frame_bounds,
+    int controls_width,
+    bool leading,
+    int horizontal_tab_strip_height = 0);
 
 // native 클릭 범위 안에서 hover/누름 배경만 공통 shell 조작 크기로 맞춘다.
 gfx::Rect ResolveBrowserWindowControlHighlightBounds(gfx::Rect button_bounds);
