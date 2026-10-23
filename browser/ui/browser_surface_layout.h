@@ -34,6 +34,18 @@ gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
                                              int content_leading_inset,
                                              int horizontal_tab_strip_advance);
 
+// 창 버튼을 기존 Header의 조작 축에 맞추고 카드의 곡률 안쪽에 배치한다.
+gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
+                                             int controls_width,
+                                             bool leading);
+
+// native 클릭 범위 안에서 hover/누름 배경만 공통 shell 조작 크기로 맞춘다.
+gfx::Rect ResolveBrowserWindowControlHighlightBounds(gfx::Rect button_bounds);
+
+// 같은 행에 겹치는 창 버튼 영역만 Header 조작의 가로 배치에서 제외한다.
+gfx::Rect ExcludeBrowserWindowControls(gfx::Rect header_bounds,
+                                       const gfx::Rect& controls_bounds);
+
 struct BrowserSurfaceSeedInput {
   gfx::Rect content_column_bounds;
   gfx::Insets surface_insets;

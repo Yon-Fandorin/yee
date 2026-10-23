@@ -193,7 +193,7 @@ Windows 개발 실행 파일은 `out\YeePilot\chrome.exe`, 설치 프로그램�
 기존 Chromium 실행 파일을 `run.ps1`로 실행해 기본 동작을 확인할 수도 있다.
 제품 이름과 아이콘을 반영하려면 소스에서 빌드해야 한다. 남은 이름·자산·OS 식별자는
 [브랜딩 적용 범위](../../docs/branding-coverage.md)를 확인한다.
-이 macOS 작업 환경에서는 Windows PowerShell 실행과 빌드를 검증하지 않았다.
+Windows 검증은 실제 Windows 환경에서 릴리즈 빌드와 브라우저·렌더러 smoke 및 native UI gate를 실행한다.
 
 ## 변경 후 테스트
 
@@ -206,6 +206,13 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
+
+Windows의 native UI 픽셀 검사는 `--enable-pixel-output-in-tests`를 사용한다.
+UIA 클라이언트가 연결된 세션에서 창 종료 후 접근성 COM 참조가 간헐적으로 남으면
+테스트 실행에 `--enable-features=UiaDisconnectRootProviders`를 추가한다. 이 옵션은
+UIA provider와 누수 검사를 유지하면서 native 창 종료 시 참조를 정리한다.
+통합 탭바 검사에서는 같은 기능 목록에 `TabStripUnification`도 포함한다.
+이 테스트 환경 옵션을 제품 실행 인수나 공통 빌드 기본값에 넣지 않는다.
 
 계산·색상·직접 callback 검사는 창 활성화를 피한다. native popup·focus 단위 검사와
 명시적 `interactive` 검사는 필요한 창 활성화를 유지한다. Sidebar는 Header의 주소줄

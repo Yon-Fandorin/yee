@@ -10,6 +10,7 @@
 #include "base/i18n/rtl.h"
 #include "base/test/bind.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -119,6 +120,14 @@ TEST_F(SidePanelResizeGutterViewTest, KeyboardDelegatesAndMarkerSharesMetrics) {
   views::test::RunScheduledLayout(root);
   ASSERT_EQ(1u, gutter->children().size());
   views::View* const marker = gutter->children().front();
+#if BUILDFLAG(IS_WIN)
+  // ShowInactive도 현재 커서 아래에 열리면 hover를 받는다. 기본 상태 검사는
+  // 시스템 커서를 움직이지 않고 명시적인 mouse exit에서 시작한다.
+  const gfx::Point outside(gutter->width() + 1, 0);
+  ui::MouseEvent initial_exit(ui::EventType::kMouseExited, outside, outside,
+                              ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE);
+  gutter->OnMouseExited(initial_exit);
+#endif
   ASSERT_TRUE(gutter->background());
   const auto resting_alpha = [&]() {
     gfx::Canvas canvas(gutter->size(), 1.f, false);

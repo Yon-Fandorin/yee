@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>yee — Browser shell pilot</title>
-    <link rel="stylesheet" href="styles.css?v=39" />
+    <link rel="stylesheet" href="styles.css?v=43" />
   </head>
   <body>
     <div class="browser-shell" data-ui="browser-shell" data-titlebar-density="regular" data-tenant-shape="offset" data-sidebar-state="open">
       <header class="titlebar" data-region="titlebar">
         <div class="window-controls" aria-label="창 제어">
-          <button class="window-control close" type="button" aria-label="창 닫기"></button>
-          <button class="window-control minimize" type="button" aria-label="창 최소화"></button>
-          <button class="window-control maximize" type="button" aria-label="창 확대"></button>
+          <button class="window-control close" type="button" aria-label="창 닫기"><span class="window-control-surface" aria-hidden="true"></span></button>
+          <button class="window-control minimize" type="button" aria-label="창 최소화"><span class="window-control-surface" aria-hidden="true"></span></button>
+          <button class="window-control maximize" type="button" aria-label="창 확대"><span class="window-control-surface" aria-hidden="true"></span></button>
         </div>
 
         <div class="launcher-shelf" aria-label="Yee Command Runway">
@@ -448,6 +448,6 @@
       </div>
       <div class="demo-toast" role="status" aria-live="polite" data-region="demo-toast" hidden></div>
     </div>
-    <script type="module" src="app.js?v=23"></script>
+    <script type="module" src="app.js?v=25"></script>
   </body>
 </html>

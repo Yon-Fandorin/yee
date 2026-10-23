@@ -12,7 +12,7 @@ Tab Sidebar에서 이미 고른 UX 결정은
 ## 1. 제품 원칙
 
 1. OS는 창 프레임을 소유하고 Yee는 제품 UI를 소유한다.
-2. OS별 차이는 Title bar 재질, Caption controls, 단축키 표기에 한정한다.
+2. OS별 차이는 native Title bar의 예약 높이와 재질, Caption controls, 단축키 표기에 한정한다.
 3. Sidebar의 폭, 정보 구조, 행 높이, 간격과 선택 상태는 모든 OS에서 같다.
 4. Sidebar와 Browser Surface 바깥 gutter는 하나의 연속된 chrome 면이다.
 5. 일반 한 탭에서는 Browser Toolbar와 실제 웹 페이지가 하나의 외곽 Browser
@@ -115,8 +115,14 @@ content_top = titlebar_height
 toolbar_content_separator = 1 DIP
 ```
 
-현재 native checkpoint는 모든 OS에서 48 DIP Title Bar, 40 DIP Browser Toolbar,
-34 DIP Omnibox를 사용한다. 상단 gutter와 Omnibox 사이에는 4 DIP가 남으므로 hover나
+현재 native checkpoint의 공통 shell 행은 48 DIP이고, 40 DIP Browser Toolbar와
+34 DIP Omnibox를 사용한다. Windows 창 버튼은 같은 Header 오른쪽에 통합하며,
+별도 Caption 행을 추가하지 않는다. 공통 좌표는 client 원점 기준이다.
+Windows 창 버튼의 클릭 범위와 glyph 위치는 native frame이 유지한다.
+hover·누름 배경만 다른 shell 조작과 같은 30 × 30 DIP, 반지름 8 DIP로
+중앙에 그려 Header와 버튼 사이에 여백을 둔다. 강제 고대비에서는 native
+색상과 배경 범위를 유지한다.
+상단 gutter와 Omnibox 사이에는 4 DIP가 남으므로 hover나
 focus 상태도 Browser Surface 외곽을 침범하지 않는다. 이 값은 Chromium layout에
 복제하지 않고 `yee::kSidebarMetrics`의 한 계산 계약을 사용한다.
 
@@ -251,9 +257,17 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 
 ### Windows
 
-- Title bar: 48 DIP
-- Caption controls: 오른쪽, native 순서 Minimize → Maximize → Close
-- 각 caption button: 46 DIP 폭, Windows snap layout과 resize hit test 보존
+- Sidebar Header와 Browser Surface Header는 기존 48 DIP 공통 shell 행을 유지한다.
+  native 창 버튼은 Browser Surface Header 오른쪽에 통합하고 추가 행을 예약하지 않는다.
+- 카드의 12 DIP 곡률·6 DIP gutter와 34 DIP Omnibox는 유지한다. 창 버튼은
+  40 DIP Toolbar와 같은 축에 놓고 카드 오른쪽 안쪽으로 8 DIP 여백을 둔다.
+- 창 버튼 폭과 이동용 여백은 native frame exclusion으로 주소줄·확장 버튼과
+  분할 Pane Header에 전달한다. 카드와 WebContents 전체 폭을 줄이지 않는다.
+- Caption controls: native 순서 Minimize → Maximize → Close, 각 46 DIP 폭.
+  투명한 기본 바탕과 8 DIP 곡률의 hover 표면을 쓰고 실제 Header 팔레트를 따른다.
+  고대비·강제 색 모드는 native 색상과 상태 표시를 사용한다.
+- 최대화·복원 시에도 같은 행을 유지하고 전체 화면에서는 창 버튼과 exclusion을 숨긴다.
+  Windows snap layout과 resize hit test는 native container가 계속 소유한다.
 - Omnibox: 34 DIP 높이, 12 DIP radius
 - 단축키: `Ctrl K`, `Ctrl T`
 
