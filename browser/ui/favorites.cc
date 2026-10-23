@@ -14,6 +14,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/path_effect.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -301,12 +302,11 @@ gfx::Rect TabDragPreviewBoundsInTabStrip(
   gfx::Rect bounds = views::View::ConvertRectFromScreen(
       &tab_strip,
       FavoritesDraggedTileInScreen(pointer_in_screen, grab_offset, row_size));
-  // `SetBoundsRect()` consumes physical coordinates, so mirror the logical
-  // leading inset explicitly instead of relying on a LayoutManager to do it.
-  bounds.set_x(base::i18n::IsRTL()
-                   ? tab_strip.width() - pad - tab_leading_inset -
-                         row_size.width()
-                   : pad + tab_leading_inset);
+  // 드롭 판정에 쓸 물리 좌표이므로 leading 여백을 여기서 반영한다.
+  // Windows preview는 실제 Views 배치 경계에서 논리 bounds로 변환한다.
+  bounds.set_x(base::i18n::IsRTL() ? tab_strip.width() - pad -
+                                         tab_leading_inset - row_size.width()
+                                   : pad + tab_leading_inset);
   bounds.set_width(row_size.width());
   bounds.set_height(row_size.height());
   bounds.AdjustToFit(tab_strip.GetLocalBounds());
@@ -831,7 +831,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
               const gfx::Size& source_tile_size) {
     const bool was_over_favorites = over_favorites_;
     const bool had_preview_bounds = has_preview_bounds_;
-    const gfx::Rect previous_bounds = bounds();
+    const gfx::Rect previous_bounds = BoundsInTabStrip();
     over_favorites_ = over_favorites;
     icon_->SetImage(favicon);
     title_->SetTitle(title);
@@ -884,7 +884,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
       tab_target_bounds_ = bounds;
     }
     if (over_favorites_) {
-      SetBoundsRect(bounds);
+      ApplyBoundsInTabStrip(bounds);
     } else {
       if (was_over_favorites && had_preview_bounds) {
         StartRegionTransition(previous_bounds, bounds);
@@ -986,6 +986,24 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   }
 
  private:
+  gfx::Rect BoundsInTabStrip() const {
+#if BUILDFLAG(IS_WIN)
+    return parent() ? parent()->GetMirroredRect(bounds()) : bounds();
+#else
+    return bounds();
+#endif
+  }
+
+  void ApplyBoundsInTabStrip(const gfx::Rect& bounds_in_tab_strip) {
+#if BUILDFLAG(IS_WIN)
+    // 드롭 판정과 애니메이션은 물리 좌표를 쓴다. Windows Views에 배치할
+    // 때만 논리 bounds로 바꿔 RTL 반전이 중복되지 않게 한다.
+    SetBoundsRect(parent()->GetMirroredRect(bounds_in_tab_strip));
+#else
+    SetBoundsRect(bounds_in_tab_strip);
+#endif
+  }
+
   double CurrentGroupIndent() const {
     if (!group_indent_animation_.is_animating()) {
       return group_indent_target_;
@@ -1036,14 +1054,13 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
     gfx::Rect bounds = *tab_target_bounds_;
     const int current = base::ClampRound(CurrentGroupIndent());
     const int remaining = group_indent_target_ - current;
-    // Animate in logical coordinates. The preview is positioned directly, not
-    // by a mirroring LayoutManager: LTR moves the left edge while RTL keeps the
-    // left edge fixed and moves the right edge.
+    // 물리 좌표의 leading 여백을 보간한다. LTR은 왼쪽 변을 이동하고,
+    // RTL은 왼쪽 변을 유지하면서 오른쪽 변을 이동한다.
     if (!base::i18n::IsRTL()) {
       bounds.Offset(-remaining, 0);
     }
     bounds.set_width(std::max(0, bounds.width() + remaining));
-    SetBoundsRect(bounds);
+    ApplyBoundsInTabStrip(bounds);
   }
 
   void StartRegionTransition(const gfx::Rect& start_bounds,
@@ -1084,7 +1101,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
       bounds.set_width(gfx::Tween::IntValueBetween(
           value, region_transition_start_width_, bounds.width()));
     }
-    SetBoundsRect(bounds);
+    ApplyBoundsInTabStrip(bounds);
   }
 
   void StopWithoutApplying(gfx::SlideAnimation& animation) {

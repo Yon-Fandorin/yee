@@ -208,3 +208,26 @@ RTL·125%와 unified strip에서도 같은 사례를 사용한다.
 펼친 그룹의 공통 배경도 같은 owner가 그린다. native Header의 입력·접근성과
 allocation은 유지한다. Header clip도 native가 계산한 현재 paint allowance를
 명시적으로 받고 이전 clip의 형태로 geometry를 추론하지 않는다.
+
+앞의 Group 시각 검사는 모델 명령으로 만든 상태를 확인하므로 실제 드래그의
+편입·해제 성공을 대신하지 않는다. `horizontal`과 `interactive` 게이트는 native
+`DetachToBrowserTabDragControllerTest`의 양방향 편입, 그룹 밖 이동, 취소 복원,
+그룹 헤더 이동과 접힌 그룹 경계를 함께 실행한다. legacy 수평 fixture는 프로필의
+기본 탭 배치와 관계없이 수평 모드로 진입한다.
+`YeeGroupMembershipDragSurvivesLayoutSwitch`는 세로→가로 전환 후 일반 창과
+최대화 창에서 분할 드래그 설정을 켠 채 두 그룹 멤버 사이로 편입하고 다시
+그룹 밖으로 뺀다. 실제 포인터 입력 후 탭 identity·순서·활성 탭·멤버 수와
+원래 멤버의 그룹 보존을 검증한다. 첫 멤버의 이전 중앙은 native lean 판정상
+그룹 앞의 재정렬 슬롯이 될 수 있으므로 내부 편입 지점과 혼동하지 않는다.
+`--yee-group-marker-capture-dir`를 주면 편입·해제 후 실제 창도 저장한다.
+`interactive`에는 세로 그룹의 편입·내부 정렬·해제·접기·헤더 드래그와
+Favorites 경계 및 취소 사례도 포함한다.
+RTL의 방향 이동 사례는 논리적인 앞·뒤를 화면 좌표로 반전하여 실행한다.
+`PreviewScreenBoundsMatchRowsInLtrAndRtl`는 Windows에서 그룹 들여쓰기별 실제
+행과 드래그 미리보기의 화면 좌표를 비교한다. 미리보기의 물리 좌표는 배치
+직전에만 Views의 논리 bounds로 바꾸며, 드롭 판정과 전환 애니메이션의 좌표
+계약 및 Mac·Linux 경로는 유지한다.
+Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single-process-tests`
+모드와 `--test-launcher-preserve-desktop-windows` 옵션으로 실행한다. 첫 옵션은
+주변 창을 정리하는 테스트 런처 단계를 건너뛰며, 두 번째는 포커스 전환 실패 때
+다른 앱을 닫는 복구 대신 검사를 실패시킨다.

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/i18n/rtl.h"
+#include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
@@ -319,6 +320,38 @@ TEST_F(FavoritesDragGeometryTest, RealPreviewUsesTheSharedTabGeometry) {
   EXPECT_FALSE(preview->GetVisible());
 }
 
+#if BUILDFLAG(IS_WIN)
+TEST_F(FavoritesDragGeometryTest, PreviewScreenBoundsMatchRowsInLtrAndRtl) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  auto* const row = tab_strip().AddChildView(std::make_unique<views::View>());
+  const int pad = kSidebarMetrics.tab_strip_horizontal_padding;
+  for (bool rtl : {false, true}) {
+    base::i18n::SetRTLForTesting(rtl);
+    for (int inset : {0, 10, 16}) {
+      SCOPED_TRACE(::testing::Message() << "rtl=" << rtl << " inset=" << inset);
+      row->SetBounds(pad + inset, 100, tab_strip().width() - 2 * pad - inset,
+                     kSidebarMetrics.tab_row_height);
+      const gfx::Point pointer = row->GetBoundsInScreen().CenterPoint();
+      ShowFavoritesDragPreview(
+          tab_strip(), pointer, /*over_favorites=*/false, inset,
+          /*favorites_target_item_count=*/0, ui::ImageModel(), u"Preview",
+          /*grab_offset=*/gfx::Vector2d(20, 8),
+          /*source_tile_size=*/gfx::Size(80, 32));
+      auto* const preview =
+          tab_strip().GetViewByID(kSidebarFavoritesDragPreviewViewId);
+      ASSERT_TRUE(preview && preview->GetVisible());
+      EXPECT_EQ(row->GetBoundsInScreen().x(), preview->GetBoundsInScreen().x());
+      EXPECT_EQ(row->width(), preview->width());
+      const gfx::Rect physical_target = TabDragPreviewBoundsInTabStrip(
+          tab_strip(), pointer, inset, gfx::Vector2d(20, 8), gfx::Size(80, 32));
+      EXPECT_EQ(physical_target, preview->GetMirroredBounds());
+      HideFavoritesDragPreview(tab_strip());
+    }
+  }
+}
+#endif  // BUILDFLAG(IS_WIN)
+
 TEST_F(FavoritesDragGeometryTest,
        ReducedMotionRetargetsPreviewImmediatelyInLtrAndRtl) {
   auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
@@ -342,7 +375,12 @@ TEST_F(FavoritesDragGeometryTest,
     views::View* preview =
         tab_strip().GetViewByID(kSidebarFavoritesDragPreviewViewId);
     ASSERT_NE(preview, nullptr);
-    EXPECT_EQ(preview->bounds(),
+#if BUILDFLAG(IS_WIN)
+    const gfx::Rect preview_bounds = preview->GetMirroredBounds();
+#else
+    const gfx::Rect preview_bounds = preview->bounds();
+#endif
+    EXPECT_EQ(preview_bounds,
               TabDragPreviewBoundsInTabStrip(
                   tab_strip(), pointer_in_screen, /*tab_leading_inset=*/16,
                   /*source_grab_offset=*/gfx::Vector2d(20, 8),
