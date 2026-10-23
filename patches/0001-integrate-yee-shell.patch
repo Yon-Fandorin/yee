@@ -4352,7 +4352,7 @@ index 3dd6c5cf30..48be59fc32 100644
    bool is_highlighted_ = false;
    base::ScopedObservation<views::View, views::ViewObserver>
 diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
-index 6c1080488d..deecbcfedf 100644
+index 6c1080488d..52c7dd8de7 100644
 --- a/chrome/browser/ui/views/frame/contents_container_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_container_view.cc
 @@ -4,6 +4,7 @@
@@ -4953,7 +4953,7 @@ index 6c1080488d..deecbcfedf 100644
    }
  
    if (glic_border_) {
-@@ -322,6 +680,26 @@ void ContentsContainerView::ChildVisibilityChanged(View* child) {
+@@ -322,7 +680,41 @@ void ContentsContainerView::ChildVisibilityChanged(View* child) {
  void ContentsContainerView::Layout(PassKey pass_key) {
    LayoutSuperclass<views::View>(this);
  
@@ -4978,9 +4978,24 @@ index 6c1080488d..deecbcfedf 100644
 +    }
 +  }
    UpdateContentsClip();
++#if BUILDFLAG(IS_WIN)
++  if (uses_yee_browser_surface_geometry_) {
++    // viewport 부모 레이어의 최종 위치가 정해진 뒤 Aura native layer도 같은
++    // 좌표계로 갱신한다. 크기가 같아도 가로·세로 탭 전환은 원점을 바꾼다.
++    for (views::WebView* web_view :
++         {static_cast<views::WebView*>(contents_view_.get()),
++          devtools_web_view_.get()}) {
++      if (web_view->IsDrawn() && web_view->holder()->native_view() &&
++          web_view->holder()->layer_managed_by_views()) {
++        web_view->holder()->DeprecatedLayoutImmediately();
++      }
++    }
++  }
++#endif
  }
  
-@@ -338,7 +716,6 @@ views::View::Views ContentsContainerView::GetChildrenInZOrder() {
+ views::View::Views ContentsContainerView::GetChildrenInZOrder() {
+@@ -338,7 +730,6 @@ views::View::Views ContentsContainerView::GetChildrenInZOrder() {
  
  void ContentsContainerView::OnViewBoundsChanged(View* observed_view) {
    if (observed_view == contents_view_) {
@@ -4988,7 +5003,7 @@ index 6c1080488d..deecbcfedf 100644
      if (!rounded_corner_radii_.IsEmpty()) {
        UpdateBorderRoundedCorners();
      }
-@@ -364,26 +741,27 @@ void ContentsContainerView::ApplyWatermarkSettings(
+@@ -364,26 +755,27 @@ void ContentsContainerView::ApplyWatermarkSettings(
                                                    outline_color, font_size);
  }
  
@@ -5036,7 +5051,7 @@ index 6c1080488d..deecbcfedf 100644
    }
  
    // When browser window is resizing, the contents_container and web_contents
-@@ -417,7 +795,13 @@ void ContentsContainerView::SetCaptureContentsBorderLocation(
+@@ -417,7 +809,13 @@ void ContentsContainerView::SetCaptureContentsBorderLocation(
  }
  
  gfx::Rect ContentsContainerView::GetContentsViewBounds() const {
@@ -5050,7 +5065,7 @@ index 6c1080488d..deecbcfedf 100644
    if (new_tab_footer_view_ && new_tab_footer_view_->GetVisible()) {
      CHECK(new_tab_footer_view_separator_);
      contents_view_bounds.set_height(contents_view_bounds.height() +
-@@ -428,6 +812,18 @@ gfx::Rect ContentsContainerView::GetContentsViewBounds() const {
+@@ -428,6 +826,18 @@ gfx::Rect ContentsContainerView::GetContentsViewBounds() const {
    return contents_view_bounds;
  }
  
@@ -5069,7 +5084,7 @@ index 6c1080488d..deecbcfedf 100644
  void ContentsContainerView::SetTargetContentBounds(
      std::optional<gfx::Outsets> target_content_bounds) {
    if (target_content_bounds_ == target_content_bounds) {
-@@ -448,18 +844,169 @@ void ContentsContainerView::SetRoundedCorners(
+@@ -448,18 +858,169 @@ void ContentsContainerView::SetRoundedCorners(
    UpdateBorderRoundedCorners();
  }
  
@@ -5247,7 +5262,7 @@ index 6c1080488d..deecbcfedf 100644
  }
  
  views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
-@@ -478,35 +1025,29 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -478,35 +1039,29 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
      return layouts;
    }
  
@@ -5297,7 +5312,7 @@ index 6c1080488d..deecbcfedf 100644
        footer_separator_rect =
            gfx::Rect(contents_view_bounds.x(), contents_view_bounds.bottom(),
                      contents_view_bounds.width(), kNewTabFooterSeparatorHeight);
-@@ -523,13 +1064,22 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -523,13 +1078,22 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
                                         footer_rect);
    }
  
@@ -5327,7 +5342,7 @@ index 6c1080488d..deecbcfedf 100644
  
    if (glic_border_) {
      // |glic_border_| should not be seen over devtools.
-@@ -545,43 +1095,32 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -545,43 +1109,32 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
                                       full_contents_bounds);
  
    CHECK(data_protection_overlay_view_);
@@ -5382,7 +5397,7 @@ index 6c1080488d..deecbcfedf 100644
      layouts.child_layouts.emplace_back(
          glic_selection_overlay_view_.get(),
          glic_selection_overlay_view_->GetVisible(),
-@@ -589,7 +1128,8 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -589,7 +1142,8 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
    }
  
    // Reading Mode overlay view bounds are the same as the contents view.
@@ -5392,7 +5407,7 @@ index 6c1080488d..deecbcfedf 100644
        read_anything_immersive_overlay_view_) {
      layouts.child_layouts.emplace_back(
          read_anything_immersive_overlay_view_.get(),
-@@ -597,23 +1137,47 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -597,23 +1151,47 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
          non_devtools_contents_bounds, size_bounds);
    }
  
@@ -5449,7 +5464,7 @@ index 6c1080488d..deecbcfedf 100644
      const gfx::Rect mini_toolbar_rect =
          gfx::Rect(offset_x, offset_y, mini_toolbar_size.width(),
                    mini_toolbar_size.height());
-@@ -634,6 +1198,7 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -634,6 +1212,7 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
          capture_location) {
        rect = *capture_location;
        rect.Offset(contents_view_bounds.OffsetFromOrigin());
@@ -5457,7 +5472,7 @@ index 6c1080488d..deecbcfedf 100644
      } else {
        rect = contents_view_bounds;
      }
-@@ -664,21 +1229,6 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+@@ -664,21 +1243,6 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
                                         views::SizeBounds(rect.size()));
    }
  
@@ -9581,10 +9596,10 @@ index 219734679c..7afe3c2317 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..1ec7b5313b 100644
+index 243d80a02d..dc877f7e6d 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,322 @@
+@@ -2,83 +2,324 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -9646,7 +9661,9 @@ index 243d80a02d..1ec7b5313b 100644
 +#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 +#include "chrome/browser/ui/views/find_bar_host.h"
 +#include "chrome/browser/ui/views/find_bar_view.h"
++#include "chrome/browser/ui/views/frame/browser_frame_view.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/browser_widget.h"
 +#include "chrome/browser/ui/views/frame/contents_capture_border_view.h"
 +#include "chrome/browser/ui/views/frame/contents_container_outline.h"
  #include "chrome/browser/ui/views/frame/contents_container_view.h"
@@ -9912,7 +9929,7 @@ index 243d80a02d..1ec7b5313b 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -95,9 +334,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -95,9 +336,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    auto ReplaceAndShowSidePanel(
        SidePanelType type,
@@ -9925,7 +9942,7 @@ index 243d80a02d..1ec7b5313b 100644
            // Note: there is a registry at browser level and one per tab; we want
            // the tab-specific one.
            auto* const registry =
-@@ -120,6 +360,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -120,6 +362,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                /*default_content_width_callback=*/base::NullCallback())));
            browser()->GetFeatures().side_panel_ui()->Show(
                SidePanelEntry::Id::kCustomizeChrome);
@@ -9937,7 +9954,7 @@ index 243d80a02d..1ec7b5313b 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -349,6 +594,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +596,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -9964,7 +9981,7 @@ index 243d80a02d..1ec7b5313b 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +631,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +633,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -10129,7 +10146,7 @@ index 243d80a02d..1ec7b5313b 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +996,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +998,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -10159,7 +10176,7 @@ index 243d80a02d..1ec7b5313b 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,134 +1046,3367 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,125 +1048,3531 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -10169,6 +10186,198 @@ index 243d80a02d..1ec7b5313b 100644
 -  kImmersive,
 -};
 +#if BUILDFLAG(IS_WIN)
++IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
++                       YeeWindowsSplitThemeChangesKeepCaptionReservations) {
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const state = tabs::VerticalTabStripStateController::From(browser());
++  auto* const theme =
++      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
++  const auto original_scheme = theme->GetBrowserColorScheme();
++  const auto captures =
++      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
++          "yee-split-tab-capture-dir");
++  gfx::Rect window_bounds = view->GetWidget()->GetWindowBoundsInScreen();
++  window_bounds.set_size(gfx::Size(1100, 760));
++  view->GetWidget()->SetBounds(window_bounds);
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(),
++      GURL("data:text/html,<title>Pane A</title><body style='margin:0;"
++           "padding:32px;box-sizing:border-box;background:rgb(242,245,250);"
++           "color:rgb(25,55,90);font:20px sans-serif'><h1>Pane A</h1>"
++           "<p>Left / top page</p><hr><p>Page content remains inside "
++           "its own rounded card during theme changes.</p>"
++           "<i style='position:fixed;left:8px;top:8px;width:8px;"
++           "height:8px;background:rgb(255,0,255)'></i>")));
++  chrome::NewSplitTab(browser(), split_tabs::SplitTabLayout::kSideBySide,
++                      split_tabs::SplitTabCreatedSource::kToolbarButton);
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(),
++      GURL("data:text/html,<title>Pane B</title><body style='margin:0;"
++           "padding:32px;box-sizing:border-box;background:rgb(21,24,32);"
++           "color:rgb(225,232,245);font:20px sans-serif'><h1>Pane B</h1>"
++           "<p>Right / bottom page</p><hr><p>Independent page colors "
++           "make clipping and overlap visible.</p>"
++           "<i style='position:fixed;left:8px;top:8px;width:8px;"
++           "height:8px;background:rgb(0,255,255)'></i>")));
++  RunScheduledLayouts();
++  ASSERT_TRUE(view->multi_contents_view()->IsInSplitView());
+ 
+-class BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest
+-    : public BrowserViewTabbedLayoutImplUiTest,
+-      public testing::WithParamInterface<TopContainerBackgroundTestMode> {
+- public:
+-  BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() = default;
+-  ~BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() override = default;
+-};
++  for (bool vertical : {false, true}) {
++    SCOPED_TRACE(vertical);
++    state->SetVerticalTabsEnabled(vertical);
++    for (auto split_layout : {split_tabs::SplitTabLayout::kSideBySide,
++                              split_tabs::SplitTabLayout::kStacked}) {
++      SCOPED_TRACE(static_cast<int>(split_layout));
++      view->multi_contents_view()->UpdateSplitVisualData(
++          split_tabs::SplitTabVisualData(split_layout));
++      RunScheduledLayouts();
++      for (bool dark : {false, true}) {
++        SCOPED_TRACE(dark);
++        // 캡처 옵션과 무관하게 실제 프레임 재생성을 통과한다.
++        theme->SetBrowserColorScheme(
++            dark ? ThemeService::BrowserColorScheme::kDark
++                 : ThemeService::BrowserColorScheme::kLight);
++        RunScheduledLayouts();
++        const BrowserLayoutParams frame_params =
++            view->browser_widget()->GetFrameView()->GetBrowserLayoutParams();
++        ASSERT_FALSE(frame_params.IsEmpty());
++        ASSERT_TRUE(frame_params.visual_client_area.Contains(view->bounds()));
++        const auto params = frame_params.InLocalCoordinates(view->bounds());
++        const auto exclusion = params.trailing_exclusion.ContentWithPadding();
++        const gfx::Rect controls(params.visual_client_area.right() -
++                                     base::ClampCeil(exclusion.width()),
++                                 params.visual_client_area.y(),
++                                 base::ClampCeil(exclusion.width()),
++                                 base::ClampCeil(exclusion.height()));
++        for (const auto& container : view->GetContentsContainerViews()) {
++          auto* const header = container->mini_toolbar();
++          ASSERT_TRUE(header->IsDrawn());
++          EXPECT_TRUE(container->GetLocalBounds().Contains(
++              container->GetPageViewportGeometry()
++                  .current_viewport_in_container));
++          auto* const web_view = container->contents_view();
++          auto* const contents = web_view->web_contents();
++          ASSERT_TRUE(contents);
++          // Views 배치만 끝난 순간의 이전 renderer 프레임을 캡처하지 않는다.
++          ASSERT_TRUE(base::test::RunUntil([&]() {
++            const auto pixels = gfx::ScaleToCeiledSize(
++                web_view->size(),
++                view->GetWidget()->GetCompositor()->device_scale_factor());
++            const auto width =
++                content::EvalJs(
++                    contents,
++                    "Math.round(visualViewport.width * devicePixelRatio)")
++                    .ExtractInt();
++            const auto height =
++                content::EvalJs(
++                    contents,
++                    "Math.round(visualViewport.height * devicePixelRatio)")
++                    .ExtractInt();
++            return width == pixels.width() && height == pixels.height();
++          }));
++          ASSERT_TRUE(content::EvalJs(
++                          contents,
++                          "new Promise(resolve => requestAnimationFrame(() => "
++                          "requestAnimationFrame(() => resolve(true))))")
++                          .ExtractBool());
++          content::WaitForCopyableViewInFrame(contents->GetPrimaryMainFrame());
++          EXPECT_EQ(web_view->GetBoundsInScreen(),
++                    contents->GetRenderWidgetHostView()->GetViewBounds());
++          for (views::View* child : header->children()) {
++            if (!child->IsDrawn()) {
++              continue;
++            }
++            const gfx::Rect bounds = views::View::ConvertRectToTarget(
++                child, view, child->GetLocalBounds());
++            EXPECT_FALSE(bounds.Intersects(controls)) << bounds.ToString();
++          }
++        }
++        auto* const location_bar = view->toolbar()->location_bar_view();
++        ASSERT_TRUE(location_bar->IsDrawn());
++        EXPECT_GE(location_bar->width(),
++                  location_bar->GetMinimumSize().width());
++        auto* const star =
++            views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
++                kBookmarkStarViewElementId,
++                views::ElementTrackerViews::GetContextForView(view), true);
++        for (views::View* control :
++             {static_cast<views::View*>(location_bar->location_icon_view()),
++              star}) {
++          if (control && control->IsDrawn()) {
++            EXPECT_TRUE(location_bar->GetLocalBounds().Contains(
++                views::View::ConvertRectToTarget(control, location_bar,
++                                                 control->GetLocalBounds())));
++          }
++        }
++        // 단색 페이지의 중앙만 검사하면 잘못 이동한 native layer도 통과한다.
++        // 각 viewport 원점에 고정한 실제 renderer 표식을 합성 결과에서 읽는다.
++        auto* const compositor = view->GetWidget()->GetCompositor();
++        base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
++        auto request = std::make_unique<viz::CopyOutputRequest>(
++            viz::CopyOutputRequest::ResultFormat::RGBA,
++            viz::CopyOutputRequest::ResultDestination::kSystemMemory,
++            readback.GetCallback());
++        compositor->root_layer()->RequestCopyOfOutput(std::move(request));
++        compositor->ScheduleFullRedraw();
++        auto result = readback.Take();
++        ASSERT_TRUE(result);
++        ASSERT_FALSE(result->IsEmpty());
++        auto pixels = result->ScopedAccessSkBitmap();
++        const SkBitmap bitmap = pixels.GetOutScopedBitmap();
++        const gfx::Point root_origin =
++            view->GetWidget()->GetRootView()->GetBoundsInScreen().origin();
++        for (const auto& container : view->GetContentsContainerViews()) {
++          auto* const web_view = container->contents_view();
++          gfx::Point marker = web_view->GetBoundsInScreen().origin();
++          marker -= root_origin.OffsetFromOrigin();
++          marker.Offset(12, 12);
++          marker = gfx::ScaleToFlooredPoint(marker,
++                                            compositor->device_scale_factor());
++          ASSERT_TRUE(
++              gfx::Rect(bitmap.width(), bitmap.height()).Contains(marker));
++          const SkColor expected =
++              web_view->web_contents()->GetTitle() == u"Pane A"
++                  ? SkColorSetRGB(255, 0, 255)
++                  : SkColorSetRGB(0, 255, 255);
++          EXPECT_EQ(expected, bitmap.getColor(marker.x(), marker.y()))
++              << "viewport=" << web_view->GetBoundsInScreen().ToString();
++        }
++        if (!captures.empty()) {
++          CaptureYeeWindowFrame(
++              view->GetWidget(),
++              captures.AppendASCII(base::StringPrintf(
++                  "theme-%s-%s-%s.png", vertical ? "sidebar" : "horizontal",
++                  split_layout == split_tabs::SplitTabLayout::kStacked
++                      ? "stacked"
++                      : "side-by-side",
++                  dark ? "dark" : "light")));
++        }
++      }
++    }
++  }
++  theme->SetBrowserColorScheme(original_scheme);
++  RunScheduledLayouts();
++}
+ 
+-IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+-                       TopContainerBackground) {
+-  std::optional<ui::TouchUiController::TouchUiScoperForTesting> touch_ui_scoper;
+-  switch (GetParam()) {
+-    case TopContainerBackgroundTestMode::kTouch:
+-      touch_ui_scoper.emplace(true);
+-      break;
+-    case TopContainerBackgroundTestMode::kImmersive:
+-      ImmersiveModeController::From(browser())->SetEnabled(true);
+-      break;
+-    case TopContainerBackgroundTestMode::kDefault:
+-      break;
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeWindowsHorizontalActiveTabPaintJoinsHeader) {
 +  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
@@ -10187,14 +10396,7 @@ index 243d80a02d..1ec7b5313b 100644
 +  const auto captures =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +          "yee-tabbar-capture-dir");
- 
--class BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest
--    : public BrowserViewTabbedLayoutImplUiTest,
--      public testing::WithParamInterface<TopContainerBackgroundTestMode> {
-- public:
--  BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() = default;
--  ~BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest() override = default;
--};
++
 +  for (bool maximized : {false, true}) {
 +    SCOPED_TRACE(maximized);
 +    if (maximized) {
@@ -10235,19 +10437,7 @@ index 243d80a02d..1ec7b5313b 100644
 +      EXPECT_EQ(tab_bounds.bottom() -
 +                    GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
 +                header_bounds.y());
- 
--IN_PROC_BROWSER_TEST_P(BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
--                       TopContainerBackground) {
--  std::optional<ui::TouchUiController::TouchUiScoperForTesting> touch_ui_scoper;
--  switch (GetParam()) {
--    case TopContainerBackgroundTestMode::kTouch:
--      touch_ui_scoper.emplace(true);
--      break;
--    case TopContainerBackgroundTestMode::kImmersive:
--      ImmersiveModeController::From(browser())->SetEnabled(true);
--      break;
--    case TopContainerBackgroundTestMode::kDefault:
--      break;
++
 +      content::WaitForCopyableViewInFrame(
 +          model->GetActiveWebContents()->GetPrimaryMainFrame());
 +      auto* const compositor = widget->GetCompositor();
@@ -11159,7 +11349,6 @@ index 243d80a02d..1ec7b5313b 100644
 -                                        SidePanel::kOpenAnimationCompletedEvent)
 -                               .SetMustBeVisibleAtStart(false))),
 -        Do([this]() { RunScheduledLayouts(); }));
--  }
 +  // 실제 보이는 전환 버튼이 수평 모드에서 접기 명령을 실행하지 않는다.
 +  // 실제 탭 포커스를 유지한 채 hierarchy를 정리한다. 늦은 blur가 정리된
 +  // collection node에 hover card 갱신을 요청하면 안 된다.
@@ -11193,15 +11382,7 @@ index 243d80a02d..1ec7b5313b 100644
 +  state->SetVerticalTabsEnabled(false);
 +  expect_rows(false);
 +  expect_colors();
- 
--  auto ClearResizeCounts() {
--    return Do([this]() {
--      const auto& container_views = GetContentsContainers();
--      for (ContentsContainerView* container : container_views) {
--        auto* contents = container->contents_view();
--        auto& data = resize_data_[contents];
--        data.last_size = contents->size();
--        data.count = 0U;
++
 +#if BUILDFLAG(IS_MAC)
 +  PrefService* const pref_service = browser()->GetProfile()->GetPrefs();
 +  const bool always_show =
@@ -11218,8 +11399,7 @@ index 243d80a02d..1ec7b5313b 100644
 +      if (host->IsDrawn() && !host->GetLocalBounds().IsEmpty() &&
 +          std::ranges::find(widgets, host->GetWidget()) == widgets.end()) {
 +        widgets.push_back(host->GetWidget());
-       }
--    });
++      }
 +    }
 +    for (auto* widget : widgets) {
 +      auto* const compositor = widget->GetCompositor();
@@ -11331,7 +11511,7 @@ index 243d80a02d..1ec7b5313b 100644
 +        view->tab_strip_view()->GetBoundsInScreen().Intersects(toolbar));
 +    EXPECT_GE(view->side_panel()->GetBoundsInScreen().y(), toolbar.bottom());
 +    EXPECT_EQ(active_handle, model->GetActiveTab()->GetHandle());
-+  }
+   }
 +  if (!capture_directory.empty()) {
 +    // 두 캡처는 별도 native 호스트의 자료다. 앞의 직접 View paint는 각 호스트의
 +    // 로컬 정책을 증명하며 최종 합성 접합부까지 증명하지는 않는다.
@@ -11340,7 +11520,7 @@ index 243d80a02d..1ec7b5313b 100644
 +    CaptureYeeCompositorFrame(
 +        immersive_header->GetWidget(),
 +        capture_directory.AppendASCII("fullscreen-header-join-header.png"));
-   }
++  }
 +  ui_test_utils::ToggleFullscreenModeAndWait(browser());
 +  native_fullscreen.WaitForEnterAndExitCount(1, 1);
 +  ASSERT_NO_FATAL_FAILURE(wait_for_header_frames());
@@ -11355,21 +11535,14 @@ index 243d80a02d..1ec7b5313b 100644
 +  expect_rows(false);
 +#endif
  
--  template <typename... Args>
--  auto CheckResizeCounts(Args&&... args) {
--    return CheckResult(
--               [this]() {
--                 const auto& container_views = GetContentsContainers();
--                 std::vector<size_t> counts;
--                 for (ContentsContainerView* container : container_views) {
--                   counts.push_back(
--                       resize_data_[container->contents_view()].count);
--                 }
--                 return counts;
--               },
--               testing::ElementsAre(
--                   testing::Matcher<size_t>(std::forward<Args>(args))...))
--        .SetDescription("CheckResizeCounts()");
+-  auto ClearResizeCounts() {
+-    return Do([this]() {
+-      const auto& container_views = GetContentsContainers();
+-      for (ContentsContainerView* container : container_views) {
+-        auto* contents = container->contents_view();
+-        auto& data = resize_data_[contents];
+-        data.last_size = contents->size();
+-        data.count = 0U;
 +  chrome::NewSplitTab(browser(), split_tabs::SplitTabLayout::kSideBySide,
 +                      split_tabs::SplitTabCreatedSource::kToolbarButton);
 +  RunScheduledLayouts();
@@ -11417,7 +11590,8 @@ index 243d80a02d..1ec7b5313b 100644
 +          EXPECT_TRUE(
 +              paint.contains(icon_center.x() + dx, icon_center.y() + dy));
 +        }
-+      }
+       }
+-    });
 +      const auto colors = styling->CalculateTargetColors();
 +      EXPECT_GE(color_utils::GetContrastRatio(colors.foreground_color,
 +                                              colors.background_color),
@@ -11456,7 +11630,7 @@ index 243d80a02d..1ec7b5313b 100644
 +    EXPECT_GT(SkColorGetA(panel_paint.getColor(0, panel_paint.height() / 2)),
 +              0u);
 +    RunTestSequence(CloseSidePanel());
-+  }
+   }
 +  browser()->GetProfile()->GetPrefs()->SetBoolean(
 +      prefs::kSidePanelHorizontalAlignment, panel_was_right_aligned);
 +  const gfx::Rect split_window = view->GetWidget()->GetWindowBoundsInScreen();
@@ -11467,7 +11641,13 @@ index 243d80a02d..1ec7b5313b 100644
 +  expect_split_capsules();
 +  view->GetWidget()->SetBounds(split_window);
 +  RunScheduledLayouts();
-+
+ 
+-  template <typename... Args>
+-  auto CheckResizeCounts(Args&&... args) {
+-    return CheckResult(
+-               [this]() {
+-                 const auto& container_views = GetContentsContainers();
+-                 std::vector<size_t> counts;
 +  if (!split_capture_directory.empty()) {
 +    auto* const theme =
 +        ThemeServiceFactory::GetForProfile(browser()->GetProfile());
@@ -13623,19 +13803,10 @@ index 243d80a02d..1ec7b5313b 100644
 +               [this]() {
 +                 const auto& container_views = GetContentsContainers();
 +                 std::vector<size_t> counts;
-+                 for (ContentsContainerView* container : container_views) {
-+                   counts.push_back(
-+                       resize_data_[container->contents_view()].count);
-+                 }
-+                 return counts;
-+               },
-+               testing::ElementsAre(
-+                   testing::Matcher<size_t>(std::forward<Args>(args))...))
-+        .SetDescription("CheckResizeCounts()");
-   }
- 
-   auto ToggleVerticalTabStripCollapsed(bool should_be_collapsed) {
-@@ -790,6 +4440,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+                  for (ContentsContainerView* container : container_views) {
+                    counts.push_back(
+                        resize_data_[container->contents_view()].count);
+@@ -790,6 +4615,47 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
          Do([this]() { RunScheduledLayouts(); }));
    }
  
@@ -13683,7 +13854,7 @@ index 243d80a02d..1ec7b5313b 100644
   private:
    const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
    GetContentsContainers() {
-@@ -819,6 +4510,716 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
+@@ -819,6 +4685,716 @@ class BrowserViewTabbedLayoutImplContentLayoutUiTest
        observation_{this};
  };
  
@@ -14400,7 +14571,7 @@ index 243d80a02d..1ec7b5313b 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -871,10 +5272,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +5447,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15359,7 +15530,7 @@ index 243d80a02d..1ec7b5313b 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +6231,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +6406,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15377,7 +15548,7 @@ index 243d80a02d..1ec7b5313b 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +6295,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +6470,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -15395,7 +15566,7 @@ index 243d80a02d..1ec7b5313b 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +6315,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +6490,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -17809,7 +17980,7 @@ index 959386b621..83f48abadf 100644
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index d5f3d22b6e..b44c1c5dd5 100644
+index d5f3d22b6e..bb524fbdff 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,35 +7,59 @@
@@ -17872,7 +18043,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
  #include "ui/views/background.h"
  #include "ui/views/controls/button/image_button.h"
  #include "ui/views/controls/button/image_button_factory.h"
-@@ -71,18 +95,63 @@ void SetAccessibleNameAndTooltip(views::View* view, int string_id) {
+@@ -71,18 +95,73 @@ void SetAccessibleNameAndTooltip(views::View* view, int string_id) {
  
  MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
      BrowserView* browser_view,
@@ -17935,11 +18106,21 @@ index d5f3d22b6e..b44c1c5dd5 100644
 +    yee_reload_button_ =
 +        add_navigation_button(IDC_RELOAD, vector_icons::kRefreshIcon,
 +                              IDS_TOOLTIP_RELOAD, IDS_ACCNAME_RELOAD);
++#if BUILDFLAG(IS_WIN)
++    // 창 버튼 예약으로 좁아질 때 앞으로 조작을 먼저 접는다. 주소창의 native
++    // 최소 폭을 유지해 보안 표시·페이지 action과 Pane 닫기가 겹치지 않는다.
++    yee_forward_button_->SetProperty(
++        views::kFlexBehaviorKey,
++        views::FlexSpecification(
++            views::MinimumFlexSizeRule::kPreferredSnapToZero,
++            views::MaximumFlexSizeRule::kPreferred)
++            .WithOrder(5));
++#endif
 +  }
  
    // Add favicon, domain label, alert state indicator, and close button.
    favicon_ = AddChildView(std::make_unique<views::ImageView>());
-@@ -104,6 +173,17 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -104,6 +183,17 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
    domain_label_->SetSubpixelRenderingEnabled(false);
    domain_label_->SetEnabledColor(kColorMultiContentsViewMiniToolbarForeground);
    domain_label_->SetBackgroundColor(kColorToolbar);
@@ -17957,7 +18138,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
    alert_state_indicator_ = AddChildView(std::make_unique<views::ImageView>());
    alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
                                        icon_flex_spec.WithOrder(2));
-@@ -132,13 +212,87 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -132,13 +222,87 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
            base::BindRepeating(&MultiContentsViewMiniToolbar::ClearWebContents,
                                base::Unretained(this)));
  
@@ -18045,7 +18226,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -166,6 +320,87 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -166,6 +330,92 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -18102,11 +18283,16 @@ index d5f3d22b6e..b44c1c5dd5 100644
 +          : gfx::Insets::TLBR(0, leading_padding, 0, horizontal_padding);
 +#if BUILDFLAG(IS_WIN)
 +  if (browser_view_ && parent()) {
++    const BrowserLayoutParams frame_params = browser_view_->browser_widget()
++                                                 ->GetFrameView()
++                                                 ->GetBrowserLayoutParams();
++    if (frame_params.IsEmpty()) {
++      // 테마 전환 중 새 프레임은 아직 client 배치를 받지 않았다. 마지막 유효
++      // 여백을 유지하고 다음 Layout에서 새 caption exclusion을 적용한다.
++      return;
++    }
 +    const BrowserLayoutParams params =
-+        browser_view_->browser_widget()
-+            ->GetFrameView()
-+            ->GetBrowserLayoutParams()
-+            .InLocalCoordinates(browser_view_->bounds());
++        frame_params.InLocalCoordinates(browser_view_->bounds());
 +    const gfx::SizeF exclusion = params.trailing_exclusion.ContentWithPadding();
 +    gfx::Point origin;
 +    views::View::ConvertPointToTarget(this, browser_view_, &origin);
@@ -18133,7 +18319,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -208,6 +443,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -208,6 +458,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
@@ -18142,7 +18328,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -224,7 +461,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -224,7 +476,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    web_contents_ = nullptr;
  }
  
@@ -18172,7 +18358,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -242,6 +501,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -242,6 +516,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -18415,7 +18601,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -262,14 +757,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -262,14 +772,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -18463,7 +18649,7 @@ index d5f3d22b6e..b44c1c5dd5 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -285,7 +806,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -285,7 +821,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
