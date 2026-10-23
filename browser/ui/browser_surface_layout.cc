@@ -18,6 +18,43 @@ bool UsesYeeBrowserSurfaceGeometry(BrowserWindowInterface::Type browser_type,
          has_vertical_tab_strip;
 }
 
+gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
+                                             int controls_width,
+                                             bool leading) {
+  const int edge_inset =
+      kSidebarMetrics.content_gutter +
+      kSidebarMetrics.browser_surface_header_control_edge_inset;
+  const int width = std::clamp(
+      controls_width, 0, std::max(0, frame_bounds.width() - 2 * edge_inset));
+  return gfx::Rect(
+      leading ? frame_bounds.x() + edge_inset
+              : frame_bounds.right() - edge_inset - width,
+      frame_bounds.y() + kSidebarMetrics.browser_surface_toolbar_top_inset(),
+      width, kSidebarMetrics.toolbar_height);
+}
+
+gfx::Rect ResolveBrowserWindowControlHighlightBounds(gfx::Rect button_bounds) {
+  button_bounds.ClampToCenteredSize(gfx::Size(
+      kSidebarMetrics.shell_control_size, kSidebarMetrics.shell_control_size));
+  return button_bounds;
+}
+
+gfx::Rect ExcludeBrowserWindowControls(gfx::Rect header_bounds,
+                                       const gfx::Rect& controls_bounds) {
+  if (!header_bounds.Intersects(controls_bounds)) {
+    return header_bounds;
+  }
+  if (controls_bounds.CenterPoint().x() >= header_bounds.CenterPoint().x()) {
+    header_bounds.set_width(
+        std::max(0, controls_bounds.x() - header_bounds.x()));
+  } else {
+    header_bounds.SetHorizontalBounds(
+        std::min(header_bounds.right(), controls_bounds.right()),
+        header_bounds.right());
+  }
+  return header_bounds;
+}
+
 ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
     const BrowserSurfaceSeedInput& input) {
   ResolvedBrowserSurfaceSeed result;

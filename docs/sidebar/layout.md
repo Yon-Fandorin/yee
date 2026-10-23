@@ -31,8 +31,10 @@ Favorites와 Tab 목록 사이에 1px 구분선을 두지 않는다. 독 칸의 
 영역을 나눈다.
 
 New Tab과 Agent Control은 Sidebar Header가 소유하며 Sidebar 본문에 중복으로
-두지 않는다. 고정 Sidebar에서는 두 컨트롤을 창 버튼과 같은 높이에 두고,
-hover 패널에서는 툴바 아래의 패널 첫 줄에 둔다. 두 컨트롤은 오른쪽 조작 열에서
+두지 않는다. 고정 Sidebar에서는 두 컨트롤을 Browser Surface Header와 같은 높이에 두고,
+hover 패널에서는 툴바 아래의 패널 첫 줄에 둔다. Windows의 native 창 버튼도 같은
+48 DIP shell 행 오른쪽에 통합하되 native frame이 배치와 입력을 소유한다.
+두 컨트롤은 오른쪽 조작 열에서
 하나의 묶음으로 정렬한다. Sidebar Toggle은 Browser
 Surface Header의 첫 컨트롤로 옮긴다. 이 묶음은 `ToolbarView`가 아니라 Sidebar
 Header가 한 번만 소유한다. 따라서 분할 상태에서 공용 Toolbar가 사라지고 native

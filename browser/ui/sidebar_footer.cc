@@ -19,6 +19,7 @@
 #include "base/strings/string_util.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_reopen_suppressor.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
@@ -485,6 +486,12 @@ class YeeSidebarFooterMenuView : public views::View,
         screen_animation_(this) {
     CHECK(bubble_delegate_);
     AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
+#if BUILDFLAG(IS_WIN)
+    // Windows FocusManager는 미처리 Escape keyup을 anchor 창으로 보내며
+    // 팝업을 비활성화한다. 뒤로 가기로 소비한 키의 release도 메뉴가 맡는다.
+    AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE,
+                                   ui::Accelerator::KeyState::RELEASED));
+#endif
     SetID(kSidebarFooterMenuViewId);
     SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kVertical,
@@ -522,6 +529,12 @@ class YeeSidebarFooterMenuView : public views::View,
   }
 
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override {
+#if BUILDFLAG(IS_WIN)
+    if (accelerator.key_code() == ui::VKEY_ESCAPE &&
+        accelerator.key_state() == ui::Accelerator::KeyState::RELEASED) {
+      return true;
+    }
+#endif
     if (accelerator.key_code() == ui::VKEY_ESCAPE &&
         screen_ != SidebarFooterScreen::kRoot) {
       ShowScreen(ParentSidebarFooterScreen(screen_),

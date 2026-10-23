@@ -135,7 +135,7 @@ def build(root, output, node_executable="node", bundled_filters=None,
         lines.append("! Source: " + entry["source"])
         for line in preprocess(raw.decode("utf-8"), entry["file"]).splitlines():
             if line.lstrip().startswith("!#include "):
-                target = str(Path(entry["file"]).parent / line.strip()[10:].strip())
+                target = (Path(entry["file"]).parent / line.strip()[10:].strip()).as_posix()
                 if target not in source_names:
                     raise ValueError(f"Unpinned include: {target}")
                 included.add(target)

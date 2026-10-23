@@ -452,6 +452,23 @@ TEST(YeeSurfaceGeometryTest, BrowserClassRoutingIsPerWindow) {
 #endif
 }
 
+TEST(YeeSurfaceGeometryTest, WindowControlsStayInsideTheRoundedHeader) {
+  const gfx::Rect frame(0, 0, 1100, 800);
+  const gfx::Rect trailing =
+      ResolveBrowserWindowControlsBounds(frame, 138, false);
+  const gfx::Rect leading =
+      ResolveBrowserWindowControlsBounds(frame, 138, true);
+  EXPECT_EQ(gfx::Rect(948, 7, 138, 40), trailing);
+  EXPECT_EQ(gfx::Rect(14, 7, 138, 40), leading);
+  EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
+            trailing.CenterPoint().y());
+  EXPECT_EQ(kSidebarMetrics.content_gutter +
+                kSidebarMetrics.browser_surface_header_control_edge_inset,
+            frame.right() - trailing.right());
+  EXPECT_EQ(trailing.y(), leading.y());
+  EXPECT_EQ(trailing.size(), leading.size());
+}
+
 TEST(YeeSurfaceGeometryTest,
      SurfaceFrameKeepsNativePanelAllocationAndYeeGutters) {
   BrowserSurfaceFrameInput input;
@@ -467,6 +484,20 @@ TEST(YeeSurfaceGeometryTest,
   EXPECT_EQ(gfx::Rect(250, 6, 944, 42), frame.header_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.notice_flow_bounds);
   EXPECT_EQ(gfx::Rect(250, 48, 650, 746), frame.multi_contents_bounds);
+}
+
+TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
+  const gfx::Rect controls(948, 7, 138, 40);
+  EXPECT_EQ(gfx::Rect(850, 6, 98, 42),
+            ExcludeBrowserWindowControls(gfx::Rect(850, 6, 244, 42), controls));
+  EXPECT_EQ(gfx::Rect(250, 6, 400, 42),
+            ExcludeBrowserWindowControls(gfx::Rect(250, 6, 400, 42), controls));
+  EXPECT_EQ(
+      gfx::Rect(850, 400, 244, 42),
+      ExcludeBrowserWindowControls(gfx::Rect(850, 400, 244, 42), controls));
+  EXPECT_EQ(gfx::Rect(152, 6, 154, 42),
+            ExcludeBrowserWindowControls(gfx::Rect(6, 6, 300, 42),
+                                         gfx::Rect(14, 7, 138, 40)));
 }
 
 TEST(YeeSurfaceGeometryTest,
