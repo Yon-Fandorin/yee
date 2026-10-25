@@ -8,6 +8,7 @@ source_set("browser") {
     "content_blocking_service_factory.h",
     "content_blocking_tab_helper.h",
     "filtering_url_loader_factory.h",
+    "transport_filtering.h",
   ]
   sources = [
     "baseline_list_updater.cc",
@@ -18,6 +19,7 @@ source_set("browser") {
     "content_blocking_service_factory.cc",
     "content_blocking_tab_helper.cc",
     "filtering_url_loader_factory.cc",
+    "transport_filtering.cc",
   ]
   public_deps = [
     "//components/yee_content_blocking:core",

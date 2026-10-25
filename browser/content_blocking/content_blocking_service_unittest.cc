@@ -81,10 +81,14 @@ TEST_F(ContentBlockingServiceTest, DomainScopeAndChangesReachExistingSnapshot) {
   EXPECT_TRUE(service_->SetBlockedDomain("Ads.Example.test.", false));
   EXPECT_TRUE(
       snapshot->IsBlockedDomain(GURL("https://ads.example.test/request")));
+  EXPECT_TRUE(snapshot->IsBlockedDomain(GURL("ws://ads.example.test/socket")));
+  EXPECT_TRUE(snapshot->IsBlockedDomain(GURL("wss://ads.example.test/socket")));
   EXPECT_TRUE(
       snapshot->IsBlockedDomain(GURL("https://ads.example.test./request")));
   EXPECT_FALSE(snapshot->IsBlockedDomain(
       GURL("https://child.ads.example.test/request")));
+  EXPECT_FALSE(
+      snapshot->IsBlockedDomain(GURL("wss://child.ads.example.test/socket")));
   EXPECT_FALSE(
       snapshot->IsBlockedDomain(GURL("https://notads.example.test/request")));
   EXPECT_TRUE(service_->SetBlockedDomain("ads.example.test", true));

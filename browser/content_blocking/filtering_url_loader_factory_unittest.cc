@@ -3,11 +3,16 @@
 #include "chrome/browser/yee_content_blocking/filtering_url_loader_factory.h"
 
 #include "base/no_destructor.h"
+#include "base/run_loop.h"
+#include "base/task/execution_fence.h"
 #include "base/test/scoped_command_line.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
+#include "base/test/test_future.h"
+#include "chrome/browser/yee_content_blocking/transport_filtering.h"
 #include "components/yee_content_blocking/settings.h"
 #include "mojo/core/embedder/embedder.h"
+#include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "mojo/public/cpp/system/data_pipe_utils.h"
 #include "net/base/net_errors.h"
@@ -19,6 +24,7 @@
 #include "services/network/public/cpp/resource_request_body.h"
 #include "services/network/public/cpp/url_loader_factory_builder.h"
 #include "services/network/public/mojom/parsed_headers.mojom.h"
+#include "services/network/public/mojom/websocket.mojom.h"
 #include "services/network/test/test_url_loader_client.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -26,6 +32,27 @@
 
 namespace yee::content_blocking {
 namespace {
+class ProbeHandshakeClient : public network::mojom::WebSocketHandshakeClient {
+ public:
+  mojo::PendingRemote<network::mojom::WebSocketHandshakeClient> Bind() {
+    return receiver_.BindNewPipeAndPassRemote();
+  }
+  void Close() { receiver_.reset(); }
+  void OnOpeningHandshakeStarted(
+      network::mojom::WebSocketHandshakeRequestPtr request) override {}
+  void OnFailure(const std::string& message,
+                 int32_t error,
+                 int32_t response_code) override {}
+  void OnConnectionEstablished(
+      mojo::PendingRemote<network::mojom::WebSocket> socket,
+      mojo::PendingReceiver<network::mojom::WebSocketClient> client,
+      network::mojom::WebSocketHandshakeResponsePtr response,
+      mojo::ScopedDataPipeConsumerHandle readable,
+      mojo::ScopedDataPipeProducerHandle writable) override {}
+
+ private:
+  mojo::Receiver<network::mojom::WebSocketHandshakeClient> receiver_{this};
+};
 class FilteringFactoryTest : public testing::Test {
  public:
   static std::unique_ptr<base::test::TaskEnvironment>& Environment() {
@@ -134,6 +161,91 @@ TEST_F(FilteringFactoryTest, BlockedRequestNeverReachesTerminal) {
   EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
   EXPECT_FALSE(client_.completion_status().should_collapse_initiator);
   EXPECT_EQ(terminal_.total_requests(), 0u);
+}
+TEST_F(FilteringFactoryTest, TransportKindsUseTheirOwnFilterOptions) {
+  const auto origin = url::Origin::Create(GURL("https://page.test/"));
+  base::test::TestFuture<bool> websocket;
+  CheckTransportRequest(nullptr, GURL("wss://yee-socket.test/ad"), origin,
+                        origin, TransportKind::kWebSocket,
+                        websocket.GetCallback());
+  EXPECT_TRUE(websocket.Get());
+  base::test::TestFuture<bool> allowed;
+  CheckTransportRequest(nullptr, GURL("ws://yee-socket.test/allowed"), origin,
+                        origin, TransportKind::kWebSocket,
+                        allowed.GetCallback());
+  EXPECT_FALSE(allowed.Get());
+  base::test::TestFuture<bool> allowed_port;
+  CheckTransportRequest(nullptr, GURL("wss://yee-socket.test:9443/allowed"),
+                        origin, origin, TransportKind::kWebSocket,
+                        allowed_port.GetCallback());
+  EXPECT_FALSE(allowed_port.Get());
+  base::test::TestFuture<bool> transport;
+  CheckTransportRequest(nullptr, GURL("https://yee-transport.test/session"),
+                        origin, origin, TransportKind::kWebTransport,
+                        transport.GetCallback());
+  EXPECT_TRUE(transport.Get());
+  base::test::TestFuture<bool> get_only;
+  CheckTransportRequest(
+      nullptr, GURL("https://yee-transport-method.test/session"), origin,
+      origin, TransportKind::kWebTransport, get_only.GetCallback());
+  EXPECT_FALSE(get_only.Get());
+}
+TEST_F(FilteringFactoryTest, AllowedHandshakeResumesOnCallerSequence) {
+  ProbeHandshakeClient client;
+  const auto origin = url::Origin::Create(GURL("https://page.test/"));
+  base::test::TestFuture<bool> started;
+  FilterWebSocket(
+      nullptr, nullptr, GURL("wss://normal.test/session"), origin, origin,
+      client.Bind(),
+      base::BindOnce(
+          [](base::test::TestFuture<bool>* started,
+             mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>) {
+            started->SetValue(true);
+          },
+          base::Unretained(&started)));
+  EXPECT_TRUE(started.Get());
+}
+TEST_F(FilteringFactoryTest, CancelledHandshakeNeverStartsConnection) {
+  ProbeHandshakeClient client;
+  const auto origin = url::Origin::Create(GURL("https://page.test/"));
+  bool started = false;
+  {
+    // 판정 작업을 잠시 멈추고 취소가 먼저 처리되도록 한다.
+    base::ScopedThreadPoolExecutionFence fence;
+    FilterWebSocket(
+        nullptr, nullptr, GURL("wss://normal.test/session"), origin, origin,
+        client.Bind(),
+        base::BindOnce(
+            [](bool* started,
+               mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>) {
+              *started = true;
+            },
+            base::Unretained(&started)));
+    client.Close();
+    base::RunLoop().RunUntilIdle();
+  }
+  Environment()->RunUntilIdle();
+  EXPECT_FALSE(started);
+}
+TEST_F(FilteringFactoryTest, TransportHonorsTopSiteException) {
+  command_.GetProcessCommandLine()->AppendSwitchASCII(
+      "yee-content-blocking-disabled-sites", "publisher.test");
+  base::test::TestFuture<bool> result;
+  CheckTransportRequest(nullptr, GURL("wss://yee-socket.test/ad"),
+                        url::Origin::Create(GURL("https://third-party.test/")),
+                        url::Origin::Create(GURL("https://publisher.test/")),
+                        TransportKind::kWebSocket, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+}
+TEST_F(FilteringFactoryTest, DisabledFeatureBypassesTransportFilters) {
+  base::test::ScopedFeatureList feature;
+  feature.InitAndDisableFeature(kYeeContentBlocking);
+  const auto origin = url::Origin::Create(GURL("https://page.test/"));
+  base::test::TestFuture<bool> result;
+  CheckTransportRequest(nullptr, GURL("https://yee-transport.test/session"),
+                        origin, origin, TransportKind::kWebTransport,
+                        result.GetCallback());
+  EXPECT_FALSE(result.Get());
 }
 TEST_F(FilteringFactoryTest, BlockedImageCollapsesInitiator) {
   Connect();

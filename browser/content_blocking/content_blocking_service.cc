@@ -65,7 +65,7 @@ void ContentBlockingSettingsSnapshot::ReplaceDisabledHosts(
 }
 
 bool ContentBlockingSettingsSnapshot::IsBlockedDomain(const GURL& url) const {
-  if (!url.SchemeIsHTTPOrHTTPS()) {
+  if (!url.SchemeIsHTTPOrHTTPS() && !url.SchemeIsWSOrWSS()) {
     return false;
   }
   std::string_view host = url.host();

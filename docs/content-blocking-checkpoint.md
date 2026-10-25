@@ -71,7 +71,7 @@ document-start 자동 주입 fixture는 통과했다. 같은 YouTube 영상·프
 | blob iframe | 비교한 Brave observer도 blob URL을 HTTP(S) 문서로 처리하지 않는다. Yee는 HTTP(S) 최상위 문서를 직접 확인할 수 있는 blob iframe에 한해 보안 origin의 필터를 적용하도록 확대했다. 최상위 blob·remote top·opaque origin에는 이를 확대하지 않는다. |
 | 동적 cosmetic | Yee는 class/id 수집과 procedural 조건·동작을 isolated world에서 처리하고 native user-origin CSS로 연결한다. 예외, 작업량 상한과 조건 해제 경로를 유지했다. shadow root 관통과 엔진 미지원 operator는 지원 범위 밖이다. |
 | 차단 정책 | Brave의 기본/추가 엔진과 Standard/Aggressive 분기, 검색 사이트별 정책은 Yee의 단일 켬·끔 정책과 다르다. 이번 연결 보완에서 새 모드나 별도 허용 정책을 만들지 않았다. |
-| 전송 경계 | Brave의 network helper는 WS/WSS도 검사한다. Yee의 URLLoaderFactory proxy에는 WebSocket/WebTransport interceptor가 없으며 Service Worker CacheStorage 직접 응답도 통과하지 않는다. 이 경계는 이번 렌더링 보완으로 해소되지 않는다. |
+| 전송 경계 | Brave의 network helper는 WS/WSS도 검사한다. 1차 비교에서 Yee의 WS/WT 연결과 Service Worker 직접 응답이 관문 밖임을 확인했고, 아래 후속 작업에서 연결했다. |
 
 대조한 공식 원본은 [네트워크 proxy](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/browser/net/brave_proxying_url_loader_factory.cc),
 [요청 helper](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/browser/net/brave_ad_block_tp_network_delegate_helper.cc),
@@ -104,6 +104,57 @@ document-start 자동 주입 fixture는 통과했다. 같은 YouTube 영상·프
 재검증에서는 본문 4,114자·정상 링크 63개를 확인하고 캡처의 게시물 목록·메뉴도
 직접 확인했다.
 흰 캡처의 원인은 재현되지 않았으며 해당 회차를 본문 표시 성공 증거로 사용하지 않는다.
+
+## 실시간 연결·서비스 워커 후속 연결
+
+기존 browser 매칭 sequence와 프로필 설정 snapshot을 WS/WSS·WebTransport 연결
+시작 전에도 사용한다. WS는 `websocket`/`GET`, WebTransport는 원본 엔진의 `other`/
+`CONNECT` 요청으로 전달한다. WebSocket connector가 확인한 프로필·initiator·최상위
+출처를 전용 등록 callback에 전달하고, 원래 확장 프로그램·직접 연결 경로를 재개한다.
+공용 `WebSocketOptions`의 역할과 구조는 유지한다. WebTransport는 기존 browser
+hook을 사용하며, 프레임이 없으면 worker origin을 사이트 문맥으로 사용한다.
+별도 `webtransport` 종류와 `method=connect` 필터 문법은 현재 엔진의 지원 범위가 아니다.
+연결 차단만 판정하며 transport URL의 removeparam·대체 응답은 실행하지 않는다.
+
+`transport_filtering`은 연결 대기·취소를 소유한다. 문서 교체·삭제와 handshake client
+종료를 확인해 사라진 요청을 재개하지 않는다. 프레임이 있는 차단은 기존 primary page의
+차단 횟수에 포함한다. 사용자 도메인 규칙도 WS/WSS 주소에 적용하며, 기능 끔은
+추가 matcher 작업 없이 원래 연결로 바로 통과한다.
+
+서비스 워커는 browser의 `ServiceWorkerContainerHostForClient`에서 창·dedicated/shared
+worker의 동일한 관문을 연결한다. 출처·최상위 문맥·프로세스·프로필은 browser의 client에서
+얻으며 renderer가 이를 지정하지 않는다. CacheStorage·합성 응답·static router가 응답하기
+전의 factory를 감싸므로 기존 차단·예외·대체 스크립트·query 제거·redirect·CSP 처리를
+같은 proxy로 실행한다. 서브리소스 외에 서비스 워커가 응답한 navigation과 worker main
+script factory에도 기존 embedder 정책을 연결한다. 제어되는 client가 사라졌으면
+새 factory를 fallback에 연결하지 않는다. top/frame 출처가 다른 문맥에는 임의의
+쿠키 문맥을 만들지 않고 빈 `SiteForCookies`를 사용한다.
+
+Chromium은 일반 정책 연결과 client 수명만 소유하고 Yee 필터·프로필 정책은 계속
+`browser/content_blocking/`에 둔다. 새로운 서비스 워커 동작 코드나 원격 JavaScript를
+다운로드하지 않는다. Windows 필터 생성은 입출력 UTF-8을 명시해 locale에 따른 실패를
+제거했다. 다른 작업의 UI 변경은 이 체크포인트의 커밋 대상에서 제외한다.
+
+실앱 회귀 진입점은 `node tools/dev/test-transport-content-blocking.mjs ABSOLUTE_YEE_EXECUTABLE PYTHON_WITH_AIOQUIC`다.
+검증용 Python에는 `aioquic==1.7.0`과 그 의존성이 필요하다. 로컬 HTTP/HTTPS·HTTP3
+서버와 격리 프로필을 사용하고 WS·WSS·WebTransport의 서버 도달 여부를 비교한다.
+검증 프로필에서만 짧은 수명의 자체 인증서와 명시적 fingerprint를 사용한다.
+Windows의 Python 3.11 UDP 시험 서버는 Selector event loop를 사용해 연결 종료 뒤
+ICMP 오류로 Proactor의 수신이 멎는 문제를 피한다. 앱의 연결 동작은 변경하지 않는다.
+끔·켬·프로필 사이트 예외·사용자 도메인 네 모드를 검사하고, 정상 연결과 캐시가
+계속 동작하는지도 요구한다. 소켓 client 취소의 미재개는 단위 테스트에서 별도로 검사한다.
+
+Windows 전체 앱 빌드와 browser/updater/factory 82개·core 78개, 총 160개 테스트가
+통과했다. 실제 WS/WSS·HTTP3 서버에서 네 모드를 두 차례 연속 통과했고, 문서·dedicated/shared
+worker·서비스 워커의 차단 주소는 켬에서 서버에 도달하지 않았다. 정상·필터 허용 주소는
+계속 연결되며 끔·프로필 예외에서는 차단 주소도 연결됐다. 사용자 도메인 규칙은
+WS와 서비스 워커 캐시 응답에도 적용됐다. cross-site iframe과 그 worker는 iframe
+주소의 예외를 최상위 사이트의 예외로 확대하지 않았다.
+서비스 워커의 navigation·worker main script, CacheStorage·합성 응답·redirect·대체
+스크립트·removeparam·CSP, 정상 URL로 변경할 때의 레이아웃 보존도 기존 경로와 함께
+검증했다. 공식 카탈로그 snapshot을 적용한 실제 개드립은 초기 광고 노출 0프레임이며
+본문 4,145자·화면 내 정상 링크 63개와 메뉴·게시물 목록 캡처를 확인했다.
+첫 화면 fixture는 켬 0·끔 357·프로필 예외 344프레임으로 결과를 구분했다.
 
 ## 반복 검토에서 유지한 원칙
 
@@ -530,9 +581,9 @@ snapshot을 갱신한다. 외부 HTTPS 목록의 구독·사용 여부·삭제�
 
 | 범위 | 순서와 현재 남은 부분 |
 | --- | --- |
-| 목록 관리 | 공식 두 목록과 외부 구독의 갱신·복구, 설정 UI 연결. 다음 범위는 커뮤니티 패키지 배포다. |
+| 목록 관리 | Brave 카탈로그 기본·개인정보·한국어 목록과 외부 구독의 갱신·복구, 설정 UI 연결. 실행 리소스는 고정된 앱 번들로 관리한다. |
 | 필터 호환성 | 엔진이 제공하는 procedural/action 연결은 완료. nested procedural·추가 operator 등 엔진의 미지원 문법은 이후 후보다. |
-| 외부 배포 | 나중 단계. 사용자에게 보이는 고지·source 접근 안내와 Windows 빌드 검증. 현재 검증 범위는 macOS 개발 앱이다. |
+| 외부 배포 | 나중 단계. 사용자에게 보이는 고지·source 접근 안내가 필요하며 개발 앱과 배포판의 검증을 구분한다. |
 
 별도 UI·Agent 작업의 판정은 [Browser Surface 검증](browser-surface-validation/results.md)과
 [Agent 다음 작업](agent-browser-worklist.md)을 따른다.
@@ -550,12 +601,11 @@ host 입력을 사용하는 임시 CLI 제어다. 제품 UI의 사이트별 예�
 지원하는 대체 응답·URL 변환·removeparam을 연결한다. 엔진이 파싱할 수 있는 모든
 동작을 실행하는 것은 아니다. 지원하는 procedural/action의 범위는 위의 문서 처리에 명시했다.
 CSP response directive는 위의 document/subdocument 응답 경로에 연결했다.
-WebSocket/WebTransport 연결에는 Yee interceptor가 없다. `about:blank/srcdoc` 문서의
+WS/WSS와 WebTransport 연결은 위의 browser 관문을 사용한다. `about:blank/srcdoc` 문서의
 cosmetic 처리는 frame의 상속 HTTP(S) origin으로 연결했으며 실제 fixture 탭에서 확인했다.
 HTTP(S) 최상위 문서를 로컬에서 확인할 수 있는 blob iframe도 같은 origin 규칙을 사용한다.
-HTTP 캐시 응답은 요청 proxy를 통과한다. 반면 Service Worker가 CacheStorage에서 직접
-돌려주는 응답은 HTTP(S) factory를 거치지 않아 network 규칙으로 차단되지 않는다.
-이는 native fixture에서 확인한 경계이며, 차단 성공으로 집계하지 않는다.
+HTTP 캐시와 Service Worker가 CacheStorage·합성 응답으로 돌려주는 요청은 위 관문을
+통과한다. URL·요청 종류에 맞는 필터를 실행하며 응답 내용에서 광고를 추론하지 않는다.
 inherited/opaque 문맥과 speculative loading의 모든 조합을 검증한 상태는 아니다.
 일반 CSS와 document MutationObserver는 shadow root 내부를 관찰하거나 관통하지 않는다.
 쿠키 격리·fingerprinting·CNAME 방어까지 포함한 Shields 전체 구현은 아니다.

@@ -327,22 +327,24 @@ index 08949a6941..0e6810e730 100644
      return false;
    }
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
-index b72da324da..cb28d556e6 100644
+index b72da324da..544f575e59 100644
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -4,6 +4,11 @@
+@@ -4,6 +4,13 @@
  
  #include "chrome/browser/chrome_content_browser_client.h"
  
-+#include "chrome/browser/yee_content_blocking/filtering_url_loader_factory.h"
 +#include "chrome/browser/yee_content_blocking/baseline_list_updater.h"
-+#include "components/yee_content_blocking/settings.h"
++#include "chrome/browser/yee_content_blocking/filtering_url_loader_factory.h"
++#include "chrome/browser/yee_content_blocking/transport_filtering.h"
 +#include "components/yee_content_blocking/baseline_list_store.h"
++#include "components/yee_content_blocking/settings.h"
++#include "content/public/browser/websocket_policy.h"
 +
  #include <algorithm>
  #include <iterator>
  #include <map>
-@@ -342,6 +347,7 @@
+@@ -342,6 +349,7 @@
  #include "content/public/browser/browser_url_handler.h"
  #include "content/public/browser/certificate_request_result_type.h"
  #include "content/public/browser/child_process_data.h"
@@ -350,10 +352,12 @@ index b72da324da..cb28d556e6 100644
  #include "content/public/browser/child_process_security_policy.h"
  #include "content/public/browser/client_certificate_delegate.h"
  #include "content/public/browser/digital_identity_provider.h"
-@@ -1752,6 +1758,23 @@ void ChromeContentBrowserClient::MaybeSetTargetNetwork(
+@@ -1752,6 +1760,25 @@ void ChromeContentBrowserClient::MaybeSetTargetNetwork(
  
  std::unique_ptr<content::BrowserMainParts>
  ChromeContentBrowserClient::CreateBrowserMainParts(bool is_integration_test) {
++  content::SetWebSocketPolicyCallback(
++      base::BindRepeating(&yee::content_blocking::FilterWebSocket));
 +  content::SetChildProcessSharedMemoryProvider(base::BindRepeating(
 +      [](const base::CommandLine& command) {
 +        std::vector<content::ChildProcessSharedMemoryRegion> regions;
@@ -374,7 +378,7 @@ index b72da324da..cb28d556e6 100644
    return ChromeBrowserMainParts::Create(
        is_integration_test, &startup_data_,
        base::BindOnce(&ChromeContentBrowserClient::InitOnUIThread,
-@@ -2882,6 +2905,7 @@ void MaybeAppendBlinkSettingsSwitchForFieldTrial(
+@@ -2882,6 +2909,7 @@ void MaybeAppendBlinkSettingsSwitchForFieldTrial(
  void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
      base::CommandLine* command_line,
      int child_process_id) {
@@ -382,7 +386,7 @@ index b72da324da..cb28d556e6 100644
    crash_keys::AppendStringAnnotationsCommandLineSwitch(command_line);
  #if BUILDFLAG(IS_MAC)
    std::unique_ptr<metrics::ClientInfo> client_info =
-@@ -6662,6 +6686,17 @@ void ChromeContentBrowserClient::WillCreateURLLoaderFactory(
+@@ -6662,6 +6690,17 @@ void ChromeContentBrowserClient::WillCreateURLLoaderFactory(
  #endif  // BUILDFLAG (ENABLE_EXTENSIONS_CORE)
  #endif  // BUILDFLAG(ENABLE_GUEST_VIEW)
  
@@ -400,6 +404,91 @@ index b72da324da..cb28d556e6 100644
    MaybeSetTargetNetwork(GetBoundNetworkFromRenderFrameHost(frame),
                          factory_builder, is_for_network_service);
  
+@@ -6815,33 +6854,60 @@ void ChromeContentBrowserClient::WillCreateWebTransport(
+     mojo::PendingRemote<network::mojom::WebTransportHandshakeClient>
+         handshake_client,
+     WillCreateWebTransportCallback callback) {
++  auto* process = content::RenderProcessHost::FromID(process_id);
++  auto* frame = content::RenderFrameHost::FromID(process_id, frame_routing_id);
++  const auto top =
++      frame ? frame->GetOutermostMainFrame()->GetLastCommittedOrigin()
++            : initiator_origin;
++  yee::content_blocking::FilterWebTransport(
++      process ? process->GetBrowserContext() : nullptr, frame, url,
++      initiator_origin, top, std::move(handshake_client),
++      base::BindOnce(
++          [](int process_id, int frame_routing_id, GURL url,
++             url::Origin initiator_origin,
++             WillCreateWebTransportCallback callback, bool blocked,
++             mojo::PendingRemote<network::mojom::WebTransportHandshakeClient>
++                 handshake_client) {
++            if (blocked) {
++              auto error = network::mojom::WebTransportError::New();
++              error->net_error = net::ERR_BLOCKED_BY_CLIENT;
++              error->details = "Blocked by Yee";
++              std::move(callback).Run(std::move(handshake_client),
++                                      std::move(error));
++              return;
++            }
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+-  // TODO(crbug.com/40195467): Add a unit test which calls
+-  // ChromeContentBrowserClient::WillCreateWebTransport() with invalid process
+-  // id and routing id.
+-  auto* render_process_host = content::RenderProcessHost::FromID(process_id);
+-  if (!render_process_host) {
+-    std::move(callback).Run(std::move(handshake_client), std::nullopt);
+-    return;
+-  }
+-  content::BrowserContext* browser_context =
+-      render_process_host->GetBrowserContext();
+-  auto* web_request_api =
+-      extensions::BrowserContextKeyedAPIFactory<extensions::WebRequestAPI>::Get(
+-          browser_context);
+-  // NOTE: Some unit test environments do not initialize BrowserContextKeyedAPI
+-  // factories like WebRequestAPI.
+-  if (!web_request_api) {
+-    std::move(callback).Run(std::move(handshake_client), std::nullopt);
+-    return;
+-  }
+-  web_request_api->ProxyWebTransport(
+-      *render_process_host, frame_routing_id, url, initiator_origin,
+-      std::move(handshake_client), std::move(callback));
++            DCHECK_CURRENTLY_ON(BrowserThread::UI);
++            // TODO(crbug.com/40195467): Add a unit test which calls
++            // ChromeContentBrowserClient::WillCreateWebTransport() with invalid
++            // process id and routing id.
++            auto* render_process_host =
++                content::RenderProcessHost::FromID(process_id);
++            if (!render_process_host) {
++              std::move(callback).Run(std::move(handshake_client),
++                                      std::nullopt);
++              return;
++            }
++            content::BrowserContext* browser_context =
++                render_process_host->GetBrowserContext();
++            auto* web_request_api = extensions::BrowserContextKeyedAPIFactory<
++                extensions::WebRequestAPI>::Get(browser_context);
++            // NOTE: Some unit test environments do not initialize
++            // BrowserContextKeyedAPI factories like WebRequestAPI.
++            if (!web_request_api) {
++              std::move(callback).Run(std::move(handshake_client),
++                                      std::nullopt);
++              return;
++            }
++            web_request_api->ProxyWebTransport(
++                *render_process_host, frame_routing_id, url, initiator_origin,
++                std::move(handshake_client), std::move(callback));
+ #else
+-  std::move(callback).Run(std::move(handshake_client), std::nullopt);
++            std::move(callback).Run(std::move(handshake_client), std::nullopt);
+ #endif
++          },
++          process_id, frame_routing_id, url, initiator_origin,
++          std::move(callback)));
+ }
+ 
+ bool ChromeContentBrowserClient::WillCreateRestrictedCookieManager(
 diff --git a/chrome/browser/content_settings/BUILD.gn b/chrome/browser/content_settings/BUILD.gn
 index d72bd31a8d..5d93366ecd 100644
 --- a/chrome/browser/content_settings/BUILD.gn
@@ -32528,3 +32617,427 @@ index 4da3bb5e16..c32c20982e 100644
  // Deactivate() function is flaky on Mac. Test is flaky on Linux Wayland because
  // activation events are asynchronous.
  #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+diff --git a/content/public/browser/websocket_policy.h b/content/public/browser/websocket_policy.h
+new file mode 100644
+--- /dev/null
++++ b/content/public/browser/websocket_policy.h
+@@ -0,0 +1,25 @@
++// Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
++#ifndef CONTENT_PUBLIC_BROWSER_WEBSOCKET_POLICY_H_
++#define CONTENT_PUBLIC_BROWSER_WEBSOCKET_POLICY_H_
++#include "base/functional/callback.h"
++#include "content/common/content_export.h"
++#include "mojo/public/cpp/bindings/pending_remote.h"
++#include "services/network/public/mojom/websocket.mojom-forward.h"
++#include "url/origin.h"
++namespace content {
++class BrowserContext;
++class RenderFrameHost;
++using WebSocketPolicyCallback = base::RepeatingCallback<void(
++    BrowserContext*,
++    RenderFrameHost*,
++    const GURL&,
++    const url::Origin&,
++    const url::Origin&,
++    mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>,
++    base::OnceCallback<void(
++        mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>)>)>;
++// 시작 시 UI thread에서 등록한다. 출처는 connector가 확인한 브라우저 문맥이다.
++CONTENT_EXPORT void SetWebSocketPolicyCallback(
++    WebSocketPolicyCallback callback);
++}  // namespace content
++#endif
+diff --git a/content/browser/loader/navigation_url_loader_impl.cc b/content/browser/loader/navigation_url_loader_impl.cc
+index 6c5241861e..213ea93de8 100644
+--- a/content/browser/loader/navigation_url_loader_impl.cc
++++ b/content/browser/loader/navigation_url_loader_impl.cc
+@@ -911,6 +911,28 @@ void NavigationURLLoaderImpl::StartInterceptedRequest(
+   loader_holder_.OnExclusiveTaskCompleted(
+       LoaderHolder::ExclusiveTaskType::kInterceptor);
+ 
++  // 서비스 워커의 navigation 응답에도 일반 factory 정책을 먼저 적용한다.
++  if (resource_request().url.SchemeIsHTTPOrHTTPS()) {
++    auto* node = FrameTreeNode::GloballyFindByID(frame_tree_node_id_);
++    if (!node || !node->navigation_request())
++      return;
++    auto* frame = node->current_frame_host();
++    single_request_factory = url_loader_factory::Create(
++        ContentBrowserClient::URLLoaderFactoryType::kNavigation,
++        url_loader_factory::TerminalParams::ForNonNetwork(
++            std::move(single_request_factory),
++            network::mojom::kBrowserProcessId),
++        url_loader_factory::ContentClientParams(
++            browser_context_, frame, frame->GetProcess()->GetDeprecatedID(),
++            resource_request().request_initiator.value_or(url::Origin()),
++            request_info_->isolation_info,
++            ukm::SourceIdObj::FromInt64(ukm_source_id_),
++            /*bypass_redirect_checks=*/nullptr,
++            node->navigation_request()->GetNavigationId(),
++            GetUIThreadTaskRunner(
++                {BrowserTaskType::kNavigationNetworkResponse})));
++  }
++
+   std::vector<std::unique_ptr<blink::URLLoaderThrottle>> additional_throttles;
+   // Intercepted requests need MimeSniffingThrottle to do mime sniffing.
+   // Non-intercepted requests usually go through the regular network
+diff --git a/content/browser/service_worker/service_worker_container_host.cc b/content/browser/service_worker/service_worker_container_host.cc
+index 3b9dccf67f..2f94702400 100644
+--- a/content/browser/service_worker/service_worker_container_host.cc
++++ b/content/browser/service_worker/service_worker_container_host.cc
+@@ -16,6 +16,7 @@
+ #include "base/metrics/histogram_functions.h"
+ #include "base/strings/stringprintf.h"
+ #include "base/task/single_thread_task_runner.h"
++#include "content/browser/loader/url_loader_factory_utils.h"
+ #include "content/browser/service_worker/service_worker_client.h"
+ #include "content/browser/service_worker/service_worker_consts.h"
+ #include "content/browser/service_worker/service_worker_context_core.h"
+@@ -342,6 +343,45 @@ void ServiceWorkerContainerHost::CloneContainerHost(
+   additional_receivers_.Add(this, std::move(receiver));
+ }
+ 
++void ServiceWorkerContainerHost::WrapSubresourceLoaderFactory(
++    mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
++    mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream) {
++  // 서비스 워커 자체는 다른 서비스 워커에 의해 제어되지 않는다.
++  mojo::ReportBadMessage(
++      "Only controlled clients may wrap a subresource factory");
++}
++
++void ServiceWorkerContainerHostForClient::WrapSubresourceLoaderFactory(
++    mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
++    mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (!service_worker_client_ || !context() ||
++      !context()->wrapper()->browser_context())
++    return;
++  const auto& client = service_worker_client();
++  auto* frame = client.IsContainerForWindowClient()
++                    ? RenderFrameHostImpl::FromID(client.GetRenderFrameHostId())
++                    : nullptr;
++  if (client.IsContainerForWindowClient() && !frame)
++    return;
++  const auto& origin = client.key().origin();
++  const auto top = client.top_frame_origin().value_or(origin);
++  const auto isolation = net::IsolationInfo::Create(
++      net::IsolationInfo::RequestType::kOther, top, origin,
++      net::SiteForCookies(), client.key().nonce());
++  url_loader_factory::CreateAndConnectToPendingReceiver(
++      std::move(receiver),
++      client.IsContainerForWindowClient()
++          ? ContentBrowserClient::URLLoaderFactoryType::kDocumentSubResource
++          : ContentBrowserClient::URLLoaderFactoryType::kWorkerSubResource,
++      url_loader_factory::TerminalParams::ForNonNetwork(
++          std::move(downstream), client.GetProcessId().GetUnsafeValue()),
++      url_loader_factory::ContentClientParams(
++          context()->wrapper()->browser_context(), frame,
++          client.GetProcessId().GetUnsafeValue(), origin, isolation,
++          ukm::SourceIdObj::FromInt64(ukm_source_id_)));
++}
++
+ void ServiceWorkerContainerHostForClient::HintToUpdateServiceWorker() {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+   service_worker_client().HintToUpdateServiceWorker();
+diff --git a/content/browser/service_worker/service_worker_container_host.h b/content/browser/service_worker/service_worker_container_host.h
+index c75399de04..25ec2305c1 100644
+--- a/content/browser/service_worker/service_worker_container_host.h
++++ b/content/browser/service_worker/service_worker_container_host.h
+@@ -174,6 +174,10 @@ class CONTENT_EXPORT ServiceWorkerContainerHost
+   void CloneContainerHost(
+       mojo::PendingReceiver<blink::mojom::ServiceWorkerContainerHost> receiver)
+       override;
++  void WrapSubresourceLoaderFactory(
++      mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
++      mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream)
++      override;
+ 
+   virtual const base::WeakPtr<ServiceWorkerContextCore>& context() const = 0;
+   virtual base::WeakPtr<ServiceWorkerContainerHost> AsWeakPtr() = 0;
+@@ -311,6 +315,10 @@ class CONTENT_EXPORT ServiceWorkerContainerHostForClient final
+   void EnsureFileAccess(const std::vector<base::FilePath>& file_paths,
+                         EnsureFileAccessCallback callback) override;
+   void OnExecutionReady() override;
++  void WrapSubresourceLoaderFactory(
++      mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
++      mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream)
++      override;
+ 
+   // Implements ServiceWorkerContainerHost.
+   const base::WeakPtr<ServiceWorkerContextCore>& context() const override;
+diff --git a/content/browser/websockets/websocket_connector_impl.cc b/content/browser/websockets/websocket_connector_impl.cc
+index cbcaed4ff4..748a986162 100644
+--- a/content/browser/websockets/websocket_connector_impl.cc
++++ b/content/browser/websockets/websocket_connector_impl.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
+ 
+ #include "base/command_line.h"
++#include "base/no_destructor.h"
+ #include "base/not_fatal_until.h"
+ #include "content/browser/devtools/devtools_instrumentation.h"
+ #include "content/browser/renderer_host/render_frame_host_impl.h"
+@@ -14,6 +15,7 @@
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_process_host.h"
+ #include "content/public/browser/storage_partition.h"
++#include "content/public/browser/websocket_policy.h"
+ #include "content/public/common/child_process_id_util.h"
+ #include "content/public/common/content_client.h"
+ #include "content/public/common/content_switches.h"
+@@ -28,6 +30,11 @@ namespace content {
+ 
+ namespace {
+ 
++WebSocketPolicyCallback& PolicyCallback() {
++  static base::NoDestructor<WebSocketPolicyCallback> callback;
++  return *callback;
++}
++
+ url::Origin MaybeTreatLocalOriginAsOpaque(const url::Origin& origin) {
+   if (std::ranges::contains(url::GetLocalSchemes(), origin.scheme()) &&
+       !base::CommandLine::ForCurrentProcess()->HasSwitch(
+@@ -64,6 +71,10 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
+           policy_exception_justification:
+             "Not implemented. WebSocket is a core web platform API."
+         })");
++}  // namespace
++
++void SetWebSocketPolicyCallback(WebSocketPolicyCallback callback) {
++  PolicyCallback() = std::move(callback);
+ }
+ 
+ WebSocketConnectorImpl::WebSocketConnectorImpl(
+@@ -130,29 +141,53 @@ void WebSocketConnectorImpl::Connect(
+       options.options, std::move(throttling_profile_id),
+       network_restrictions_id_);
+ 
+-  if (GetContentClient()->browser()->WillInterceptWebSocket(frame)) {
+-    GetContentClient()->browser()->CreateWebSocket(
+-        frame, std::move(factory), url, isolation_info_.site_for_cookies(),
+-        user_agent, std::move(handshake_client), std::move(options));
+-    return;
+-  }
++  auto continue_connect = base::BindOnce(
++      [](GlobalRenderFrameHostId frame_id, WeakDocumentPtr document,
++         ContentBrowserClient::WebSocketFactory factory, GURL url,
++         net::SiteForCookies site_for_cookies,
++         std::optional<std::string> user_agent,
++         ContentBrowserClient::WebSocketOptions options,
++         std::optional<base::UnguessableToken> devtools_worker_token,
++         mojo::PendingRemote<network::mojom::WebSocketHandshakeClient> client) {
++        if (frame_id.frame_routing_id != IPC::mojom::kRoutingIdNone &&
++            !document.AsRenderFrameHostIfValid())
++          return;
++        auto* frame = RenderFrameHost::FromID(frame_id);
++        if (GetContentClient()->browser()->WillInterceptWebSocket(frame)) {
++          GetContentClient()->browser()->CreateWebSocket(
++              frame, std::move(factory), url, site_for_cookies, user_agent,
++              std::move(client), std::move(options));
++          return;
++        }
+ 
+-  net::HttpRequestHeaders headers;
+-  if (user_agent) {
+-    headers.SetHeader(net::HttpRequestHeaders::kUserAgent, *user_agent);
+-  }
+-  devtools_instrumentation::ApplyExtraHeadersForWebSocket(
+-      frame_id_, devtools_worker_token_, &headers);
++        net::HttpRequestHeaders headers;
++        if (user_agent) {
++          headers.SetHeader(net::HttpRequestHeaders::kUserAgent, *user_agent);
++        }
++        devtools_instrumentation::ApplyExtraHeadersForWebSocket(
++            frame_id, devtools_worker_token, &headers);
+ 
+-  std::vector<network::mojom::HttpHeaderPtr> additional_headers;
+-  for (net::HttpRequestHeaders::Iterator it(headers); it.GetNext();) {
+-    additional_headers.push_back(
+-        network::mojom::HttpHeader::New(it.name(), it.value()));
+-  }
++        std::vector<network::mojom::HttpHeaderPtr> additional_headers;
++        for (net::HttpRequestHeaders::Iterator it(headers); it.GetNext();) {
++          additional_headers.push_back(
++              network::mojom::HttpHeader::New(it.name(), it.value()));
++        }
+ 
+-  std::move(factory).Run(url, std::move(additional_headers),
+-                         std::move(handshake_client), mojo::NullRemote(),
+-                         std::move(options.header_client));
++        std::move(factory).Run(url, std::move(additional_headers),
++                               std::move(client), mojo::NullRemote(),
++                               std::move(options.header_client));
++      },
++      frame_id_, weak_document_, std::move(factory), url,
++      isolation_info_.site_for_cookies(), user_agent, std::move(options),
++      devtools_worker_token_);
++  if (PolicyCallback()) {
++    PolicyCallback().Run(process->GetBrowserContext(), frame, url, origin_,
++                         isolation_info_.top_frame_origin().value_or(origin_),
++                         std::move(handshake_client),
++                         std::move(continue_connect));
++  } else {
++    std::move(continue_connect).Run(std::move(handshake_client));
++  }
+ }
+ 
+ void WebSocketConnectorImpl::ConnectCalledByContentBrowserClient(
+diff --git a/content/browser/worker_host/worker_script_loader.cc b/content/browser/worker_host/worker_script_loader.cc
+index 5a9aa12d71..64979d875d 100644
+--- a/content/browser/worker_host/worker_script_loader.cc
++++ b/content/browser/worker_host/worker_script_loader.cc
+@@ -7,6 +7,7 @@
+ #include "base/functional/bind.h"
+ #include "content/browser/loader/navigation_loader_interceptor.h"
+ #include "content/browser/loader/response_head_update_params.h"
++#include "content/browser/loader/url_loader_factory_utils.h"
+ #include "content/browser/service_worker/service_worker_client.h"
+ #include "content/browser/service_worker/service_worker_main_resource_handle.h"
+ #include "content/browser/service_worker/service_worker_main_resource_loader_interceptor.h"
+@@ -37,6 +38,8 @@ WorkerScriptLoader::WorkerScriptLoader(
+     scoped_refptr<network::SharedURLLoaderFactory> default_loader_factory,
+     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
+     : request_id_(request_id),
++      process_id_(process_id),
++      isolation_info_(isolation_info),
+       options_(options),
+       resource_request_(resource_request),
+       client_(std::move(client)),
+@@ -129,7 +132,21 @@ void WorkerScriptLoader::MaybeStartLoader(
+ 
+   if (interceptor_result && interceptor_result->single_request_factory) {
+     // The interceptor elected to handle the request. Use it.
+-    url_loader_factory_ = std::move(interceptor_result->single_request_factory);
++    auto* browser_context = browser_context_getter_.Run();
++    if (!browser_context) {
++      Abort();
++      return;
++    }
++    url_loader_factory_ = url_loader_factory::Create(
++        ContentBrowserClient::URLLoaderFactoryType::kWorkerMainResource,
++        url_loader_factory::TerminalParams::ForNonNetwork(
++            std::move(interceptor_result->single_request_factory),
++            process_id_.GetUnsafeValue()),
++        url_loader_factory::ContentClientParams(
++            browser_context, nullptr, process_id_.GetUnsafeValue(),
++            resource_request_.request_initiator.value_or(url::Origin()),
++            isolation_info_,
++            ukm::SourceIdObj::FromInt64(ukm::kInvalidSourceId)));
+     url_loader_.reset();
+     url_loader_factory_->CreateLoaderAndStart(
+         url_loader_.BindNewPipeAndPassReceiver(), request_id_, options_,
+diff --git a/content/browser/worker_host/worker_script_loader.h b/content/browser/worker_host/worker_script_loader.h
+index 3311f12a63..0c5963ef81 100644
+--- a/content/browser/worker_host/worker_script_loader.h
++++ b/content/browser/worker_host/worker_script_loader.h
+@@ -16,6 +16,7 @@
+ #include "mojo/public/cpp/bindings/pending_remote.h"
+ #include "mojo/public/cpp/bindings/receiver.h"
+ #include "mojo/public/cpp/bindings/remote.h"
++#include "net/base/isolation_info.h"
+ #include "net/base/load_timing_info.h"
+ #include "net/traffic_annotation/network_traffic_annotation.h"
+ #include "net/url_request/url_request.h"
+@@ -119,6 +120,8 @@ class CONTENT_EXPORT WorkerScriptLoader
+   std::unique_ptr<ServiceWorkerMainResourceLoaderInterceptor> interceptor_;
+ 
+   const int32_t request_id_;
++  const ChildProcessId process_id_;
++  const net::IsolationInfo isolation_info_;
+   const uint32_t options_;
+   network::ResourceRequest resource_request_;
+   mojo::Remote<network::mojom::URLLoaderClient> client_;
+diff --git a/content/public/browser/BUILD.gn b/content/public/browser/BUILD.gn
+index b93a897d32..6756033bb3 100644
+--- a/content/public/browser/BUILD.gn
++++ b/content/public/browser/BUILD.gn
+@@ -549,6 +549,7 @@ source_set("browser_sources") {
+     "webrtc_log.h",
+     "webrtc_recording.h",
+     "websocket_handshake_request_info.h",
++    "websocket_policy.h",
+     "webui_config.cc",
+     "webui_config.h",
+     "webui_config_map.cc",
+diff --git a/content/renderer/renderer_blink_platform_impl.cc b/content/renderer/renderer_blink_platform_impl.cc
+index 4341f407c4..5ed6a75144 100644
+--- a/content/renderer/renderer_blink_platform_impl.cc
++++ b/content/renderer/renderer_blink_platform_impl.cc
+@@ -986,9 +986,15 @@ void RendererBlinkPlatformImpl::CreateServiceWorkerSubresourceLoaderFactory(
+   // if there is such use case. As of 2023-06-01, only
+   // `DedicatedOrSharedWorkerGlobalScopeContextImpl` calls the function, and
+   // no need to allow it set the `router_rules`.
++  mojo::Remote<blink::mojom::ServiceWorkerContainerHost> host(
++      std::move(service_worker_container_host));
++  mojo::PendingRemote<network::mojom::URLLoaderFactory> raw_factory;
++  auto raw_receiver = raw_factory.InitWithNewPipeAndPassReceiver();
++  host->WrapSubresourceLoaderFactory(std::move(receiver),
++                                     std::move(raw_factory));
+   ServiceWorkerSubresourceLoaderFactory::Create(
+       base::MakeRefCounted<ControllerServiceWorkerConnector>(
+-          std::move(service_worker_container_host),
++          host.Unbind(),
+           /*remote_controller=*/mojo::NullRemote(),
+           /*remote_cache_storage=*/mojo::NullRemote(), client_id.Utf8(),
+           blink::mojom::ServiceWorkerFetchHandlerBypassOption::kDefault,
+@@ -999,7 +1005,7 @@ void RendererBlinkPlatformImpl::CreateServiceWorkerSubresourceLoaderFactory(
+           blink::EmbeddedWorkerStatus::kStopped,
+           /*running_status_receiver=*/mojo::NullReceiver()),
+       network::SharedURLLoaderFactory::Create(std::move(fallback_factory)),
+-      std::move(receiver), std::move(task_runner));
++      std::move(raw_receiver), std::move(task_runner));
+ }
+ 
+ //------------------------------------------------------------------------------
+diff --git a/content/renderer/service_worker/service_worker_provider_context.cc b/content/renderer/service_worker/service_worker_provider_context.cc
+index 898781723d..fb81da855f 100644
+--- a/content/renderer/service_worker/service_worker_provider_context.cc
++++ b/content/renderer/service_worker/service_worker_provider_context.cc
+@@ -71,8 +71,14 @@ void CreateSubresourceLoaderFactoryForProviderContext(
+         connector_receiver,
+     mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
+     scoped_refptr<base::SequencedTaskRunner> task_runner) {
++  mojo::Remote<blink::mojom::ServiceWorkerContainerHost> host(
++      std::move(remote_container_host));
++  mojo::PendingRemote<network::mojom::URLLoaderFactory> raw_factory;
++  auto raw_receiver = raw_factory.InitWithNewPipeAndPassReceiver();
++  host->WrapSubresourceLoaderFactory(std::move(receiver),
++                                     std::move(raw_factory));
+   auto connector = base::MakeRefCounted<ControllerServiceWorkerConnector>(
+-      std::move(remote_container_host), std::move(remote_controller),
++      host.Unbind(), std::move(remote_controller),
+       std::move(remote_cache_storage), client_id, fetch_handler_bypass_option,
+       router_rules, cross_origin_embedder_policy,
+       std::move(cross_origin_embedder_policy_reporter),
+@@ -83,7 +89,7 @@ void CreateSubresourceLoaderFactoryForProviderContext(
+       std::move(connector),
+       network::SharedURLLoaderFactory::Create(
+           std::move(pending_fallback_factory)),
+-      std::move(receiver), std::move(task_runner));
++      std::move(raw_receiver), std::move(task_runner));
+ }
+ }  // namespace
+ 
+diff --git a/third_party/blink/public/mojom/service_worker/service_worker_container.mojom b/third_party/blink/public/mojom/service_worker/service_worker_container.mojom
+index 0b315d3092..337b6b5371 100644
+--- a/third_party/blink/public/mojom/service_worker/service_worker_container.mojom
++++ b/third_party/blink/public/mojom/service_worker/service_worker_container.mojom
+@@ -5,6 +5,7 @@
+ module blink.mojom;
+ 
+ import "mojo/public/mojom/base/file_path.mojom";
++import "services/network/public/mojom/url_loader_factory.mojom";
+ import "third_party/blink/public/mojom/loader/fetch_client_settings_object.mojom";
+ import "third_party/blink/public/mojom/messaging/transferable_message.mojom";
+ import "third_party/blink/public/mojom/service_worker/controller_service_worker.mojom";
+@@ -103,6 +104,11 @@ interface ServiceWorkerContainerHost {
+   // Makes a new endpoint to this ServiceWorkerContainerHost.
+   CloneContainerHost(pending_receiver<ServiceWorkerContainerHost> container_host);
+ 
++  // 창·워커의 서비스 워커 요청 앞에 브라우저의 일반 factory 정책을 연결한다.
++  WrapSubresourceLoaderFactory(
++      pending_receiver<network.mojom.URLLoaderFactory> receiver,
++      pending_remote<network.mojom.URLLoaderFactory> downstream);
++
+   // Gives a hint to the browser process to update the service worker after a
+   // controlled page load. This message is meant to be sent at a time when page
+   // load is no longer busy, so update doesn't adversely affect performance.

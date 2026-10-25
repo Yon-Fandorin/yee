@@ -546,6 +546,46 @@ scoped_refptr<base::SingleThreadTaskRunner> MatchingRunner() {
 }
 }  // namespace
 
+void CheckTransportRequest(content::BrowserContext* browser_context,
+                           const GURL& url,
+                           const url::Origin& initiator,
+                           const url::Origin& top_site,
+                           TransportKind kind,
+                           base::OnceCallback<void(bool)> reply) {
+  scoped_refptr<ContentBlockingSettingsSnapshot> settings;
+  if (browser_context) {
+    if (auto* service = ContentBlockingServiceFactory::GetForProfile(
+            Profile::FromBrowserContext(browser_context)))
+      settings = service->settings_snapshot();
+  }
+  const GURL site = top_site.GetURL().SchemeIsHTTPOrHTTPS()
+                        ? top_site.GetURL()
+                        : initiator.GetURL();
+  MatchingRunner()->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          [](GURL url, GURL source, GURL site, TransportKind kind,
+             scoped_refptr<ContentBlockingSettingsSnapshot> settings) {
+            if ((kind == TransportKind::kWebSocket ? !url.SchemeIsWSOrWSS()
+                                                   : !url.SchemeIs("https")) ||
+                (settings ? !settings->EnabledForSite(site)
+                          : !EnabledForSite(site)))
+              return false;
+            if (settings && settings->IsBlockedDomain(url))
+              return true;
+            if (!source.SchemeIsHTTPOrHTTPS())
+              source = site;
+            return BundledEngineForCurrentSequence()
+                .Evaluate(
+                    url.spec(), source.spec(),
+                    kind == TransportKind::kWebSocket ? "websocket" : "other",
+                    kind == TransportKind::kWebSocket ? "GET" : "CONNECT")
+                .blocked;
+          },
+          url, initiator.GetURL(), site, kind, std::move(settings)),
+      std::move(reply));
+}
+
 void MaybeAppendFilteringFactory(network::URLLoaderFactoryBuilder& builder,
                                  const url::Origin& initiator,
                                  const url::Origin& top_site,

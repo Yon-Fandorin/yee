@@ -1,5 +1,16 @@
 ! Test-only rules, enabled with --yee-content-blocking-test-rules.
 ||yee-block.test^
+||yee-socket.test^$websocket
+@@||yee-socket.test^*allowed^$websocket
+||yee-transport.test^$other
+||yee-transport-method.test^$other,method=get
+@@||yee-transport.test^*allowed^$other
+||yee-fixture.test^*/sw-blocked-
+||yee-fixture.test^*/sw-replacement.js$redirect=blank-js
+||yee-fixture.test^*/sw-query^$removeparam=tracking
+||yee-fixture.test^*/sw-frame^$subdocument
+||yee-fixture.test^*/sw-main^$document
+||yee-fixture.test^*/sw-worker-blocked.js$script
 @@||yee-block.test/allowed^
 yee-fixture.test##.yee-ad
 ##.yee-generic-ad

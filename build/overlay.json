@@ -91,6 +91,7 @@
     "chrome/browser/resources/webui_browser/icons.html.ts"
   ],
   "new_glue": [
+    "content/public/browser/websocket_policy.h",
     "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.cc",
     "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.h",
     "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc"
