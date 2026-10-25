@@ -87,13 +87,33 @@ for(const scenario of ['on','off','exception']) {
       await page.call('Fetch.disable');
       await page.call('Page.navigate',{url:'https://www.dogdrip.net/'});
       await pause(5000);
-      const live=JSON.parse((await page.call('Runtime.evaluate',{expression:'JSON.stringify({title:document.title,samples:window.__yeePaintTrace.samples})',returnByValue:true})).result.value);
+      const live=JSON.parse((await page.call('Runtime.evaluate',{expression:`JSON.stringify({
+        title:document.title,samples:window.__yeePaintTrace.samples,
+        bodyText:document.body.innerText.length,
+        visibleLinks:[...document.querySelectorAll('a')].filter(e=>{
+          const r=e.getBoundingClientRect();
+          if(!e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})||
+            r.width<=0||r.height<=0||r.top>=innerHeight||r.bottom<=0||
+            r.left>=innerWidth||r.right<=0)return false;
+          const x=(Math.max(0,r.left)+Math.min(innerWidth-1,r.right))/2;
+          const y=(Math.max(0,r.top)+Math.min(innerHeight-1,r.bottom))/2;
+          const painted=document.elementFromPoint(x,y);
+          return painted!==null&&(painted===e||e.contains(painted));
+        }).map(e=>e.innerText.trim()).filter(Boolean),
+        rootStyle:{display:getComputedStyle(document.documentElement).display,
+          visibility:getComputedStyle(document.documentElement).visibility,
+          clipPath:getComputedStyle(document.documentElement).clipPath},
+        bodyStyle:{display:getComputedStyle(document.body).display,
+          visibility:getComputedStyle(document.body).visibility,
+          clipPath:getComputedStyle(document.body).clipPath}
+      })`,returnByValue:true})).result.value);
       assert.match(live.title,/DogDrip/,'실제 개드립 본문 로드');
       live.visibleFrames=live.samples.filter(s=>s.visibleAds.length).length;
       if(mode==='verify')assert.equal(live.visibleFrames,0,'실제 개드립 광고 프레임의 초기 노출 방지');
       await fs.writeFile(path.join(output,'dogdrip.json'),JSON.stringify(live,null,2));
       const shot=await page.call('Page.captureScreenshot',{format:'png'});
       await fs.writeFile(path.join(output,'dogdrip.png'),Buffer.from(shot.data,'base64'));
+      assert.ok(live.bodyText>500&&live.visibleLinks.length>10,'실제 개드립 본문과 화면 안의 정상 링크가 표시되어야 함');
       console.log(JSON.stringify({liveDogdrip:true,visibleFrames:live.visibleFrames}));
     }
   } finally {
