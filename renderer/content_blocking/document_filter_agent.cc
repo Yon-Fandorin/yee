@@ -67,20 +67,25 @@ bool EnabledForFrame(blink::WebLocalFrame* frame) {
   const GURL site = url::Origin(frame->Top()->GetSecurityOrigin()).GetURL();
   if (!EnabledForSite(site))
     return false;
-  content::RenderFrame* render_frame =
-      content::RenderFrame::FromWebFrame(frame);
-  auto* settings_agent =
-      content_settings::ContentSettingsAgentImpl::Get(render_frame);
-  if (!settings_agent)
+  // 초기 about:blank에는 아직 설정이 없을 수 있다. 이 경우 로컬 부모의
+  // 동일한 top-level 사이트 설정으로 사이트 예외를 보존한다.
+  for (blink::WebFrame* current = frame; current && current->IsWebLocalFrame();
+       current = current->Parent()) {
+    auto* render_frame =
+        content::RenderFrame::FromWebFrame(current->ToWebLocalFrame());
+    auto* settings_agent =
+        content_settings::ContentSettingsAgentImpl::Get(render_frame);
+    auto* rules = settings_agent
+                      ? settings_agent->GetRendererContentSettingRules()
+                      : nullptr;
+    if (!rules || rules->yee_content_blocking_rules.empty())
+      continue;
+    for (const ContentSettingPatternSource& rule :
+         rules->yee_content_blocking_rules) {
+      if (rule.secondary_pattern.Matches(site))
+        return rule.GetContentSetting() != CONTENT_SETTING_BLOCK;
+    }
     return true;
-  RendererContentSettingRules* rules =
-      settings_agent->GetRendererContentSettingRules();
-  if (!rules || rules->yee_content_blocking_rules.empty())
-    return true;
-  for (const ContentSettingPatternSource& rule :
-       rules->yee_content_blocking_rules) {
-    if (rule.secondary_pattern.Matches(site))
-      return rule.GetContentSetting() != CONTENT_SETTING_BLOCK;
   }
   return true;
 }
@@ -262,6 +267,16 @@ void DocumentFilterAgent::Apply() {
   applied_ = true;
   auto* frame = render_frame()->GetWebFrame();
   GURL url(frame->GetDocument().Url());
+  if (url.SchemeIsBlob()) {
+    // 최상위 blob 탐색은 Chromium의 host별 설정 전달 대상이 아니다.
+    // 실제 HTTP(S) 최상위 문서를 확인한 iframe에만 origin 규칙을 적용한다.
+    auto* top = frame->Top();
+    if (!top->IsWebLocalFrame() ||
+        !GURL(top->ToWebLocalFrame()->GetDocument().Url())
+             .SchemeIsHTTPOrHTTPS())
+      return;
+    url = url::Origin(frame->GetSecurityOrigin()).GetURL();
+  }
   if (url.IsAboutBlank() || url.IsAboutSrcdoc())
     url = url::Origin(frame->GetSecurityOrigin()).GetURL();
   if (!url.SchemeIsHTTPOrHTTPS() || !EnabledForFrame(frame))

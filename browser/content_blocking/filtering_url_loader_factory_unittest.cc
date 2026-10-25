@@ -132,7 +132,48 @@ TEST_F(FilteringFactoryTest, BlockedRequestNeverReachesTerminal) {
   Start("https://yee-block.test/ad");
   client_.RunUntilComplete();
   EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
+  EXPECT_FALSE(client_.completion_status().should_collapse_initiator);
   EXPECT_EQ(terminal_.total_requests(), 0u);
+}
+TEST_F(FilteringFactoryTest, BlockedImageCollapsesInitiator) {
+  Connect();
+  network::ResourceRequest request;
+  request.url = GURL("https://yee-block.test/ad.png");
+  request.resource_type = static_cast<int>(blink::mojom::ResourceType::kImage);
+  request.destination = network::mojom::RequestDestination::kImage;
+  StartRequest(request);
+  client_.RunUntilComplete();
+  EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
+  EXPECT_TRUE(client_.completion_status().should_collapse_initiator);
+  EXPECT_EQ(terminal_.total_requests(), 0u);
+}
+TEST_F(FilteringFactoryTest, BlockedIframeCollapsesInitiator) {
+  ConnectNavigation();
+  StartNavigation("https://yee-block.test/ad", false);
+  client_.RunUntilComplete();
+  EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
+  EXPECT_TRUE(client_.completion_status().should_collapse_initiator);
+  EXPECT_EQ(terminal_.total_requests(), 0u);
+}
+TEST_F(FilteringFactoryTest, BlockedMainDocumentNeverCollapsesFrameTreeRoot) {
+  ConnectNavigation();
+  StartNavigation("https://yee-block.test/ad");
+  client_.RunUntilComplete();
+  EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
+  EXPECT_FALSE(client_.completion_status().should_collapse_initiator);
+}
+TEST_F(FilteringFactoryTest, UpstreamFailureDoesNotCollapseImage) {
+  terminal_.AddResponse(GURL("https://allowed.test/broken.png"), nullptr, "",
+                        network::URLLoaderCompletionStatus(net::ERR_FAILED));
+  Connect();
+  network::ResourceRequest request;
+  request.url = GURL("https://allowed.test/broken.png");
+  request.resource_type = static_cast<int>(blink::mojom::ResourceType::kImage);
+  request.destination = network::mojom::RequestDestination::kImage;
+  StartRequest(request);
+  client_.RunUntilComplete();
+  EXPECT_EQ(client_.completion_status().error_code, net::ERR_FAILED);
+  EXPECT_FALSE(client_.completion_status().should_collapse_initiator);
 }
 TEST_F(FilteringFactoryTest, AllowedResponseKeepsHeadAndBody) {
   terminal_.AddResponse("https://yee-block.test/allowed/content", "retained",

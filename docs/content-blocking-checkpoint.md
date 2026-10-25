@@ -54,6 +54,52 @@ document-start 자동 주입 fixture는 통과했다. 같은 YouTube 영상·프
 실영상 테스트의 40초대 오류는 테스트용 DOM 인터페이스 노출을 제거한 뒤
 재생 gate를 통과했다. 원인과 현재 결과는 [40초대 재생 오류](#40초대-재생-오류)에 있다.
 
+## Brave 연결 비교와 렌더링 보완 (2026-10-25)
+
+비교 기준은 Brave Core `1e6f00267d382150bac8f87266a163d36e609eb8`이다.
+카탈로그·엔진 입력부터 요청 proxy, 문서 시작, CSS·scriptlet 소비자까지 호출을
+추적했다. Shields 전체의 동등성 판정이나 모든 사이트의 차단 보장은 아니다.
+
+| 경로 | Brave와 Yee의 비교·조치 |
+| --- | --- |
+| 목록 선택·갱신 | Yee는 공식 기본·개인정보·한국어 원문을 같은 generation으로 검증한다. Brave 서비스의 실행 중 엔진 교체와 달리 다음 실행 시 적용한다. 실행 중 서로 다른 browser/renderer 목록을 사용하지 않도록 현재 snapshot을 고정한다. |
+| 실행 리소스 | 양쪽 모두 엔진에 scriptlet·redirect 저장소를 연결한다. Yee는 앱에 고정한 리소스와 권한으로 호환성을 확인하고 미지원 규칙을 원문 그대로 보존·제외한다. 새 문법이나 scriptlet을 필터 갱신만으로 지원한다고 간주하지 않는다. |
+| 요청·redirect·CSP | Yee의 navigation/subresource 종류, 원 요청의 initiator, redirect 재판정, 로컬 대체 응답, query-only removeparam, 기존 CSP 보존 경로를 확인했다. 기존 Mojo 회귀 테스트가 각 결과를 검사한다. |
+| 차단 요소의 레이아웃 | Brave proxy는 광고 차단 완료에 `should_collapse_initiator`를 전달한다. Yee에 빠졌던 이 연결을 차단된 image/subdocument에 추가했다. 최상위 탐색·일반 통신 실패·성공한 대체 응답에는 접기를 요청하지 않는다. |
+| 문서 시작·수명 | Yee는 새 문서마다 상태를 초기화하고 첫 페이지 script 이전에 엔진 결과를 적용한다. 비동기 generic 결과는 문서 교체 시 취소한다. 순수 CSS action의 첫 프레임 적용은 이전 보완을 유지한다. |
+| 초기 빈 프레임의 설정 | Brave는 설정이 없는 로컬 프레임에서 부모 설정을 찾는다. Yee도 같은 경우 부모의 top-level 사이트 예외를 찾도록 보완했다. 실제 프로필 pref의 예외에서 초기 blank에 CSS·scriptlet이 주입되던 현상을 재현했다. |
+| blob iframe | 비교한 Brave observer도 blob URL을 HTTP(S) 문서로 처리하지 않는다. Yee는 HTTP(S) 최상위 문서를 직접 확인할 수 있는 blob iframe에 한해 보안 origin의 필터를 적용하도록 확대했다. 최상위 blob·remote top·opaque origin에는 이를 확대하지 않는다. |
+| 동적 cosmetic | Yee는 class/id 수집과 procedural 조건·동작을 isolated world에서 처리하고 native user-origin CSS로 연결한다. 예외, 작업량 상한과 조건 해제 경로를 유지했다. shadow root 관통과 엔진 미지원 operator는 지원 범위 밖이다. |
+| 차단 정책 | Brave의 기본/추가 엔진과 Standard/Aggressive 분기, 검색 사이트별 정책은 Yee의 단일 켬·끔 정책과 다르다. 이번 연결 보완에서 새 모드나 별도 허용 정책을 만들지 않았다. |
+| 전송 경계 | Brave의 network helper는 WS/WSS도 검사한다. Yee의 URLLoaderFactory proxy에는 WebSocket/WebTransport interceptor가 없으며 Service Worker CacheStorage 직접 응답도 통과하지 않는다. 이 경계는 이번 렌더링 보완으로 해소되지 않는다. |
+
+대조한 공식 원본은 [네트워크 proxy](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/browser/net/brave_proxying_url_loader_factory.cc),
+[요청 helper](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/browser/net/brave_ad_block_tp_network_delegate_helper.cc),
+[엔진 wrapper](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/components/brave_shields/content/browser/ad_block_engine_wrapper.cc),
+[cosmetic handler](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/components/cosmetic_filters/renderer/cosmetic_filters_js_handler.cc),
+[frame observer](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/components/cosmetic_filters/renderer/cosmetic_filters_js_render_frame_observer.cc),
+[서비스](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/components/brave_shields/content/browser/ad_block_service.cc),
+[Rust API](https://github.com/brave/brave-core/blob/1e6f00267d382150bac8f87266a163d36e609eb8/components/brave_shields/core/common/adblock/rs/src/lib.rs)다.
+
+변경 소유자는 기존 browser 요청 proxy와 renderer 문서 agent다. 엔진은 매칭 결과와
+문서 규칙만 반환하며 Blink 접기·frame 설정·CSS 설치를 결정하지 않는다.
+새 모듈이나 Chromium glue 변경 없이 이 경계를 유지했다.
+실앱 회귀 진입점은 `node tools/dev/test-content-blocking-rendering.mjs ABSOLUTE_YEE_EXECUTABLE`이다.
+테스트는 격리 프로필과 실제 로컬 HTTP 서버에서 끔·켬·프로필 사이트 예외를 비교한다.
+이미지·iframe의 직접/redirect 차단, 정상 콘텐츠 재사용 시 복구, 통신 실패 요소 보존,
+초기 blank·srcdoc·blob의 첫 script와 CSS, opaque·remote-top·최상위 blob 경계를 검사한다.
+
+수정 전 실제 Windows Yee에서는 직접/redirect 광고 이미지가 240×90,
+광고 iframe이 244×94 영역으로 남았다. 수정 후에는 네 요소 모두 0×0으로 접히고
+정상 URL로 바꾼 이미지·iframe은 원래 크기로 돌아왔다. 정상 iframe과 일반 404 이미지의
+크기는 유지했다. 사이트 예외에서 초기 blank에 주입되던 scriptlet·CSS도 중지됐다.
+켬에서는 srcdoc·지원 범위의 blob 모두 첫 inline script 전에 scriptlet과 CSS가 적용되고,
+끔·프로필 사이트 예외에서는 유지되지 않았다. opaque·remote-top·최상위 blob 대조도
+통과했다. 새 앱 빌드와 core 78개·browser/updater/factory 77개, 총 155개 테스트를
+통과했다. 공식 카탈로그 snapshot으로 실제 개드립을 다시 확인했으며 초기 광고
+노출 프레임은 0이었다. 첫 화면 fixture도 켬 0프레임·끔 468프레임·사이트 예외
+462프레임으로 동작을 구분했고 정상 iframe은 계속 표시됐다.
+
 ## 반복 검토에서 유지한 원칙
 
 - 필터링은 navigation과 subresource의 실제 URLLoaderFactory 경로에 연결하고,
@@ -501,6 +547,7 @@ host 입력을 사용하는 임시 CLI 제어다. 제품 UI의 사이트별 예�
 CSP response directive는 위의 document/subdocument 응답 경로에 연결했다.
 WebSocket/WebTransport 연결에는 Yee interceptor가 없다. `about:blank/srcdoc` 문서의
 cosmetic 처리는 frame의 상속 HTTP(S) origin으로 연결했으며 실제 fixture 탭에서 확인했다.
+HTTP(S) 최상위 문서를 로컬에서 확인할 수 있는 blob iframe도 같은 origin 규칙을 사용한다.
 HTTP 캐시 응답은 요청 proxy를 통과한다. 반면 Service Worker가 CacheStorage에서 직접
 돌려주는 응답은 HTTP(S) factory를 거치지 않아 network 규칙으로 차단되지 않는다.
 이는 native fixture에서 확인한 경계이며, 차단 성공으로 집계하지 않는다.

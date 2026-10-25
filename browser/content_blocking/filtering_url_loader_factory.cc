@@ -443,7 +443,11 @@ class FilteringRequest final : public network::mojom::URLLoader,
   }
   void CompleteBlocked() {
     ReportBlockedRequest();
-    CompleteError(net::ERR_BLOCKED_BY_CLIENT);
+    // 광고로 차단된 iframe·이미지만 Blink에서 접는다. 최상위 탐색의
+    // FrameTreeNode는 접을 수 없고 일반 통신 오류에는 이 신호를 주지 않는다.
+    const auto type = RequestType(request_);
+    CompleteError(net::ERR_BLOCKED_BY_CLIENT,
+                  type == "subdocument" || type == "image");
   }
   void ReportBlockedRequest() {
     if (reported_blocked_request_ || !context_.frame_id ||
@@ -469,8 +473,10 @@ class FilteringRequest final : public network::mojom::URLLoader,
             },
             context_.frame_id));
   }
-  void CompleteError(int error) {
-    client_->OnComplete(network::URLLoaderCompletionStatus(error));
+  void CompleteError(int error, bool collapse_initiator = false) {
+    network::URLLoaderCompletionStatus status(error);
+    status.should_collapse_initiator = collapse_initiator;
+    client_->OnComplete(status);
     Destroy();
   }
   void UpstreamDisconnected() {
