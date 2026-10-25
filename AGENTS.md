@@ -1,6 +1,10 @@
 # Yee work rules
 
 Follow this file as process, not as a second product spec.
+Use [`CONTRIBUTING.md`](CONTRIBUTING.md) for the shared implementation,
+fresh-context review, validation, and delivery workflow. The rules below add
+repository-specific ownership and verification requirements.
+
 Product layout and names:
 
 - [`docs/browser-shell-spec.md`](docs/browser-shell-spec.md)

@@ -25,7 +25,8 @@ Chromium을 사용하고, 창의 UI와 Agent 연결은 별도 제품 코드로 �
 파일 배치는 [프로젝트 구조](docs/project-structure.md), 화면 배치와 용어는
 [브라우저 셸 명세](docs/browser-shell-spec.md)와
 [레이아웃 용어](docs/browser-shell-layout-glossary.md)를 따른다.
-작업 절차는 [`AGENTS.md`](AGENTS.md)에 있다.
+기여·구현·검수·검증 절차는 [`CONTRIBUTING.md`](CONTRIBUTING.md),
+저장소별 추가 작업 규칙은 [`AGENTS.md`](AGENTS.md)를 따른다.
 
 ## 빌드 없이 확인
 
