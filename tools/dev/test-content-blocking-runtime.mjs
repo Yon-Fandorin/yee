@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import {closeOwnedBrowser, connectCDP, requireShutdown} from './content_blocking_test_runtime.mjs';
+import {closeOwnedBrowser, connectCDP, requireShutdown, waitForShutdown} from './content_blocking_test_runtime.mjs';
 const active = () => ({pid: 123, exitCode: null, signalCode: null});
 {
   const browser = active(), calls = [];
@@ -23,6 +23,16 @@ await closeOwnedBrowser({pid: undefined}, undefined, () => {throw Error('No proc
 await assert.rejects(closeOwnedBrowser(active(), undefined, async () => {}, async () => {}), /did not exit gracefully/);
 assert.throws(() => requireShutdown([{pid: 42, executable: '/tmp/Renamed.app/Contents/MacOS/Renamed'}]), /Gracefully/);
 requireShutdown([]);
+{
+  // 본체 종료 후 renderer만 남은 구간도 지나야 다음 실행을 허용한다.
+  const inventories = [[{pid: 1}], [{pid: 2}], []];
+  let waits = 0;
+  await waitForShutdown(() => inventories.shift(), async () => { ++waits; });
+  assert.equal(waits, 2);
+  assert.equal(inventories.length, 0);
+}
+await assert.rejects(waitForShutdown(() => [{pid: 42}], async () => {}), /Gracefully/);
+await assert.rejects(waitForShutdown(() => { throw Error('inventory unavailable'); }), /inventory unavailable/);
 class FakeSocket extends EventTarget {
   static OPEN = 1;
   static mode = 'open';

@@ -193,6 +193,10 @@ Windows 개발 실행 파일은 `out\YeePilot\chrome.exe`, 설치 프로그램�
 이 명령은 `.local-build/releases/`에 unsigned 테스트 설치 파일·메타데이터·안내를 만든다.
 `node tools/dev/test-windows-installer.mjs PACKAGE_DIRECTORY`로 실제 설치·기본 프로필·수리·
 재설치·제거를 검증한다. 기존 Yee 데이터가 있으면 시험이 시작되지 않는다.
+기존 설치를 보존하는 업데이트 검증은
+`node tools/dev/test-windows-installer.mjs NEW_PACKAGE --upgrade-existing OLD_PACKAGE`로 실행한다.
+등록된 구버전·실행 파일 버전을 확인한 뒤 업데이트·설정 보존·구버전 역설치 거부·동일 버전
+수리를 검사하며 기존 설치와 프로필은 삭제하지 않는다. 배포마다 `branding/VERSION`을 올린다.
 범위와 제한은 [Windows 테스트판](../../docs/windows-test-release.md)을 참고한다.
 
 기존 Chromium 실행 파일을 `run.ps1`로 실행해 기본 동작을 확인할 수도 있다.

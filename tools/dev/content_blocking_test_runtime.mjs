@@ -84,6 +84,16 @@ export function requireShutdown(processes) {
   assert.equal(processes.length, 0,
     `Gracefully shut down product browsers before validation: ${JSON.stringify(processes)}`);
 }
+// 정상 종료를 요청한 뒤 본체보다 늦게 끝나는 보조 프로세스도 기다린다.
+export async function waitForShutdown(inspectProcesses, wait = pause) {
+  let processes;
+  for (let attempt = 0; attempt < 20; ++attempt) {
+    processes = await inspectProcesses();
+    if (processes.length === 0) return;
+    if (attempt < 19) await wait(100);
+  }
+  requireShutdown(processes);
+}
 export async function closeOwnedBrowser(browser, cdp, gracefulQuit, wait = pause) {
   if (exited(browser)) return;
   try {await cdp?.call('Browser.close');} catch {}

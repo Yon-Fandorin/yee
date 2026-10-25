@@ -118,13 +118,14 @@ class BrandingOverlayTest(unittest.TestCase):
         self.repo = self.base / "product"
         self.overlay = self.repo / "tools/overlay"
         self.overlay.mkdir(parents=True)
-        for name in ("brand_config.py", "brand_strings.py", "product_identity.py", "install-branding.sh"):
+        for name in ("brand_config.py", "brand_strings.py", "product_identity.py", "product_version.py", "install-branding.sh"):
             shutil.copy(ROOT / "tools/overlay" / name, self.overlay)
         shutil.copytree(ROOT / "tools/overlay/lib", self.overlay / "lib")
         (self.repo / "build").mkdir()
         shutil.copy(ROOT / "build/overlay.json", self.repo / "build/overlay.json")
         (self.repo / "branding").mkdir()
         shutil.copy(ROOT / "branding/identity.json", self.repo / "branding/identity.json")
+        shutil.copy(ROOT / "branding/VERSION", self.repo / "branding/VERSION")
         patches = self.repo / "patches"
         patches.mkdir()
         self.patch = patches / PATCH_NAME

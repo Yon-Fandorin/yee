@@ -6,19 +6,19 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {connectCDP, pause, requireShutdown} from './content_blocking_test_runtime.mjs';
+import {connectCDP, pause, requireShutdown, waitForShutdown} from './content_blocking_test_runtime.mjs';
 
 const [executable, mode = 'verify'] = process.argv.slice(2);
 assert.ok(executable, 'Usage: node tools/dev/test-content-blocking-rendering.mjs YEE_EXECUTABLE [record|verify]');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = await fs.mkdtemp(path.join(root, '.local-build/rendering-'));
-function requireYeeShutdown() {
+function runningYeeExecutables() {
   assert.equal(process.platform, 'win32', '현재 프로세스 확인은 Windows용이다');
   const raw = execFileSync('powershell.exe', ['-NoProfile', '-Command',
     '@(Get-Process chrome -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path) | ConvertTo-Json -Compress'], {encoding: 'utf8'}).trim();
   const processes = JSON.parse(raw || '[]');
-  requireShutdown((Array.isArray(processes) ? processes : [processes])
-    .filter(p => p?.toLowerCase() === executable.replaceAll('/', '\\').toLowerCase()));
+  return (Array.isArray(processes) ? processes : [processes])
+    .filter(p => p?.toLowerCase() === executable.replaceAll('/', '\\').toLowerCase());
 }
 const requests = [];
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aDVkAAAAASUVORK5CYII=', 'base64');
@@ -75,7 +75,7 @@ window.measure=()=>Object.fromEntries(['blocked-image','redirect-image','broken-
 const reports = [];
 try {
   for (const scenario of ['on', 'off', 'exception']) {
-    requireYeeShutdown();
+    requireShutdown(runningYeeExecutables());
     requests.length = 0;
     const profile = path.join(output, scenario);
     await fs.mkdir(path.join(profile, 'Default'), {recursive: true});
@@ -156,6 +156,7 @@ try {
       browser?.close();
       for (let i = 0; i < 150 && child.exitCode === null; i++) await pause(100);
       assert.notEqual(child.exitCode, null, '검증 브라우저 정상 종료');
+      await waitForShutdown(runningYeeExecutables);
     }
   }
 } finally {await new Promise(resolve => server.close(resolve));}

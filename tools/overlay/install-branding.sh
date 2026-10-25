@@ -15,6 +15,7 @@ fi
 # 체크아웃을 변경하기 전에 제품 설정과 이름·문자열 입력을 검증한다.
 python3 "$SCRIPT_DIR/brand_config.py" show >/dev/null
 python3 "$SCRIPT_DIR/product_identity.py" install "$CHROMIUM_SRC" --check >/dev/null
+python3 "$SCRIPT_DIR/product_version.py" install "$CHROMIUM_SRC" --check >/dev/null
 python3 "$SCRIPT_DIR/brand_config.py" install "$CHROMIUM_SRC" --check >/dev/null
 python3 "$SCRIPT_DIR/brand_strings.py" "$CHROMIUM_SRC" --check >/dev/null
 check_args=()
@@ -23,3 +24,4 @@ python3 "$SCRIPT_DIR/lib/overlay_tools.py" patches "$CHROMIUM_SRC" --role brandi
 python3 "$SCRIPT_DIR/brand_config.py" install "$CHROMIUM_SRC" "${check_args[@]}"
 python3 "$SCRIPT_DIR/brand_strings.py" "$CHROMIUM_SRC" "${check_args[@]}"
 python3 "$SCRIPT_DIR/product_identity.py" install "$CHROMIUM_SRC" "${check_args[@]}"
+python3 "$SCRIPT_DIR/product_version.py" install "$CHROMIUM_SRC" "${check_args[@]}"

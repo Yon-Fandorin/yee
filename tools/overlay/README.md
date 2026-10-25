@@ -13,6 +13,7 @@
 | `install-branding.*` | 제품 이름 설정·번역 생성과 관련 패치 적용 |
 | `brand_strings.py` | 고정 upstream에서 제품 문구와 모든 기존 XTB 번역 생성 |
 | `product_identity.py` | 영속 제품·Windows 설치 식별자 검증과 native 빌드 입력 생성 |
+| `product_version.py` | 제품 배포 버전과 엔진 원본의 호환 범위 검증·공통 버전 입력 적용 |
 | `generate-brand-assets.py` | 설정의 SVG·배색·이름에서 desktop 로고 묶음 생성 |
 | `install-brand-assets.*` | 같은 로고 묶음의 해시·경로를 검증하고 적용 |
 | `audit_logo_assets.py` | GRIT·네이티브·공통 WebUI·삽화의 독립 로고 경로와 적용 상태 검사 |

@@ -9,6 +9,7 @@
 | --- | --- |
 | `brand.json` | 표시 이름, 내부 URL 접두어, 이름 확정 여부, SVG 원본·배색·생성 자산 경로 |
 | `identity.json` | 표시 이름과 독립적인 제품 ID·프로필 이름·Windows 설치 등록 식별자 |
+| `VERSION` | 설치·업데이트 순서에 사용하는 제품의 네 자리 배포 버전 |
 | `strings.json` | 제품 문구·번역 생성 범위와 보존 규칙 |
 | `surfaces.json` | 브랜딩 대상의 소스 위치, 처리 상태, 보존 이유와 테스트 항목 |
 
@@ -16,6 +17,11 @@
 `identity.json`은 표시 이름을 바꿀 때 수정하지 않는다. 식별자 변경은 기존 설치·사용자
 데이터 접근에 영향을 주므로 별도의 이전 작업이 필요하다. Windows 테스트판은 새 Yee
 프로필을 사용하고 Chromium 데이터를 자동 이전하지 않는다.
+`VERSION`은 `product_version.py`가 공통 Chromium 빌드 입력 `chrome/VERSION`에 적용한다.
+Yee 변경을 배포할 때도 이전 배포보다 큰 버전으로 올린다. 앞 세 자리는 checkout 원본의
+Chromium major/minor/build와 같아야 하고 마지막 자리는 엔진 patch 이상이어야 한다.
+엔진을 갱신하면 이 파일도 함께 검토한다. 설치 파일·실행 파일·버전 폴더가 같은 버전을
+사용하며 `release.json`은 엔진 원본 버전도 `chromium_version`으로 별도 기록한다.
 `short_name`을 생략하면 `name`을 사용한다.
 내부 URL 접두어는 기본적으로 `short_name`의 소문자 값이다. 이름을 바꾸고
 빌드하면 접두어도 바뀐다. URL scheme으로 쓸 수 없는 이름은 선택 필드

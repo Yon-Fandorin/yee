@@ -11,9 +11,16 @@ $python = Get-DepotCommand -Name python3
 $identityText = & $python (Join-Path $script:YeeRoot 'tools/overlay/product_identity.py') show
 if ($LASTEXITCODE -ne 0) { throw 'Invalid product identity.' }
 $identity = $identityText | ConvertFrom-Json
+$versionText = & $python (Join-Path $script:YeeRoot 'tools/overlay/product_version.py') show $script:ChromiumSrc
+if ($LASTEXITCODE -ne 0) { throw 'Invalid product version.' }
+$releaseVersion = $versionText | ConvertFrom-Json
 $browser = Get-Item -LiteralPath $script:YeeBrowserBin
 $version = [regex]::Match($browser.VersionInfo.ProductVersion, '^\d+\.\d+\.\d+\.\d+').Value
-if (-not $version) { throw 'Browser version is missing.' }
+if ($version -ne $releaseVersion.version) { throw 'Browser does not match branding/VERSION.' }
+foreach ($binary in @('setup.exe', 'mini_installer.exe')) {
+    $binaryVersion = [regex]::Match((Get-Item -LiteralPath (Join-Path $script:YeeOutDir $binary)).VersionInfo.ProductVersion, '^\d+\.\d+\.\d+\.\d+').Value
+    if ($binaryVersion -ne $version) { throw "$binary has a stale product version." }
+}
 $stream = [System.IO.File]::OpenRead($browser.FullName)
 $reader = [System.IO.BinaryReader]::new($stream)
 try {
@@ -58,6 +65,7 @@ $metadata = [ordered]@{
     architecture = $architecture
     channel = 'test'
     version = $version
+    chromium_version = $releaseVersion.chromium_version
     source_commit = $sourceCommit
     working_tree_dirty = $dirty
     built_at_utc = $stamp
