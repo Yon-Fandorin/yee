@@ -1200,3 +1200,732 @@ index 4d176cc36f..a18f9143d4 100644
    bool ShouldExpire(const NavigationDetails& details) const override;
    std::u16string GetMessageText() const override;
    std::u16string GetButtonLabel(InfoBarButton button) const override;
+diff --git a/chrome/installer/mini_installer/BUILD.gn b/chrome/installer/mini_installer/BUILD.gn
+index ce1f5a5711..fcf6cd3104 100644
+--- a/chrome/installer/mini_installer/BUILD.gn
++++ b/chrome/installer/mini_installer/BUILD.gn
+@@ -41,6 +41,7 @@ config("mini_installer_compiler_flags") {
+ 
+ source_set("lib") {
+   sources = [
++    "//chrome/app/yee_windows_registration.h",
+     "appid.h",
+     "chrome_appid.cc",
+     "configuration.cc",
+@@ -157,6 +158,17 @@ action("mini_installer_archive") {
+     "//chrome/tools/build/win/makecab.py",
+     release_file,
+   ]
++  inputs += [
++    "$root_out_dir/YeeCommunityFilterManifest.json",
++    "$root_out_dir/YeeCommunityFilterNotices.txt",
++    "$root_out_dir/YeeCommunityFilters.txt",
++    "$root_out_dir/YeeCommunityFilterSources.tar.xz",
++    "$root_out_dir/YeeCommunityResources.json",
++    "$root_out_dir/YeeCompiledFilterManifest.json",
++    "$root_out_dir/YeeCompiledFilters.dat",
++    "$root_out_dir/YeeContentBlockingNotices.txt",
++    "$root_out_dir/YeeContentBlockingSources.tar.xz",
++  ]
+ 
+   outputs = [
+     "$root_out_dir/chrome.7z",
+@@ -197,6 +209,7 @@ action("mini_installer_archive") {
+     "//chrome/chrome_elf",
+     "//chrome/common/win:eventlog_provider",
+     "//chrome/installer/setup",
++    "//components/yee_content_blocking:notices",
+     "//third_party/icu:icudata",
+   ]
+ 
+diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/mini_installer/chrome.release
+index b0008cc7bb..0526c83779 100644
+--- a/chrome/installer/mini_installer/chrome.release
++++ b/chrome/installer/mini_installer/chrome.release
+@@ -3,6 +3,15 @@
+ # found in the LICENSE file.
+ 
+ [GENERAL]
++YeeCommunityFilterManifest.json: %(VersionDir)s\
++YeeCommunityFilterNotices.txt: %(VersionDir)s\
++YeeCommunityFilters.txt: %(VersionDir)s\
++YeeCommunityFilterSources.tar.xz: %(VersionDir)s\
++YeeCommunityResources.json: %(VersionDir)s\
++YeeCompiledFilterManifest.json: %(VersionDir)s\
++YeeCompiledFilters.dat: %(VersionDir)s\
++YeeContentBlockingNotices.txt: %(VersionDir)s\
++YeeContentBlockingSources.tar.xz: %(VersionDir)s\
+ #
+ # Chrome Application dir entries, sorted alphabetically.
+ #
+diff --git a/chrome/installer/mini_installer/mini_installer_constants.cc b/chrome/installer/mini_installer/mini_installer_constants.cc
+index c2a03ccbb6..754f466d1f 100644
+--- a/chrome/installer/mini_installer/mini_installer_constants.cc
++++ b/chrome/installer/mini_installer/mini_installer_constants.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/installer/mini_installer/mini_installer_constants.h"
+ 
+ #include "build/branding_buildflags.h"
++#include "chrome/app/yee_windows_registration.h"
+ 
+ namespace mini_installer {
+ 
+@@ -67,12 +68,12 @@ const wchar_t kCleanupRegistryKey[] = L"Software\\Chrome for Testing";
+ #else
+ // The path to the key containing each app's Clients registry key.
+ // No trailing slash on this one because the app's GUID is not appended.
+-const wchar_t kClientsKeyBase[] = L"Software\\Chromium";
++const wchar_t kClientsKeyBase[] = YEE_WINDOWS_PRODUCT_REGISTRY_KEY;
+ // The path to the key containing each app's Client State registry key.
+ // No trailing slash on this one because the app's GUID is not appended.
+-const wchar_t kClientStateKeyBase[] = L"Software\\Chromium";
++const wchar_t kClientStateKeyBase[] = YEE_WINDOWS_PRODUCT_REGISTRY_KEY;
+ // The path to the key in which kCleanupRegistryValue is found.
+-const wchar_t kCleanupRegistryKey[] = L"Software\\Chromium";
++const wchar_t kCleanupRegistryKey[] = YEE_WINDOWS_PRODUCT_REGISTRY_KEY;
+ #endif
+ 
+ }  // namespace mini_installer
+diff --git a/chrome/installer/setup/BUILD.gn b/chrome/installer/setup/BUILD.gn
+index 9635a435d6..624cc3c386 100644
+--- a/chrome/installer/setup/BUILD.gn
++++ b/chrome/installer/setup/BUILD.gn
+@@ -162,6 +162,7 @@ if (is_win) {
+       "setup_util_unittest.cc",
+       "setup_util_unittest.h",
+       "taskbar_util_unittest.cc",
++      "uninstall.cc",
+       "unpack_archive_unittest.cc",
+       "update_active_setup_version_work_item_unittest.cc",
+       "user_hive_visitor_unittest.cc",
+@@ -175,6 +176,7 @@ if (is_win) {
+       "//base/allocator:buildflags",
+       "//base/test:test_support",
+       "//build:branding_buildflags",
++      "//chrome/chrome_elf:constants",
+       "//chrome/common:constants",
+       "//chrome/common:version_header",
+       "//chrome/install_static:buildflags",
+@@ -183,7 +185,10 @@ if (is_win) {
+       "//chrome/installer/mini_installer:unit_tests",
+       "//chrome/installer/util:serial_unittests",
+       "//chrome/installer/util:test_support",
++      "//chrome/windows_services/elevated_tracing_service:integration",
+       "//components/crash/core/app:test_support",
++      "//content/public/common:static_switches",
++      "//rlz:rlz_lib_no_network",
+       "//testing/gmock",
+       "//testing/gtest",
+     ]
+diff --git a/chrome/installer/setup/install_worker_unittest.cc b/chrome/installer/setup/install_worker_unittest.cc
+index e626893700..737014bf3a 100644
+--- a/chrome/installer/setup/install_worker_unittest.cc
++++ b/chrome/installer/setup/install_worker_unittest.cc
+@@ -20,6 +20,7 @@
+ #include "base/win/windows_version.h"
+ #include "build/branding_buildflags.h"
+ #include "chrome/common/chrome_constants.h"
++#include "chrome/install_static/install_details.h"
+ #include "chrome/install_static/install_util.h"
+ #include "chrome/install_static/test/scoped_install_details.h"
+ #include "chrome/installer/setup/install_params.h"
+@@ -276,6 +277,9 @@ class InstallWorkerTest : public testing::Test {
+ // Chrome for Testing does not support system-level installations.
+ #if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+ TEST_F(InstallWorkerTest, TestInstallChromeSystem) {
++  if (!install_static::InstallDetails::Get().mode().supports_system_level) {
++    GTEST_SKIP() << "이 설치 모드는 시스템 전체 설치를 지원하지 않는다.";
++  }
+   const bool system_level = true;
+   NiceMock<MockWorkItemList> work_item_list;
+ 
+diff --git a/chrome/installer/setup/setup_util.cc b/chrome/installer/setup/setup_util.cc
+index 623618d3b7..4a9fbf7ead 100644
+--- a/chrome/installer/setup/setup_util.cc
++++ b/chrome/installer/setup/setup_util.cc
+@@ -70,17 +70,12 @@ constexpr wchar_t kEventLogProvidersRegPath[] =
+ // for this mode of install was dropped from ToT in December 2016. Remove any
+ // stray bits in the registry leftover from such installs.
+ void RemoveBinariesVersionKey(const InstallerState& installer_state) {
+-#if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   std::wstring path(install_static::GetClientsKeyPath(
+       L"{4DC8B4CA-1BDA-483e-B5FA-D3C12E15B62D}"));
+-#else
+-  // Assume that non-Google is Chromium branding.
+-  std::wstring path(L"Software\\Chromium Binaries");
+-#endif
+   installer::DeleteRegistryKey(installer_state.root_key(), path,
+                                KEY_WOW64_32KEY);
+-#endif  // !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ }
+ 
+ void RemoveAppLauncherVersionKey(const InstallerState& installer_state) {
+diff --git a/chrome/installer/setup/setup_util_unittest.cc b/chrome/installer/setup/setup_util_unittest.cc
+index cedb4cecd0..025b3f9451 100644
+--- a/chrome/installer/setup/setup_util_unittest.cc
++++ b/chrome/installer/setup/setup_util_unittest.cc
+@@ -42,6 +42,7 @@
+ #include "chrome/installer/setup/installer_state.h"
+ #include "chrome/installer/setup/setup_constants.h"
+ #include "chrome/installer/setup/setup_util.h"
++#include "chrome/installer/setup/uninstall.h"
+ #include "chrome/installer/util/google_update_constants.h"
+ #include "chrome/installer/util/install_util.h"
+ #include "chrome/installer/util/installation_state.h"
+@@ -825,13 +826,73 @@ TEST_F(LegacyCleanupsTest, NoOpOnFailedUpdate) {
+ 
+ TEST_F(LegacyCleanupsTest, Do) {
+   DoLegacyCleanups(installer_state(), NEW_VERSION_UPDATED);
+-#if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+-  EXPECT_FALSE(HasBinariesVersionKey());
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
++  EXPECT_FALSE(HasBinariesVersionKey());
+   EXPECT_FALSE(HasAppLauncherVersionKey());
+   EXPECT_FALSE(HasInstallExtensionCommand());
+-#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+-#endif  // !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++#elif !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++  EXPECT_TRUE(HasBinariesVersionKey());
++#endif
+ }
+ 
++#if !BUILDFLAG(GOOGLE_CHROME_BRANDING) && \
++    !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++TEST_F(LegacyCleanupsTest, YeeRemovalPreservesOtherBrowserRegistration) {
++  registry_util::RegistryOverrideManager machine_registry;
++  ASSERT_NO_FATAL_FAILURE(
++      machine_registry.OverrideRegistry(HKEY_LOCAL_MACHINE));
++  const base::FilePath chrome_exe =
++      installer_state().target_path().Append(kChromeExe);
++  ASSERT_TRUE(base::WriteFile(chrome_exe, "test executable"));
++  const wchar_t* shared_keys[] = {
++      L"Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe",
++      L"Software\\Classes\\Applications\\chrome.exe\\shell\\open\\command",
++      L"Software\\Classes\\.html\\OpenWithList\\chrome.exe",
++      L"Software\\Classes\\ChromiumExt",
++      L"Software\\Classes\\.crx",
++      L"Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Yee.exe",
++      L"Software\\Classes\\Applications\\Yee.exe\\shell\\open\\command",
++  };
++  for (auto* key_name : shared_keys) {
++    base::win::RegKey key(HKEY_CURRENT_USER, key_name, KEY_ALL_ACCESS);
++    ASSERT_TRUE(key.Valid());
++    ASSERT_EQ(ERROR_SUCCESS,
++              key.WriteValue(L"", L"C:\\Other Browser\\chrome.exe"));
++  }
++  InstallStatus status = UNKNOWN_STATUS;
++  EXPECT_TRUE(DeleteChromeRegistrationKeys(installer_state(), HKEY_CURRENT_USER,
++                                           L"", &status));
++  RemoveChromeLegacyRegistryKeys(chrome_exe);
++  for (auto* key_name : shared_keys) {
++    base::win::RegKey key(HKEY_CURRENT_USER, key_name, KEY_QUERY_VALUE);
++    std::wstring value;
++    ASSERT_EQ(ERROR_SUCCESS, key.ReadValue(L"", &value));
++    EXPECT_EQ(value, L"C:\\Other Browser\\chrome.exe");
++  }
++  // 같은 Yee 등록 이름이라도 제거 대상의 실행 경로를 소유한 경우만 지운다.
++  const wchar_t* app_path =
++      L"Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Yee.exe";
++  const wchar_t* application = L"Software\\Classes\\Applications\\Yee.exe";
++  base::win::RegKey owned_path(HKEY_CURRENT_USER, app_path, KEY_ALL_ACCESS);
++  ASSERT_EQ(ERROR_SUCCESS,
++            owned_path.WriteValue(L"", chrome_exe.value().c_str()));
++  owned_path.Close();
++  base::win::RegKey owned_application(
++      HKEY_CURRENT_USER,
++      (std::wstring(application) + L"\\shell\\open\\command").c_str(),
++      KEY_ALL_ACCESS);
++  ASSERT_EQ(
++      ERROR_SUCCESS,
++      owned_application.WriteValue(
++          L"", base::CommandLine(chrome_exe).GetCommandLineString().c_str()));
++  owned_application.Close();
++  EXPECT_TRUE(DeleteChromeRegistrationKeys(installer_state(), HKEY_CURRENT_USER,
++                                           L"", &status));
++  EXPECT_FALSE(
++      base::win::RegKey(HKEY_CURRENT_USER, app_path, KEY_READ).Valid());
++  EXPECT_FALSE(
++      base::win::RegKey(HKEY_CURRENT_USER, application, KEY_READ).Valid());
++}
++#endif
++
+ }  // namespace installer
+diff --git a/chrome/installer/setup/uninstall.cc b/chrome/installer/setup/uninstall.cc
+index c0bd24ff9b..c78bc8ba67 100644
+--- a/chrome/installer/setup/uninstall.cc
++++ b/chrome/installer/setup/uninstall.cc
+@@ -36,6 +36,7 @@
+ #include "base/win/registry.h"
+ #include "base/win/shortcut.h"
+ #include "build/branding_buildflags.h"
++#include "chrome/app/yee_windows_registration.h"
+ #include "chrome/chrome_elf/blocklist_constants.h"
+ #include "chrome/common/chrome_constants.h"
+ #include "chrome/common/chrome_paths.h"
+@@ -105,6 +106,7 @@ void ProcessChromeWorkItems(const InstallerState& installer_state) {
+   work_item_list->Do();
+ }
+ 
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ void ClearRlzProductState() {
+   const rlz_lib::AccessPoint points[] = {rlz_lib::CHROME_OMNIBOX,
+                                          rlz_lib::CHROME_HOME_PAGE,
+@@ -120,6 +122,7 @@ void ClearRlzProductState() {
+     rlz_lib::ClearProductState(rlz_lib::CHROME, points);
+   }
+ }
++#endif
+ 
+ // Removes all files from the installer directory. Returns false in case of an
+ // error.
+@@ -710,17 +713,27 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+ 
+   // Delete the App Paths and Applications keys that let Explorer find Chrome:
+   // http://msdn.microsoft.com/en-us/library/windows/desktop/ee872121
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING) || \
++    BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++  const std::wstring registration_name = installer::kChromeExe;
++#else
++  const std::wstring registration_name = YEE_WINDOWS_REGISTRY_APPLICATION_NAME;
++#endif
+   std::wstring app_key(ShellUtil::kRegClasses);
+   app_key.push_back(base::FilePath::kSeparators[0]);
+   app_key.append(L"Applications");
+   app_key.push_back(base::FilePath::kSeparators[0]);
+-  app_key.append(installer::kChromeExe);
+-  DeleteRegistryKey(root, app_key, WorkItem::kWow64Default);
++  app_key.append(registration_name);
++  DeleteRegistryKeyIf(root, app_key, app_key + ShellUtil::kRegShellOpen,
++                      WorkItem::kWow64Default, nullptr,
++                      ProgramCompare(chrome_exe));
+ 
+   std::wstring app_path_key(ShellUtil::kAppPathsRegistryKey);
+   app_path_key.push_back(base::FilePath::kSeparators[0]);
+-  app_path_key.append(installer::kChromeExe);
+-  DeleteRegistryKey(root, app_path_key, WorkItem::kWow64Default);
++  app_path_key.append(registration_name);
++  // 등록할 때 쓴 전체 경로가 일치하는 키만 삭제한다.
++  DeleteRegistryKeyIf(root, app_path_key, app_path_key, WorkItem::kWow64Default,
++                      nullptr, ValueEquals(chrome_exe.value()));
+ 
+   // Cleanup OpenWithList and OpenWithProgids:
+   // http://msdn.microsoft.com/en-us/library/bb166549
+@@ -734,7 +747,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+ 
+     open_with_list_key.clear();
+     base::StrAppend(&open_with_list_key,
+-                    {file_assoc_key, L"OpenWithList\\", installer::kChromeExe});
++                    {file_assoc_key, L"OpenWithList\\", registration_name});
+     DeleteRegistryKey(root, open_with_list_key, WorkItem::kWow64Default);
+ 
+     open_with_progids_key.clear();
+@@ -784,6 +797,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+ }
+ 
+ void RemoveChromeLegacyRegistryKeys(const base::FilePath& chrome_exe) {
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   // We used to register Chrome to handle crx files, but this turned out
+   // to be not worth the hassle. Remove these old registry entries if
+   // they exist. See: http://codereview.chromium.org/210007
+@@ -816,6 +830,7 @@ void RemoveChromeLegacyRegistryKeys(const base::FilePath& chrome_exe) {
+     DeleteRegistryKey(UNSAFE_TODO(roots[i]), ext_association,
+                       WorkItem::kWow64Default);
+   }
++#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ }
+ 
+ void UninstallFirewallRules(const base::FilePath& chrome_exe) {
+@@ -927,7 +942,9 @@ InstallStatus UninstallProduct(const ModifyParams& modify_params,
+   // Chrome is not in use so lets uninstall Chrome by deleting various files
+   // and registry entries. Here we will just make best effort and keep going
+   // in case of errors.
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   ClearRlzProductState();
++#endif
+ 
+   auto_launch_util::DisableStartAtLogin();
+ 
+diff --git a/chrome/installer/util/shell_util.cc b/chrome/installer/util/shell_util.cc
+index fabd1fbc1e..58fd8eeda5 100644
+--- a/chrome/installer/util/shell_util.cc
++++ b/chrome/installer/util/shell_util.cc
+@@ -48,6 +48,7 @@
+ #include "base/win/shortcut.h"
+ #include "base/win/win_util.h"
+ #include "base/win/windows_version.h"
++#include "chrome/app/yee_windows_registration.h"
+ #include "chrome/common/chrome_constants.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "chrome/install_static/install_constants.h"
+@@ -447,9 +448,15 @@ void GetChromeAppRegistrationEntries(
+     const base::FilePath& chrome_exe,
+     const std::wstring& suffix,
+     std::vector<std::unique_ptr<RegistryEntry>>* entries) {
+-  std::wstring app_path_key =
+-      base::StrCat({ShellUtil::kAppPathsRegistryKey, kFilePathSeparator,
+-                    chrome_exe.BaseName().value()});
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING) || \
++    BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
++  const std::wstring registration_name = chrome_exe.BaseName().value();
++#else
++  // 실행 파일 이름을 공유해도 등록 키는 Yee 전용으로 유지한다.
++  const std::wstring registration_name = YEE_WINDOWS_REGISTRY_APPLICATION_NAME;
++#endif
++  std::wstring app_path_key = base::StrCat(
++      {ShellUtil::kAppPathsRegistryKey, kFilePathSeparator, registration_name});
+   entries->push_back(
+       std::make_unique<RegistryEntry>(app_path_key, chrome_exe.value()));
+   entries->push_back(std::make_unique<RegistryEntry>(
+diff --git a/chrome/install_static/BUILD.gn b/chrome/install_static/BUILD.gn
+index dc056db749..0bdfcada1e 100644
+--- a/chrome/install_static/BUILD.gn
++++ b/chrome/install_static/BUILD.gn
+@@ -57,7 +57,11 @@ if (is_win) {
+     } else if (is_chrome_for_testing_branded) {
+       sources += [ "google_chrome_for_testing_install_modes.h" ]
+     } else {
+-      sources += [ "chromium_install_modes.h" ]
++      sources += [
++        "//chrome/app/yee_product_identity.h",
++        "//chrome/app/yee_windows_registration.h",
++        "chromium_install_modes.h",
++      ]
+     }
+ 
+     libs = [ "kernel32.lib" ]
+diff --git a/chrome/install_static/chromium_install_modes.h b/chrome/install_static/chromium_install_modes.h
+index f29a8228fe..f8cfd725c8 100644
+--- a/chrome/install_static/chromium_install_modes.h
++++ b/chrome/install_static/chromium_install_modes.h
+@@ -10,6 +10,7 @@
+ #include <array>
+ 
+ #include "chrome/app/chrome_dll_resource.h"
++#include "chrome/app/yee_product_identity.h"
+ #include "chrome/common/chrome_icon_resources_win.h"
+ #include "chrome/install_static/install_constants.h"
+ 
+@@ -21,7 +22,7 @@ inline constexpr wchar_t kCompanyPathName[] = L"";
+ 
+ // The brand-specific product name to be included as a component of the install
+ // and user data directory paths.
+-inline constexpr wchar_t kProductPathName[] = L"Chromium";
++inline constexpr auto& kProductPathName = yee::identity::kProfileDirectory;
+ 
+ // The brand-specific safe browsing client name.
+ inline constexpr char kSafeBrowsingName[] = "chromium";
+@@ -45,39 +46,28 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+         .logo_suffix = L"",  // No logo suffix for the primary install mode.
+         .app_guid =
+             L"",  // Empty app_guid since no integration with Google Update.
+-        .base_app_name = L"Chromium",              // A distinct base_app_name.
+-        .base_app_id = L"Chromium",                // A distinct base_app_id.
+-        .browser_prog_id_prefix = L"ChromiumHTM",  // Browser ProgID prefix.
++        .base_app_name =
++            yee::identity::kApplicationName,   // A distinct base_app_name.
++        .base_app_id = yee::identity::kAppId,  // A distinct base_app_id.
++        .browser_prog_id_prefix =
++            yee::identity::kBrowserProgIdPrefix,  // Browser ProgID prefix.
+         .browser_prog_id_description =
+-            L"Chromium HTML Document",  // Browser ProgID description.
+-        .direct_launch_url_scheme = "chromium",
+-        .pdf_prog_id_prefix = L"ChromiumPDF",  // PDF ProgID prefix.
++            L"Yee HTML Document",  // Browser ProgID description.
++        .direct_launch_url_scheme = yee::identity::kDirectLaunchScheme,
++        .pdf_prog_id_prefix =
++            yee::identity::kPdfProgIdPrefix,  // PDF ProgID prefix.
+         .pdf_prog_id_description =
+-            L"Chromium PDF Document",  // PDF ProgID description.
+-        .active_setup_guid =
+-            L"{7D2B3E1D-D096-4594-9D8F-A6667F12E0AC}",  // Active Setup
+-                                                        // GUID.
+-        .toast_activator_clsid = {0x635EFA6F,
+-                                  0x08D6,
+-                                  0x4EC9,
+-                                  {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51,
+-                                   0x59}},  // Toast Activator CLSID.
+-        .elevator_clsid = {0xD133B120,
+-                           0x6DB4,
+-                           0x4D6B,
+-                           {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1,
+-                            0xB0}},  // Elevator CLSID.
++            L"Yee PDF Document",  // PDF ProgID description.
++        .active_setup_guid = yee::identity::kActiveSetupGuid,
++        .toast_activator_clsid = yee::identity::kToastActivatorClsid,
++        .elevator_clsid = yee::identity::kElevatorClsid,
+         .elevator_iid = {0xbb19a0e5,
+                          0xc6,
+                          0x4966,
+                          {0x94, 0xb2, 0x5a, 0xfe, 0xc6, 0xfe, 0xd9,
+                           0x3a}},  // IElevator IID and TypeLib
+         // {BB19A0E5-00C6-4966-94B2-5AFEC6FED93A}.
+-        .tracing_service_clsid = {0x83f69367,
+-                                  0x442d,
+-                                  0x447f,
+-                                  {0x8b, 0xcc, 0x0e, 0x3f, 0x97, 0xbe, 0x9c,
+-                                   0xf2}},  // SystemTraceSession CLSID.
++        .tracing_service_clsid = yee::identity::kTracingServiceClsid,
+         .tracing_service_iid = {0xa3fd580a,
+                                 0xffd4,
+                                 0x4075,
+@@ -87,7 +77,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+         .default_channel_name =
+             L"",  // Empty default channel name since no update integration.
+         .channel_strategy = ChannelStrategy::UNSUPPORTED,
+-        .supports_system_level = true,  // Supports system-level installs.
++        .supports_system_level = false,  // 테스트판은 사용자별 설치만 지원한다.
+         .supports_set_as_default_browser =
+             true,  // Supports in-product set as default browser UX.
+         .app_icon_resource_index =
+@@ -97,10 +87,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+             icon_resources::kHtmlDocIndex,  // HTML doc icon resource index.
+         .pdf_doc_icon_resource_index =
+             icon_resources::kPDFDocIndex,  // PDF doc icon resource index.
+-        .sandbox_sid_prefix =
+-            L"S-1-15-2-3251537155-1984446955-2931258699-841473695-"
+-            L"1938553385-"
+-            L"924012148-",  // App container sid prefix for sandbox.
++        .sandbox_sid_prefix = yee::identity::kSandboxSidPrefix,
+     },
+ });
+ 
+diff --git a/chrome/install_static/install_util_unittest.cc b/chrome/install_static/install_util_unittest.cc
+index 90483d7745..ae1c8e9ea9 100644
+--- a/chrome/install_static/install_util_unittest.cc
++++ b/chrome/install_static/install_util_unittest.cc
+@@ -356,8 +356,10 @@ class InstallStaticUtilTest
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+     static constexpr wchar_t kPolicyKey[] =
+         L"Software\\Policies\\Google\\Chrome";
+-#else
++#elif BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+     static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Chromium";
++#else
++    static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Yee";
+ #endif
+ 
+     ASSERT_EQ(ERROR_SUCCESS,
+@@ -412,7 +414,7 @@ TEST_P(InstallStaticUtilTest, GetChromeInstallSubDirectory) {
+   // The directory strings for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr const wchar_t* kInstallDirs[] = {
+-      L"Chromium",
++      L"Yee",
+   };
+ #endif
+   static_assert(std::size(kInstallDirs) == NUM_INSTALL_MODES,
+@@ -441,7 +443,7 @@ TEST_P(InstallStaticUtilTest, GetRegistryPath) {
+   // The registry path strings for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr const wchar_t* kRegistryPaths[] = {
+-      L"Software\\Chromium",
++      L"Software\\Yee",
+   };
+ #endif
+   static_assert(std::size(kRegistryPaths) == NUM_INSTALL_MODES,
+@@ -474,7 +476,7 @@ TEST_P(InstallStaticUtilTest, GetUninstallRegistryPath) {
+   // The registry path strings for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr const wchar_t* kUninstallRegistryPaths[] = {
+-      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chromium",
++      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Yee",
+   };
+ #endif
+   static_assert(std::size(kUninstallRegistryPaths) == NUM_INSTALL_MODES,
+@@ -523,7 +525,7 @@ TEST_P(InstallStaticUtilTest, GetBaseAppId) {
+ #else
+   // The base app ids for the brand's install modes; parallel to kInstallModes.
+   static constexpr const wchar_t* kBaseAppIds[] = {
+-      L"Chromium",
++      L"Yee",
+   };
+ #endif
+   static_assert(std::size(kBaseAppIds) == NUM_INSTALL_MODES,
+@@ -583,15 +585,15 @@ TEST_P(InstallStaticUtilTest, GetToastActivatorClsid) {
+   // The toast activator CLSIDs for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr CLSID kToastActivatorClsids[] = {
+-      {0x635EFA6F,
+-       0x08D6,
+-       0x4EC9,
+-       {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51, 0x59}}  // Chromium.
++      {0xC9EB99B2,
++       0x59A9,
++       0x45FB,
++       {0xA3, 0x09, 0xF0, 0x4C, 0xBD, 0xBA, 0x38, 0x48}}  // Chromium.
+   };
+ 
+   // The string representation of the CLSIDs above.
+   static constexpr const wchar_t* kToastActivatorClsidsString[] = {
+-      L"{635EFA6F-08D6-4EC9-BD14-8A0FDE975159}"  // Chromium.
++      L"{C9EB99B2-59A9-45FB-A309-F04CBDBA3848}"  // Chromium.
+   };
+ #endif
+   static_assert(std::size(kToastActivatorClsids) == NUM_INSTALL_MODES,
+@@ -653,15 +655,15 @@ TEST_P(InstallStaticUtilTest, GetElevatorClsid) {
+ #else
+   // The Elevator CLSIDs, one for each of the kInstallModes.
+   static constexpr CLSID kElevatorClsids[] = {
+-      {0xD133B120,
+-       0x6DB4,
+-       0x4D6B,
+-       {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1, 0xB0}},  // Chromium.
++      {0xE45ED4A4,
++       0x3272,
++       0x4DDD,
++       {0x91, 0x32, 0x12, 0x1F, 0xDF, 0x08, 0x3A, 0xB7}},  // Chromium.
+   };
+ 
+   // The string representation of the CLSIDs above.
+   static constexpr const wchar_t* kElevatorClsidsString[] = {
+-      L"{D133B120-6DB4-4D6B-8BFE-83BF8CA1B1B0}",  // Chromium.
++      L"{E45ED4A4-3272-4DDD-9132-121FDF083AB7}",  // Chromium.
+   };
+ #endif
+   static_assert(std::size(kElevatorClsids) == NUM_INSTALL_MODES,
+@@ -843,8 +845,8 @@ TEST_P(InstallStaticUtilTest, GetSandboxSidPrefix) {
+   };
+ #else
+   static constexpr const wchar_t* kSandBoxSids[] = {
+-      L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+-      L"924012148-",  // Chromium.
++      L"S-1-15-2-2726106554-2681646199-3803488136-3045051458-339147570-"
++      L"929043407-",  // Chromium.
+   };
+ #endif
+   EXPECT_STREQ(GetSandboxSidPrefix(),
+@@ -880,11 +882,14 @@ INSTANTIATE_TEST_SUITE_P(
+     testing::Combine(testing::Values(GOOGLE_CHROME_FOR_TESTING_INDEX),
+                      testing::Values("user")));
+ #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+-// Chromium supports user and system levels.
++// Yee 테스트판은 사용자별 설치만 지원한다.
+ INSTANTIATE_TEST_SUITE_P(Chromium,
+                          InstallStaticUtilTest,
+                          testing::Combine(testing::Values(CHROMIUM_INDEX),
+-                                          testing::Values("user", "system")));
++                                          testing::Values("user")));
++TEST(InstallModeIdentityTest, YeeTestBuildHasNoSystemInstall) {
++  EXPECT_FALSE(kInstallModes[CHROMIUM_INDEX].supports_system_level);
++}
+ #endif  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ 
+ }  // namespace install_static
+diff --git a/chrome/install_static/product_install_details_unittest.cc b/chrome/install_static/product_install_details_unittest.cc
+index 2e5b799d34..7cd1dff10e 100644
+--- a/chrome/install_static/product_install_details_unittest.cc
++++ b/chrome/install_static/product_install_details_unittest.cc
+@@ -207,13 +207,13 @@ constexpr TestData kTestData[] = {
+ #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ constexpr TestData kTestData[] = {
+     {
+-        L"C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe",
++        L"C:\\Program Files (x86)\\Yee\\Application\\chrome.exe",
+         CHROMIUM_INDEX,
+-        true,
++        false,
+         L"",
+     },
+     {
+-        L"C:\\Users\\user\\AppData\\Local\\Chromium\\Application\\chrome.exe",
++        L"C:\\Users\\user\\AppData\\Local\\Yee\\Application\\chrome.exe",
+         CHROMIUM_INDEX,
+         false,
+         L"",
+diff --git a/chrome/install_static/user_data_dir_win_unittest.cc b/chrome/install_static/user_data_dir_win_unittest.cc
+index efa4cbb99e..0ad33cf57f 100644
+--- a/chrome/install_static/user_data_dir_win_unittest.cc
++++ b/chrome/install_static/user_data_dir_win_unittest.cc
+@@ -30,8 +30,8 @@ const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
+ const wchar_t kUserDataDirNameSuffix[] =
+     L"\\Google\\Chrome for Testing\\User Data";
+ #else
+-const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
+-const wchar_t kUserDataDirNameSuffix[] = L"\\Chromium\\User Data";
++const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Yee";
++const wchar_t kUserDataDirNameSuffix[] = L"\\Yee\\User Data";
+ #endif
+ 
+ const wchar_t kUserDataDirRegistryKey[] = L"UserDataDir";
+diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
+index 5f345583e6..dfc42ef2e5 100644
+--- a/components/policy/BUILD.gn
++++ b/components/policy/BUILD.gn
+@@ -86,8 +86,14 @@ policy_templates_deps_file = "$policy_templates_base_dir/policy_templates.d"
+ policy_templates_generated_json_path =
+     "$policy_templates_base_dir/policy_templates.json"
+ 
++if (is_win && !is_chrome_branded && !is_chrome_for_testing_branded) {
++  import("//chrome/app/yee_product_identity.gni")
++}
+ generate_policy_source("policy_code_generate") {
+   chunking = true
++  if (is_win && !is_chrome_branded && !is_chrome_for_testing_branded) {
++    chromium_policy_key = yee_windows_policy_key
++  }
+ }
+ 
+ policy_templates_grd_file = "resources/policy_templates.build.grd"
+diff --git a/components/policy/tools/generate_policy_source.gni b/components/policy/tools/generate_policy_source.gni
+index 9bfa540933..e45e49ef42 100644
+--- a/components/policy/tools/generate_policy_source.gni
++++ b/components/policy/tools/generate_policy_source.gni
+@@ -61,6 +61,9 @@ template("generate_policy_source") {
+           rebase_path(policy_templates_generated_json_path, root_build_dir),
+       "--target-platform=" + target_os,
+     ]
++    if (defined(invoker.chromium_policy_key)) {
++      args += [ "--chromium-policy-key=" + invoker.chromium_policy_key ]
++    }
+     if (!chunking) {
+       args += [ "--no-chunking" ]
+     }
+diff --git a/components/policy/tools/generate_policy_source.py b/components/policy/tools/generate_policy_source.py
+index 040c3e2a6d..14f164cb13 100755
+--- a/components/policy/tools/generate_policy_source.py
++++ b/components/policy/tools/generate_policy_source.py
+@@ -300,6 +300,8 @@ def main():
+       dest='chunking',  # A variable called `no_chunking` would be confusing.
+       default=True,
+       help='do not split policies into subProto1, subProto2, etc.')
++  parser.add_argument('--chromium-policy-key', default=r'SOFTWARE\Policies\Chromium',
++                      help='unbranded Windows policy registry path')
+   args = parser.parse_args()
+ 
+   has_arg_error = False
+@@ -375,11 +377,13 @@ def main():
+                  sorted=True,
+                  mutable=True)
+   if args.source_path:
+-    GenerateFile(args.source_path, _WritePolicyConstantSource, sorted=True)
++    writer = partial(_WritePolicyConstantSource,
++                     chromium_policy_key=json.dumps(args.chromium_policy_key)[1:-1])
++    GenerateFile(args.source_path, writer, sorted=True)
+     # Also write a version of the source with get_proto_mutable() functions.
+     assert args.source_path.endswith('.cc')
+     GenerateFile(args.source_path.replace('.cc', '_mutable.cc'),
+-                 _WritePolicyConstantSource,
++                 writer,
+                  sorted=True,
+                  mutable=True)
+   if args.risk_header_path:
+@@ -1099,7 +1103,7 @@ def _GenerateDefaultValue(value):
+ 
+ def _WritePolicyConstantSource(all_policies, policy_atomic_groups,
+                                target_platform, f, risk_tags, chunking,
+-                               mutable):
++                               mutable, chromium_policy_key=CHROMIUM_POLICY_KEY):
+   policies = _GetSupportedPolicies(all_policies, target_platform)
+   policy_names = [policy.name for policy in policies]
+   namespace = 'policy::test' if mutable else 'policy'
+@@ -1214,7 +1218,7 @@ namespace {namespace} {{
+             'L"' + CHROME_FOR_TESTING_POLICY_KEY + '";\n'
+             '#else\n'
+             'const wchar_t kRegistryChromePolicyKey[] = '
+-            'L"' + CHROMIUM_POLICY_KEY + '";\n'
++            'L"' + chromium_policy_key + '";\n'
+             '#endif\n\n')
+ 
+   # Setting enterprise defaults code generation.

@@ -57,6 +57,7 @@ class BundleExecutablesTest(unittest.TestCase):
         self.bundle("Missing").unlink()
         self.assertEqual(browser_executables(self.output), [])
 
+    @unittest.skipIf(sys.platform == 'win32', 'macOS ps의 POSIX 실행 경로를 검사한다.')
     def test_running_inventory_tracks_identity_across_names_and_build_roots(self):
         old = self.bundle('Yee')
         new = self.bundle('새 이름', parent=self.root)

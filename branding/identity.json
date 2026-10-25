@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "product_id": "yee",
+  "profile_directory": "Yee",
+  "windows": {
+    "application_name": "Yee",
+    "app_id": "Yee",
+    "browser_prog_id_prefix": "YeeHTML",
+    "pdf_prog_id_prefix": "YeePDF",
+    "direct_launch_scheme": "yee-browser",
+    "active_setup_guid": "{F33B2203-279A-4388-BEBE-9019D574B369}",
+    "toast_activator_clsid": "{C9EB99B2-59A9-45FB-A309-F04CBDBA3848}",
+    "elevator_clsid": "{E45ED4A4-3272-4DDD-9132-121FDF083AB7}",
+    "tracing_service_clsid": "{567AF35C-DFEA-4544-B693-7FDC2948D9E7}"
+  }
+}

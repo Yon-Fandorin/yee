@@ -48,6 +48,9 @@
     }
   ],
   "generated_roots": [
+    "chrome/app/yee_product_identity.h",
+    "chrome/app/yee_product_identity.gni",
+    "chrome/app/yee_windows_registration.h",
     "chrome/app/yee_branding_strings",
     "chrome/app/yee_branding_strings.gni",
     "chrome/app/chromium_strings.grd",

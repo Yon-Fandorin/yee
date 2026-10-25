@@ -105,9 +105,11 @@ part 연결, 작은따옴표가 포함된 제품명의 macOS 서명 Python templ
 
 표시 이름 변경은 `yee::` namespace, `yee-ui` source directory, `YEE_*` 개발
 플래그, MCP/agent protocol schema, copyright를 바꾸지 않는다. 기존 macOS
-Bundle ID·Keychain 이름·기본 profile 경로와 Windows install-mode identity도
-이 설정의 범위에 넣지 않았다. 독립 설치 식별자로 전환할 때 데이터 이전을
-함께 설계한다.
+Bundle ID·Keychain 이름과 플랫폼의 영속 식별자는 이 표시 설정의 범위에 넣지 않는다.
+Windows 테스트판의 독립 설치·프로필·정책·앱 등록 식별자는 별도
+`branding/identity.json`에서 관리한다. 표시 이름 변경 시 이 값을 바꾸지 않으며,
+기존 Chromium 프로필을 자동으로 복사하지 않는다. macOS·Linux 영속 식별자의
+이전은 아직 구현하지 않았다. [Windows 테스트판](windows-test-release.md)에 현재 경계를 둔다.
 
 제품 문구와 번역은 `strings_policy`가 지정하는 정책을 따른다.
 `brand_strings.py`는 Chromium `HEAD`의 GRD·GRDP·XTB를 읽어 여섯 문자열 계열의

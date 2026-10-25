@@ -46,7 +46,7 @@ class BrandingAuditTest(unittest.TestCase):
                         "input_check": "product_inputs"}
         self.write_manifest([self.surface])
         for filename, text in auditor.product_parts(self.brand).items():
-            (self.app / filename).write_text(text)
+            (self.app / filename).write_bytes(text.encode('utf-8'))
         branding = self.app / "theme/chromium/BRANDING"
         branding.parent.mkdir(parents=True)
         branding.write_text("\n".join(f"{key}={value}" for key, value in self.brand.product_values.items()) + "\n")

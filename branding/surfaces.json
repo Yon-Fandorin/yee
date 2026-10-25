@@ -501,10 +501,6 @@
         },
         {
           "scope": "chromium",
-          "path": "chrome/install_static/chromium_install_modes.h"
-        },
-        {
-          "scope": "chromium",
           "path": "components/os_crypt/common/keychain_password_mac.mm"
         }
       ],
@@ -519,7 +515,7 @@
         "identity",
         "data_migration_policy"
       ],
-      "notes": "Stable IDs are independent from provisional display name; preserve current values until a separately defined identity/data migration.",
+      "notes": "표시 이름과 영속 식별자는 분리한다. macOS Bundle ID·Keychain·UTType은 현재 값을 보존하며, Windows 전용 설치·프로필은 windows-install-profile-identity 항목이 소유한다.",
       "runtime_verification": "not_verified"
     },
     {
@@ -1432,6 +1428,49 @@
         "logo_palette"
       ],
       "notes": "Pin legacy and centralized-spec notices, desktop session restore, Windows startup launch and updater-enabled macOS Keystone promotion share the configured transparent two-color product mark, refreshed for the actual infobar background. Existing behavior and semantic warning/permission/extension icons are preserved. Windows, Linux and updater-disabled paths are not runtime-verified by the macOS core build. Chrome-branded-only Windows installer-download notices and separate bubble/OS-notification surfaces keep their existing vector rendering.",
+      "runtime_verification": "not_verified"
+    },
+    {
+      "id": "windows-install-profile-identity",
+      "status": "managed",
+      "sources": [
+        {
+          "scope": "repository",
+          "path": "branding/identity.json"
+        },
+        {
+          "scope": "repository",
+          "path": "tools/overlay/product_identity.py"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/install_static/chromium_install_modes.h"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/util/shell_util.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "chrome/installer/setup/uninstall.cc"
+        },
+        {
+          "scope": "chromium",
+          "path": "components/policy/BUILD.gn"
+        }
+      ],
+      "symbols": [
+        "InstallConstants",
+        "kProductPathName",
+        "YEE_WINDOWS_REGISTRY_APPLICATION_NAME",
+        "yee_windows_policy_key"
+      ],
+      "configuration_roles": [
+        "identity",
+        "profile_directory",
+        "windows_registration"
+      ],
+      "notes": "identity.json에서 사용자별 설치·프로필·정책·AppID·ProgID·전용 등록 이름과 GUID를 생성한다. 다른 Chrome/Chromium의 공유 등록·RLZ·과거 확장자 정리는 실행하지 않는다. Windows 시스템 설치·서비스·앱 자동 업데이트는 별도 범위다.",
       "runtime_verification": "not_verified"
     }
   ]

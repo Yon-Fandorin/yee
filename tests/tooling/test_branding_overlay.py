@@ -73,6 +73,23 @@ INPUT_PATHS = (
     "chrome/browser/pdf/BUILD.gn",
     "chrome/tools/build/mac/infoplist_strings_util.cc",
     "chrome/VERSION",
+    "chrome/install_static/chromium_install_modes.h",
+    "chrome/install_static/BUILD.gn",
+    "chrome/install_static/install_util_unittest.cc",
+    "chrome/install_static/product_install_details_unittest.cc",
+    "chrome/install_static/user_data_dir_win_unittest.cc",
+    "components/policy/BUILD.gn",
+    "components/policy/tools/generate_policy_source.gni",
+    "components/policy/tools/generate_policy_source.py",
+    "chrome/installer/mini_installer/BUILD.gn",
+    "chrome/installer/mini_installer/chrome.release",
+    "chrome/installer/mini_installer/mini_installer_constants.cc",
+    "chrome/installer/util/shell_util.cc",
+    "chrome/installer/setup/uninstall.cc",
+    "chrome/installer/setup/setup_util.cc",
+    "chrome/installer/setup/setup_util_unittest.cc",
+    "chrome/installer/setup/BUILD.gn",
+    "chrome/installer/setup/install_worker_unittest.cc",
 )
 ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
@@ -101,12 +118,13 @@ class BrandingOverlayTest(unittest.TestCase):
         self.repo = self.base / "product"
         self.overlay = self.repo / "tools/overlay"
         self.overlay.mkdir(parents=True)
-        for name in ("brand_config.py", "brand_strings.py", "install-branding.sh"):
+        for name in ("brand_config.py", "brand_strings.py", "product_identity.py", "install-branding.sh"):
             shutil.copy(ROOT / "tools/overlay" / name, self.overlay)
         shutil.copytree(ROOT / "tools/overlay/lib", self.overlay / "lib")
         (self.repo / "build").mkdir()
         shutil.copy(ROOT / "build/overlay.json", self.repo / "build/overlay.json")
         (self.repo / "branding").mkdir()
+        shutil.copy(ROOT / "branding/identity.json", self.repo / "branding/identity.json")
         patches = self.repo / "patches"
         patches.mkdir()
         self.patch = patches / PATCH_NAME

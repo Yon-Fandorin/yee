@@ -181,14 +181,19 @@ $env:YEE_BUILD_JOBS = '4'
 `usage.ps1`은 큰 디렉터리를 모두 읽어 오래 걸릴 수 있으므로 빌드와 별도로 실행한다.
 
 Windows 개발 실행 파일은 `out\YeePilot\chrome.exe`, 설치 프로그램은
-`mini_installer.exe`다. 생성되는 제품명 리소스와 선택된 아이콘에는 브랜딩 설정을
-사용한다. 현재 설치 경로·AppID·ProgID 등의 설치 식별자는 Chromium과 공유한다.
-제품 전용 설치 식별자와 기존 데이터 이전 방법은 아직 검토가 남아 있어 기존 Chromium 설치와
-충돌할 수 있다. 설치 프로그램을 별도로 테스트할 때는 이 한계를 명시하는 옵션을 사용한다.
+`mini_installer.exe`다. 제품 표시 이름·아이콘은 브랜딩 설정을 사용하고,
+설치·프로필·정책·등록 식별자는 별도 `branding/identity.json`에서 생성한다.
+테스트판은 사용자별 설치만 지원하며 기존 Chromium의 데이터를 자동으로 이전하지 않는다.
+다른 브라우저의 공유 실행 파일 등록과 과거 제품 데이터도 정리 대상으로 삼지 않는다.
 
 ```powershell
-.\tools\dev\build.ps1 -Target mini_installer -AllowSharedChromiumInstallIdentity
+.\tools\dev\package-windows.ps1
 ```
+
+이 명령은 `.local-build/releases/`에 unsigned 테스트 설치 파일·메타데이터·안내를 만든다.
+`node tools/dev/test-windows-installer.mjs PACKAGE_DIRECTORY`로 실제 설치·기본 프로필·수리·
+재설치·제거를 검증한다. 기존 Yee 데이터가 있으면 시험이 시작되지 않는다.
+범위와 제한은 [Windows 테스트판](../../docs/windows-test-release.md)을 참고한다.
 
 기존 Chromium 실행 파일을 `run.ps1`로 실행해 기본 동작을 확인할 수도 있다.
 제품 이름과 아이콘을 반영하려면 소스에서 빌드해야 한다. 남은 이름·자산·OS 식별자는

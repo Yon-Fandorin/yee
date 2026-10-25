@@ -18,6 +18,14 @@ function Invoke-BrandStrings([switch] $Preview) {
     & $python.Source @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Brand string generation failed.' }
 }
+function Invoke-ProductIdentity([switch] $Preview) {
+    $python = Get-Command python3 -ErrorAction SilentlyContinue
+    if (-not $python) { $python = Get-Command python -ErrorAction Stop }
+    $arguments = @((Join-Path $PSScriptRoot 'product_identity.py'), 'install', $ChromiumSrc)
+    if ($Preview) { $arguments += '--check' }
+    & $python.Source @arguments
+    if ($LASTEXITCODE -ne 0) { throw 'Product identity generation failed.' }
+}
 if (-not [System.IO.Path]::IsPathRooted($ChromiumSrc)) { throw 'Chromium src path must be absolute.' }
 $ChromiumSrc = [System.IO.Path]::GetFullPath($ChromiumSrc)
 $appDir = Join-Path $ChromiumSrc 'chrome\app'
@@ -105,6 +113,7 @@ function Get-BrandingPlan([switch] $Preview) {
     return $plan
 }
 $null = Get-BrandingPlan -Preview
+Invoke-ProductIdentity -Preview
 Invoke-BrandStrings -Preview
 $patchPlan = @(Get-YeeOverlayPatchPlan -ChromiumSrc $ChromiumSrc -RepoRoot $repoRoot -Role branding)
 Invoke-YeeOverlayPatchPlan -ChromiumSrc $ChromiumSrc -Plan $patchPlan -CheckOnly:$CheckOnly
@@ -125,3 +134,4 @@ foreach ($path in $plan.Keys) {
     Write-Host "${verb}: $(Split-Path -Leaf $path)"
 }
 Invoke-BrandStrings -Preview:$CheckOnly
+Invoke-ProductIdentity -Preview:$CheckOnly
