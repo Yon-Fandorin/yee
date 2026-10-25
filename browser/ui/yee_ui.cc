@@ -1029,7 +1029,7 @@ ResolveSidebarItemColors(const ui::ColorProvider &color_provider,
             hover_progress * 0.42)));
       } else {
         fill_alpha = static_cast<int>(std::lround(
-            kSidebarMetrics.favorites_cell_fill_alpha * hover_progress));
+            kSidebarMetrics.sidebar_row_hover_fill_alpha * hover_progress));
       }
       break;
     case SidebarItemVisualState::kActive:

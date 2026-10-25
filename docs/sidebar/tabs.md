@@ -20,6 +20,9 @@ Tabs는 URL과 `WebContents`에 연결된 실제 브라우저 탭이다. Favorit
   elevated surface, hover는 system hover overlay, focus는 system focus ring을
   사용하며 비활성 창에서는 같은 상태의 대비를 낮춘다. 스펙의 3×20 mint
   indicator를 넣을지는 묻는다.
+  Windows의 hover·active 채움은 밝은 Sidebar에서도 구별되도록 각각 24/255,
+  40/255 alpha를 사용한다. macOS는 기존 18/255, 30/255를 유지한다. 치수와
+  hit target은 바꾸지 않는다.
 
 `Tabs` 섹션 제목은 두지 않는다.
 

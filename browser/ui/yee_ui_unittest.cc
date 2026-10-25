@@ -916,7 +916,7 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
     const SidebarItemColors hovered_row = ResolveSidebarItemColors(
         provider, SidebarItemVisualState::kHovered, /*hover_progress=*/1.0,
         /*frame_active=*/true, /*persistent_surface=*/false);
-    EXPECT_EQ(kSidebarMetrics.favorites_cell_fill_alpha,
+    EXPECT_EQ(kSidebarMetrics.sidebar_row_hover_fill_alpha,
               static_cast<int>(SkColorGetA(hovered_row.fill)));
     EXPECT_EQ(0, static_cast<int>(SkColorGetA(hovered_row.stroke)));
     EXPECT_GT(color_utils::GetContrastRatio(hovered_row.foreground, shell),
@@ -953,6 +953,14 @@ TEST(YeeSidebarItemColorTest, EveryStateSharesOneThemeAwarePalette) {
     EXPECT_EQ(active.foreground, dragging.foreground);
     const SkColor composited_active_fill =
         color_utils::GetResultingPaintColor(active.fill, shell);
+#if BUILDFLAG(IS_WIN)
+    EXPECT_GE(color_utils::GetContrastRatio(composited_active_fill, shell),
+              1.3f);
+    EXPECT_GE(color_utils::GetContrastRatio(
+                  color_utils::GetResultingPaintColor(hovered_row.fill, shell),
+                  shell),
+              1.15f);
+#endif
     EXPECT_GE(color_utils::GetContrastRatio(active.foreground,
                                             composited_active_fill),
               color_utils::kMinimumReadableContrastRatio);

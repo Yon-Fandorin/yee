@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "base/functional/callback_forward.h"
+#include "build/build_config.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
@@ -94,7 +95,13 @@ struct SidebarMetrics {
   int sidebar_footer_surface_padding_vertical = 4;
   int sidebar_footer_surface_padding_horizontal = 5;
   int sidebar_row_hover_animation_duration_ms = 50;
+#if BUILDFLAG(IS_WIN)
+  int sidebar_row_hover_fill_alpha = 24;
+  int sidebar_row_active_fill_alpha = 40;
+#else
+  int sidebar_row_hover_fill_alpha = 18;
   int sidebar_row_active_fill_alpha = 30;
+#endif
   int sidebar_footer_menu_gap = 8;
   int sidebar_footer_root_row_height = 44;
   int sidebar_footer_menu_row_height = 28;

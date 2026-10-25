@@ -97,6 +97,8 @@ Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` pla
 - 지속 행의 기본 상태는 배경과 외곽선 없이 Sidebar 위에 놓인다. Hover에는 옅은
   배경만, open·press에는 active 배경을 사용한다. keyboard focus에는 system
   focus ring 한 겹만 표시하며 내부 stroke를 겹쳐 그리지 않는다.
+  Windows에서는 밝은 Sidebar와 행을 구분하도록 기본 상태에도 옅은 rounded
+  배경을 유지한다. macOS의 기존 투명 기본 상태는 유지한다.
 - 지속 행의 background와 hover·focus·press highlight는 같은 6 DIP 곡률을
   공유해 상태가 바뀌어도 사각 모서리가 드러나지 않는다.
 - hover와 open 상태는 한 겹의 Yee surface로 표현하고 keyboard focus는 같은
@@ -114,6 +116,8 @@ Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` pla
 - 현재 Workspace mark만 accent tonal surface를 사용한다. 일반 action은 배경 없는
   neutral glyph slot으로 표시한다. 선택·hover는
   기존 Sidebar 상태 팔레트보다 강해지지 않는다.
+  Windows의 기본 라이트 테마는 tonal container와 Sidebar가 같은 색이므로,
+  Workspace mark에는 system primary/on-primary 쌍을 사용한다.
 - 지속 행의 Workspace title은 primary hierarchy, 보조 계정 정보는 system
   secondary foreground를 사용한다. 후행 disclosure는 선행 Workspace mark보다
   작아야 한다.
@@ -149,8 +153,17 @@ Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` pla
 split에서 복제되지 않는지, collapse와 expand에 맞춰 표시되는지를 검증한다.
 메뉴를 정상 종료하거나 네이티브 종료한 직후 browser theme가 바뀌어도 dangling
 anchor observer가 남지 않는지 함께 검증한다.
-외부 클릭 종료는 배경과 외곽선이 없는 resting 상태로 돌아가고 포커스를 강제로
-trigger에 되돌리지 않으며, Escape 종료만 keyboard traversal focus를 복원한다.
+외부 클릭 종료는 플랫폼의 resting 상태로 돌아가고 포커스를 강제로 trigger에
+되돌리지 않는다. Windows는 옅은 기본 배경을 유지하고 macOS는 배경·외곽선이
+없는 상태로 돌아간다. Escape 종료만 keyboard traversal focus를 복원한다.
 지속 행의 후행 요소는 disclosure 하나로 유지해 Account/Profile mark가 다시
 중복되지 않게 한다.
 테마 대비, bubble의 연결감, 긴 이름 말줄임은 실제 Yee 앱에서 확인한다.
+
+Windows의 지속 Footer trigger는 hover 시 focus를 요청하거나 exit 시 focus를
+지우지 않는다. 부모 창 재활성화로 열린 bubble이 닫히는 것을 방지한다. 메뉴
+내부 행의 pointer focus 동작과 macOS의 기존 동작은 유지한다. Escape 종료는
+native bubble 삭제와 부모 창 활성화를 마친 뒤 traversal focus를 복원한다.
+외부 클릭 종료는 클릭한 목적지의 현재·저장 focus를 보존한다.
+복원 대기 중 trigger가 Widget에서 분리되면 이전 복원 요청을 취소한다.
+다시 부착되더라도 그 사이 다른 컨트롤에 지정한 focus를 가져오지 않는다.

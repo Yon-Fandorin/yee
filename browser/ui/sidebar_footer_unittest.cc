@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
+#include "base/test/run_until.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -21,10 +22,12 @@
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rrect_f.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -43,6 +46,8 @@
 
 namespace yee {
 namespace {
+
+constexpr bool kFooterHasRestingSurface = BUILDFLAG(IS_WIN);
 
 gfx::Insets FooterSurfaceInsetsForTesting() {
   return gfx::Insets::VH(
@@ -149,7 +154,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
   raw_ptr<views::View> footer_ = nullptr;
   int popup_locks_ = 0;
 
-private:
+ private:
   std::unique_ptr<views::Widget> widget_;
 };
 
@@ -371,23 +376,23 @@ TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
   EXPECT_TRUE(highlight->HasRoundedCorners());
   EXPECT_FLOAT_EQ(highlight->GetSimpleRadius(),
                   kSidebarMetrics.sidebar_footer_corner_radius);
-  auto *const button = static_cast<views::Button *>(footer_.get());
+  auto* const button = static_cast<views::Button*>(footer_.get());
   ASSERT_TRUE(footer_->GetColorProvider());
 
   button->SetState(views::Button::STATE_NORMAL);
-  ExpectFooterSurface(/*paint_background=*/false);
+  ExpectFooterSurface(/*paint_background=*/kFooterHasRestingSurface);
 
   button->SetState(views::Button::STATE_HOVERED);
   ExpectFooterSurface(/*paint_background=*/true);
-  views::FocusRing *const focus_ring = views::FocusRing::Get(footer_);
+  views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
   ASSERT_TRUE(focus_ring);
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
 
   button->SetState(views::Button::STATE_NORMAL);
-  ExpectFooterSurface(/*paint_background=*/false);
+  ExpectFooterSurface(/*paint_background=*/kFooterHasRestingSurface);
   footer_->RequestFocus();
   EXPECT_FALSE(focus_ring->ShouldPaintForTesting());
-  ExpectFooterSurface(/*paint_background=*/false);
+  ExpectFooterSurface(/*paint_background=*/kFooterHasRestingSurface);
   footer_->GetFocusManager()->SetFocusedView(nullptr);
   footer_->RequestFocusWithReason(
       views::FocusManager::FocusChangeReason::kFocusTraversal);
@@ -395,7 +400,7 @@ TEST_F(SidebarFooterViewTest, InteractionStatesUseOnlyTheYeeSurface) {
   EXPECT_EQ(focus_ring->GetColorId(), ui::kColorSysStateFocusRing);
   EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
 
-  views::InkDropHost *const ink_drop_host = views::InkDrop::Get(footer_);
+  views::InkDropHost* const ink_drop_host = views::InkDrop::Get(footer_);
   ASSERT_TRUE(ink_drop_host);
   std::unique_ptr<views::InkDrop> ink_drop = ink_drop_host->CreateInkDrop();
   ASSERT_TRUE(ink_drop);
@@ -562,68 +567,173 @@ TEST_F(SidebarFooterViewTest,
   footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
   focus_target->SetBoundsRect(gfx::Rect(0, 50, 240, 20));
 
-  views::FocusManager *const focus_manager = footer_->GetFocusManager();
+  views::FocusManager* const focus_manager = footer_->GetFocusManager();
   ASSERT_TRUE(focus_manager);
-  // 현재 포커스와 비활성 창에 저장된 포커스 모두 닫힌 Footer를 복원하면 안
-  // 된다.
-  for (bool stored_only : {false, true}) {
-    SCOPED_TRACE(stored_only);
-    views::View *const menu = OpenBubble();
-    ASSERT_TRUE(menu);
-    focus_manager->SetFocusedViewWithReason(
-        footer_, views::FocusManager::FocusChangeReason::kFocusRestore);
-    if (stored_only) {
-      focus_manager->StoreFocusedView(/*clear_native_focus=*/false);
-    }
-    ASSERT_EQ(stored_only ? nullptr : footer_, focus_manager->GetFocusedView());
-    ASSERT_EQ(footer_, focus_manager->GetStoredFocusView());
-    menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
-    base::RunLoop().RunUntilIdle();
-    EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
-    EXPECT_FALSE(footer_->HasFocus());
-    EXPECT_EQ(nullptr, focus_manager->GetStoredFocusView());
-    EXPECT_FALSE(focus_manager->RestoreFocusedView());
-  }
+  // 열기 전에 trigger에 포커스를 둔다. Windows에서 열린 뒤 부모 창에
+  // 포커스를 요청하면 메뉴가 먼저 닫혀 저장 포커스를 검사할 수 없다.
+  widget()->Show();
+  widget()->Activate();
+  ASSERT_TRUE(base::test::RunUntil([&]() { return widget()->IsActive(); }));
+  footer_->RequestFocus();
+  ASSERT_TRUE(footer_->HasFocus());
+  views::View* menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  ASSERT_EQ(footer_, focus_manager->GetStoredFocusView());
+  menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_FALSE(footer_->HasFocus());
+  EXPECT_EQ(nullptr, focus_manager->GetStoredFocusView());
+  EXPECT_FALSE(focus_manager->RestoreFocusedView());
 
-  views::View *const menu = OpenBubble();
+  menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   ExpectFooterSurface(/*paint_background=*/true);
   footer_->GetFocusManager()->SetFocusedViewWithReason(
       focus_target, views::FocusManager::FocusChangeReason::kDirectFocusChange);
-  menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+  // Windows는 native 활성화 중 닫힐 수 있다. macOS에서도 같은 외부 종료를
+  // 마친다.
+  if (views::View* const remaining_menu =
+          GetSidebarFooterMenuForTesting(*footer_)) {
+    remaining_menu->GetWidget()->CloseWithReason(
+        views::Widget::ClosedReason::kLostFocus);
+  }
   base::RunLoop().RunUntilIdle();
+  widget()->Activate();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return widget()->IsActive() && focus_target->HasFocus(); }));
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_FALSE(footer_->HasFocus());
   EXPECT_TRUE(focus_target->HasFocus());
   EXPECT_EQ(focus_target, focus_manager->GetStoredFocusView());
-  ExpectFooterSurface(/*paint_background=*/false);
+  ExpectFooterSurface(/*paint_background=*/kFooterHasRestingSurface);
 }
 
 TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
-  views::View *const menu = OpenBubble();
+  views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   footer_->GetFocusManager()->SetFocusedView(nullptr);
   EXPECT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
       ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
-  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(base::test::RunUntil([&]() {
+    return !GetSidebarFooterMenuForTesting(*footer_) && footer_->HasFocus() &&
+           footer_->GetFocusManager()->focus_change_reason() ==
+               views::FocusManager::FocusChangeReason::kFocusTraversal;
+  }));
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_TRUE(footer_->HasFocus());
   ASSERT_TRUE(footer_->GetFocusManager());
   EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
             footer_->GetFocusManager()->focus_change_reason());
-  views::FocusRing *const focus_ring = views::FocusRing::Get(footer_);
+  views::FocusRing* const focus_ring = views::FocusRing::Get(footer_);
   ASSERT_TRUE(focus_ring);
   EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
   ExpectFooterSurface(/*paint_background=*/true);
+
+#if BUILDFLAG(IS_WIN)
+  // 이후 pointer exit도 키보드 traversal 포커스를 지우지 않는다.
+  ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::Point(-1, -1),
+                      gfx::Point(-1, -1), ui::EventTimeForNow(), 0, 0);
+  footer_->OnMouseExited(exit);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(footer_->HasFocus());
+  EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
+            footer_->GetFocusManager()->focus_change_reason());
+  EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
+#endif
 }
+
+#if BUILDFLAG(IS_WIN)
+TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
+  footer_ = nullptr;
+  auto root = std::make_unique<views::View>();
+  views::View* const container = root.get();
+  footer_ = root->AddChildView(CreateSidebarFooterView(
+      CreateLocalSidebarFooterModel(u"Account"),
+      SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
+      SidebarMemoryChangedCallback()));
+  views::View* const focus_target =
+      root->AddChildView(std::make_unique<views::View>());
+  focus_target->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+  widget()->SetContentsView(std::move(root));
+  footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
+  focus_target->SetBoundsRect(gfx::Rect(0, 50, 240, 20));
+
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  ASSERT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
+      ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
+  // 삭제를 기다리는 복원 작업은 이전 Widget의 포커스 계약에만 속한다.
+  auto detached = container->RemoveChildViewT(footer_.get());
+  container->AddChildView(std::move(detached));
+  focus_target->RequestFocus();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(focus_target->HasFocus());
+  EXPECT_FALSE(footer_->HasFocus());
+}
+
+TEST_F(SidebarFooterViewTest, PointerExitAndReentryKeepNativePopupFocus) {
+  widget()->Show();
+  const gfx::Point center = footer_->GetLocalBounds().CenterPoint();
+  ui::MouseEvent enter(ui::EventType::kMouseEntered, center, center,
+                       ui::EventTimeForNow(), 0, 0);
+  footer_->OnMouseEntered(enter);
+  ui::MouseEvent press(ui::EventType::kMousePressed, center, center,
+                       ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                       ui::EF_LEFT_MOUSE_BUTTON);
+  ASSERT_TRUE(footer_->OnMousePressed(press));
+  ui::MouseEvent release(ui::EventType::kMouseReleased, center, center,
+                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+  footer_->OnMouseReleased(release);
+  ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_EQ(1, popup_locks_);
+
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::Point(-80, -80),
+                        gfx::Point(-80, -80), ui::EventTimeForNow(), 0, 0);
+    footer_->OnMouseExited(exit);
+    footer_->OnMouseEntered(enter);
+    base::RunLoop().RunUntilIdle();
+    views::View* const menu = GetSidebarFooterMenuForTesting(*footer_);
+    ASSERT_TRUE(menu);
+    EXPECT_TRUE(menu->GetWidget()->IsVisible());
+    EXPECT_TRUE(menu->GetWidget()->IsActive());
+    EXPECT_FALSE(widget()->IsActive());
+    EXPECT_EQ(1, popup_locks_);
+  }
+}
+
+TEST_F(SidebarFooterViewTest, WorkspaceMarkHasContrastInLightAndDarkThemes) {
+  widget()->Show();
+  for (const auto mode : {ui::ColorProviderKey::ColorMode::kLight,
+                          ui::ColorProviderKey::ColorMode::kDark}) {
+    widget()->SetColorModeOverride(mode);
+    const ui::ColorProvider* const colors = footer_->GetColorProvider();
+    ASSERT_TRUE(colors);
+    const auto* const mark = static_cast<const views::Label*>(
+        footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
+    ASSERT_TRUE(mark);
+    ASSERT_TRUE(mark->background());
+    const SkColor fill = mark->background()->color().ResolveToSkColor(colors);
+    EXPECT_GE(color_utils::GetContrastRatio(
+                  fill, ResolveShellBackgroundColor(*colors, true)),
+              3.0f);
+    EXPECT_GE(color_utils::GetContrastRatio(mark->GetEnabledColor(), fill),
+              color_utils::kMinimumReadableContrastRatio);
+  }
+}
+#endif
 
 TEST_F(SidebarFooterViewTest,
        ThemeChangeAfterNativeTeardownHasNoDanglingBubble) {
-  views::View *const menu = OpenBubble();
+  views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
 

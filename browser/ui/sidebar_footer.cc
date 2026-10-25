@@ -96,14 +96,14 @@ gfx::Insets FooterSurfaceInsets() {
       kSidebarMetrics.sidebar_footer_surface_horizontal_inset());
 }
 
-bool HasKeyboardTraversalFocus(const views::View &view) {
-  const views::FocusManager *const focus_manager = view.GetFocusManager();
+bool HasKeyboardTraversalFocus(const views::View& view) {
+  const views::FocusManager* const focus_manager = view.GetFocusManager();
   return view.HasFocus() && focus_manager &&
          focus_manager->focus_change_reason() ==
              views::FocusManager::FocusChangeReason::kFocusTraversal;
 }
 
-ui::ColorId MenuOutlineColorId(const views::View &view) {
+ui::ColorId MenuOutlineColorId(const views::View& view) {
   const bool light_mode =
       view.GetWidget() && view.GetWidget()->GetColorMode() ==
                               ui::ColorProviderKey::ColorMode::kLight;
@@ -187,10 +187,19 @@ std::unique_ptr<views::Label> CreateMarkLabel(std::u16string text, int size) {
   label->SetPreferredSize(gfx::Size(size, size));
   label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
   label->SetTextStyle(views::style::STYLE_BODY_5_EMPHASIS);
+#if BUILDFLAG(IS_WIN)
+  // Windows 기본 라이트 테마는 frame과 tonal container가 같은 색이다.
+  // 명암·사용자 테마에서도 표식이 구분되도록 primary/on-primary를 함께 쓴다.
+  label->SetAutoColorReadabilityEnabled(false);
+  label->SetEnabledColor(ui::kColorSysOnPrimary);
+  label->SetBackground(views::CreateRoundedRectBackground(
+      ui::kColorSysPrimary, std::min(kMenuCornerRadius, size / 2)));
+#else
   label->SetEnabledColor(ui::kColorSysOnTonalContainer);
-  label->SetSkipSubpixelRenderingOpacityCheck(true);
   label->SetBackground(views::CreateRoundedRectBackground(
       ui::kColorSysTonalContainer, std::min(kMenuCornerRadius, size / 2)));
+#endif
+  label->SetSkipSubpixelRenderingOpacityCheck(true);
   label->SetCanProcessEventsWithinSubtree(false);
   return label;
 }
@@ -276,8 +285,8 @@ std::unique_ptr<views::ImageView> CreateFooterChevron() {
   return chevron;
 }
 
-void SetCompactContentMargins(views::View *icon, views::View *secondary) {
-    // 두 열의 세로 간격은 기본 control-list 여백 대신 이 행의 border가 정한다.
+void SetCompactContentMargins(views::View* icon, views::View* secondary) {
+  // 두 열의 세로 간격은 기본 control-list 여백 대신 이 행의 border가 정한다.
   if (icon) {
     icon->parent()->SetProperty(views::kMarginsKey, gfx::Insets());
   }
@@ -452,8 +461,8 @@ class FooterBubble final : public views::WidgetObserver {
       widget_observation_{this};
 };
 
-HoverButton::Params CreateFooterTriggerParams(const SidebarFooterModel &model) {
-  const SidebarContextItem &context = SelectedContext(model);
+HoverButton::Params CreateFooterTriggerParams(const SidebarFooterModel& model) {
+  const SidebarContextItem& context = SelectedContext(model);
   HoverButton::Params params;
   params.icon_view = CreateMarkLabel(FirstCodePointMark(context.workspace_name),
                                      kSidebarMetrics.sidebar_footer_icon_size);
@@ -905,7 +914,7 @@ class YeeSidebarFooterMenuView : public views::View,
   gfx::SlideAnimation screen_animation_;
 };
 
-class YeeSidebarFooterView : public HoverButton {
+class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
  private:
   class HoverAnimationDelegate final : public gfx::AnimationDelegate {
    public:
@@ -993,6 +1002,9 @@ class YeeSidebarFooterView : public HoverButton {
 
   void SetFooterVisible(bool visible) {
     if (!visible) {
+#if BUILDFLAG(IS_WIN)
+      restore_keyboard_focus_pending_ = false;
+#endif
       CloseBubble();
     }
     SetVisible(visible);
@@ -1008,6 +1020,9 @@ class YeeSidebarFooterView : public HoverButton {
   void AddedToWidget() override {
     HoverButton::AddedToWidget();
     if (views::Widget* const widget = GetWidget()) {
+#if BUILDFLAG(IS_WIN)
+      owner_widget_observation_.Observe(widget);
+#endif
       paint_as_active_subscription_ =
           widget->RegisterPaintAsActiveChangedCallback(base::BindRepeating(
               &YeeSidebarFooterView::UpdateSurface, base::Unretained(this)));
@@ -1016,17 +1031,27 @@ class YeeSidebarFooterView : public HoverButton {
   }
 
   void RemovedFromWidget() override {
+#if BUILDFLAG(IS_WIN)
+    owner_widget_observation_.Reset();
+    restore_keyboard_focus_pending_ = false;
+#endif
     paint_as_active_subscription_ = {};
     HoverButton::RemovedFromWidget();
   }
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
+#if BUILDFLAG(IS_WIN)
+    restore_keyboard_focus_pending_ = false;
+#endif
     bubble_reopen_suppressor_.OnMousePressed();
     return HoverButton::OnMousePressed(event);
   }
 
   void OnGestureEvent(ui::GestureEvent* event) override {
     if (event->type() == ui::EventType::kGestureTapDown) {
+#if BUILDFLAG(IS_WIN)
+      restore_keyboard_focus_pending_ = false;
+#endif
       bubble_reopen_suppressor_.OnMousePressed();
     }
     HoverButton::OnGestureEvent(event);
@@ -1056,7 +1081,13 @@ class YeeSidebarFooterView : public HoverButton {
   }
 
   void StateChanged(ButtonState old_state) override {
+#if BUILDFLAG(IS_WIN)
+    // 메뉴 행과 달리 지속 trigger의 hover·exit는 포커스를 바꾸지 않는다.
+    // Windows에서 부모 창에 포커스를 요청하면 열린 bubble이 비활성화된다.
+    views::LabelButton::StateChanged(old_state);
+#else
     HoverButton::StateChanged(old_state);
+#endif
     const bool was_hovered = old_state == STATE_HOVERED;
     const bool is_hovered = GetState() == STATE_HOVERED;
     if (was_hovered != is_hovered) {
@@ -1077,8 +1108,27 @@ class YeeSidebarFooterView : public HoverButton {
     UpdateSurface();
   }
 
+#if BUILDFLAG(IS_WIN)
+  void OnWidgetActivationChanged(views::Widget* widget, bool active) override {
+    if (active && restore_keyboard_focus_pending_) {
+      // native 활성화가 저장 포커스를 복원한 뒤 traversal 이유를 적용한다.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(&YeeSidebarFooterView::RestoreKeyboardFocus,
+                                    weak_factory_.GetWeakPtr()));
+    }
+  }
+
+  void OnWidgetDestroying(views::Widget* widget) override {
+    owner_widget_observation_.Reset();
+    restore_keyboard_focus_pending_ = false;
+  }
+#endif
+
  private:
   void ToggleBubble(const ui::Event& event) {
+#if BUILDFLAG(IS_WIN)
+    restore_keyboard_focus_pending_ = false;
+#endif
     const bool is_pointer_interaction =
         event.IsMouseEvent() || event.IsGestureEvent();
     if (bubble_reopen_suppressor_.ShouldSuppressBubbleShow(
@@ -1161,7 +1211,7 @@ class YeeSidebarFooterView : public HoverButton {
     if (!restore_keyboard_focus) {
       // 부모 창이 다시 활성화돼도 닫힌 메뉴의 Footer 포커스를 복원하지 않는다.
       // 클릭한 다른 목적지의 현재·저장 포커스는 유지한다.
-      if (views::FocusManager *const focus_manager = GetFocusManager()) {
+      if (views::FocusManager* const focus_manager = GetFocusManager()) {
         if (HasFocus()) {
           focus_manager->ClearFocus();
         }
@@ -1172,10 +1222,35 @@ class YeeSidebarFooterView : public HoverButton {
     }
     UpdateSurface();
     if (restore_keyboard_focus && GetVisible()) {
+#if BUILDFLAG(IS_WIN)
+      // bubble의 지연 삭제와 부모 창 활성화가 끝난 뒤 포커스를 복원한다.
+      restore_keyboard_focus_pending_ = true;
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(&YeeSidebarFooterView::RestoreKeyboardFocus,
+                                    weak_factory_.GetWeakPtr()));
+#else
       RequestFocusWithReason(
           views::FocusManager::FocusChangeReason::kFocusTraversal);
+#endif
     }
   }
+
+#if BUILDFLAG(IS_WIN)
+  void RestoreKeyboardFocus() {
+    if (!restore_keyboard_focus_pending_ || !GetVisible() ||
+        bubble_tracker_.view() || !GetWidget()) {
+      restore_keyboard_focus_pending_ = false;
+      return;
+    }
+    if (!GetWidget()->IsActive()) {
+      GetWidget()->Activate();
+      return;
+    }
+    restore_keyboard_focus_pending_ = false;
+    FocusForReason(*this, FocusChangeReason::kFocusTraversal);
+    UpdateSurface();
+  }
+#endif
 
   void SelectContext(size_t context_index) {
     CHECK_LT(context_index, model_.contexts.size());
@@ -1214,7 +1289,7 @@ class YeeSidebarFooterView : public HoverButton {
     } else {
       GetViewAccessibility().SetIsCollapsed();
     }
-    const ui::ColorProvider *const color_provider = GetColorProvider();
+    const ui::ColorProvider* const color_provider = GetColorProvider();
     if (!color_provider) {
       return;
     }
@@ -1228,13 +1303,18 @@ class YeeSidebarFooterView : public HoverButton {
       // 키보드 포커스는 활성 면과 system focus ring 한 겹으로 구분한다.
       visual_state = SidebarItemVisualState::kActive;
     }
-    const views::Widget *const widget = GetWidget();
+    const views::Widget* const widget = GetWidget();
     const SidebarItemColors colors =
         ResolveSidebarItemColors(*color_provider, visual_state, hover_progress,
                                  !widget || widget->ShouldPaintAsActive(),
+#if BUILDFLAG(IS_WIN)
+                                 /*persistent_surface=*/true);
+    const bool paint_background = true;
+#else
                                  /*persistent_surface=*/false);
     const bool paint_background =
         visual_state != SidebarItemVisualState::kResting;
+#endif
     // 모든 상태가 같은 여백을 예약한다. 포커스에는 system ring만 그려
     // 내부 stroke와 겹친 이중 윤곽이 생기지 않게 한다.
     SetBackground(
@@ -1265,6 +1345,11 @@ class YeeSidebarFooterView : public HoverButton {
   raw_ptr<views::Label> account_label_ = nullptr;
   raw_ptr<views::ImageView> chevron_ = nullptr;
   views::ViewTracker bubble_tracker_;
+#if BUILDFLAG(IS_WIN)
+  base::ScopedObservation<views::Widget, views::WidgetObserver>
+      owner_widget_observation_{this};
+  bool restore_keyboard_focus_pending_ = false;
+#endif
   WebUIBubbleReopenSuppressor bubble_reopen_suppressor_;
   base::CallbackListSubscription paint_as_active_subscription_;
   HoverAnimationDelegate hover_animation_delegate_;

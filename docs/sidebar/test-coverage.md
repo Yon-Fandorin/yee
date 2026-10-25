@@ -60,6 +60,27 @@ focus와 잠금을 해제하면 페이지 폭을 바꾸지 않고 숨겨야 한�
 `SidebarFooterViewTest.*`는 실제 메뉴의 목적지, 키보드 이동과 Back, 선별된 Browser
 action 실행, 접근 가능한 이름, Footer와 독립적인 메뉴 폭, Memory callback을 확인한다.
 `WorkspaceMarkAppearsOnlyInFooter`는 profile mark 중복을 확인한다.
+Windows에서는 `PointerExitAndReentryKeepNativePopupFocus`가 실제 press/release
+이후의 이탈·재진입에도 같은 popup과 활성 focus를 유지하는지 검사한다.
+`WorkspaceMarkHasContrastInLightAndDarkThemes`는 mark 배경과 Sidebar 사이의
+3:1 대비 및 글자 가독성을 검사한다. Escape와 외부 클릭 검사는 native 활성화
+완료 후 각각 traversal focus 복원과 새 목적지 focus 보존을 확인한다.
+실제 앱 검사는
+`VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus`
+에서 OS pointer 이동과 Escape 후 focus를 검증한다.
+`EscapeRestoreIsCancelledWhenTriggerLeavesWidget`는 Escape 직후 trigger를
+분리·재부착한 뒤 다른 컨트롤의 focus를 지연 복원 작업이 빼앗지 않는지 확인한다.
+
+실제 Footer 검사는 별도 프로세스의 UI Automation 클라이언트가 브라우저·팝업
+트리를 보관하는 조건도 포함한다. 클라이언트는 전용 MTA에서 조회하고, 닫힌
+팝업의 현재 속성 조회가 실패하는지 확인한 뒤 COM 참조를 반환한다. 테스트는
+브라우저 STA가 살아 있는 `TearDownOnMainThread`에서 클라이언트 종료와 지연된
+참조 반환을 기다린다. 그 뒤 기존 `ContentTestSuiteBase`의 창·COM 누수 검사를
+그대로 실행한다. 외부 참조를 UI 스레드 종료 뒤까지 남기는 대조 실행에서는
+`ghost_count=53`, 먼저 정리하는 실행에서는 0으로 차이가 재현됐다.
+UIA 클라이언트 스레드 원칙은
+[Microsoft UI Automation threading](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading)을 따른다.
+
 `InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
 rest와 direct focus → keyboard traversal focus 순서에서 배경·외곽선 painter와
 고정 inset 계약을 확인한다. `PointerDismissDoesNotRestoreFocusOrOutlinedSurface`는
@@ -231,3 +252,7 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 모드와 `--test-launcher-preserve-desktop-windows` 옵션으로 실행한다. 첫 옵션은
 주변 창을 정리하는 테스트 런처 단계를 건너뛰며, 두 번째는 포커스 전환 실패 때
 다른 앱을 닫는 복구 대신 검사를 실패시킨다.
+실제 Windows 창·bubble의 입력 및 화면 검수에는
+`--enable-pixel-output-in-tests --disable-gpu --force-device-scale-factor=1`도
+지정한다. 기본 BrowserTest의 GL drawing 비활성화 상태에서는 검정 캡처나
+보이지 않는 native dialog로 인해 화면·입력 검증이 성립하지 않을 수 있다.
