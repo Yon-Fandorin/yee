@@ -61,7 +61,8 @@ std::optional<base::DictValue> ReadMetadata(const base::FilePath& path) {
     return std::nullopt;
   auto result = base::JSONReader::ReadDict(text, base::JSON_PARSE_RFC);
   if (!result || (result->FindInt("schema_version") != 1 &&
-                  result->FindInt("schema_version") != 2))
+                  result->FindInt("schema_version") != 2 &&
+                  result->FindInt("schema_version") != 3))
     return std::nullopt;
   return result;
 }
@@ -114,8 +115,12 @@ std::string ListTitle(std::string_view text, std::string_view fallback) {
   return std::string(fallback);
 }
 std::string GenerationIdentity(bool downloaded,
-                               const base::ListValue& entries) {
-  std::string identity = downloaded ? "2\n1\n" : "2\n0\n";
+                               const base::ListValue& entries,
+                               std::string_view catalog_hash = {}) {
+  std::string identity = catalog_hash.empty() ? "2\n" : "3\n";
+  identity += downloaded ? "1\n" : "0\n";
+  if (!catalog_hash.empty())
+    identity += std::string(catalog_hash) + "\n";
   for (const auto& value : entries) {
     const auto& entry = value.GetDict();
     identity +=
@@ -148,6 +153,27 @@ BaselineListSnapshot ReadBaselineListGeneration(const base::FilePath& directory,
     return snapshot;
   snapshot.baseline_downloaded =
       manifest->FindBool("baseline_downloaded").value_or(true);
+  std::string catalog_hash;
+  if (manifest->FindInt("schema_version") == 3) {
+    const auto* hash = manifest->FindString("catalog_sha256");
+    const auto file = path.AppendASCII("catalog.json");
+    if (!hash || !ValidGeneration(*hash) || base::IsLink(file) ||
+        !base::ReadFileToStringWithMaxSize(file, &snapshot.catalog_data,
+                                           kMaxCatalogDataBytes) ||
+        Digest(snapshot.catalog_data) != *hash)
+      return {};
+    const auto catalog = ParseCatalogFilterData(snapshot.catalog_data);
+    const auto prepared =
+        catalog ? PrepareCatalogFilters(*catalog) : std::nullopt;
+    if (!prepared)
+      return {};
+    catalog_hash = *hash;
+    snapshot.catalog_active = true;
+    snapshot.filters = prepared->filters;
+    snapshot.trusted_filters = prepared->trusted_filters;
+    snapshot.catalog_omitted_rules = prepared->omitted_rules;
+    snapshot.catalog_source_count = static_cast<int>(catalog->downloads.size());
+  }
   size_t subscribed_bytes = 0;
   std::set<std::string> urls;
   std::array<std::string, 2> checksums;
@@ -185,7 +211,8 @@ BaselineListSnapshot ReadBaselineListGeneration(const base::FilePath& directory,
       return {};
     if (official) {
       checksums[index] = *checksum;
-      snapshot.filters += *selected;
+      if (!snapshot.catalog_active)
+        snapshot.filters += *selected;
     } else {
       subscribed_bytes += original.size();
       if (subscribed_bytes > kMaxSubscriptionTotalBytes)
@@ -199,13 +226,17 @@ BaselineListSnapshot ReadBaselineListGeneration(const base::FilePath& directory,
     }
   }
   if ((legacy ? Digest(checksums[0] + "\n" + checksums[1])
-              : GenerationIdentity(snapshot.baseline_downloaded, *entries)) !=
-      generation)
+              : GenerationIdentity(snapshot.baseline_downloaded, *entries,
+                                   catalog_hash)) != generation)
     return {};
   snapshot.generation = std::string(generation);
   snapshot.checked_at = base::Time::FromSecondsSinceUnixEpoch(*time);
   const auto cache = ReadMetadata(path.AppendASCII("compiled.json"));
-  if (cache && cache->FindString("bundle_generation") &&
+  if (cache &&
+      (!snapshot.catalog_active ||
+       cache->FindInt("catalog_compatibility_version") ==
+           kCatalogCompatibilityVersion) &&
+      cache->FindString("bundle_generation") &&
       *cache->FindString("bundle_generation") == kBundleGeneration &&
       cache->FindString("community_generation") &&
       *cache->FindString("community_generation") ==
@@ -245,6 +276,15 @@ bool WriteFilterListSet(const base::FilePath& directory,
       lists.subscriptions.size() > kMaxFilterSubscriptions)
     return false;
   std::string selected_filters;
+  std::optional<std::string> catalog_text;
+  std::optional<PreparedCatalogFilters> prepared;
+  if (lists.catalog) {
+    prepared = PrepareCatalogFilters(*lists.catalog);
+    catalog_text = SerializeCatalogFilterData(*lists.catalog);
+    if (!prepared || !catalog_text)
+      return false;
+    selected_filters = prepared->filters;
+  }
   base::ListValue entries;
   std::vector<std::string_view> originals;
   size_t subscribed_bytes = 0;
@@ -266,7 +306,7 @@ bool WriteFilterListSet(const base::FilePath& directory,
       if (subscribed_bytes > kMaxSubscriptionTotalBytes)
         return false;
     }
-    if (official || info.enabled)
+    if ((official && !prepared) || (!official && info.enabled))
       selected_filters += *selected;
     auto entry =
         base::DictValue()
@@ -285,7 +325,8 @@ bool WriteFilterListSet(const base::FilePath& directory,
     originals.push_back(original);
   }
   const auto generation =
-      GenerationIdentity(lists.baseline_downloaded, entries);
+      GenerationIdentity(lists.baseline_downloaded, entries,
+                         catalog_text ? Digest(*catalog_text) : "");
   const auto previous = ReadBaselineListStore(directory);
   std::string rollback =
       previous.generation == generation ? "" : previous.generation;
@@ -319,9 +360,14 @@ bool WriteFilterListSet(const base::FilePath& directory,
               originals[index]))
         return false;
     }
+    if (catalog_text &&
+        !base::ImportantFileWriter::WriteFileAtomically(
+            temporary.GetPath().AppendASCII("catalog.json"), *catalog_text))
+      return false;
     auto manifest = base::WriteJson(
         base::DictValue()
-            .Set("schema_version", 2)
+            .Set("schema_version", catalog_text ? 3 : 2)
+            .Set("catalog_sha256", catalog_text ? Digest(*catalog_text) : "")
             .Set("baseline_downloaded", lists.baseline_downloaded)
             .Set("checked_at", base::Time::Now().InSecondsFSinceUnixEpoch())
             .Set("lists", std::move(entries)));
@@ -335,18 +381,36 @@ bool WriteFilterListSet(const base::FilePath& directory,
   // and its own digest make an interrupted/stale cache fall back to parsing.
   const auto filters = selected_filters + "\n" + std::string(kOwnedFilters);
   const auto& community = CommunityFilterData();
-  const auto compiled = compile_baseline_rules(
-      rust::Str(filters.data(), filters.size()),
-      rust::Str(community.filters.data(), community.filters.size()));
+  const auto& trusted =
+      prepared ? prepared->trusted_filters : community.filters;
+  const auto compiled =
+      compile_baseline_rules(rust::Str(filters.data(), filters.size()),
+                             rust::Str(trusted.data(), trusted.size()));
   const std::string_view compiled_view(
       reinterpret_cast<const char*>(compiled.data()), compiled.size());
   const auto target = generations.AppendASCII(generation);
-  auto cache =
-      base::WriteJson(base::DictValue()
-                          .Set("schema_version", 1)
-                          .Set("bundle_generation", kBundleGeneration)
-                          .Set("community_generation", community.generation)
-                          .Set("sha256", Digest(compiled_view)));
+  if (prepared) {
+    base::ListValue examples;
+    for (const auto& example : prepared->omitted_examples)
+      examples.Append(example);
+    const auto report = base::WriteJson(
+        base::DictValue()
+            .Set("engine_version", "adblock-rust 0.13.3")
+            .Set("selection_version", kCatalogCompatibilityVersion)
+            .Set("resource_generation", community.generation)
+            .Set("omitted_rules", prepared->omitted_rules)
+            .Set("omitted_examples", std::move(examples)));
+    if (report)
+      base::ImportantFileWriter::WriteFileAtomically(
+          target.AppendASCII("compatibility.json"), *report);
+  }
+  auto cache = base::WriteJson(
+      base::DictValue()
+          .Set("schema_version", 1)
+          .Set("catalog_compatibility_version", kCatalogCompatibilityVersion)
+          .Set("bundle_generation", kBundleGeneration)
+          .Set("community_generation", community.generation)
+          .Set("sha256", Digest(compiled_view)));
   if (compiled.size() <= kMaxCompiledBytes && cache &&
       base::ImportantFileWriter::WriteFileAtomically(
           target.AppendASCII("compiled.dat"), compiled_view))
@@ -396,6 +460,11 @@ FilterListSet ReadFilterListSet(const base::FilePath& directory) {
   const auto snapshot = ReadBaselineListStore(directory);
   lists.baseline_downloaded = snapshot.baseline_downloaded;
   lists.checked_at = snapshot.checked_at;
+  if (snapshot.catalog_active) {
+    lists.catalog = ParseCatalogFilterData(snapshot.catalog_data);
+    if (!lists.catalog)
+      return {};
+  }
   if (snapshot.generation.empty()) {
     for (size_t i = 0; i < 2; ++i)
       lists.baseline[i] = kBundledBaselineOriginals[i];
@@ -489,7 +558,8 @@ FilterListUpdateResult UpdateFilterLists(
     std::array<std::string, 2> baseline,
     std::vector<FilterListDownload> downloads,
     base::Time checked_at,
-    std::string_view running_generation) {
+    std::string_view running_generation,
+    std::optional<CatalogFilterData> catalog) {
   auto lists = ReadFilterListSet(directory);
   FilterListUpdateResult result;
   bool valid_pair = true;
@@ -507,6 +577,22 @@ FilterListUpdateResult UpdateFilterLists(
     lists.checked_at = checked_at;
   }
   bool changed = valid_pair;
+  if (catalog) {
+    if (PrepareCatalogFilters(*catalog)) {
+      lists.catalog = std::move(catalog);
+      lists.checked_at = checked_at;
+      // 카탈로그가 기본 목록도 포함하므로 기존 두 서버의 실패는 정상 카탈로그
+      // 갱신을 막지 않는다.
+      std::erase_if(result.failed_urls, [](const auto& url) {
+        return std::ranges::find(kBaselineListURLs, url) !=
+               kBaselineListURLs.end();
+      });
+      changed = true;
+    } else {
+      lists.checked_at = {};
+      result.failed_urls.emplace_back(kBraveCatalogURL);
+    }
+  }
   size_t total_bytes = 0;
   for (const auto& list : lists.subscriptions)
     total_bytes += list.original.size();

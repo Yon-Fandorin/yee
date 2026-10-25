@@ -51,16 +51,17 @@ BaselineListUpdater::BaselineListUpdater(
     scoped_refptr<network::SharedURLLoaderFactory> factory,
     std::string running_generation,
     base::Time checked_at,
-    scoped_refptr<base::SequencedTaskRunner> worker)
+    scoped_refptr<base::SequencedTaskRunner> worker,
+    bool use_brave_catalog)
     : directory_(std::move(directory)),
       factory_(std::move(factory)),
       running_generation_(std::move(running_generation)),
       checked_at_(checked_at),
-      worker_(worker
-                  ? std::move(worker)
-                  : base::ThreadPool::CreateSequencedTaskRunner(
-                        {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
-                         base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})) {}
+      worker_(worker ? std::move(worker)
+                     : base::ThreadPool::CreateSequencedTaskRunner(
+                           {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
+                            base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN})),
+      use_brave_catalog_(use_brave_catalog) {}
 BaselineListUpdater::~BaselineListUpdater() {
   weak_factory_.InvalidateWeakPtrs();
   StatusCallbacks().Notify();
@@ -105,7 +106,8 @@ void BaselineListUpdater::GetStatus(
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
           kBaselineListDirectorySwitch);
   BaselineListUpdateStatus status;
-  status.running_downloaded = BaselineLists().baseline_downloaded;
+  status.running_downloaded =
+      BaselineLists().baseline_downloaded || BaselineLists().catalog_active;
   status.available = !!Coordinator();
   status.in_flight = Coordinator() && Coordinator()->update_in_flight();
   if (Coordinator())
@@ -116,10 +118,14 @@ void BaselineListUpdater::GetStatus(
           [](base::FilePath directory, std::string running_generation,
              BaselineListUpdateStatus status) {
             const auto saved = ReadBaselineListStore(directory);
-            status.downloaded = saved.baseline_downloaded;
+            status.downloaded =
+                saved.baseline_downloaded || saved.catalog_active;
             status.subscriptions = saved.subscriptions;
             status.pending_restart = saved.generation != running_generation;
             status.recovered = saved.recovered;
+            status.catalog_downloaded = saved.catalog_active;
+            status.catalog_sources = saved.catalog_source_count;
+            status.omitted_rules = saved.catalog_omitted_rules;
             status.checked_at = saved.checked_at;
             return status;
           },
@@ -199,6 +205,10 @@ void BaselineListUpdater::Start() {
 void BaselineListUpdater::PlanLoaded(
     std::vector<FilterSubscription> subscriptions) {
   downloads_.clear();
+  catalog_update_.reset();
+  catalog_sources_.clear();
+  catalog_bytes_ = 0;
+  catalog_failed_ = false;
   for (const auto& info : subscriptions)
     if (info.enabled)
       downloads_.push_back({info.url, ""});
@@ -206,13 +216,10 @@ void BaselineListUpdater::PlanLoaded(
 }
 void BaselineListUpdater::Download(size_t index) {
   if (index == 2 + downloads_.size()) {
-    worker_->PostTaskAndReplyWithResult(
-        FROM_HERE,
-        base::BindOnce(&UpdateFilterLists, directory_, std::move(originals_),
-                       std::move(downloads_), base::Time::Now(),
-                       running_generation_),
-        base::BindOnce(&BaselineListUpdater::UpdatesInstalled,
-                       weak_factory_.GetWeakPtr()));
+    if (use_brave_catalog_)
+      DownloadCatalog();
+    else
+      InstallUpdates();
     return;
   }
   download_index_ = index;
@@ -226,6 +233,82 @@ void BaselineListUpdater::Download(size_t index) {
                      weak_factory_.GetWeakPtr(), index),
       subscription ? kMaxSubscribedListBytes : kMaxBaselineListBytes);
 }
+void BaselineListUpdater::DownloadCatalog() {
+  CreateLoader(kBraveCatalogURL, false);
+  loader_->DownloadToString(
+      factory_.get(),
+      base::BindOnce(&BaselineListUpdater::CatalogDownloaded,
+                     weak_factory_.GetWeakPtr()),
+      kMaxCatalogBytes);
+}
+void BaselineListUpdater::CatalogDownloaded(std::optional<std::string> body) {
+  const bool complete = body && ResponseComplete();
+  loader_.reset();
+  if (!complete) {
+    catalog_failed_ = true;
+    InstallUpdates();
+    return;
+  }
+  catalog_update_ = CatalogFilterData{std::move(*body), {}};
+  worker_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce([](std::string text) { return ParseBraveCatalog(text); },
+                     catalog_update_->catalog),
+      base::BindOnce(&BaselineListUpdater::CatalogPlanLoaded,
+                     weak_factory_.GetWeakPtr()));
+}
+void BaselineListUpdater::CatalogPlanLoaded(
+    std::optional<std::vector<CatalogFilterSource>> sources) {
+  if (!sources) {
+    catalog_failed_ = true;
+    catalog_update_.reset();
+    InstallUpdates();
+    return;
+  }
+  catalog_sources_ = std::move(*sources);
+  catalog_downloads_active_ = true;
+  DownloadCatalogSource();
+}
+void BaselineListUpdater::DownloadCatalogSource() {
+  const auto index = catalog_update_->downloads.size();
+  if (index == catalog_sources_.size()) {
+    catalog_downloads_active_ = false;
+    InstallUpdates();
+    return;
+  }
+  CreateLoader(catalog_sources_[index].url, true);
+  loader_->DownloadToString(
+      factory_.get(),
+      base::BindOnce(&BaselineListUpdater::CatalogSourceDownloaded,
+                     weak_factory_.GetWeakPtr()),
+      kMaxCatalogSourceBytes);
+}
+void BaselineListUpdater::CatalogSourceDownloaded(
+    std::optional<std::string> body) {
+  const bool complete = body && ResponseComplete();
+  loader_.reset();
+  if (!complete || catalog_bytes_ + body->size() > kMaxCatalogTotalBytes) {
+    catalog_failed_ = true;
+    catalog_downloads_active_ = false;
+    catalog_update_.reset();
+    InstallUpdates();
+    return;
+  }
+  catalog_bytes_ += body->size();
+  const auto& source = catalog_sources_[catalog_update_->downloads.size()];
+  catalog_update_->downloads.push_back({source.url, std::move(*body)});
+  DownloadCatalogSource();
+}
+void BaselineListUpdater::InstallUpdates() {
+  worker_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(&UpdateFilterLists, directory_, std::move(originals_),
+                     std::move(downloads_),
+                     catalog_failed_ ? base::Time() : base::Time::Now(),
+                     running_generation_, std::move(catalog_update_)),
+      base::BindOnce(&BaselineListUpdater::UpdatesInstalled,
+                     weak_factory_.GetWeakPtr()));
+}
 void BaselineListUpdater::CreateLoader(const std::string& url,
                                        bool subscription) {
   auto request = std::make_unique<network::ResourceRequest>();
@@ -238,7 +321,7 @@ void BaselineListUpdater::CreateLoader(const std::string& url,
       net::DefineNetworkTrafficAnnotation("yee_filter_list_update", R"(
         semantics {
           sender: "Yee content blocking"
-          description: "Downloads official EasyList and EasyPrivacy and user-subscribed HTTPS filter lists. Validated rules are applied on the next browser start; previous working rules remain available."
+          description: "Downloads EasyList, EasyPrivacy, Brave's public filter catalog and its default and Korean HTTPS lists, and user subscriptions. Compatible rules apply on the next browser start; previous working rules remain available."
           trigger: "Thirty seconds after a regular profile starts, then once daily, or when the user checks in Settings or adds a subscription. Failed updates retry after six hours."
           data: "No user content, cookies or credentials."
           destination: WEBSITE
@@ -258,6 +341,10 @@ void BaselineListUpdater::CreateLoader(const std::string& url,
           if (!owner || CanonicalFilterSubscriptionURL(redirect.new_url.spec()))
             return;
           owner->loader_.reset();
+          if (owner->catalog_downloads_active_) {
+            owner->CatalogSourceDownloaded(std::nullopt);
+            return;
+          }
           if (owner->mutation_callback_)
             owner->MutationCompleted(std::move(url), "download-failed");
           else
@@ -280,7 +367,7 @@ void BaselineListUpdater::Downloaded(size_t index,
       originals_[index] = std::move(*body);
     // A failed official pair must not stop independent subscription updates.
     if (!complete_response) {
-      if (downloads_.empty()) {
+      if (downloads_.empty() && !use_brave_catalog_) {
         Completed(false);
         return;
       }
@@ -294,7 +381,9 @@ void BaselineListUpdater::Downloaded(size_t index,
 }
 void BaselineListUpdater::UpdatesInstalled(FilterListUpdateResult result) {
   failed_urls_ = std::move(result.failed_urls);
-  Completed(result.succeeded);
+  if (catalog_failed_)
+    failed_urls_.emplace_back(kBraveCatalogURL);
+  Completed(result.succeeded && !catalog_failed_);
 }
 
 bool BaselineListUpdater::AddSubscription(
@@ -390,6 +479,9 @@ void BaselineListUpdater::MutationCompleted(std::string url,
 void BaselineListUpdater::Completed(bool installed) {
   in_flight_ = false;
   originals_ = {};
+  catalog_update_.reset();
+  catalog_sources_.clear();
+  catalog_downloads_active_ = false;
   if (installed)
     checked_at_ = base::Time::Now();
   timer_.Start(

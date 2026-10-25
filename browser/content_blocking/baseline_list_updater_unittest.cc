@@ -28,9 +28,10 @@ class BaselineListUpdaterTest : public testing::Test {
     path_ = base::MakeAbsoluteFilePath(directory_.GetPath());
     ASSERT_FALSE(path_.empty());
   }
-  std::unique_ptr<BaselineListUpdater> Create(base::Time checked = {}) {
+  std::unique_ptr<BaselineListUpdater> Create(base::Time checked = {},
+                                              bool catalog = false) {
     return std::make_unique<BaselineListUpdater>(
-        path_, factory_.GetSafeWeakWrapper(), "", checked);
+        path_, factory_.GetSafeWeakWrapper(), "", checked, nullptr, catalog);
   }
   base::test::TaskEnvironment tasks_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
@@ -38,6 +39,38 @@ class BaselineListUpdaterTest : public testing::Test {
   base::FilePath path_;
   network::TestURLLoaderFactory factory_;
 };
+// 마지막 지역 목록까지 받은 뒤에만 새 카탈로그를 저장한다.
+TEST_F(BaselineListUpdaterTest,
+       CatalogDownloadsDefaultsAndKoreanAsOneGeneration) {
+  factory_.AddResponse(std::string(kBaselineListURLs[0]), kList);
+  factory_.AddResponse(std::string(kBaselineListURLs[1]), kPrivacy);
+  factory_.AddResponse(kBraveCatalogURL, R"([
+    {"uuid":"default","permission_mask":1,"sources":[{"url":"https://filters.test/default.txt","format":"Standard"}]},
+    {"uuid":"4D715457-307C-4383-8873-73A2FD263F71","permission_mask":1,"sources":[{"url":"https://filters.test/privacy.txt","format":"Standard"}]},
+    {"uuid":"45B3ED40-C607-454F-A623-195FDD084637","sources":[{"url":"https://filters.test/ko.txt","format":"Standard"}]}
+  ])");
+  factory_.AddResponse("https://filters.test/default.txt",
+                       "||catalog-ad.test^\n");
+  factory_.AddResponse("https://filters.test/privacy.txt",
+                       "||catalog-tracker.test^\n");
+  auto updater = Create({}, true);
+  updater->Start();
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(ReadBaselineListStore(path_).catalog_active);
+  ASSERT_EQ(1, factory_.NumPending());
+  const auto& request = factory_.GetPendingRequest(0)->request;
+  EXPECT_EQ(GURL("https://filters.test/ko.txt"), request.url);
+  EXPECT_EQ(network::mojom::CredentialsMode::kOmit, request.credentials_mode);
+  factory_.SimulateResponseForPendingRequest("https://filters.test/ko.txt",
+                                             "||ssl.pstatic.net/tveta/libs/\n");
+  tasks_.RunUntilIdle();
+  EXPECT_TRUE(ReadBaselineListStore(path_).catalog_active);
+  EXPECT_EQ(3, ReadBaselineListStore(path_).catalog_source_count);
+  EXPECT_FALSE(updater->update_in_flight());
+  const auto requests = factory_.total_requests();
+  tasks_.FastForwardBy(base::Hours(23));
+  EXPECT_EQ(requests, factory_.total_requests());
+}
 TEST_F(BaselineListUpdaterTest,
        DownloadsCookieFreePairAndPublishesOnlyAfterBoth) {
   auto updater = Create();

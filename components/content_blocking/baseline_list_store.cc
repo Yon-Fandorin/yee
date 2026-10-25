@@ -17,8 +17,9 @@
 namespace yee::content_blocking {
 namespace {
 constexpr size_t kMaxCompiledBytes = 64 * 1024 * 1024;
-constexpr size_t kMaxSelectedBytes =
-    2 * kMaxBaselineListBytes + kMaxSubscriptionTotalBytes + 4096;
+constexpr size_t kMaxSelectedBytes = 2 * kMaxBaselineListBytes +
+                                     kMaxSubscriptionTotalBytes +
+                                     kMaxCatalogTotalBytes + 4096;
 bool ValidGeneration(std::string_view value) {
   return value.size() == 64 &&
          base::ContainsOnlyChars(value, "0123456789abcdef");
@@ -36,7 +37,9 @@ StartupData& Data() {
 
 namespace {
 std::optional<std::string> PreprocessList(std::string_view text,
-                                          bool require_header) {
+                                          bool require_header,
+                                          bool allow_empty = false,
+                                          bool allow_includes = false) {
   if (text.empty() || text.size() > kMaxBaselineListBytes ||
       !base::IsStringUTF8(text) || text.find('\0') != std::string_view::npos ||
       (require_header && !text.starts_with("[Adblock Plus ")))
@@ -79,6 +82,11 @@ std::optional<std::string> PreprocessList(std::string_view text,
         return std::nullopt;
       active = stack.back().parent;
       stack.pop_back();
+    } else if (allow_includes && directive.starts_with("!#include ")) {
+      if (active) {
+        output.append(line);
+        output.push_back('\n');
+      }
     } else if (directive.starts_with("!#")) {
       // Includes require an independently validated download. Never silently
       // accept an incomplete list or malformed preprocessing directive.
@@ -90,7 +98,7 @@ std::optional<std::string> PreprocessList(std::string_view text,
           !directive.empty() && directive[0] != '!' && directive[0] != '[';
     }
   }
-  if (!stack.empty() || !has_rule)
+  if (!stack.empty() || (!has_rule && !allow_empty))
     return std::nullopt;
   return output;
 }
@@ -107,6 +115,13 @@ std::optional<std::string> PreprocessSubscribedList(std::string_view text) {
     text.remove_prefix(3);
   return PreprocessList(text, false);
 }
+std::optional<std::string> PreprocessCatalogList(std::string_view text) {
+  if (text.size() > kMaxCatalogSourceBytes)
+    return std::nullopt;
+  if (text.starts_with("\xef\xbb\xbf"))
+    text.remove_prefix(3);
+  return PreprocessList(text, false, true, true);
+}
 std::optional<std::string> CanonicalFilterSubscriptionURL(
     std::string_view input) {
   const GURL url(base::TrimWhitespaceASCII(input, base::TRIM_ALL));
@@ -122,6 +137,11 @@ base::ReadOnlySharedMemoryRegion CreateBaselineListRegion(
   if ((!snapshot.generation.empty() && !ValidGeneration(snapshot.generation)) ||
       snapshot.filters.size() > kMaxSelectedBytes ||
       snapshot.compiled_filters.size() > kMaxCompiledBytes ||
+      snapshot.trusted_filters.size() > kMaxCatalogTotalBytes ||
+      !base::IsStringUTF8(snapshot.trusted_filters) ||
+      snapshot.trusted_filters.find('\0') != std::string::npos ||
+      (!snapshot.catalog_active && !snapshot.trusted_filters.empty()) ||
+      (snapshot.generation.empty() && snapshot.catalog_active) ||
       !base::IsStringUTF8(snapshot.filters) ||
       snapshot.filters.find('\0') != std::string::npos ||
       (!snapshot.generation.empty() && snapshot.filters.empty()) ||
@@ -129,10 +149,12 @@ base::ReadOnlySharedMemoryRegion CreateBaselineListRegion(
        (!snapshot.filters.empty() || !snapshot.compiled_filters.empty())))
     return {};
   base::Pickle pickle;
-  pickle.WriteUInt32(1);
+  pickle.WriteUInt32(2);
   pickle.WriteString(snapshot.generation);
   pickle.WriteString(snapshot.filters);
   pickle.WriteString(snapshot.compiled_filters);
+  pickle.WriteString(snapshot.trusted_filters);
+  pickle.WriteBool(snapshot.catalog_active);
   auto memory = base::ReadOnlySharedMemoryRegion::Create(pickle.size());
   if (!memory.IsValid())
     return {};
@@ -149,20 +171,32 @@ std::optional<BaselineListSnapshot> ReadBaselineListRegion(
     return std::nullopt;
   auto reader = base::PickleIterator::WithData(base::span(mapping));
   uint32_t version;
-  std::string_view generation, filters, compiled;
-  if (!reader.ReadUInt32(&version) || version != 1 ||
+  std::string_view generation, filters, compiled, trusted;
+  bool catalog_active = false;
+  if (!reader.ReadUInt32(&version) || (version != 1 && version != 2) ||
       !reader.ReadStringPiece(&generation) ||
       !reader.ReadStringPiece(&filters) || !reader.ReadStringPiece(&compiled) ||
+      (version == 2 && (!reader.ReadStringPiece(&trusted) ||
+                        !reader.ReadBool(&catalog_active))) ||
       !reader.ReachedEnd() ||
       (!generation.empty() && !ValidGeneration(generation)) ||
       filters.size() > kMaxSelectedBytes ||
       compiled.size() > kMaxCompiledBytes || !base::IsStringUTF8(filters) ||
+      trusted.size() > kMaxCatalogTotalBytes || !base::IsStringUTF8(trusted) ||
+      trusted.find('\0') != std::string_view::npos ||
+      (!catalog_active && !trusted.empty()) ||
       filters.find('\0') != std::string_view::npos ||
       (generation.empty() && (!filters.empty() || !compiled.empty())) ||
+      (generation.empty() && catalog_active) ||
       (!generation.empty() && filters.empty()))
     return std::nullopt;
-  return BaselineListSnapshot{std::string(generation), std::string(filters),
-                              std::string(compiled)};
+  BaselineListSnapshot snapshot;
+  snapshot.generation = generation;
+  snapshot.filters = filters;
+  snapshot.compiled_filters = compiled;
+  snapshot.trusted_filters = trusted;
+  snapshot.catalog_active = catalog_active;
+  return snapshot;
 }
 
 const base::ReadOnlySharedMemoryRegion& BaselineListRegion() {

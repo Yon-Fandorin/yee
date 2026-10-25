@@ -11,6 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/memory/read_only_shared_memory_region.h"
 #include "base/time/time.h"
+#include "components/yee_content_blocking/catalog_filter_data.h"
 
 namespace yee::content_blocking {
 inline constexpr char kBaselineListDirectorySwitch[] = "yee-baseline-list-dir";
@@ -23,8 +24,8 @@ inline constexpr size_t kMaxSubscribedListBytes = 4 * 1024 * 1024;
 inline constexpr size_t kMaxSubscriptionTotalBytes = 16 * 1024 * 1024;
 // Official and subscribed lists, compiled data, and bounded metadata.
 inline constexpr size_t kMaxBaselineListSnapshotBytes =
-    2 * kMaxBaselineListBytes + kMaxSubscriptionTotalBytes + 64 * 1024 * 1024 +
-    4096;
+    2 * kMaxBaselineListBytes + kMaxSubscriptionTotalBytes +
+    kMaxCatalogTotalBytes + 64 * 1024 * 1024 + 4096;
 inline constexpr std::array<std::string_view, 2> kBaselineListFiles = {
     "easylist.txt", "easyprivacy.txt"};
 inline constexpr std::array<std::string_view, 2> kBaselineListURLs = {
@@ -46,6 +47,11 @@ struct BaselineListSnapshot {
   bool recovered = false;
   bool baseline_downloaded = false;
   std::vector<FilterSubscription> subscriptions;
+  std::string trusted_filters;
+  bool catalog_active = false;
+  std::string catalog_data;
+  int catalog_omitted_rules = 0;
+  int catalog_source_count = 0;
 };
 
 // Preserves original text in immutable generation directories. A single atomic
@@ -53,6 +59,7 @@ struct BaselineListSnapshot {
 // All IO and validation run before sandboxing or on a blocking worker.
 std::optional<std::string> PreprocessBaselineList(std::string_view text);
 std::optional<std::string> PreprocessSubscribedList(std::string_view text);
+std::optional<std::string> PreprocessCatalogList(std::string_view text);
 std::optional<std::string> CanonicalFilterSubscriptionURL(std::string_view url);
 BaselineListSnapshot ReadBaselineListStore(const base::FilePath& directory);
 BaselineListSnapshot ReadBaselineListGeneration(const base::FilePath& directory,

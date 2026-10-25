@@ -8,6 +8,12 @@ use std::collections::{HashMap, HashSet};
 
 #[cxx::bridge(namespace = "yee::content_blocking")]
 mod ffi {
+    struct CatalogRuleSelection {
+        valid: bool,
+        rules: String,
+        omitted_rules: i32,
+        omitted_examples: Vec<String>,
+    }
     struct DocumentRules {
         selectors: Vec<String>,
         procedural_actions: Vec<String>,
@@ -22,6 +28,7 @@ mod ffi {
     }
 
     extern "Rust" {
+        fn select_catalog_rules(rules: &str, bundled: &str, community: &str, trusted: bool) -> CatalogRuleSelection;
         fn baseline_rules_valid(rules: &str) -> bool;
         fn compile_baseline_rules(rules: &str, trusted_rules: &str) -> Vec<u8>;
         type FilterEngine;
@@ -49,11 +56,117 @@ mod ffi {
 
 pub struct FilterEngine(Engine, bool);
 
+// 엔진의 실제 파서와 설치된 리소스 저장소로 규칙을 검사한다. 미지원 옵션을 삭제해 차단 범위를 넓히지 않는다.
+fn select_catalog_rules(
+    rules: &str,
+    bundled: &str,
+    community: &str,
+    trusted: bool,
+) -> ffi::CatalogRuleSelection {
+    use adblock::filters::cosmetic::{
+        CosmeticFilterError, CosmeticFilterMask, CosmeticFilterOperator,
+    };
+    use adblock::filters::network::NetworkFilterError;
+    use adblock::lists::{FilterParseError, ParsedLine};
+    let mut result = ffi::CatalogRuleSelection {
+        valid: false,
+        rules: String::new(),
+        omitted_rules: 0,
+        omitted_examples: Vec::new(),
+    };
+    let Some(backend) = resource_storage(bundled, community) else {
+        return result;
+    };
+    let storage = adblock::resources::ResourceStorage::from_backend(backend);
+    let permission = PermissionMask::from_bits(u8::from(trusted));
+    let options = ParseOptions {
+        permissions: permission,
+        ..ParseOptions::default()
+    };
+    let mut total = 0usize;
+    let mut parsed = 0usize;
+    let mut unsupported = 0usize;
+    for line in rules.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('!') || line.starts_with('[') {
+            continue;
+        }
+        total += 1;
+        let compatible = match adblock::lists::parse_filter(line, false, options) {
+            Ok(ParsedLine::Cosmetic(filter)) => {
+                parsed += 1;
+                if filter.mask.contains(CosmeticFilterMask::UNHIDE) {
+                    // 예외는 코드를 실행하지 않는다. 낮은 권한 목록도 상위 목록의 주입을 제외할 수 있다.
+                    true
+                } else if filter.mask.contains(CosmeticFilterMask::SCRIPT_INJECT) {
+                    match filter.selector.first() {
+                        Some(CosmeticFilterOperator::CssSelector(args)) => {
+                            args.is_empty()
+                                || !storage
+                                    .get_scriptlet_resources([(args.as_str(), permission)])
+                                    .is_empty()
+                        }
+                        _ => false,
+                    }
+                } else {
+                    true
+                }
+            }
+            Ok(ParsedLine::Network(filter)) => {
+                parsed += 1;
+                if filter.is_redirect() {
+                    filter.modifier_option.is_some_and(|name| {
+                        let canonical = name
+                            .rsplit_once(':')
+                            .filter(|(_, priority)| priority.parse::<i32>().is_ok())
+                            .map_or(name, |(name, _)| name);
+                        storage.get_redirect_resource(canonical).is_some()
+                    })
+                } else {
+                    true
+                }
+            }
+            Err(error) => {
+                // 지원 범위 밖의 문법은 손상된 입력과 구분하고, 해당 규칙 전체를 제외한다.
+                if matches!(
+                    error,
+                    FilterParseError::Network(
+                        NetworkFilterError::UnrecognisedOption
+                            | NetworkFilterError::RemoveparamRegexUnsupported
+                            | NetworkFilterError::FullRegexUnsupported
+                    ) | FilterParseError::Cosmetic(
+                        CosmeticFilterError::UnsupportedSyntax
+                            | CosmeticFilterError::HtmlFilteringUnsupported
+                            | CosmeticFilterError::LocationModifiersUnsupported
+                    ) | FilterParseError::Unsupported
+                ) {
+                    unsupported += 1;
+                }
+                false
+            }
+        };
+        if compatible {
+            result.rules.push_str(line);
+            result.rules.push('\n');
+        } else {
+            result.omitted_rules += 1;
+            if result.omitted_examples.len() < 20 {
+                result
+                    .omitted_examples
+                    .push(line.chars().take(256).collect());
+            }
+        }
+    }
+    result.valid = total == 0 || (parsed + unsupported) * 100 >= total * 90;
+    result
+}
+
 fn baseline_rules_valid(rules: &str) -> bool {
     let mut total = 0usize;
     let mut valid = 0usize;
     for line in rules.lines().map(str::trim) {
-        if line.is_empty() || line.starts_with('!') || line.starts_with('[') { continue; }
+        if line.is_empty() || line.starts_with('!') || line.starts_with('[') {
+            continue;
+        }
         total += 1;
         if adblock::lists::parse_filter(line, false, ParseOptions::default()).is_ok() {
             valid += 1;

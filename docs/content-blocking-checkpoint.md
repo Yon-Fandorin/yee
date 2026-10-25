@@ -6,6 +6,47 @@ procedural/action cosmetic은 아래 별도 로컬 fixture로 검증했다. 패�
 [비공개 본체·공개 필터·원본 scriptlet](content-blocking-private-core-filter-data.md)을
 따른다. 완료된 중간 회차·실패 로그 대신 현재 구조와 검증 결론을 유지한다.
 
+## Brave 카탈로그 기반 기본·한국어 갱신
+
+기존 `BaselineListUpdater`가 시작 30초 후와 이후 하루 간격으로 Brave 공식
+`filter_lists/list_catalog.json`을 확인한다. `default`, 기본 개인정보 목록,
+한국어 목록의 안정된 UUID를 기준으로 원본 HTTPS 주소를 다시 선택하므로,
+카탈로그에 등록된 주소 변경도 다음 확인에 반영한다. 사용자 구독은 별도로 유지한다.
+카탈로그의 권한은 현재 지원하는 0·1 범위로 제한한다.
+
+다운로드는 쿠키·인증 정보를 보내지 않고 순차 처리한다. 카탈로그는 512 KiB,
+원본은 개당 4 MiB·총 24 MiB·최대 64개로 제한한다. 모든 원본이 준비된 뒤
+현재 엔진의 조건 분기·문법과 설치된 scriptlet·redirect 리소스를 검사한다.
+미지원 규칙은 옵션을 잘라서 완화하지 않고 규칙 전체를 제외한다.
+원문과 카탈로그는 보존하며 `compatibility.json`에 엔진·리소스 generation,
+제외 개수와 원본 위치가 포함된 예시를 기록한다. 실행 JavaScript는 임의의
+목록 URL에서 내려받지 않고 앱이 제공하는 검증된 리소스 묶음을 사용한다.
+앱의 리소스가 변경되면 원문에서 호환 규칙을 다시 선택하고 이전 컴파일 캐시는 사용하지 않는다.
+
+같은 카탈로그에 따로 등록된 원본을 가리키는 include는 한 번만 합친다.
+등록되지 않은 include, 불완전한 다운로드, 손상된 원문은 새 카탈로그 묶음을
+거부한다. 정상본을 세대별로 보관하고 이전 정상본으로 복구한다.
+기존 1·2 버전 저장소는 계속 읽으며 카탈로그 저장에는 3 버전을 사용한다.
+
+적용 시점은 다음 브라우저 실행이다. 새 묶음이 선택되면 고정 커뮤니티 규칙을
+갱신된 카탈로그 기본 규칙으로 교체하고, 한국어 규칙·사용자 구독·Yee 독립 규칙을
+함께 적용한다. browser와 renderer에는 같은 읽기 전용 snapshot을 전달한다.
+기존 EasyList·EasyPrivacy 갱신은 카탈로그를 사용할 수 없을 때의 기본 갱신 경로로 유지한다.
+
+검증 진입점은 `yee_content_blocking_unittests`, `yee_filtering_factory_unittests`와
+`node tools/dev/test-catalog-content-blocking.mjs ABSOLUTE_YEE_EXECUTABLE`이다.
+실앱 검증은 새 프로필의 실제 자동 다운로드를 기다린 뒤 브라우저를 정상 종료하고
+재시작한다. 개드립 본문, 네이버 광고 SDK의 실제 전송·차단, 광고 프레임과 화면을
+전후로 비교하며 원문·호환성 보고서·스크린샷을 `.local-build/catalog-validation-*`에 남긴다.
+
+2026-10-25 Windows 앱 빌드와 core 78개·browser/updater/factory 73개 테스트가
+통과했다. 새 프로필에서 공식 원본 25개를 자동 갱신하고 정상 종료·재시작한 뒤,
+개드립의 네이버 광고 SDK가 `ERR_BLOCKED_BY_CLIENT`로 차단되고 관측된 광고
+iframe이 2개에서 0개가 된 것을 네트워크 기록과 실제 화면으로 확인했다.
+쿠팡·Optad360·Cloudflare 요청 차단과 Google 두 스크립트의 로컬 대체 응답도 유지했다.
+미지원 문법·실행 리소스 규칙 4,703개는 원문을 보존하고 제외 내역으로 기록했다.
+이는 해당 시점 목록·페이지의 검증이며 모든 사이트에서 Brave와 같은 동작을 보장하지 않는다.
+
 상태: 엔진·요청·페이지 연결, 전체 앱 빌드와 오프라인 회귀 검증, 실제 Yee의
 document-start 자동 주입 fixture는 통과했다. 같은 YouTube 영상·프로필의 끔 대조에서
 시작·중간 광고와 실제 출력을 확보했고, 켬은 해당 본편 위치를 넘어 약 20분 동안
@@ -175,7 +216,7 @@ archive의 원본 파일이 추출된 source와 같은지 확인했다.
 컴파일된 원본이 바뀌었는데 소스 묶음만 이전 상태로 남는 것을 방지한다.
 빌드 중 다운로드는 하지 않는다.
 
-기본 목록은 EasyList·EasyPrivacy와 별도로 식별한 Yee 규칙이다. 목록은 공식
+내장 복구용 목록은 EasyList·EasyPrivacy와 별도로 식별한 Yee 규칙이다. 목록은 공식
 Adblock Plus 서버의 원본을 보존하고, dual license의 CC BY-SA 3.0-or-later 조건을
 선택했다. 원저작자, 출처·조회일·hash와 라이선스 URI를 보존한다.
 필터와 라이선스 데이터가 기록된 SHA-256과 다르면 생성/packaging을 중단한다.
@@ -195,11 +236,13 @@ Yee Rust/C++/JavaScript·test 규칙은 포함하지 않는다. macOS에서는 b
 data로, 다른 플랫폼에서는 output directory의 파일로 연결했다.
 macOS 전체 빌드 후 실제 `Yee.app/Contents/Frameworks/Yee Framework.framework/Resources/`에
 두 파일이 포함된 것을 확인했다. source archive에는 적용되는 root `LICENSE`도 포함한다.
-Windows 빌드는 아직 검증하지 않았다. 현재 개발 빌드의 `chrome://credits`는 Chromium
+Windows에서는 위 카탈로그 갱신과 개드립의 실제 요청·문서 처리를 검증했다.
+기존 YouTube 장시간 재생 검증은 macOS 범위다. 현재 개발 빌드의 `chrome://credits`는 Chromium
 sample이므로 외부 배포 전 사용자에게 보이는 고지/source 접근 안내를 추가 확인해야 한다.
 
-기본 EasyList·EasyPrivacy의 런타임 갱신은 아래 목록 관리 경로로 연결했다.
-커뮤니티 규칙·scriptlet 묶음은 원본·hash를 고정한 앱 빌드로 관리한다.
+기본·한국어 규칙의 런타임 갱신은 위 카탈로그 경로로 연결했다.
+카탈로그를 사용할 수 없을 때의 커뮤니티 규칙과 scriptlet 실행 리소스는
+원본·hash를 고정한 앱 빌드로 관리한다.
 사용자 구독은 HTTPS 규칙 파일을 받아 같은 검증·저장·다음 실행 적용 경로에 연결한다. 미지원 조건을 임의로 삭제해 더 넓은
 차단 규칙을 만드는 별도 변환기는 없다.
 

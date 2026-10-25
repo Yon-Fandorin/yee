@@ -19,6 +19,23 @@
 
 namespace yee::content_blocking {
 namespace {
+CatalogFilterData CatalogFixture(std::string_view revision = "current") {
+  CatalogFilterData data;
+  data.catalog = R"([
+    {"uuid":"default","permission_mask":1,"sources":[{"url":"https://filters.test/default.txt","format":"Standard"}]},
+    {"uuid":"4D715457-307C-4383-8873-73A2FD263F71","permission_mask":1,"sources":[{"url":"https://filters.test/privacy.txt","format":"Standard"}]},
+    {"uuid":"45B3ED40-C607-454F-A623-195FDD084637","sources":[{"url":"https://filters.test/ko.txt","format":"Standard"}]}
+  ])";
+  data.downloads = {
+      {"https://filters.test/default.txt",
+       "! Title: Default\n||" + std::string(revision) + ".catalog.test^\n"},
+      {"https://filters.test/privacy.txt",
+       "! Title: Privacy\n||catalog-tracker.test^\n"},
+      {"https://filters.test/ko.txt",
+       "! Title: "
+       "Korean\n||ssl.pstatic.net/tveta/libs/\ndogdrip.net##.ddnad\n"}};
+  return data;
+}
 std::array<std::string, 2> Lists(std::string_view revision) {
   return {"[Adblock Plus 2.0]\n! Title: EasyList\n||" + std::string(revision) +
               ".test^\n" + std::string(revision) +
@@ -64,6 +81,110 @@ TEST_F(BaselineListStoreTest, PublishesCompleteOriginalPairAndCompiledCache) {
   EXPECT_EQ(
       1u,
       engine.RulesForPage("https://updated.test/").procedural_actions.size());
+}
+
+// 기본·한국어 목록은 구독과 함께 원자적으로 저장되고 같은 선택이 렌더러에도
+// 전달된다.
+TEST_F(BaselineListStoreTest,
+       CatalogReplacesPinnedDefaultsAndSurvivesSubscriptionChanges) {
+  auto catalog = CatalogFixture();
+  ASSERT_TRUE(
+      UpdateFilterLists(path_, Lists("old"), {}, base::Time::Now(), "", catalog)
+          .succeeded);
+  auto saved = Read();
+  ASSERT_TRUE(saved.catalog_active);
+  EXPECT_EQ(3, saved.catalog_source_count);
+  EXPECT_EQ(std::string::npos, saved.filters.find("||old.test^"));
+  EXPECT_NE(std::string::npos,
+            saved.trusted_filters.find("current.catalog.test"));
+  Engine engine(saved.filters, kBundledResources, saved.trusted_filters, "",
+                saved.compiled_filters);
+  EXPECT_TRUE(engine.ShouldBlock(
+      "https://ssl.pstatic.net/tveta/libs/glad/prod/gfp-core.js",
+      "https://www.dogdrip.net/", "script"));
+  EXPECT_TRUE(engine.ShouldBlock("https://current.catalog.test/ad",
+                                 "https://www.dogdrip.net/", "script"));
+  EXPECT_FALSE(
+      engine.ShouldBlock("https://ssl.pstatic.net/static/common/logo.png",
+                         "https://www.dogdrip.net/", "image"));
+  const auto received = ReadBaselineListRegion(CreateBaselineListRegion(saved));
+  ASSERT_TRUE(received);
+  EXPECT_TRUE(received->catalog_active);
+  EXPECT_EQ(saved.trusted_filters, received->trusted_filters);
+  const auto cache_path =
+      Generation(saved.generation).AppendASCII("compiled.json");
+  std::string cache_text;
+  ASSERT_TRUE(base::ReadFileToString(cache_path, &cache_text));
+  auto cache = base::JSONReader::ReadDict(cache_text, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(cache);
+  cache->Remove("catalog_compatibility_version");
+  ASSERT_TRUE(base::WriteFile(cache_path, base::WriteJson(*cache).value()));
+  EXPECT_TRUE(Read().compiled_filters.empty());
+  EXPECT_TRUE(Read().catalog_active);
+  ASSERT_EQ("", AddFilterSubscription(path_, "https://filters.test/user.txt",
+                                      "||user-ad.test^\n", ""));
+  EXPECT_TRUE(Read().catalog_active);
+  EXPECT_NE(std::string::npos, Read().filters.find("user-ad.test"));
+}
+
+// 네트워크 실패·손상된 원문은 이전 카탈로그 묶음을 대체하지 않는다.
+TEST_F(BaselineListStoreTest,
+       InvalidCatalogUpdateAndCorruptGenerationKeepLastGood) {
+  ASSERT_TRUE(UpdateFilterLists(path_, Lists("old"), {}, base::Time::Now(), "",
+                                CatalogFixture("old"))
+                  .succeeded);
+  const auto old = Read().generation;
+  auto invalid = CatalogFixture("invalid");
+  invalid.downloads.pop_back();
+  EXPECT_FALSE(
+      UpdateFilterLists(path_, Lists("old"), {}, base::Time::Now(), "", invalid)
+          .succeeded);
+  EXPECT_NE(std::string::npos, Read().trusted_filters.find("old.catalog.test"));
+  ASSERT_TRUE(UpdateFilterLists(path_, Lists("new"), {}, base::Time::Now(), "",
+                                CatalogFixture("new"))
+                  .succeeded);
+  ASSERT_TRUE(base::WriteFile(
+      Generation(Read().generation).AppendASCII("catalog.json"), "broken"));
+  EXPECT_EQ(old, Read().generation);
+  EXPECT_TRUE(Read().recovered);
+}
+
+// 모르는 scriptlet과 redirect는 규칙 전체를 제외하며 정상 네트워크 규칙은
+// 유지한다.
+TEST_F(BaselineListStoreTest,
+       CatalogRecordsResourceIncompatibilityWithoutBroadeningRules) {
+  auto catalog = CatalogFixture();
+  catalog.downloads[2].body +=
+      "dogdrip.net##+js(unknown-new-scriptlet, test)\n"
+      "||unknown-redirect.test^$redirect=missing-resource.js\n";
+  const auto prepared = PrepareCatalogFilters(catalog);
+  ASSERT_TRUE(prepared);
+  EXPECT_EQ(2, prepared->omitted_rules);
+  EXPECT_EQ(std::string::npos, prepared->filters.find("unknown-new-scriptlet"));
+  EXPECT_EQ(std::string::npos, prepared->filters.find("unknown-redirect.test"));
+  EXPECT_NE(std::string::npos, prepared->filters.find("ssl.pstatic.net"));
+  ASSERT_TRUE(
+      UpdateFilterLists(path_, Lists("old"), {}, base::Time::Now(), "", catalog)
+          .succeeded);
+  EXPECT_EQ(2, Read().catalog_omitted_rules);
+  EXPECT_TRUE(base::PathExists(
+      Generation(Read().generation).AppendASCII("compatibility.json")));
+}
+
+TEST_F(BaselineListStoreTest,
+       CatalogRejectsIncompleteGroupsAndUnregisteredIncludes) {
+  auto catalog = CatalogFixture();
+  EXPECT_FALSE(ParseBraveCatalog("[]"));
+  catalog.downloads[0].body += "!#include missing.txt\n";
+  EXPECT_FALSE(PrepareCatalogFilters(catalog));
+  catalog = CatalogFixture();
+  catalog.downloads[0].body +=
+      "!#if env_mobile\n!#include filters-mobile.txt\n!#endif\n";
+  EXPECT_TRUE(PrepareCatalogFilters(catalog));
+  catalog.downloads[0].body += "!#include privacy.txt\n";
+  EXPECT_TRUE(PrepareCatalogFilters(catalog));
+  catalog.catalog[0] = '<';
+  EXPECT_FALSE(ParseBraveCatalog(catalog.catalog));
 }
 TEST_F(BaselineListStoreTest, FailedValidationLeavesPublishedStateIntact) {
   ASSERT_TRUE(Install("old"));

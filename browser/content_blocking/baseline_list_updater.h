@@ -30,6 +30,9 @@ struct BaselineListUpdateStatus {
   bool running_downloaded = false;
   bool pending_restart = false;
   bool recovered = false;
+  bool catalog_downloaded = false;
+  int catalog_sources = 0;
+  int omitted_rules = 0;
   base::Time checked_at;
   std::vector<FilterSubscription> subscriptions;
   std::vector<std::string> failed_urls;
@@ -39,12 +42,12 @@ struct BaselineListUpdateStatus {
 // requests omit cookies. Disk IO/validation never execute on the UI thread.
 class BaselineListUpdater {
  public:
-  BaselineListUpdater(
-      base::FilePath directory,
-      scoped_refptr<network::SharedURLLoaderFactory> factory,
-      std::string running_generation,
-      base::Time checked_at,
-      scoped_refptr<base::SequencedTaskRunner> worker = nullptr);
+  BaselineListUpdater(base::FilePath directory,
+                      scoped_refptr<network::SharedURLLoaderFactory> factory,
+                      std::string running_generation,
+                      base::Time checked_at,
+                      scoped_refptr<base::SequencedTaskRunner> worker = nullptr,
+                      bool use_brave_catalog = true);
   ~BaselineListUpdater();
   BaselineListUpdater(const BaselineListUpdater&) = delete;
   BaselineListUpdater& operator=(const BaselineListUpdater&) = delete;
@@ -80,6 +83,13 @@ class BaselineListUpdater {
   void PlanLoaded(std::vector<FilterSubscription> subscriptions);
   void Download(size_t index);
   void Downloaded(size_t index, std::optional<std::string> body);
+  void DownloadCatalog();
+  void CatalogDownloaded(std::optional<std::string> body);
+  void CatalogPlanLoaded(
+      std::optional<std::vector<CatalogFilterSource>> sources);
+  void DownloadCatalogSource();
+  void CatalogSourceDownloaded(std::optional<std::string> body);
+  void InstallUpdates();
   void SubscriptionDownloaded(std::string url, std::optional<std::string> body);
   void MutationCompleted(std::string url, std::string error);
   bool BeginMutation(base::OnceCallback<void(std::string)> callback);
@@ -93,12 +103,18 @@ class BaselineListUpdater {
   const std::string running_generation_;
   base::Time checked_at_;
   const scoped_refptr<base::SequencedTaskRunner> worker_;
+  const bool use_brave_catalog_;
   base::OneShotTimer timer_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
   std::array<std::string, 2> originals_;
   size_t download_index_ = 0;
   std::vector<FilterListDownload> downloads_;
   std::vector<std::string> failed_urls_;
+  std::optional<CatalogFilterData> catalog_update_;
+  std::vector<CatalogFilterSource> catalog_sources_;
+  size_t catalog_bytes_ = 0;
+  bool catalog_failed_ = false;
+  bool catalog_downloads_active_ = false;
   base::OnceCallback<void(std::string)> mutation_callback_;
   bool in_flight_ = false;
   std::vector<base::OnceCallback<void(bool)>> completion_callbacks_;

@@ -125,11 +125,13 @@ action("community_filter_data") {
 source_set("filter_data") {
   public = [
     "baseline_list_store.h",
+    "catalog_filter_data.h",
     "filter_data.h",
     "filter_list_store.h",
   ]
   sources = [
     "baseline_list_store.cc",
+    "catalog_filter_data.cc",
     "filter_data.cc",
     "filter_list_store.cc",
   ]
@@ -246,6 +248,7 @@ test("yee_content_blocking_unittests") {
   deps = [
     ":bundled_rules",
     ":core",
+    ":rust_bridge",
     "//base/test:run_all_unittests",
     "//base/test:test_support",
     "//components/yee_tasks:unit_tests",

@@ -16,6 +16,7 @@ struct FilterListSet {
   bool baseline_downloaded = false;
   base::Time checked_at;
   std::vector<SubscribedFilterList> subscriptions;
+  std::optional<CatalogFilterData> catalog;
 };
 struct FilterListDownload {
   std::string url;
@@ -34,7 +35,8 @@ FilterListUpdateResult UpdateFilterLists(
     std::array<std::string, 2> baseline,
     std::vector<FilterListDownload> downloads,
     base::Time checked_at,
-    std::string_view running_generation);
+    std::string_view running_generation,
+    std::optional<CatalogFilterData> catalog = std::nullopt);
 std::string AddFilterSubscription(const base::FilePath& directory,
                                   std::string_view url,
                                   std::string body,

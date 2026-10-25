@@ -8,6 +8,7 @@
 #include "base/json/json_writer.h"
 #include "base/json/json_reader.h"
 #include "base/values.h"
+#include "components/yee_content_blocking/rust/src/lib.rs.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace yee::content_blocking {
@@ -33,11 +34,59 @@ base::DictValue MakeResource(std::string_view name, std::string_view source,
 }
 }  // namespace
 
+// 낮은 권한의 한국어 목록에 있는 예외가 기본 목록의 신뢰 scriptlet 주입을
+// 취소해야 한다.
+TEST(ContentBlockingEngine,
+     CatalogPreservesUntrustedExceptionsToTrustedScriptlets) {
+  base::ListValue resources;
+  resources.Append(
+      MakeResource("privileged.js", "window.privileged = true;", 1));
+  const auto json = base::WriteJson(resources).value();
+  const auto selected =
+      select_catalog_rules("page.test#@#+js(privileged)\n", "[]",
+                           rust::Str(json.data(), json.size()), false);
+  ASSERT_TRUE(selected.valid);
+  EXPECT_EQ(0, selected.omitted_rules);
+  Engine before("", "", "page.test##+js(privileged)\n", json);
+  ASSERT_FALSE(before.RulesForPage("https://page.test/").script.empty());
+  Engine after(std::string(selected.rules.data(), selected.rules.size()), "",
+               "page.test##+js(privileged)\n", json);
+  EXPECT_TRUE(after.RulesForPage("https://page.test/").script.empty());
+  const auto forbidden =
+      select_catalog_rules("page.test##+js(privileged)\n", "[]",
+                           rust::Str(json.data(), json.size()), false);
+  EXPECT_EQ(1, forbidden.omitted_rules);
+  EXPECT_TRUE(forbidden.rules.empty());
+}
+
+// urlskip 같은 새 문법은 제외해도 정상 규칙을 갱신하며, 손상된 입력은 계속
+// 거부한다.
+TEST(ContentBlockingEngine,
+     CatalogDistinguishesUnsupportedSyntaxFromMalformedRules) {
+  std::string current = "||ordinary-ad.test^\n";
+  std::string malformed = current;
+  for (int i = 0; i < 20; ++i) {
+    current +=
+        "||redirect" + std::to_string(i) + ".test^$document,urlskip=?url\n";
+    malformed += "||broken" + std::to_string(i) + ".test^$redirect=\n";
+  }
+  const auto selected = select_catalog_rules(
+      rust::Str(current.data(), current.size()), "[]", "[]", true);
+  EXPECT_TRUE(selected.valid);
+  EXPECT_EQ(20, selected.omitted_rules);
+  EXPECT_EQ(std::string(selected.rules.data(), selected.rules.size()),
+            "||ordinary-ad.test^\n");
+  const auto rejected = select_catalog_rules(
+      rust::Str(malformed.data(), malformed.size()), "[]", "[]", true);
+  EXPECT_FALSE(rejected.valid);
+}
+
 TEST(ContentBlockingEngine, ProceduralOperatorsAndActionsReachRenderer) {
-  Engine engine("page.test##.label:has-text(Advertisement):upward(1)\n"
-                "page.test##.styled:style(color: red !important)\n"
-                "page.test##.removed:remove()\n"
-                "page.test#?#.conditional:matches-attr(data-ad=\"yes\")\n");
+  Engine engine(
+      "page.test##.label:has-text(Advertisement):upward(1)\n"
+      "page.test##.styled:style(color: red !important)\n"
+      "page.test##.removed:remove()\n"
+      "page.test#?#.conditional:matches-attr(data-ad=\"yes\")\n");
   const auto rules = engine.RulesForPage("https://page.test/");
   ASSERT_EQ(rules.procedural_actions.size(), 4u);
   bool chained = false, style = false, remove = false, attribute = false;

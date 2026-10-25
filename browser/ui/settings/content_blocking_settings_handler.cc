@@ -173,6 +173,9 @@ class SettingsHandler : public content::WebUIMessageHandler {
             .Set("runningDownloaded", status.running_downloaded)
             .Set("pendingRestart", status.pending_restart)
             .Set("recovered", status.recovered)
+            .Set("catalogDownloaded", status.catalog_downloaded)
+            .Set("catalogSources", status.catalog_sources)
+            .Set("omittedRules", status.omitted_rules)
             .Set("checkedAt",
                  status.checked_at.is_null()
                      ? 0.0

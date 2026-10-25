@@ -147,7 +147,8 @@ std::unique_ptr<Engine> CreateBundledEngine() {
   return std::make_unique<Engine>(
       filters,
       TestRulesEnabled() ? kTestResources : kBundledResources,
-      community.filters, community.resources, compiled);
+      baseline.catalog_active ? baseline.trusted_filters : community.filters,
+      community.resources, compiled);
 }
 Engine& BundledEngineForCurrentSequence() {
   // Browser request matching uses one dedicated sequence. Never transfer an
