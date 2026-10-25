@@ -154,6 +154,13 @@ function declarations(text) {
       !sheet.cssRules[0].style?.length) throw Error('Invalid action style');
   return sheet.cssRules[0].style.cssText;
 }
+function staticStyleSelector(selector, css) {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(`${selector}{${css}}`);
+  if (sheet.cssRules.length !== 1 || typeof sheet.cssRules[0].selectorText !== 'string' ||
+      !sheet.cssRules[0].style?.length) throw Error('Invalid static style');
+  return sheet.cssRules[0].selectorText;
+}
 for (const serialized of proceduralActions) {
   try {
     const rule = JSON.parse(serialized);
@@ -166,6 +173,12 @@ for (const serialized of proceduralActions) {
     let css = null;
     if (!action || action.type === 'style') {
       css = declarations(action?.arg ?? 'display: none !important');
+      // CSS만으로 판정되는 스타일은 요소 생성 전 설치해 첫 프레임과 동적 삽입에도 바로 적용한다.
+      if (action?.type === 'style' && rule.selector.length === 1 &&
+          rule.selector[0].type === 'css-selector') {
+        const selector = staticStyleSelector(rule.selector[0].arg, css);
+        if (__yeeInsertProceduralStyle(marker, css, selector) === true) continue;
+      }
       if (__yeeInsertProceduralStyle(marker, css) !== true) continue;
     }
     rules.push({selector: rule.selector, operators, action, marker, css, targets: new Set()});

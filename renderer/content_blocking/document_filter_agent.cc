@@ -123,7 +123,8 @@ void DocumentFilterAgent::ProceduralEnabled(
 void DocumentFilterAgent::InsertProceduralStyle(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   args.GetReturnValue().Set(false);
-  if (args.Length() != 2 || !args[0]->IsString() || !args[1]->IsString())
+  if ((args.Length() != 2 && args.Length() != 3) || !args[0]->IsString() ||
+      !args[1]->IsString() || (args.Length() == 3 && !args[2]->IsString()))
     return;
   auto* frame = blink::WebLocalFrame::FrameForContext(
       args.GetIsolate()->GetCurrentContext());
@@ -134,20 +135,23 @@ void DocumentFilterAgent::InsertProceduralStyle(
     return;
   const std::string marker = gin::V8ToString(args.GetIsolate(), args[0]);
   const std::string declarations = gin::V8ToString(args.GetIsolate(), args[1]);
-  // The private isolated-world runtime validates a single CSS declaration
-  // block, then tags matching nodes. Native user-origin CSS keeps page styles
-  // from overriding the result. Bound its per-document sheet storage.
+  const std::string selector = args.Length() == 3
+                                   ? gin::V8ToString(args.GetIsolate(), args[2])
+                                   : "[" + marker + "]";
+  const size_t css_bytes = selector.size() + declarations.size() + 2;
+  // isolated world에서 단일 CSS 규칙을 검증한다. 순수 CSS 스타일은 문서 시작에
+  // 설치하고 DOM 분석이 필요한 규칙만 나중에 marker로 연결한다.
   if (!base::StartsWith(marker, "data-yee-cb-") || marker.size() > 96 ||
       !base::ContainsOnlyChars(std::string_view(marker).substr(12),
-                              "0123456789abcdef-") ||
-      declarations.empty() || declarations.size() > 32 * 1024 ||
+                               "0123456789abcdef-") ||
+      declarations.empty() || selector.empty() || css_bytes > 32 * 1024 ||
       agent->procedural_style_keys_.size() >= 1024 ||
-      agent->procedural_style_bytes_ + declarations.size() > 256 * 1024)
+      agent->procedural_style_bytes_ + css_bytes > 256 * 1024)
     return;
-  const std::string css = "[" + marker + "]{" + declarations + "}";
+  const std::string css = selector + "{" + declarations + "}";
   agent->procedural_style_keys_.push_back(frame->GetDocument().InsertStyleSheet(
       blink::WebString::FromUtf8(css), nullptr, blink::WebCssOrigin::kUser));
-  agent->procedural_style_bytes_ += declarations.size();
+  agent->procedural_style_bytes_ += css.size();
   args.GetReturnValue().Set(true);
 }
 

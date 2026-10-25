@@ -190,6 +190,16 @@ Yee 전용 isolated world에서 실행하며 native callback은 페이지 world�
 `matches-path`, `min-text-length`, `upward`, `xpath`와 중간·후속 CSS selector다.
 결과에는 기본 숨김과 `style`, `remove`, `remove-attr`, `remove-class`를 적용한다.
 숨김·스타일은 native Blink user-origin CSS와 문서별 임의 marker를 사용한다.
+단일 CSS selector에 `style`만 적용하는 규칙은 문서 시작 때 selector 자체의
+user-origin stylesheet로 설치한다. 요소가 뒤늦게 생성되거나 native `:has()`
+조건이 성립해도 idle 작업을 기다리지 않고 첫 스타일 계산부터 적용된다.
+CSS 규칙 하나인지 renderer에서 검증하며, 전체 stylesheet 보관 상한을 그대로 적용한다.
+텍스트·속성·계산 스타일 등의 추가 연산과 삭제 동작은 기존 marker·증분 실행을 유지한다.
+2026-10-25 Windows 실제 Yee의 첫 프레임 fixture에서 기존 빌드의 노출 3프레임이
+수정 빌드에서 0프레임이 됐고, 최초·동적 삽입 직후의 스타일 계산에도 숨김이 적용됐다.
+정상 iframe, 보호 끔, 사이트 예외 대조와 실제 개드립 초기 프레임 추적도 통과했다.
+재검증 명령은 `node tools/dev/test-content-blocking-first-paint.mjs YEE_EXECUTABLE LIST_STORE`다.
+기록 모드는 마지막 인자로 `record`를 주며 결과는 `.local-build/first-paint-*`에 보존한다.
 DOM 접근은 renderer에서 실행하며, callback당 512단계·4ms 경계에서 작업을 재개한다.
 하나의 native selector/computed-style 호출 자체를 중간에 끊는 시간 보장은 아니다.
 

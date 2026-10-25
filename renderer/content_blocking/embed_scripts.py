@@ -6,9 +6,9 @@ lines = ['// Generated.', '#pragma once', 'namespace yee::content_blocking {']
 for name, path in [('kGenericCosmeticScript', generic), ('kYouTubeScript', youtube),
                    ('kSelectorValidationScript', validation),
                    ('kProceduralCosmeticScript', procedural)]:
-    text = path.read_text()
+    text = path.read_text(encoding='utf-8')
     assert ')yee_script"' not in text
     lines.append(f'inline constexpr char {name}[] = R"yee_script({text})yee_script";')
 lines.append('}')
 output.parent.mkdir(parents=True, exist_ok=True)
-output.write_text('\n'.join(lines) + '\n')
+output.write_text('\n'.join(lines) + '\n', encoding='utf-8')
