@@ -3,8 +3,9 @@
 2026-10-26 · 브랜치 `codex/project-navigation-handoff`
 
 사용자가 긍정적으로 본 프로젝트 탐색 흐름을 다음 작업에서 이어가기 위한 인계다.
-이번 브랜치는 문서, 시안 원본, 독립 실행용 시안과 캡처를 보관한다.
-네이티브 기능 구현이나 제품 명세 변경을 완료한 브랜치가 아니다.
+이 브랜치의 고유 변경은 문서, 시안 원본, 독립 실행용 시안과 캡처다.
+기반에는 아래 네이티브 UI 개선이 통합됐으며, 프로젝트 기능의 구현과 제품 명세는
+아직 다음 작업에서 구체화해야 한다.
 
 ## 바로 이어갈 작업
 
@@ -22,19 +23,72 @@ AI 실행 기능의 구현을 모두 승인하는 것은 아니다.
 
 | 항목 | 값 |
 | --- | --- |
-| 이 브랜치의 작업 폴더 | `F:/yee/worktrees/project-navigation-handoff` |
-| 분기 기준 | `pilot`의 `efc3e425bd80a8db507b89430cc5f9824a527d9b` |
-| 기존 작업 폴더 | `F:/yee/pilot-repo` |
-| 기존 미커밋 변경 | 13개 파일. 이 브랜치에 포함하지 않고 원래 폴더에 보존 |
+| 현재 기반 | `pilot`의 `95f3e45c0f0d0cf89c9d91513c0f14ffff18387f` 위로 리베이스 |
+| 최초 분기 기준 | `efc3e425bd80a8db507b89430cc5f9824a527d9b` |
+| 기존 13개 파일 | 위 `pilot` 커밋에 반영되어 이 브랜치의 기반에 모두 포함 |
+| Windows의 UI 작업 폴더 | `F:/yee/worktrees/project-navigation-handoff` — 다른 환경에서는 실제 체크아웃 루트 사용 |
+| Windows의 기본 브랜치 폴더 | `F:/yee/pilot-repo` |
 
-기존 변경에는 Browser Surface, 주소창, 관련 테스트·명세와 Chromium 연결 패치가 있다.
-[기준 상태와 파일 해시](../experiments/shell-prototype/project-navigation/baseline-working-tree.json)를
-먼저 확인한다. 해시는 변경 내용을 복원하는 백업 패치가 아니다. 다른 환경에서 이어가려면
-해당 기존 작업을 별도로 전달받아야 한다. 구현 전에 기존 작업의 통합 여부와 실제 기반을
-확인하고, 기존 변경을 덮어쓰거나 현재 브랜치에 무작정 합치지 않는다.
+기존 변경은 주소창 제안의 여백·강조·구분선, 주소줄 hover 배경, 미디어 버튼,
+Windows 창 버튼의 크기·입력 범위, 팝업 재구성 시 상태 유지와 관련 검사·명세를 다룬다.
+검토에서 발견한 고대비 선택 표시 문제도 함께 보완했다. 별도 파일 전달 없이 Git 기록으로
+가져올 수 있다.
 
-이 브랜치는 위 별도 폴더에 이미 체크아웃되어 있다. 기존 `pilot` 폴더를 강제로 전환하지
-말고 새 작업 폴더를 사용한다. 위치는 어느 체크아웃에서든 `git worktree list`로 확인할 수 있다.
+[최초 분기 당시 파일 목록과 해시](../experiments/shell-prototype/project-navigation/baseline-working-tree.json)는
+당시 상태를 남긴 역사적 기록이다. 내용 백업이나 현재 파일의 해시 기준으로 사용하지 않는다.
+그 기록의 ‘미커밋·미포함’ 상태는 위 통합 전의 상태이며, 현재 소스는 통합 커밋을 기준으로 읽는다.
+작업 폴더 위치는 `git worktree list`로 확인하고 해당 환경의 경로를 사용한다.
+
+### 맥에서 최신 브랜치 받기
+
+먼저 미커밋 작업을 보존한다. 이 저장소는 `pilot`만 가져오도록 설정된 환경도 있으므로,
+처음 한 번 UI 브랜치도 가져올 대상으로 등록한다. 명령행 fetch만으로는 추적 설정이
+등록되지 않는다. 아래 명령은 저장소 루트에서 실행한다.
+
+```sh
+git remote set-branches --add origin codex/project-navigation-handoff
+git fetch origin \
+  +refs/heads/pilot:refs/remotes/origin/pilot \
+  +refs/heads/codex/project-navigation-handoff:refs/remotes/origin/codex/project-navigation-handoff
+```
+
+로컬에 UI 브랜치가 없으면 다음으로 시작한다.
+
+```sh
+git switch --create codex/project-navigation-handoff --track origin/codex/project-navigation-handoff
+```
+
+이전 UI 끝점 `ab368ca2040cda10608c6be607d879c3ee18b096`을 기반으로 이미 작업했다면,
+그 브랜치의 백업을 만든 뒤 아래와 같이 로컬 추가 커밋만 새 원격 기반 위로 옮긴다.
+첫 명령이 성공해 옛 끝점이 조상임을 확인한 경우에만 두 번째 명령을 실행한다.
+이미 새 기반으로 갱신한 브랜치에는 이 옛 기준 명령을 다시 적용하지 않는다.
+
+```sh
+git merge-base --is-ancestor ab368ca2040cda10608c6be607d879c3ee18b096 codex/project-navigation-handoff &&
+git rebase --onto origin/codex/project-navigation-handoff ab368ca2040cda10608c6be607d879c3ee18b096 codex/project-navigation-handoff
+```
+
+### 통합 검증과 남은 검수
+
+| 항목 | 결과 |
+| --- | --- |
+| 최종 Windows 앱 및 관련 회귀 검사 실행 파일 빌드 | 성공 |
+| 단위 검사 | layout 27, geometry 18, Header 60, Aura 1: 총 106개 통과 |
+| Overlay 도구 검사 | 16개 통과 |
+| 최종 독립 코드 검토 | 남은 수정 사항 없음 |
+| 최종본의 Windows 실제 앱 검수 | 사용자 요청에 따라 후속 작업으로 이월 |
+| 새 WebUI 대비 행렬 | 컴파일 성공, 실제 실행 미실시 |
+| macOS·Linux 빌드와 실제 앱 검수 | 이번 통합에서 미실시 |
+
+Windows 검수에서는 단일·분할 탭의 주소창 제안과 미디어 버튼, 가로·세로 탭의 창 버튼,
+팝업 재구성, 대비 증가·강제 색의 선택 표시를 확인한다. 새 WebUI 대비 행렬의 실행도 남아 있다.
+이 상태를 실제 앱 검수 완료로 간주하지 않는다. 기존 검증 기록과 새 보완본의 범위는
+[Header 검사 문서](header/test-coverage.md)를 함께 읽는다.
+
+`0001` 패치를 다시 생성할 때는 기존 `chrome/installer/util/BUILD.gn`과
+`chrome/installer/util/taskbar_util_internal.h` 블록을 보존한다. 현재 생성 도구는
+branding과 공유하는 파일 및 등록되지 않은 새 연결 파일을 제외할 수 있다. 이번 통합에서는
+두 블록을 기존 기록 그대로 보존했고, 전체 패치의 역적용 검사와 소스 일치를 확인했다.
 
 ## 자료 열기
 
@@ -164,7 +218,7 @@ AI 실행 기능의 구현을 모두 승인하는 것은 아니다.
 
 | 단계 | 작업과 선행 조건 | 완료 조건 |
 | --- | --- | --- |
-| 0. 상세 계획 | 기존 미커밋 작업과 기반을 확인하고 위 결정, 책임·파일 배치, 저장 계약, 테스트와 변경 단위를 정리 | mock 상태와 native 구현을 구분한 계획. 명세 충돌과 예약 범위를 명시하고 미해결 정책을 숨기지 않음 |
+| 0. 상세 계획 | 통합된 native UI 기반과 미실시 검수를 확인하고 위 결정, 책임·파일 배치, 저장 계약, 테스트와 변경 단위를 정리 | mock 상태와 native 구현을 구분한 계획. 명세 충돌과 예약 범위를 명시하고 미해결 정책을 숨기지 않음 |
 | 1. 첫 실제 흐름 | 단계 0의 저장·허브 호스팅 결정 후 프로젝트 생성/이름/탭 연결, 허브 왕복과 재시작 복원 구현 | 실제 탭 하나를 연결해 읽던 페이지·입력 내용을 잃지 않고 허브 왕복. 재시작 후 기록·탭 재연결이 중복 없이 복원됨 |
 | 2. 탐색 목록 | 단계 1의 동일 데이터로 세로 혼합 목록과 수평 프로젝트 목록 연결, 일반 그룹·미소속 탭 유지 | 이름과 화살표 역할이 일관됨. 배치 전환·탭 이동·닫기·재열기·다중 창에서 일관된 상태. 수평에 왼쪽 영역이 생기지 않음 |
 | 3. 대화 연결 | 실제 대화 provider와 저장 계약 후 허브 입력·대화 참조·패널 연결 | 현재 페이지 또는 허브를 유지하며 대화를 이어감. 참고 자료는 명시적이며 다른 탭으로 자동 교체되지 않음 |
@@ -187,13 +241,15 @@ AI 실행 기능의 구현을 모두 승인하는 것은 아니다.
   요청하고, 종료가 안 된 프로세스를 임의 강제 종료하지 않는다. 개인 프로필과 테스트 프로필을 구분한다.
 - 시안의 320px 반응형 검사는 네이티브 앱의 최소 창 폭이나 모바일 지원을 확정한 것이 아니다.
 
-이번 인계에서는 export된 시안을 열고 캡처의 동선을 확인했다. Chromium 빌드, 실제 Yee 앱,
-실제 영속 저장·재시작 복원, AI 실행·provider 연결은 검증하지 않았다.
+최초 시안 인계에서는 export된 시안과 캡처의 동선만 확인했다. 이후 기반에 포함한 네이티브
+UI 개선의 빌드·검사 결과와 남은 Windows 검수는 위 표에 별도로 기록했다. 프로젝트의 실제
+영속 저장·재시작 복원, AI 실행·provider 연결은 아직 구현하거나 검증하지 않았다.
 
 ## 다음 대화에 전달할 문장
 
-> `F:/yee/worktrees/project-navigation-handoff`의 `codex/project-navigation-handoff` 브랜치에서
-> `docs/project-navigation-handoff.md`와 저장소 작업 규칙을 읽고 이어가줘. 캡처의 기본 UX를
-> 유지하면서 실제 코드에 근거한 상세 구현 계획부터 작성해줘. 먼저 기존 `pilot`의 미커밋 작업과
-> 기반을 확인하고, 프로젝트 저장·탭 재연결·허브의 native 호스팅을 구체화해줘. 첫 구현 목표는
-> 프로젝트 생성 → 실제 탭 연결 → 허브 왕복 → 재시작 복원이야.
+> 이 저장소의 `codex/project-navigation-handoff` 브랜치에서 `docs/project-navigation-handoff.md`와
+> 작업 규칙을 읽고 이어가줘. 기반은 `pilot`의 `95f3e45`이며 기존 13개 UI 파일은 포함돼 있어.
+> Windows 실제 앱 검수와 새 WebUI 대비 행렬 실행은 후속으로 남겨둔 상태야. 캡처의 기본 UX를
+> 유지하면서 실제 코드에 근거한 상세 구현 계획부터 작성하고, 프로젝트 저장·탭 재연결·허브의
+> native 호스팅을 구체화해줘. 첫 구현 목표는 프로젝트 생성 → 실제 탭 연결 → 허브 왕복 →
+> 재시작 복원이야.

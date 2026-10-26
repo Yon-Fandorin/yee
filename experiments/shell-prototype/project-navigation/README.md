@@ -24,7 +24,11 @@ Windows에서는 설치된 Python 실행 명령으로 바꿔 실행할 수 있�
 | [ux-fragment.html](ux-fragment.html) | 대화에서 사용한 원본 HTML 조각. 제품 코드로 복사할 대상이 아니다. |
 | [index.html](index.html) | 원본을 감싸 내보낸 실행용 화면. 이 복사본을 수정해 제품 구현으로 간주하지 않는다. |
 | [manifest.json](manifest.json) | 원본·내보낸 화면·캡처의 해시와 검증 범위 |
-| [baseline-working-tree.json](baseline-working-tree.json) | 분기 당시 원래 체크아웃의 미커밋 파일 목록과 해시. 파일 내용 백업은 아니다. |
+| [baseline-working-tree.json](baseline-working-tree.json) | 최초 분기 당시 미커밋 파일 목록과 해시의 역사적 기록. 현재 미포함 파일 목록이나 내용 백업이 아니다. |
+
+현재 브랜치는 `pilot`의 `95f3e45` 위로 리베이스했으며 당시 13개 UI 파일은 기반에
+포함돼 있다. 원본 시안과 캡처는 그대로 보존했다. 네이티브 빌드·단위 검사 결과와
+후속으로 남긴 Windows 실제 앱 검수는 [핸드오프](../../../docs/project-navigation-handoff.md)에 있다.
 
 원본은 Codex visualize 1.0.55의 `scripts/render.py`로 내보냈다.
 내보낸 화면은 이 저장소 안에서 열 수 있으며 원래 대화의 절대 경로를 읽지 않는다.

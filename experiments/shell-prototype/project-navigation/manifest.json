@@ -2,8 +2,29 @@
   "schema": "yee-project-navigation-reference-v1",
   "date_kst": "2026-10-26",
   "branch": "codex/project-navigation-handoff",
-  "base_commit": "efc3e425bd80a8db507b89430cc5f9824a527d9b",
-  "scope": "Documentation and frozen HTML UX reference; no native product implementation",
+  "base_commit": "95f3e45c0f0d0cf89c9d91513c0f14ffff18387f",
+  "reference_base_commit": "efc3e425bd80a8db507b89430cc5f9824a527d9b",
+  "scope": "Branch-specific documentation and frozen project-navigation UX reference on top of integrated native UI refinements",
+  "integration": {
+    "native_ui_commit": "95f3e45c0f0d0cf89c9d91513c0f14ffff18387f",
+    "previous_ui_tip": "ab368ca2040cda10608c6be607d879c3ee18b096",
+    "previously_uncommitted_file_count": 13,
+    "native_ui_changes_included_through_ancestry": true,
+    "validation": {
+      "windows_app_and_regression_targets_build": "passed",
+      "native_unit_cases_passed": {
+        "layout": 27,
+        "geometry": 18,
+        "header": 60,
+        "aura": 1
+      },
+      "overlay_tool_cases_passed": 16,
+      "independent_review": "no remaining actionable findings",
+      "windows_app_inspection": "deferred at user request on 2026-10-26",
+      "new_webui_contrast_matrix": "compiled; not run",
+      "macos_and_linux_build_and_app_inspection": "not run"
+    }
+  },
   "priority": "Daily personal browser first; external agent execution and in-browser work also needed",
   "source": {
     "path": "ux-fragment.html",
@@ -56,6 +77,7 @@
     }
   ],
   "verification": {
+    "scope": "Original UX reference artifact only; native integration checks are recorded in integration.validation",
     "source_snapshot_matches": true,
     "fragment_script_syntax": "passed",
     "export_opened_in_browser": true,
@@ -78,6 +100,6 @@
     "All pages, project records and agent states are fictional sample data",
     "Mock UI-state memory does not persist full dynamic records or native browser sessions",
     "Capture size is documentation preview geometry, not a native minimum window-size requirement",
-    "Existing uncommitted primary-checkout changes are listed and hashed separately, not included or backed up in this branch"
+    "baseline-working-tree.json preserves the original dirty-checkout history; those 13 UI files are now included through the integrated pilot commit"
   ]
 }
