@@ -1,0 +1,83 @@
+{
+  "schema": "yee-project-navigation-reference-v1",
+  "date_kst": "2026-10-26",
+  "branch": "codex/project-navigation-handoff",
+  "base_commit": "efc3e425bd80a8db507b89430cc5f9824a527d9b",
+  "scope": "Documentation and frozen HTML UX reference; no native product implementation",
+  "priority": "Daily personal browser first; external agent execution and in-browser work also needed",
+  "source": {
+    "path": "ux-fragment.html",
+    "sha256": "6b6ce72b1de5e903f2b0af24e90f22ff8e680c208eb5ff0ef9d97c39259aef51",
+    "bytes": 45804,
+    "provenance": "Conversation visualization yee-mixed-navigation.html, latest project overview revision"
+  },
+  "export": {
+    "path": "index.html",
+    "sha256": "9a2ef3584b17593f87e25b4166560c7862b7de865d91744d44e0aa7552838038",
+    "bytes": 135300,
+    "renderer": "Codex visualize 1.0.55 scripts/render.py",
+    "source_host_apis": [
+      "setWidgetState",
+      "widgetState"
+    ]
+  },
+  "captures": [
+    {
+      "path": "captures/vertical-hub.jpg",
+      "state": "Vertical layout with mixed left navigation and project overview",
+      "sha256": "ab97f31051784309d303c7f866b4cdded6f1cfd8e63aba6d663579e6d6848021",
+      "bytes": 49726,
+      "width": 1147,
+      "height": 895
+    },
+    {
+      "path": "captures/horizontal-hub.jpg",
+      "state": "Horizontal layout without left navigation, project overview",
+      "sha256": "92354c09ce41fe14c8d9906db2a0c297bb330f12060261b42356eae6b73740a5",
+      "bytes": 44756,
+      "width": 1147,
+      "height": 895
+    },
+    {
+      "path": "captures/horizontal-mixed-list.jpg",
+      "state": "Horizontal real-page strip and mixed project popup",
+      "sha256": "8fcb04b87fab0e96ecd0f17b47ad1d5652b349fb2c4305e5faa3ad4a4e580117",
+      "bytes": 51427,
+      "width": 1147,
+      "height": 895
+    },
+    {
+      "path": "captures/vertical-conversation.jpg",
+      "state": "Project overview and persistent left list with conversation panel",
+      "sha256": "5a136bd809ac2180f5f091b46154153e3a1495c080653b350756fe4f805ef861",
+      "bytes": 67399,
+      "width": 1147,
+      "height": 895
+    }
+  ],
+  "verification": {
+    "source_snapshot_matches": true,
+    "fragment_script_syntax": "passed",
+    "export_opened_in_browser": true,
+    "export_interactions_verified": [
+      "Horizontal overview on initial load",
+      "Open reference page from overview",
+      "Project arrow opens mixed list without changing the page",
+      "Switch to vertical layout and open overview through project name",
+      "Open conversation alongside overview",
+      "Close auxiliary panel"
+    ],
+    "export_browser_console_errors": [],
+    "captures_visually_inspected": true,
+    "native_build": "not run: documentation and reference artifacts only",
+    "native_app": "not run",
+    "native_persistence_and_restart": "not implemented or verified",
+    "production_code_or_spec_changed": false
+  },
+  "limits": [
+    "All pages, project records and agent states are fictional sample data",
+    "Mock UI-state memory does not persist full dynamic records or native browser sessions",
+    "Capture size is documentation preview geometry, not a native minimum window-size requirement",
+    "Existing uncommitted primary-checkout changes are listed and hashed separately, not included or backed up in this branch"
+  ]
+}

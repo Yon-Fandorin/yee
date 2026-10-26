@@ -1,0 +1,74 @@
+{
+  "base_branch": "pilot",
+  "base_commit": "efc3e425bd80a8db507b89430cc5f9824a527d9b",
+  "primary_checkout": "F:\\yee\\pilot-repo",
+  "status": [
+    " M browser/ui/BUILD.gn",
+    " M browser/ui/browser_surface_layout.cc",
+    " M browser/ui/yee_ui.cc",
+    " M browser/ui/yee_ui.h",
+    " M browser/ui/yee_ui_unittest.cc",
+    " M docs/browser-shell-spec.md",
+    " M docs/header/test-coverage.md",
+    " M docs/sidebar/test-coverage.md",
+    " M patches/0001-integrate-yee-shell.patch",
+    " M tools/dev/test-browser-surface-layout.sh",
+    " M tools/dev/test-header.sh",
+    "?? browser/ui/omnibox_popup_style.cc",
+    "?? browser/ui/omnibox_popup_style.h"
+  ],
+  "files": [
+    {
+      "path": "browser/ui/browser_surface_layout.cc",
+      "sha256": "DAF106C1A0DC098259FA2A010FB3B28EDB623E6764D5CB6BBC27B44787F44BFF"
+    },
+    {
+      "path": "browser/ui/BUILD.gn",
+      "sha256": "21950697EA31705FE4641F18D312366C56F381FEAB4A8DCC441D4BA72445B97E"
+    },
+    {
+      "path": "browser/ui/omnibox_popup_style.cc",
+      "sha256": "13F9E59B05543619EEDD13CA4E7BFD4E5ADCCF1C41FBF54074C8F9D4BFB4928A"
+    },
+    {
+      "path": "browser/ui/omnibox_popup_style.h",
+      "sha256": "0E0FCA2EBC168C4FCC450011E908131F4A8C2AC052C53684F35097A0DD2D8FB1"
+    },
+    {
+      "path": "browser/ui/yee_ui_unittest.cc",
+      "sha256": "2D66408679D2E1AD7AAF3B1912F118C8FE4B45B13854B87F96B929F0EE3EB3FB"
+    },
+    {
+      "path": "browser/ui/yee_ui.cc",
+      "sha256": "B8ADA32FC8ED73784BA015155D4A188EDCD293024C50386FC201E306DA791F3A"
+    },
+    {
+      "path": "browser/ui/yee_ui.h",
+      "sha256": "C14C12862569E95D2DA9230FB223001EBB22B095C4BF00073351048319E9740C"
+    },
+    {
+      "path": "docs/browser-shell-spec.md",
+      "sha256": "73743F19B0137F3E75679F11BBDFBF617CC3148A315042AFDC6128AA9693C784"
+    },
+    {
+      "path": "docs/header/test-coverage.md",
+      "sha256": "B39ACA96DEBB258C17DAB2884A82D8CF5977193BC06507AC7BB138F6CAF8EA62"
+    },
+    {
+      "path": "docs/sidebar/test-coverage.md",
+      "sha256": "63B0619E141BFE697D75276F0BADC983679E607CAAF6195B583DE27310A395C3"
+    },
+    {
+      "path": "patches/0001-integrate-yee-shell.patch",
+      "sha256": "4995BCF2C5C278199ABC38BD56532B6862CF2EE3CAD191D762F09AFF9BD36665"
+    },
+    {
+      "path": "tools/dev/test-browser-surface-layout.sh",
+      "sha256": "BD58A1C0C08D72A4E9AB02AE18171A4B4066EAFE7DA43C193FE2021EAF87613B"
+    },
+    {
+      "path": "tools/dev/test-header.sh",
+      "sha256": "8B54A3AE2A1C852E2E336FF611B09767F5CF440C4D686AAF56F4F65D4E518CF3"
+    }
+  ]
+}

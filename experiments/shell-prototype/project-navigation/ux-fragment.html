@@ -1,0 +1,367 @@
+<div id="yee-mixed-navigation">
+  <style>
+    #yee-mixed-navigation .mn-label { display:flex; align-items:center; min-height:48px; padding-inline-end:100px; }
+    #yee-mixed-navigation .mn-stage { min-height:800px; }
+    #yee-mixed-navigation .mn-app {
+      --mn-shell:light-dark(#e0e8f4,#202b39); --mn-page:light-dark(#fff,#171e28);
+      --mn-subtle:light-dark(#f3f5f9,#273240); --mn-text:light-dark(#243245,#edf2f7);
+      --mn-muted:light-dark(#59697c,#b7c4d4); --mn-line:light-dark(#d5dee9,#3a485b);
+      --mn-selected:light-dark(#cddbed,#34475f); --mn-accent:light-dark(#4e688c,#a6c1e5);
+      --mn-on-accent:light-dark(#fff,#17273b); --mn-running:light-dark(#2b7968,#9ad6c5);
+      --mn-sidebar-width:244px; --mn-row-height:34px;
+      position:relative; width:100%; min-height:800px; box-sizing:border-box;
+      display:flex; flex-direction:column; color:var(--mn-text); background:var(--mn-shell);
+      border:1px solid var(--mn-line); border-radius:14px;
+      font:14px/1.5 "Segoe UI","Malgun Gothic",system-ui,sans-serif;
+    }
+    #yee-mixed-navigation .mn-app * { box-sizing:border-box; }
+    #yee-mixed-navigation .mn-app button,#yee-mixed-navigation .mn-app input,#yee-mixed-navigation .mn-app textarea { font:inherit; }
+    #yee-mixed-navigation .mn-app button { border:0; background:transparent; color:inherit; }
+    #yee-mixed-navigation .mn-app i,#yee-mixed-navigation .mn-app svg { width:16px; height:16px; flex:0 0 auto; }
+    #yee-mixed-navigation .mn-app [hidden] { display:none !important; }
+    #yee-mixed-navigation .mn-titlebar { display:flex; gap:8px; align-items:center; min-height:40px; padding:5px 10px; min-width:0; }
+    #yee-mixed-navigation .mn-spacer { flex:1; }
+    #yee-mixed-navigation .mn-caption { display:flex; gap:18px; align-items:center; color:var(--mn-muted); padding-inline:5px; font-size:14px; }
+    #yee-mixed-navigation .mn-icon { display:inline-flex; align-items:center; justify-content:center; height:28px; width:28px; flex:0 0 auto; border-radius:6px; padding:0; }
+    #yee-mixed-navigation .mn-icon:hover { background:var(--mn-selected); }
+    #yee-mixed-navigation .mn-body { display:grid; grid-template-columns:var(--mn-sidebar-width) minmax(0,1fr); flex:1; min-width:0; }
+    #yee-mixed-navigation .mn-horizontal .mn-body { grid-template-columns:minmax(0,1fr); }
+    #yee-mixed-navigation .mn-horizontal .mn-main { padding-inline-start:6px; }
+    #yee-mixed-navigation .mn-horizontal .mn-toolbar > [data-command="all-navigation"] { display:none; }
+    #yee-mixed-navigation .mn-sidebar { display:flex; flex-direction:column; gap:5px; padding:5px 8px 10px; min-width:0; }
+    #yee-mixed-navigation .mn-rail { display:flex; flex-direction:column; align-items:center; gap:9px; padding:8px 0; }
+    #yee-mixed-navigation .mn-rail button { width:32px; height:32px; }
+    #yee-mixed-navigation .mn-footer { margin-block-start:auto; padding:10px 6px 0; color:var(--mn-muted); font-size:12px; display:flex; align-items:center; gap:7px; }
+    #yee-mixed-navigation .mn-outline { display:grid; align-content:start; gap:4px; min-width:0; }
+    #yee-mixed-navigation .mn-item-row { display:flex; align-items:center; gap:3px; min-width:0; }
+    #yee-mixed-navigation .mn-item { min-width:0; flex:1; min-height:var(--mn-row-height); display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:7px; text-align:start; }
+    #yee-mixed-navigation .mn-item:hover,#yee-mixed-navigation .mn-item.is-active { background:var(--mn-selected); }
+    #yee-mixed-navigation .mn-item-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+    #yee-mixed-navigation .mn-item .mn-type-mark { color:var(--mn-muted); display:flex; align-items:center; }
+    #yee-mixed-navigation .mn-child-list { display:grid; gap:3px; padding:3px 0 10px 15px; min-width:0; }
+    #yee-mixed-navigation .mn-container-row { display:flex; align-items:center; gap:1px; margin-block-start:7px; min-width:0; }
+    #yee-mixed-navigation .mn-container-row .mn-item { font-weight:500; }
+    #yee-mixed-navigation .mn-chevron { width:22px; height:28px; }
+    #yee-mixed-navigation .mn-running-dot { width:5px; height:5px; border-radius:50%; background:var(--mn-running); flex:0 0 auto; }
+    #yee-mixed-navigation .mn-empty { padding:9px; color:var(--mn-muted); font-size:12px; }
+    #yee-mixed-navigation .mn-main { display:flex; flex-direction:column; min-width:0; padding:0 6px 6px 0; }
+    #yee-mixed-navigation .mn-surface { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--mn-page); border:1px solid var(--mn-line); border-radius:11px; }
+    #yee-mixed-navigation .mn-toolbar { display:flex; align-items:center; gap:4px; min-height:43px; padding:5px 7px; min-width:0; border-bottom:1px solid var(--mn-line); }
+    #yee-mixed-navigation .mn-address { display:flex; align-items:center; gap:7px; min-width:0; flex:1; color:var(--mn-muted); background:var(--mn-subtle); border:1px solid var(--mn-line); border-radius:7px; min-height:28px; padding:4px 9px; font-size:12px; }
+    #yee-mixed-navigation .mn-address span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #yee-mixed-navigation .mn-context { display:flex; align-items:center; gap:6px; padding:5px 9px; border-radius:6px; font-size:11px; color:var(--mn-muted); flex:0 0 auto; }
+    #yee-mixed-navigation .mn-context:hover { background:var(--mn-subtle); }
+    #yee-mixed-navigation .mn-page-and-panel { display:flex; min-width:0; flex:1; align-items:stretch; }
+    #yee-mixed-navigation .mn-webpage { min-width:0; flex:1; padding:36px 28px; }
+    #yee-mixed-navigation .mn-article { width:100%; max-width:550px; margin:15px auto; }
+    #yee-mixed-navigation .mn-eyebrow { font-size:11px; color:var(--mn-muted); margin-block-end:9px; }
+    #yee-mixed-navigation h2 { font-size:24px; line-height:1.3; font-weight:500; margin:0 0 22px; letter-spacing:-.5px; }
+    #yee-mixed-navigation h3 { font-size:15px; font-weight:500; margin:22px 0 10px; }
+    #yee-mixed-navigation .mn-article p { margin:14px 0; line-height:1.9; }
+    #yee-mixed-navigation .mn-article ul { padding-inline-start:20px; line-height:1.9; }
+    #yee-mixed-navigation .mn-rule { border:0; border-top:1px solid var(--mn-line); margin:24px 0; }
+    #yee-mixed-navigation .mn-callout { background:var(--mn-subtle); border-radius:8px; padding:13px 15px; color:var(--mn-muted); font-size:13px; margin-block:22px; }
+    #yee-mixed-navigation .mn-button { display:inline-flex; justify-content:center; align-items:center; gap:6px; min-height:32px; padding:6px 10px; border:1px solid var(--mn-line) !important; border-radius:7px; background:var(--mn-page) !important; font-size:12px; }
+    #yee-mixed-navigation .mn-primary { background:var(--mn-accent) !important; color:var(--mn-on-accent) !important; border-color:var(--mn-accent) !important; }
+    #yee-mixed-navigation .mn-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    #yee-mixed-navigation .mn-panel { width:292px; min-width:0; flex:0 0 292px; padding:16px; border-inline-start:1px solid var(--mn-line); background:var(--mn-page); border-radius:0 0 10px 0; display:flex; flex-direction:column; gap:14px; }
+    #yee-mixed-navigation .mn-panel-head { display:flex; align-items:flex-start; gap:8px; }
+    #yee-mixed-navigation .mn-panel-head h3 { flex:1; margin:0; font-size:14px; overflow-wrap:anywhere; }
+    #yee-mixed-navigation .mn-panel-type { color:var(--mn-muted); font-size:11px; display:flex; align-items:center; gap:6px; }
+    #yee-mixed-navigation .mn-panel p { line-height:1.8; margin:0; font-size:13px; }
+    #yee-mixed-navigation .mn-message { padding:12px; background:var(--mn-selected); border-radius:9px; font-size:13px; }
+    #yee-mixed-navigation .mn-panel-note { color:var(--mn-muted); font-size:11px; }
+    #yee-mixed-navigation .mn-panel textarea { width:100%; min-height:78px; padding:10px; resize:vertical; border:1px solid var(--mn-line); background:var(--mn-page); color:var(--mn-text); border-radius:8px; }
+    #yee-mixed-navigation .mn-panel-label { font-size:12px; color:var(--mn-muted); }
+    #yee-mixed-navigation .mn-source { display:flex; gap:7px; align-items:center; padding:9px; border:1px solid var(--mn-line) !important; border-radius:7px; text-align:start; font-size:12px; }
+    #yee-mixed-navigation .mn-step { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--mn-muted); }
+    #yee-mixed-navigation .mn-status { display:flex; align-items:center; gap:7px; color:var(--mn-muted); font-size:12px; }
+    #yee-mixed-navigation .mn-newtab { max-width:560px; margin:70px auto; }
+    #yee-mixed-navigation .mn-search { display:flex; gap:8px; align-items:center; padding:10px 12px; border:1px solid var(--mn-line); border-radius:10px; }
+    #yee-mixed-navigation .mn-search input { width:100%; min-width:0; border:0; background:transparent; color:var(--mn-text); padding:5px; }
+    #yee-mixed-navigation .mn-search-links { display:flex; gap:8px; flex-wrap:wrap; margin-block-start:18px; }
+    #yee-mixed-navigation .mn-strip { display:flex; gap:4px; align-items:center; flex:1; min-width:0; }
+    #yee-mixed-navigation .mn-tab { display:flex; align-items:center; gap:5px; border-radius:8px 8px 4px 4px; min-width:0; width:127px; height:31px; padding:5px 7px; }
+    #yee-mixed-navigation .mn-tab.is-active { background:var(--mn-page); }
+    #yee-mixed-navigation .mn-tab-select { flex:1; display:flex; align-items:center; gap:6px; min-width:0; padding:0; text-align:start; }
+    #yee-mixed-navigation .mn-tab-select span { font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #yee-mixed-navigation .mn-tab-close { display:flex; align-items:center; padding:0; flex:0 0 auto; }
+    #yee-mixed-navigation .mn-tab-close svg { width:12px; height:12px; }
+    #yee-mixed-navigation .mn-strip-group { display:flex; gap:2px; min-width:0; align-items:center; padding:2px; border-radius:8px; background:var(--mn-selected); }
+    #yee-mixed-navigation .mn-strip-label { display:flex; align-items:center; gap:5px; flex:0 0 auto; padding:6px 7px; border-radius:6px; font-size:11px; }
+    #yee-mixed-navigation .mn-strip-label svg { width:14px; height:14px; }
+    #yee-mixed-navigation .mn-strip-label.is-active { background:var(--mn-page); }
+    #yee-mixed-navigation .mn-project-location { display:flex; align-items:center; gap:8px; min-width:0; flex:1; color:var(--mn-muted); font-size:12px; }
+    #yee-mixed-navigation .mn-project-location span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #yee-mixed-navigation .mn-hub { max-width:740px; margin:8px auto; min-width:0; }
+    #yee-mixed-navigation .mn-hub-heading { display:flex; gap:10px; align-items:center; margin-block-end:16px; }
+    #yee-mixed-navigation .mn-hub-heading > svg { width:21px; height:21px; color:var(--mn-muted); }
+    #yee-mixed-navigation .mn-hub h2 { margin:0; overflow-wrap:anywhere; }
+    #yee-mixed-navigation .mn-hub-description { color:var(--mn-muted); line-height:1.8; margin:0 0 26px; }
+    #yee-mixed-navigation .mn-hub-composer { display:flex; flex-wrap:wrap; gap:9px; align-items:center; padding:10px; margin-bottom:28px; border:1px solid var(--mn-line); border-radius:10px; background:var(--mn-page); }
+    #yee-mixed-navigation .mn-hub-composer input { flex:1 1 170px; width:100%; min-width:0; border:0; padding:8px 3px; color:var(--mn-text); background:transparent; }
+    #yee-mixed-navigation .mn-hub-composer .mn-button { margin-inline-start:auto; }
+    #yee-mixed-navigation .mn-hub-flow { display:grid; gap:3px; }
+    #yee-mixed-navigation .mn-hub-row { display:flex; align-items:flex-start; gap:12px; width:100%; min-width:0; text-align:start; padding:14px 10px; border-radius:8px; }
+    #yee-mixed-navigation .mn-hub-row > svg { margin-top:3px; color:var(--mn-muted); }
+    #yee-mixed-navigation .mn-hub-row:hover,#yee-mixed-navigation .mn-hub-row.is-active { background:var(--mn-subtle); }
+    #yee-mixed-navigation .mn-hub-row-copy { flex:1; min-width:0; }
+    #yee-mixed-navigation .mn-hub-row-title { display:block; font-size:13px; font-weight:500; overflow-wrap:anywhere; }
+    #yee-mixed-navigation .mn-hub-row-preview { display:block; color:var(--mn-muted); font-size:12px; margin-top:4px; overflow-wrap:anywhere; }
+    #yee-mixed-navigation .mn-popover-project { flex:1; min-width:0; padding:0; text-align:start; font-size:13px; font-weight:500; }
+    #yee-mixed-navigation .mn-strip-arrow { width:20px; height:26px; }
+    #yee-mixed-navigation .mn-strip .mn-loose-tab { width:102px; }
+    #yee-mixed-navigation .mn-more-tabs { display:none; }
+    #yee-mixed-navigation .mn-horizontal .mn-more-tabs { display:flex; }
+    #yee-mixed-navigation .mn-popover { position:absolute; z-index:6; top:43px; left:min(260px,23%); width:284px; max-width:calc(100% - 60px); padding:10px; border:1px solid var(--mn-line); background:var(--mn-page); border-radius:10px; box-shadow:0 8px 24px light-dark(#23334825,#00000055); }
+    #yee-mixed-navigation .mn-popover-head { display:flex; gap:7px; align-items:center; padding:2px 4px 9px; }
+    #yee-mixed-navigation .mn-popover-head strong { font-size:13px; font-weight:500; flex:1; }
+    #yee-mixed-navigation .mn-popover .mn-item-name { font-size:12px; }
+    #yee-mixed-navigation .mn-popover .mn-child-list { padding-inline-start:11px; }
+    #yee-mixed-navigation .mn-popover .mn-container-row { margin-block-start:4px; }
+    #yee-mixed-navigation .mn-popover-footer { margin:8px 4px 0; padding-top:8px; border-top:1px solid var(--mn-line); font-size:11px; color:var(--mn-muted); }
+    #yee-mixed-navigation .mn-side-shade { display:none; }
+    #yee-mixed-navigation .mn-compact-rail { display:none; }
+    #yee-mixed-navigation .mn-rail-dot { width:5px; height:5px; border-radius:50%; background:var(--mn-running); }
+    #yee-mixed-navigation .mn-sr { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+    @media (max-width:900px) {
+      #yee-mixed-navigation .mn-caption { gap:12px; }
+      #yee-mixed-navigation .mn-tab { width:104px; }
+      #yee-mixed-navigation .mn-horizontal .mn-strip .mn-loose-tab { width:75px; }
+      #yee-mixed-navigation .mn-webpage { padding:26px 20px; }
+      #yee-mixed-navigation .mn-panel { width:266px; flex-basis:266px; }
+      #yee-mixed-navigation .mn-page-and-panel.has-panel { flex-wrap:wrap; }
+      #yee-mixed-navigation .mn-page-and-panel.has-panel .mn-webpage { flex-basis:52%; }
+    }
+    @media (max-width:720px) {
+      #yee-mixed-navigation .mn-tab { width:83px; }
+      #yee-mixed-navigation .mn-horizontal .mn-caption { display:none; }
+      #yee-mixed-navigation .mn-vertical .mn-body { grid-template-columns:198px minmax(0,1fr); }
+      #yee-mixed-navigation .mn-panel { flex-basis:100%; width:100%; border-inline-start:0; border-block-start:1px solid var(--mn-line); }
+      #yee-mixed-navigation .mn-page-and-panel.has-panel .mn-webpage { flex-basis:100%; }
+      #yee-mixed-navigation .mn-page-and-panel.has-panel .mn-webpage .mn-article { margin-block:0; }
+      #yee-mixed-navigation h2 { font-size:21px; }
+    }
+    @media (max-width:520px) {
+      #yee-mixed-navigation .mn-stage,#yee-mixed-navigation .mn-app { min-height:1040px; }
+      #yee-mixed-navigation .mn-vertical .mn-body { grid-template-columns:44px minmax(0,1fr); }
+      #yee-mixed-navigation .mn-vertical .mn-sidebar { display:none; }
+      #yee-mixed-navigation .mn-compact-rail { display:flex; }
+      #yee-mixed-navigation .mn-vertical .mn-main { padding-inline-start:0; }
+      #yee-mixed-navigation .mn-toolbar .mn-extra { display:none; }
+      #yee-mixed-navigation .mn-context span { display:none; }
+      #yee-mixed-navigation .mn-context { padding-inline:5px; }
+      #yee-mixed-navigation .mn-webpage { padding:22px 14px; }
+      #yee-mixed-navigation .mn-strip .mn-tab { width:70px; }
+      #yee-mixed-navigation .mn-horizontal .mn-strip .mn-loose-tab,#yee-mixed-navigation .mn-horizontal .mn-strip-group .mn-tab:not(.is-active) { display:none; }
+      #yee-mixed-navigation .mn-strip-label { padding-inline:4px; font-size:11px; }
+      #yee-mixed-navigation .mn-strip-label .mn-shortenable { max-width:34px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+      #yee-mixed-navigation .mn-strip-arrow { width:17px; }
+      #yee-mixed-navigation .mn-horizontal .mn-more-tabs { display:flex; }
+      #yee-mixed-navigation .mn-horizontal .mn-titlebar { padding-inline:5px; gap:3px; }
+      #yee-mixed-navigation .mn-popover { left:48px; max-width:calc(100% - 54px); }
+      #yee-mixed-navigation .mn-horizontal .mn-popover { left:8px; max-width:calc(100% - 16px); }
+      #yee-mixed-navigation .mn-search input,#yee-mixed-navigation .mn-panel textarea,#yee-mixed-navigation .mn-hub-composer input { font-size:16px; }
+    }
+    @media (pointer:coarse) {
+      #yee-mixed-navigation .mn-item,#yee-mixed-navigation .mn-icon,#yee-mixed-navigation .mn-button { min-height:40px; }
+    }
+  </style>
+  <div class="mn-label text-small text-muted">프로젝트 이름에서 시작 · 혼합 목록 · 세로 / 수평 탭</div>
+  <div class="viz-carousel" aria-label="혼합 목록의 탭 배치" data-previous-label="이전 배치" data-next-label="다음 배치">
+    <section class="mn-stage" data-variant="수평 탭" aria-label="수평 탭과 혼합 목록">
+      <div class="mn-app mn-horizontal" id="yee-mixed-horizontal" data-layout="horizontal" aria-label="수평 탭 배치와 간격"></div>
+    </section>
+    <section class="mn-stage" data-variant="세로 탭" aria-label="세로 탭과 혼합 목록" hidden>
+      <div class="mn-app mn-vertical" id="yee-mixed-vertical" data-layout="vertical" aria-label="세로 탭 배치와 간격"></div>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const root=document.getElementById('yee-mixed-navigation');
+      const esc=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      const icon=name=>`<i data-lucide="${name}" aria-hidden="true"></i>`;
+      const pages={
+        newtab:{id:'newtab',title:'새 탭',host:'새 탭',open:true,owner:null},
+        reading:{id:'reading',title:'이번 주에 읽을 글',host:'reading.example.com',open:true,owner:'reading-group'},
+        typography:{id:'typography',title:'좋은 글의 화면',host:'journal.example.com',open:true,owner:'reading-group'},
+        note:{id:'note',title:'레이아웃 노트',host:'notes.example.com',open:true,owner:'yee-project'},
+        reference:{id:'reference',title:'작업 공간 참고',host:'docs.example.com',open:true,owner:'yee-project'},
+        checklist:{id:'checklist',title:'탭 UX 체크리스트',host:'guide.example.com',open:false,owner:'yee-project'}
+      };
+      const containers={
+        'reading-group':{id:'reading-group',kind:'group',name:'읽을거리',pages:['reading','typography']},
+        'yee-project':{id:'yee-project',kind:'project',name:'Yee 리디자인',pages:['note','reference','checklist'],items:['note','compare','reference','collect','checklist']}
+      };
+      const items={
+        note:{id:'note',kind:'page',title:'레이아웃 노트',page:'note'},
+        compare:{id:'compare',kind:'chat',title:'구성 비교',sourcePage:'note',message:'일반 탭 그룹과 프로젝트를 함께 쓰면서, 안에서는 종류별로 나누지 않는 구성을 보고 싶어.'},
+        reference:{id:'reference',kind:'page',title:'작업 공간 참고',page:'reference'},
+        collect:{id:'collect',kind:'task',title:'화면과 근거 모으기',agent:'Codex',status:'working'},
+        checklist:{id:'checklist',kind:'saved',title:'탭 UX 체크리스트',page:'checklist'}
+      };
+      const shared={view:'project',activePage:'note',activeItem:null,panel:null,selectedContainer:'yee-project',reply:'',hubDraft:'',answered:false,serial:0};
+      const activityOrder=['collect','compare','note','reference','checklist'];
+      const layouts=[...root.querySelectorAll('.mn-app')].map(app=>({app,orientation:app.dataset.layout,popup:null,expanded:{'reading-group':true,'yee-project':true},stripCollapsed:{'reading-group':true,'yee-project':false},design:{sidebarWidth:244,density:'compact'}}));
+      const kindName={page:'웹페이지',chat:'대화',task:'에이전트 작업',saved:'저장한 페이지'};
+      const symbolFor=item=>item.kind==='chat'?'message-square':item.kind==='task'?'circle-play':item.kind==='saved'||(item.page&&!pages[item.page].open)?'bookmark':'globe';
+      const currentItemKind=item=>item.page&&!pages[item.page].open?'saved':item.kind;
+      const command=(name,label,classes='',extra='')=>`<button type="button" class="mn-button ${classes}" data-command="${name}" ${extra}>${label}</button>`;
+
+      function itemRow(item) {
+        const closed=item.page&&!pages[item.page].open;
+        const label=kindName[currentItemKind(item)]+' · '+item.title;
+        return `<div class="mn-item-row"><button type="button" class="mn-item ${shared.activeItem===item.id?'is-active':''}" data-item="${item.id}" aria-label="${esc(label)}" data-tooltip="${esc(label)}"><span class="mn-type-mark">${icon(symbolFor(item))}</span><span class="mn-item-name">${esc(item.title)}</span>${item.kind==='task'&&item.status==='working'?'<span class="mn-running-dot" aria-label="진행 중"></span>':''}</button>${item.page&&pages[item.page].open?`<button type="button" class="mn-icon" data-close="${item.page}" aria-label="${esc(item.title)} 탭 닫기">${icon('x')}</button>`:''}</div>`;
+      }
+      function pageRow(page) {
+        return `<div class="mn-item-row"><button type="button" class="mn-item ${shared.view==='page'&&shared.activeItem===page.id?'is-active':''}" data-page="${page.id}" aria-label="웹페이지 · ${esc(page.title)}" data-tooltip="웹페이지 · ${esc(page.title)}">${icon('globe')}<span class="mn-item-name">${esc(page.title)}</span></button><button type="button" class="mn-icon" data-close="${page.id}" aria-label="${esc(page.title)} 탭 닫기">${icon('x')}</button></div>`;
+      }
+      function containerChildren(container) {
+        return container.kind==='project'?container.items.map(id=>itemRow(items[id])).join(''):container.pages.filter(id=>pages[id].open).map(id=>pageRow(pages[id])).join('');
+      }
+      function outline(layout) {
+        const loose=Object.values(pages).filter(page=>page.open&&!page.owner).map(pageRow).join('');
+        return `<nav class="mn-outline" aria-label="일반 탭·그룹·프로젝트">${loose}${['reading-group','yee-project'].map(id=>{const container=containers[id],isProject=container.kind==='project';return `<div class="mn-container-row"><button type="button" class="mn-icon mn-chevron" data-expand="${id}" aria-expanded="${layout.expanded[id]}" aria-label="${container.name} ${layout.expanded[id]?'목록 접기':'목록 펼치기'}">${icon(layout.expanded[id]?'chevron-down':'chevron-right')}</button><button type="button" class="mn-item ${shared.selectedContainer===id?'is-active':''}" ${isProject?`data-project="${id}"`:`data-container="${id}"`} aria-label="${container.name} ${isProject?'프로젝트 기본 화면 열기':'일반 탭 그룹'}" data-tooltip="${isProject?'프로젝트 · 페이지와 대화, 작업':'일반 탭 그룹 · 열린 웹페이지'}">${icon(isProject?'briefcase-business':'folder')}<span class="mn-item-name">${container.name}</span></button></div>${layout.expanded[id]?`<div class="mn-child-list" aria-label="${container.name} 항목">${containerChildren(container)||'<div class="mn-empty">열린 페이지 없음</div>'}</div>`:''}`;}).join('')}</nav>`;
+      }
+      function rail(layout) {
+        return `<nav class="mn-rail ${layout.orientation==='vertical'?'mn-compact-rail':''}" aria-label="탐색 바로가기"><button type="button" class="mn-icon" data-command="all-navigation" aria-label="탭·그룹·프로젝트 목록 열기">${icon('panel-left')}</button><button type="button" class="mn-icon" data-project="yee-project" aria-label="Yee 리디자인 프로젝트 기본 화면 열기">${icon('briefcase-business')}</button><button type="button" class="mn-icon" data-command="new-tab" aria-label="일반 새 탭">${icon('plus')}</button></nav>`;
+      }
+      function browserTab(page,loose=false) {
+        const active=shared.view==='page'&&shared.activePage===page.id;
+        return `<div class="mn-tab ${loose?'mn-loose-tab':''} ${active?'is-active':''}"><button type="button" class="mn-tab-select" data-page="${page.id}" aria-label="브라우저 탭 · ${esc(page.title)}" data-tooltip="${esc(page.title)}" aria-pressed="${active}">${icon('globe')}<span>${esc(page.title)}</span></button><button type="button" class="mn-tab-close" data-close="${page.id}" aria-label="${esc(page.title)} 브라우저 탭 닫기">${icon('x')}</button></div>`;
+      }
+      function tabstrip(layout) {
+        return `<nav class="mn-strip" aria-label="열린 웹페이지의 수평 탭바">${Object.values(pages).filter(page=>page.open&&!page.owner).map(page=>browserTab(page,true)).join('')}${['reading-group','yee-project'].map(id=>{const container=containers[id],project=container.kind==='project';return `<div class="mn-strip-group"><button type="button" class="mn-strip-label ${project&&shared.view==='project'?'is-active':''}" ${project?`data-project="${id}"`:`data-strip-toggle="${id}"`} aria-label="${container.name} ${project?'프로젝트 기본 화면 열기':'일반 탭 그룹 접기·펼치기'}" data-tooltip="${project?container.name+' · 프로젝트 열기':container.name}">${icon(project?'briefcase-business':'folder')}<span class="mn-shortenable">${project?'리디자인':container.name}</span></button>${project?`<button type="button" class="mn-icon mn-strip-arrow" data-project-list="${id}" aria-label="${container.name} 항목 목록 ${layout.popup===id?'닫기':'펼치기'}" aria-expanded="${layout.popup===id}">${icon('chevron-down')}</button>`:''}${container.pages.filter(pageId=>pages[pageId].open&&(!layout.stripCollapsed[id]||shared.activePage===pageId)).map(pageId=>browserTab(pages[pageId])).join('')}</div>`;}).join('')}<button type="button" class="mn-icon mn-more-tabs" data-command="all-navigation" aria-label="탭·그룹·프로젝트 목록 열기">${icon('chevron-down')}</button><button type="button" class="mn-icon" data-command="new-tab" aria-label="일반 새 탭 열기">${icon('plus')}</button></nav>`;
+      }
+      function titlebar(layout) {
+        return `<div class="mn-titlebar">${layout.orientation==='vertical'?`<span class="mn-spacer"></span><button type="button" class="mn-icon" data-command="new-tab" aria-label="일반 새 탭 열기">${icon('plus')}</button>`:tabstrip(layout)}<div class="mn-caption" aria-hidden="true"><span>−</span><span>□</span><span>×</span></div></div>`;
+      }
+      function toolbar(layout) {
+        if(shared.view==='project')return `<div class="mn-toolbar">${layout.orientation==='vertical'?`<button type="button" class="mn-icon" data-command="all-navigation" aria-label="탐색 목록">${icon('panel-left')}</button>`:''}<button type="button" class="mn-icon" data-command="return-to-page" aria-label="읽던 페이지로 돌아가기" data-tooltip="읽던 페이지 · ${esc(pages[shared.activePage].title)}">${icon('arrow-left')}</button><div class="mn-project-location">${icon('briefcase-business')}<span>Yee 리디자인</span></div><button type="button" class="mn-icon" data-project-list="yee-project" aria-label="프로젝트 항목 목록 펼치기">${icon('list')}</button></div>`;
+        const page=pages[shared.activePage],container=page.owner?containers[page.owner]:null;
+        return `<div class="mn-toolbar"><button type="button" class="mn-icon" data-command="all-navigation" aria-label="탐색 목록">${icon('panel-left')}</button><button type="button" class="mn-icon mn-extra" data-command="previous-page" aria-label="이전 예시 페이지">${icon('arrow-left')}</button><div class="mn-address">${icon(page.host==='새 탭'?'search':'lock-keyhole')}<span>${page.host}</span></div>${container?`<button type="button" class="mn-context" ${container.kind==='project'?`data-project="${container.id}"`:`data-container="${container.id}"`} aria-label="${container.name} ${container.kind==='project'?'프로젝트 기본 화면 열기':'목록'}" data-tooltip="${container.name}">${icon(container.kind==='project'?'briefcase-business':'folder')}<span>${container.kind==='project'?'리디자인':container.name}</span></button>`:''}<button type="button" class="mn-icon" data-command="ask-page" aria-label="구성 비교 대화 열기">${icon('sparkles')}</button></div>`;
+      }
+      function projectHub(layout) {
+        const previews={collect:items.collect.status==='working'?'Codex · 차이와 근거 정리 중':'Codex · 중단됨 · 자료와 기록 보존',compare:'일반 탭 그룹과 프로젝트를 함께 쓰는 구성',note:'마지막으로 읽은 페이지 · '+pages.note.host,reference:pages.reference.host,checklist:'보관한 참고 자료 · '+pages.checklist.host};
+        const order=[...activityOrder,...containers['yee-project'].items.filter(id=>!activityOrder.includes(id))];
+        return `<section class="mn-hub" aria-label="Yee 리디자인 프로젝트 기본 화면"><div class="mn-eyebrow">프로젝트</div><div class="mn-hub-heading">${icon('briefcase-business')}<h2>Yee 리디자인</h2></div><p class="mn-hub-description">매일 쓰는 브라우저에서 페이지를 읽고, 대화하고, 맡긴 일을 이어가는 경험을 정리합니다.</p><label class="mn-sr" for="mn-project-draft-${layout.orientation}">프로젝트에서 새 대화 시작</label><div class="mn-hub-composer">${icon('message-square')}<input id="mn-project-draft-${layout.orientation}" data-hub-draft placeholder="이 프로젝트에서 이어갈 내용을 적어보세요" value="${esc(shared.hubDraft)}"/>${command('new-chat',icon('arrow-up')+' 시작','mn-primary')}</div><h3>이어서 보기</h3><div class="mn-hub-flow">${order.map(id=>{const item=items[id],label=kindName[currentItemKind(item)]+' · '+item.title;return `<button type="button" class="mn-hub-row ${shared.activeItem===id?'is-active':''}" data-item="${id}" aria-label="${esc(label)}">${icon(symbolFor(item))}<span class="mn-hub-row-copy"><span class="mn-hub-row-title">${esc(item.title)}</span><span class="mn-hub-row-preview">${esc(previews[id]||item.message||'이 프로젝트에서 시작한 대화')}</span></span>${item.kind==='task'&&item.status==='working'?'<span class="mn-running-dot" aria-label="진행 중"></span>':''}</button>`;}).join('')}</div></section>`;
+      }
+      function webpage(layout) {
+        const page=pages[shared.activePage];
+        if(page.host==='새 탭')return `<div class="mn-newtab"><div class="mn-eyebrow">새 탭</div><h2>어디로 갈까요?</h2><div class="mn-search">${icon('search')}<label class="mn-sr" for="mn-search-${layout.orientation}">검색어 또는 주소</label><input id="mn-search-${layout.orientation}" data-search placeholder="검색어 또는 주소 입력"/><button type="button" class="mn-icon" data-command="search-sample" aria-label="검색 예시 열기">${icon('arrow-right')}</button></div><div class="mn-search-links">${command('open-reading','읽을거리 '+icon('folder'))}${command('open-project','Yee 리디자인 '+icon('briefcase-business'))}</div></div>`;
+        if(page.id==='note')return `<article class="mn-article"><div class="mn-eyebrow">제품 노트 / 브라우저 UX</div><h2>레이아웃 노트</h2><p>페이지를 읽고, 대화로 생각을 정리하고, 필요한 일은 맡깁니다. 같은 일에 관한 항목을 가까이 놓아 흐름을 이어갑니다.</p><hr class="mn-rule"/><h3>한 목록에서 이어가기</h3><p>페이지 옆에 비교 대화가 있고, 그 아래에 자료를 모으는 작업이 있습니다. 항목의 위치는 흐름에 맞추고, 종류는 아이콘으로 구분합니다.</p><div class="mn-callout">가볍게 모아 본 페이지는 일반 탭 그룹에, 계속 이어갈 일은 프로젝트에 둡니다.</div><div class="mn-actions">${command('open-comparison',icon('message-square')+' 구성 비교 열기')}${command('open-task',icon('circle-play')+' 진행 중인 작업')}</div></article>`;
+        if(page.owner==='reading-group')return `<article class="mn-article"><div class="mn-eyebrow">읽을거리 · 일반 탭 그룹</div><h2>${esc(page.title)}</h2><p>읽고 싶은 페이지를 잠깐 모았습니다. 탭을 묶어 두는 데 프로젝트를 만들 필요는 없습니다.</p><p>다른 일을 시작하거나 대화를 열어도 이 그룹은 같은 탐색 목록과 탭바에 남습니다.</p><hr class="mn-rule"/><h3>열린 페이지 묶음</h3><p>그룹 이름을 눌러 열린 탭을 접거나 펼칠 수 있습니다. 프로젝트는 옆에 별도로 두고 함께 사용합니다.</p></article>`;
+        return `<article class="mn-article"><div class="mn-eyebrow">${page.host}</div><h2>${esc(page.title)}</h2><p>${page.id==='checklist'?'탭 전환, 닫기와 복원, 읽던 위치, 대화와 작업의 연결을 확인합니다.':'사람이 읽는 페이지와 에이전트의 작업 페이지를 구분하고, 필요한 순간에 확인하거나 이어갑니다.'}</p><div class="mn-callout">이 페이지는 Yee 리디자인 프로젝트와 연결되어 있습니다.</div>${command('open-comparison',icon('message-square')+' 구성 비교 열기')}</article>`;
+      }
+      function panel() {
+        if(!shared.panel)return '';
+        const item=items[shared.panel];
+        const type=currentItemKind(item);
+        let body='';
+        if(item.kind==='chat')body=`${item.sourcePage?`<div class="mn-source">${icon('globe')}<span>참고 페이지 · ${esc(pages[item.sourcePage].title)}</span></div>`:''}<div class="mn-message">${esc(item.message||'이 프로젝트에서 생각을 이어가요.')}</div><p>항목은 한 목록에 두고, 아이콘과 현재 선택으로 구분하는 구성을 검토합니다.</p><label class="mn-panel-label">이어서 질문<textarea data-reply placeholder="생각을 이어서 적어보세요">${esc(shared.reply)}</textarea></label>${command('reply','보내기','mn-primary')}${shared.answered?'<p class="mn-panel-note" role="status">질문을 남겼어요. 화면 시연을 위한 예시 응답입니다.</p>':''}`;
+        else if(item.kind==='task')body=`<div class="mn-status">${icon(item.status==='working'?'circle-play':'square')} ${item.agent} · ${item.status==='working'?'진행 중':'중단됨'}</div><div class="mn-step">${icon('check')} 참고 페이지 확인</div><div class="mn-step">${icon('check')} 화면 요소 분류</div><div class="mn-step">${icon(item.status==='working'?'loader-circle':'square')} ${item.status==='working'?'차이와 근거 정리 중':'열린 자료와 기록 보존'}</div><button type="button" class="mn-source" data-page="reference">${icon('globe')} 작업 공간 참고</button>${item.status==='working'?command('stop-task','중단'):''}${command('open-comparison',icon('message-square')+' 관련 대화')}`;
+        else body=`<p>프로젝트에 보관한 페이지입니다. 원할 때 브라우저 탭으로 다시 열 수 있어요.</p><div class="mn-panel-note">${pages[item.page].host}</div>${command('reopen-source','페이지 열기','mn-primary',`data-source-page="${item.page}"`)}`;
+        return `<aside class="mn-panel" aria-label="${esc(kindName[type]+' · '+item.title)}"><div class="mn-panel-type">${icon(symbolFor(item))} ${kindName[type]} · Yee 리디자인</div><div class="mn-panel-head"><h3>${esc(item.title)}</h3><button type="button" class="mn-icon" data-command="close-panel" aria-label="보조 패널 닫기">${icon('x')}</button></div>${body}</aside>`;
+      }
+      function popover(layout) {
+        if(!layout.popup)return '';
+        const all=layout.popup==='all';
+        const container=containers[layout.popup];
+        return `<aside class="mn-popover" aria-label="${all?'탭·그룹·프로젝트 목록':container.name+' 혼합 목록'}"><div class="mn-popover-head">${icon(all?'panel-left':container.kind==='project'?'briefcase-business':'folder')}${!all&&container.kind==='project'?`<button type="button" class="mn-popover-project" data-project="${container.id}" aria-label="${container.name} 프로젝트 기본 화면 열기" data-tooltip="프로젝트 기본 화면 열기">${container.name}</button>`:`<strong>${all?'탭 · 그룹 · 프로젝트':container.name}</strong>`}${!all&&container.kind==='project'?`<button type="button" class="mn-icon" data-command="new-chat" aria-label="프로젝트에 새 대화 추가">${icon('message-square-plus')}</button>`:''}<button type="button" class="mn-icon" data-command="close-popup" aria-label="탐색 목록 닫기">${icon('x')}</button></div>${all?outline(layout):`<div class="mn-outline">${containerChildren(container)}</div>`}<div class="mn-popover-footer">${all?'일반 그룹과 프로젝트를 함께 사용':container.kind==='project'?'페이지 · 대화 · 작업을 같은 순서로 유지':'열린 웹페이지를 모은 일반 탭 그룹'}</div></aside>`;
+      }
+      function renderLayout(layout) {
+        layout.app.style.setProperty('--mn-sidebar-width',layout.design.sidebarWidth+'px');
+        layout.app.style.setProperty('--mn-row-height',layout.design.density==='comfortable'?'40px':'34px');
+        layout.app.innerHTML=titlebar(layout)+`<div class="mn-body">${layout.orientation==='vertical'?`<aside class="mn-sidebar">${outline(layout)}<div class="mn-footer">${icon('user')} 개인 · 로컬</div></aside>${rail(layout)}`:''}<main class="mn-main"><div class="mn-surface">${toolbar(layout)}<div class="mn-page-and-panel ${shared.panel?'has-panel':''}"><div class="mn-webpage">${shared.view==='project'?projectHub(layout):webpage(layout)}</div>${panel()}</div></div></main></div>`+popover(layout);
+      }
+      function renderAll() {
+        layouts.forEach(renderLayout);
+        root.querySelectorAll('.mn-app button').forEach(button=>button.classList.add('cursor-interaction'));
+        if(globalThis.lucide&&typeof lucide.createIcons==='function')lucide.createIcons({attrs:{width:16,height:16}});
+      }
+      function openPage(id) {
+        const page=pages[id];page.open=true;shared.view='page';shared.activePage=id;shared.activeItem=id;shared.panel=null;shared.selectedContainer=page.owner;
+      }
+      function openProject() {
+        shared.view='project';shared.panel=null;shared.activeItem=null;shared.selectedContainer='yee-project';
+        layouts.forEach(layout=>{layout.popup=null;});
+      }
+      function openItem(id) {
+        const item=items[id];shared.activeItem=id;shared.selectedContainer='yee-project';
+        if(item.page&&pages[item.page].open){openPage(item.page);return;}
+        shared.panel=id;
+      }
+      function closePage(id) {
+        pages[id].open=false;
+        if(shared.activePage===id){const replacement=Object.values(pages).find(page=>page.open);if(replacement){shared.activePage=replacement.id;shared.activeItem=replacement.id;shared.panel=null;}else{pages.newtab.open=true;shared.activePage='newtab';shared.activeItem='newtab';shared.panel=null;}}
+      }
+      function startProjectChat() {
+        const id='chat-'+(++shared.serial),message=shared.hubDraft.trim();
+        items[id]={id,kind:'chat',title:message?message.slice(0,32):'새 대화',message:message||'이 프로젝트에서 새 대화를 시작합니다.'};
+        containers['yee-project'].items.push(id);activityOrder.unshift(id);shared.hubDraft='';shared.reply='';shared.answered=false;openItem(id);
+      }
+      function applyRememberedState(widgetState) {
+        const saved=widgetState?.privateContent?.mixedNavigation;
+        if(saved?.version!==3)return;
+        if(saved.view==='page'||saved.view==='project')shared.view=saved.view;
+        if(pages[saved.activePage])shared.activePage=saved.activePage;
+        shared.activeItem=items[saved.activeItem]||pages[saved.activeItem]?saved.activeItem:null;
+        shared.panel=items[saved.panel]?saved.panel:null;
+        shared.selectedContainer=shared.view==='project'||shared.panel?'yee-project':pages[shared.activePage].owner;
+        if(saved.openPages)Object.keys(pages).forEach(id=>{if(typeof saved.openPages[id]==='boolean')pages[id].open=saved.openPages[id];});
+        pages[shared.activePage].open=true;
+        layouts.forEach(layout=>{const options=saved.layouts?.[layout.orientation];if(!options)return;['reading-group','yee-project'].forEach(id=>{if(typeof options.expanded?.[id]==='boolean')layout.expanded[id]=options.expanded[id];});if(options.density==='compact'||options.density==='comfortable')layout.design.density=options.density;if(Number.isFinite(options.sidebarWidth))layout.design.sidebarWidth=Math.max(220,Math.min(280,options.sidebarWidth));});
+      }
+      function remember(layout) {
+        const snapshot={version:3,view:shared.view,activePage:shared.activePage,activeItem:shared.activeItem,panel:shared.panel,openPages:Object.fromEntries(Object.values(pages).map(page=>[page.id,page.open])),layouts:Object.fromEntries(layouts.map(item=>[item.orientation,{expanded:item.expanded,density:item.design.density,sidebarWidth:item.design.sidebarWidth}]))};
+        if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{design:'Mixed navigation with project name opening its overview',lastLayout:layout.orientation,displayedSurface:shared.view,activeItem:shared.activeItem},privateContent:{mixedNavigation:snapshot}}).catch(()=>{});
+      }
+      layouts.forEach(layout=>{
+        layout.app.addEventListener('input',event=>{if(event.target.hasAttribute('data-reply'))shared.reply=event.target.value;if(event.target.hasAttribute('data-hub-draft'))shared.hubDraft=event.target.value;});
+        layout.app.addEventListener('keydown',event=>{
+          if(event.key==='Escape'&&layout.popup){layout.popup=null;renderAll();}
+          if(event.key==='Enter'&&event.target.hasAttribute('data-search')){event.preventDefault();openPage('reading');renderAll();}
+          if(event.key==='Enter'&&event.target.hasAttribute('data-hub-draft')){event.preventDefault();startProjectChat();layout.popup=null;renderAll();}
+        });
+        layout.app.addEventListener('click',event=>{
+          const target=event.target.closest('button');if(!target||!layout.app.contains(target))return;
+          if(target.dataset.item){openItem(target.dataset.item);layout.popup=null;renderAll();return;}
+          if(target.dataset.page){openPage(target.dataset.page);layout.popup=null;renderAll();return;}
+          if(target.dataset.close){closePage(target.dataset.close);renderAll();return;}
+          if(target.dataset.expand){const id=target.dataset.expand;layout.expanded[id]=!layout.expanded[id];renderAll();return;}
+          if(target.dataset.stripToggle){const id=target.dataset.stripToggle;layout.stripCollapsed[id]=!layout.stripCollapsed[id];renderAll();return;}
+          if(target.dataset.project){openProject();renderAll();return;}
+          if(target.dataset.projectList){const id=target.dataset.projectList;layout.popup=layout.popup===id?null:id;renderAll();return;}
+          if(target.dataset.container){const id=target.dataset.container;shared.selectedContainer=id;if(layout.orientation==='vertical'&&!layout.popup){layout.expanded[id]=true;}else{layout.popup=layout.popup===id?null:id;}renderAll();return;}
+          const action=target.dataset.command;if(!action)return;
+          if(action==='all-navigation')layout.popup=layout.popup==='all'?null:'all';
+          if(action==='close-popup')layout.popup=null;
+          if(action==='close-panel'){shared.panel=null;shared.activeItem=shared.view==='project'?null:shared.activePage;}
+          if(action==='new-tab'){const id='loose-'+(++shared.serial);pages[id]={id,title:'새 탭',host:'새 탭',open:true,owner:null};openPage(id);layout.popup=null;}
+          if(action==='open-reading'||action==='search-sample')openPage('reading');
+          if(action==='open-project')openProject();
+          if(action==='return-to-page'){shared.view='page';shared.panel=null;shared.activeItem=shared.activePage;}
+          if(action==='previous-page')openPage(shared.activePage==='note'?'reading':'note');
+          if(action==='ask-page'||action==='open-comparison'){openItem('compare');layout.popup=null;}
+          if(action==='open-task'){openItem('collect');layout.popup=null;}
+          if(action==='stop-task')items.collect.status='stopped';
+          if(action==='reopen-source'){openPage(target.dataset.sourcePage);layout.popup=null;}
+          if(action==='reply')shared.answered=true;
+          if(action==='new-chat'){startProjectChat();layout.popup=null;}
+          renderAll();
+        });
+        layout.app.addEventListener('click',()=>remember(layout));
+        layout.app.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key==='Escape')remember(layout);});
+      });
+      applyRememberedState(window.openai?.widgetState);
+      window.addEventListener('openai:set_globals',event=>{if(event.detail?.globals?.widgetState){applyRememberedState(event.detail.globals.widgetState);renderAll();}});
+      renderAll();
+      layouts.forEach(layout=>{
+        if(!globalThis.Tweak)return;
+        const tweak=new Tweak({container:layout.app,onChange:()=>{renderAll();remember(layout);}});
+        if(layout.orientation==='vertical')tweak.addSlider(layout.design,'sidebarWidth',{label:'왼쪽 목록 폭',min:220,max:280,step:4,unit:'px'});
+        tweak.addSelect(layout.design,'density',{label:'목록 간격',options:[{label:'촘촘하게',value:'compact'},{label:'여유 있게',value:'comfortable'}]});
+      });
+    })();
+  </script>
+</div>
