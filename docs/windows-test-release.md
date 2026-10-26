@@ -147,3 +147,83 @@ tooling 122개 중 플랫폼 전용 등 40개를 skip하고 나머지를 통과�
 종료 실패·조회 오류를 포함한 런타임 시험도 통과했다. 독립 검수와 수정 후 재검수에서
 수정할 발견 사항은 없었다. 업데이트 증거는 `.local-build/windows-install-test-PkOcFb/`,
 수정 후 광고 차단 증거는 `.local-build/rendering-e2mHtu/`에 따로 보관한다.
+
+## 153.0.8005.4 패키지와 재설치 검증
+
+2026-10-26 `branding/VERSION`을 `153.0.8005.3`에서 `153.0.8005.4`로 올리고
+기존 `package-windows.ps1`으로 Windows x64 테스트 설치 파일을 만들었다.
+사이트 정보와 Protection 팝업 분리·방패 재클릭 닫기·그룹 시작 기본값과 설치 검사
+격리(`968941b`), Windows 접근성 종료 정리(`ea6495e`), 서비스워커 캐시 검사
+정합성 수정(`91bc800`)을 포함한 작업 트리에서 빌드했다.
+
+| 항목 | 기록 |
+| --- | --- |
+| 설치 파일 | `Yee-153.0.8005.4-windows-x64-test-unsigned.exe` |
+| 이 PC의 패키지 디렉토리 | `F:\yee\releases\windows-153.0.8005.4-20261026T045823Z` |
+| 빌드 시각(UTC) | `2026-10-26 04:58:23` |
+| 빌드 시점 기준 커밋 | `91bc8006148b241ab2d2b22098c04b34a097ef36` |
+| 엔진 원본 버전 | `153.0.8005.0` |
+| 형태 | 서명하지 않은 Windows x64 component 테스트 빌드 |
+| 크기 | 579,889,664 bytes |
+| 설치 파일 SHA-256 | `06896a0c7b005fff11ec671b7f20f342b326ec6c58eaf5f25475c278546d2ab8` |
+
+빌드 당시 작업 중인 변경이 있어 `release.json`의 `working_tree_dirty`는 `true`다.
+위 기준 커밋만으로 같은 산출물을 재현할 수 있다고 주장하지 않는다.
+`chrome.exe`·`chrome.dll`·`setup.exe`·`mini_installer.exe`의 제품 버전은 모두
+`153.0.8005.4`이며, 설치 파일 해시와 필터·실행 리소스·고지·원본 묶음 9개의
+해시가 메타데이터와 일치했다. 설치된 `chrome.dll`도 최종 빌드와 일치했다.
+
+검증 시작 시 기본 프로필에 열려 있던 기존 그룹은 0개였다. 실제 기본 프로필의
+한 창에 검증용 그룹 두 개와 HTTP 탭 네 개를 만들었다. 파란 그룹은 펼치고 녹색
+그룹은 접은 상태로, 그룹 이름·색상·접힘·그룹 순서·멤버 탭 순서를 비교했다.
+작업표시줄에 이미 고정된 `Yee.lnk`를 사용했으며 고정 해제·다시 고정을 하지 않았다.
+
+### 153.0.8005.3에서 새 버전으로 업데이트
+
+설치 프로세스 종료 0과 새 버전 적용, 기존 바로가기의 대상·인수·아이콘 경로·앱
+식별자, Windows Shell이 읽은 정규화 아이콘 픽셀의 보존을 확인했다. 기존 아이콘으로
+실행한 새 세션의 그룹 구성은 재설치 전과 일치했다.
+
+이후 검증용 탭 정리 단계에서 정상 종료 대기가 초과돼 최초 드라이버는 종료 1로
+실패했다. 설치·보존 assertion이 끝났더라도 이 회차 전체를 통과로 기록하지 않는다.
+검증용 제어 연결이 있는 창에는 `Browser.close` 정상 종료를 먼저 요청하도록 도구를
+보완했다. 별도 정리 복구의 첫 시도도 검증용 그룹의 펼침 상태 차이로 중단됐다.
+복구에서는 검증용 그룹의 접힘 차이만 허용하고 기존 그룹과 나머지 상태를 비교한 뒤,
+기록된 검증 URL 네 개만 정리했다. 원본 그룹 상태로 복귀하고 기존 아이콘으로 새
+설치본을 실행한 최종 확인은 통과했다. 복구 실행을 그룹 보존의 추가 근거나 최초
+업데이트 전체 흐름을 다시 통과한 결과로 합치지 않는다. 강제 종료는 사용하지 않았다.
+
+### 153.0.8005.4 동일 버전 재설치
+
+보완한 절차로 그룹 두 개·탭 네 개를 다시 만든 뒤 같은 설치 파일을 실행했다.
+설치 프로세스와 전체 검증 드라이버가 모두 종료 0으로 끝났고, 정리 뒤 최종 상태
+검사도 통과했다. 설치 직후와 기존 아이콘 실행 후에 바로가기 정보·고정 상태·아이콘
+픽셀이 유지됐다. 새 native 세션에서 그룹 메타데이터·멤버 수를, 실제 그룹 API에서
+그룹 구성·순서를 비교해 일치를 확인했다.
+
+원래 바로가기 실행에는 `--restore-last-session`·`--remote-debugging-port`·
+`--user-data-dir`를 추가하지 않았다. 최종 정리 후 기존 아이콘으로 실행한 프로세스에서
+`153.0.8005.4\chrome.dll` 로드를 확인했고 설치된 DLL의 해시는 다음과 같았다.
+
+`B4C145F02624474D465B1F20C7E4459FAC43A4AB1A0E04439DBC78CDE1EFBCB7`
+
+검증 URL만 정리한 뒤 그룹 상태가 원본과 같음을 확인했고, 기존 아이콘으로 새
+설치본을 열어뒀다. 이 기록은 현재 개발 PC의 사용자별 설치 범위이며, 다른 PC나
+macOS·Linux 검증을 의미하지 않는다.
+
+### 로컬 증거 위치
+
+- 패키지 `release.json`과 빌드 로그 `.local-build/reinstall-153-0-8005-4/package.log`
+- 최초 업데이트: `.local-build/reinstall-153-0-8005-4/upgrade.log`와
+  `.local-build/taskbar-repair-audit/group-sDDNZk/`의 원본·예상·복원 상태
+- 정리 복구: `.local-build/reinstall-153-0-8005-4/`의 `recovery.log`·
+  `recovery-complete.log`·`upgrade-final-state.json`과
+  `.local-build/taskbar-repair-audit/group-sDDNZk/cleanup-recovery.json`
+- 동일 버전 재설치: `.local-build/reinstall-153-0-8005-4/repair.log`·
+  `repair-final-state.json`과 `.local-build/taskbar-repair-audit/group-VAiOxR/`의
+  `original.json`·`expected.json`·`compare.json`·`cleaned.json`·`result.json`
+- 단계별 최종 요약: `.local-build/reinstall-153-0-8005-4/result.json`
+
+원시 로그·프로필 백업·감사 스크립트와 설치 산출물은 로컬 자료이며 이 기록에 첨부해
+저장소에 넣지 않는다. 이전 검증 회차의 테스트 수치를 이번 패키지의 재실행 결과로
+합산하지 않는다.
