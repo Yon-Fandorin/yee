@@ -23,6 +23,6 @@ prepare_ui_test_display
 gracefully_quit_yee
 "$YEE_OUT_DIR/site_controls_browsertests" \
   "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
-  --gtest_filter='SiteControlsBrowserTest.*' \
+  --gtest_filter='SiteControlsBrowserTest.*:UiaApplicationExitBrowserTest.*' \
   --test-launcher-jobs=1 \
   --test-launcher-retry-limit=0

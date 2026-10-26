@@ -304,6 +304,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/startup",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/views/page_info",
     "//chrome/browser/yee_content_blocking:browser",
     "//chrome/renderer",
     "//chrome/test:browser_tests_runner",
@@ -332,6 +333,7 @@ test("site_controls_browsertests") {
     "//net:test_support",
     "//testing/gtest",
     "//ui/compositor:test_support",
+    "//ui/events:test_support",
     "//ui/snapshot",
     "//ui/views:test_support",
   ]
@@ -341,6 +343,12 @@ test("site_controls_browsertests") {
     "//ui/resources:ui_test_pak_data",
   ]
   if (is_win) {
-    deps += [ "//ui/aura:test_support" ]
+    sources += [ "//chrome/browser/accessibility/leaked_node_detection_browsertest.cc" ]
+    deps += [
+      "//chrome/browser/accessibility:test_support",
+      "//chrome/browser/lifetime",
+      "//ui/accessibility",
+      "//ui/aura:test_support",
+    ]
   }
 }

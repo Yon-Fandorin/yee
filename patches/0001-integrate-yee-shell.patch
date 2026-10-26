@@ -33185,3 +33185,154 @@ index 0b315d3092..337b6b5371 100644
    // Gives a hint to the browser process to update the service worker after a
    // controlled page load. This message is meant to be sent at a time when page
    // load is no longer busy, so update doesn't adversely affect performance.
+diff --git a/chrome/browser/accessibility/BUILD.gn b/chrome/browser/accessibility/BUILD.gn
+index 969711ff4e..200acc7047 100644
+--- a/chrome/browser/accessibility/BUILD.gn
++++ b/chrome/browser/accessibility/BUILD.gn
+@@ -235,6 +235,7 @@ if (!is_android) {
+       ]
+       deps += [
+         ":test_support",
++        "//chrome/browser/lifetime",
+         "//chrome/browser/ui/views/accessibility:uia_test_support",
+       ]
+     } else {
+diff --git a/chrome/browser/accessibility/leaked_node_detection_browsertest.cc b/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
+index 118dc6e733..e4ebe899de 100644
+--- a/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
++++ b/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
+@@ -5,15 +5,19 @@
+ #include <string>
+ #include <tuple>
+ 
++#include "base/functional/bind.h"
+ #include "base/functional/callback.h"
+ #include "base/location.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/test/scoped_feature_list.h"
+ #include "base/test/test_timeouts.h"
+ #include "chrome/browser/accessibility/browser_test_with_ax_client.h"
++#include "chrome/browser/lifetime/application_lifetime.h"
++#include "chrome/browser/ui/browser.h"
+ #include "content/public/test/browser_test.h"
+ #include "testing/gtest/include/gtest/gtest.h"
+ #include "ui/accessibility/accessibility_features.h"
++#include "ui/accessibility/platform/ax_platform.h"
+ #include "ui/accessibility/platform/ax_platform_node_win.h"
+ 
+ namespace {
+@@ -42,8 +46,57 @@ LeakedNodeDetectionBrowsertest::LeakedNodeDetectionBrowsertest() {
+       features::kUiaDisconnectRootProviders);
+ }
+ 
++class UiaApplicationExitBrowserTest : public BrowserTestWithAxClient {
++ private:
++  ClientApi GetClientApi() const override { return ClientApi::kUiAutomation; }
++};
++
+ }  // namespace
+ 
++// 다른 창을 닫아도 살아 있는 창의 접근성 연결은 계속 사용할 수 있어야 한다.
++IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
++                       ClosingOneWindowKeepsAccessibilityAvailable) {
++  Browser* remaining = CreateBrowser(browser()->GetProfile());
++  ASSERT_HRESULT_SUCCEEDED(InitializeClient(remaining));
++  ASSERT_HRESULT_SUCCEEDED(FindAll());
++
++  CloseBrowserSynchronously(browser());
++
++  EXPECT_TRUE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
++  EXPECT_GT(ui::AXPlatformNodeWin::GetCounts().live_nodes, 0U);
++  EXPECT_HRESULT_SUCCEEDED(FindAll());
++}
++
++// 외부 클라이언트가 노드를 보유해도 앱 종료가 연결과 노드를 정리해야 한다.
++IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
++                       ApplicationExitReleasesClientReferences) {
++  ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
++  ASSERT_HRESULT_SUCCEEDED(FindAll());
++  ASSERT_GT(ui::AXPlatformNodeWin::GetCounts().live_nodes, 0U);
++
++  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&chrome::AttemptExit));
++  RunUntilBrowserProcessQuits();
++
++  EXPECT_FALSE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
++  WaitForNodeCounts({0U, 0U, 0U, 0U});
++}
++
++// 마지막 창이 먼저 사라진 경우에도 종료 전 UIA 참조를 해제해야 한다.
++IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
++                       ExitAfterLastWindowReleasesClientReferences) {
++  ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
++  ASSERT_HRESULT_SUCCEEDED(FindAll());
++  CloseBrowserSynchronously(browser());
++
++  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&chrome::AttemptExit));
++  RunUntilBrowserProcessQuits();
++
++  EXPECT_FALSE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
++  WaitForNodeCounts({0U, 0U, 0U, 0U});
++}
++
+ IN_PROC_BROWSER_TEST_P(LeakedNodeDetectionBrowsertest, DetectGhostNodeLeaks) {
+   // Initialize the UI Automation client; giving it this window.
+   ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
+diff --git a/chrome/browser/lifetime/BUILD.gn b/chrome/browser/lifetime/BUILD.gn
+index 34c713f0fc..d0c39d8d82 100644
+--- a/chrome/browser/lifetime/BUILD.gn
++++ b/chrome/browser/lifetime/BUILD.gn
+@@ -127,7 +127,10 @@ source_set("impl") {
+   }
+ 
+   if (is_win) {
+-    deps += [ "//chrome/browser/win" ]
++    deps += [
++      "//chrome/browser/win",
++      "//ui/accessibility",
++    ]
+   }
+ 
+   if (!is_android) {
+diff --git a/chrome/browser/lifetime/application_lifetime_aura.cc b/chrome/browser/lifetime/application_lifetime_aura.cc
+index ecb7509bb1..c0643d89de 100644
+--- a/chrome/browser/lifetime/application_lifetime_aura.cc
++++ b/chrome/browser/lifetime/application_lifetime_aura.cc
+@@ -2,12 +2,11 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+-#include "chrome/browser/lifetime/application_lifetime.h"
+-
+ #include "base/command_line.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/browser_process_platform_part.h"
++#include "chrome/browser/lifetime/application_lifetime.h"
+ #include "chrome/browser/lifetime/termination_notification.h"
+ #include "chrome/common/buildflags.h"
+ #include "chrome/common/chrome_switches.h"
+@@ -15,6 +14,10 @@
+ #include "ui/aura/window_event_dispatcher.h"
+ #include "ui/views/widget/widget.h"
+ 
++#if BUILDFLAG(IS_WIN)
++#include "ui/accessibility/platform/ax_platform.h"
++#endif
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/shell.h"
+ #include "chrome/browser/lifetime/application_lifetime_chromeos.h"
+@@ -27,6 +30,11 @@
+ namespace chrome {
+ 
+ void HandleAppExitingForPlatform() {
++#if BUILDFLAG(IS_WIN)
++  // UI 스레드가 살아 있을 때 외부 UIA 참조를 해제하고 재진입 요청을 차단한다.
++  ui::AXPlatform::GetInstance().DisableActiveUiaProvider();
++#endif
++
+   // Close all non browser windows now. Those includes notifications
+   // and windows created by Ash (launcher, background, etc).
+ 

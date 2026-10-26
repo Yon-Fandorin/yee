@@ -217,11 +217,11 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `all`: 여러 변경을 마친 뒤 전체 확인
 
 Windows의 native UI 픽셀 검사는 `--enable-pixel-output-in-tests`를 사용한다.
-UIA 클라이언트가 연결된 세션에서 창 종료 후 접근성 COM 참조가 간헐적으로 남으면
-테스트 실행에 `--enable-features=UiaDisconnectRootProviders`를 추가한다. 이 옵션은
-UIA provider와 누수 검사를 유지하면서 native 창 종료 시 참조를 정리한다.
-통합 탭바 검사에서는 같은 기능 목록에 `TabStripUnification`도 포함한다.
-이 테스트 환경 옵션을 제품 실행 인수나 공통 빌드 기본값에 넣지 않는다.
+Windows는 실제 앱 종료 때 UI 스레드가 살아 있는 동안 외부 UIA 연결을 정리한다.
+다른 창이 남아 있는 일반 창 닫기는 접근성을 유지한다. 접근성 기능과 COM 누수
+검사를 유지한 채 정리하며, Windows의 `test-site-controls.sh`는
+외부 접근성 클라이언트를 연결한 `UiaApplicationExitBrowserTest.*`도 실행해
+일반 창 닫기·앱 종료·마지막 창이 먼저 닫힌 종료를 확인한다.
 
 계산·색상·직접 callback 검사는 창 활성화를 피한다. native popup·focus 단위 검사와
 명시적 `interactive` 검사는 필요한 창 활성화를 유지한다. Sidebar는 Header의 주소줄

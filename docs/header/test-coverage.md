@@ -69,7 +69,8 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 탭 배치에서 실제 마우스로 방패 버튼을 연속 클릭해 열기→닫기→열기→닫기를 확인한다.
 버튼을 누르는 동안 팝업이 포커스를 잃고 닫혀도 손을 뗄 때 다시 열리지 않아야 한다.
 2026-10-26 Windows 실제 입력 검증에서 두 배치의 총 8회 클릭 assertion을 완료했다.
-아래 공통 COM `ghost_count` 종료 오류로 이 사례 역시 전체 통과로 기록하지 않는다.
+초기 실행은 아래 공통 COM `ghost_count` 종료 오류로 실패했다. 후속 수정 결과는
+아래 접근성 종료 검증 기록을 따른다.
 
 `SiteControlsBrowserTest.PageInfoAndProtectionUseSeparatePopups`는 수평·수직 탭
 배치에서 방패 버튼이 탭 없는 Protection 팝업을 열고, 사이트 정보 action은 별도의
@@ -80,7 +81,7 @@ Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다. 20
 Windows 검증에서 앱·검사 실행 파일 빌드와 실제 팝업 캡처를 완료했다. 관련 8개
 사례의 기능 assertion은 완료됐지만, 모든 사례가 종료 시 공통 접근성 검사
 `content_test_suite_base.cc`의 COM `ghost_count` 오류로 실패했다. 전체 통과로
-기록하지 않으며 접근성 객체 정리 문제는 남아 있다.
+기록하지 않았다. 후속 수정 결과는 아래 접근성 종료 검증 기록을 따른다.
 
 같은 날 후속 진단에서 방패 팝업을 열지 않는
 `InternalURLsBrowserTest.ProductAndNativeSettingsRoutes`도 같은 종료 오류를 재현했다.
@@ -89,8 +90,29 @@ Windows 검증에서 앱·검사 실행 파일 빌드와 실제 팝업 캡처를
 창을 명시적으로 닫은 진단 실행에서는 `ghost_count`가 44에서, 메시지를 처리하며
 5초 기다린 뒤 3으로 줄었다. `UiaDisconnectRootProviders`를 활성화한 별도 실행도
 44→3으로 같았다. 일부는 비동기 해제 지연이며, 나머지 참조가 영구 누수인지와
-안전한 수정 위치는 아직 확정하지 않았다. 전체 연결 해제와 개별 요소 해제 실험은
-오류를 해결하지 못해 모두 되돌렸다. 누수 검사·접근성 기능은 그대로 유지한다.
+안전한 수정 위치는 당시 확정하지 못했다. 플랫폼 소멸자에서 전체 연결을 해제하거나
+개별 요소를 해제하는 초기 실험은 오류를 해결하지 못해 모두 되돌렸다.
+
+2026-10-26 후속 진단에서는 두 기존 검사의 종료 참조 45개를 재현했고, Yee 화면을
+끈 기본 Chromium 화면에서도 같은 문제가 발생했다. 창을 닫고 10초 동안 메시지를
+처리하거나 `UiaDisconnectRootProviders`만 켜는 비교 실행에서도 43개가 남았다.
+반면 UI 스레드에서 전체 UIA 연결을 해제하면 마지막 창이 먼저 닫힌 경로까지 0개가 됐다.
+
+Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에서 Widget을
+정리하기 전에 기존 `AXPlatform::DisableActiveUiaProvider()`를 호출한다. 새 UIA
+요청을 먼저 차단한 뒤 연결을 해제해 재진입 시 같은 공급자를 다시 반환하지 않는다.
+일반 창 닫기나 취소 가능한 종료 시도에는 이 처리를 적용하지 않는다.
+[Microsoft의 종료 전 UIA 자원 정리 지침](https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcoreapi/nf-uiautomationcoreapi-uiadisconnectallproviders)을
+따르며 접근성 기능·COM 누수 검사는 유지한다.
+
+`UiaApplicationExitBrowserTest.*`는 별도 프로세스의 실제 UIA 클라이언트로 세 경로를
+확인한다. 다른 창을 닫아도 남은 창 조회가 가능해야 하며, 앱 종료와 마지막 창이 먼저
+닫힌 종료는 클라이언트가 참조를 보유한 상태에서도 모든 접근성 노드가 0개가 돼야 한다.
+수정 호출을 제거한 대조 빌드는 종료 검사 두 개에서 각각 41개·2개 참조가 남아
+실패했고, 수정본은 세 경로를 통과했다. 같은 수정본의 관련 실행 35회 중 34회가
+통과했으며 모든 실행에서 COM 종료 오류가 사라졌다. 서비스워커 캐시 응답 사례
+하나는 기대한 `allowed` 대신 `blocked`로 실패했다. 이 기능 실패는 종료 수정을
+뺀 비교 빌드에서도 재현됐으므로 접근성 수정과 구분하고 전체 suite 통과로 기록하지 않는다.
 
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
 렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
