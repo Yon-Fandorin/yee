@@ -89,6 +89,10 @@ Windows에서는 `PointerExitAndReentryKeepNativePopupFocus`가 실제 press/rel
 UIA 클라이언트 스레드 원칙은
 [Microsoft UI Automation threading](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading)을 따른다.
 
+후속 Windows 검수는 단위 25개와 관련 실제 창 7종을 모두 종료 검사까지
+통과했다. Footer는 외부 UIA 조회를 포함해 3회 반복했다. macOS·Linux는 실제
+실행 대신 Footer의 주요 비-Windows 메서드 6개의 본문과 기존 18/30 팔레트가
+유지되는지 소스로 대조했다. 두 플랫폼의 빌드·실기 결과를 의미하지 않는다.
 `InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
 rest와 direct focus → keyboard traversal focus 순서에서 배경·외곽선 painter와
 고정 inset 계약을 확인한다. `PointerDismissDoesNotRestoreFocusOrOutlinedSurface`는
@@ -167,6 +171,9 @@ favicon 요약과 native 펼치기 아이콘을 포함하며, 모든 자식의 �
 반대색인 Header 표면을 적용해 이음새의 합성 픽셀까지 검사한다. 탭 행 전체
 높이만 맞고 실제 탭 밑에 shell 바탕이 끼는 경우도 실패해야 한다. 같은 검사를 기본·RTL 125%·통합 탭바에서
 실행하며, 세로 Sidebar의 기존 창 버튼 조작 축은 유지한다.
+창 버튼 배치는 두 모드를 구분한다. 수평 탭에서는 본문 외곽선의 6 DIP gutter,
+Sidebar에서는 같은 gutter에 Header 내부 여백 8 DIP를 더한 위치를 검사한다.
+기하 단위 테스트와 창 버튼 입력 테스트가 같은 모드별 배치 계약을 사용한다.
 `YeeWindowsSplitThemeChangesKeepCaptionReservations`는 Windows에서 수평·세로 탭과
 좌우·상하 분할을 유지한 채 밝음·어두움 테마를 바꾼다. 캡처 옵션 없이도 프레임
 재생성을 실행하고, 다시 배치된 각 Pane Header의 실제 자식이 창 버튼 예약 영역과
@@ -264,3 +271,17 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 `--enable-pixel-output-in-tests --disable-gpu --force-device-scale-factor=1`도
 지정한다. 기본 BrowserTest의 GL drawing 비활성화 상태에서는 검정 캡처나
 보이지 않는 native dialog로 인해 화면·입력 검증이 성립하지 않을 수 있다.
+
+`YeeAimPopupKeepsStateThroughPresentationRebuild`는 예열 창 교체와 테마 갱신 후
+AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바깥 클릭으로 닫히는지
+확인한다. `YeeTabLayoutSelectPopupFollowsItsHost`는 맞춤설정 창을 움직이기 전
+첫 번째·두 번째 열기와 창 이동 후 반복 열기에서 HTML select와 실제 popup의
+화면 좌표를 함께 확인한다. Windows Aura의
+`UnmanagedLayerKeepsScreenOriginAfterAncestorMoves`는 Views 조상 이동 뒤 layer의
+로컬 좌표가 같아도 native 화면 좌표와 변경 알림이 갱신되는지 확인한다.
+`CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*`는
+이벤트를 버튼에 직송하지 않고 실제 화면 좌표에서 마우스를 이동한다. 가로·세로,
+밝음·어두움, 일반·최대화의 각 조합을 새 창에서 검사한다. 버튼의 중앙과 양쪽 끝에서
+hover와 native hit-test를, 사방 여백에서 비활성 상태를 확인한다. 가로 탭의
+본문 경계 정렬은 geometry 검사도 함께 쓰며, Sidebar에서만 예약하는 버튼 왼쪽
+간격은 native frame exclusion으로 확인한다.

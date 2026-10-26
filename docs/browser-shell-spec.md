@@ -117,10 +117,10 @@ toolbar_content_separator = 1 DIP
 현재 native checkpoint의 공통 shell 행은 48 DIP이고, 40 DIP Browser Toolbar와
 34 DIP Omnibox를 사용한다. Windows 창 버튼은 같은 Header 오른쪽에 통합하며,
 별도 Caption 행을 추가하지 않는다. 공통 좌표는 client 원점 기준이다.
-Windows 창 버튼의 클릭 범위와 glyph 위치는 native frame이 유지한다.
-hover·누름 배경만 다른 shell 조작과 같은 30 × 30 DIP, 반지름 8 DIP로
-중앙에 그려 Header와 버튼 사이에 여백을 둔다. 강제 고대비에서는 native
-색상과 배경 범위를 유지한다.
+Windows 창 버튼의 입력과 glyph는 native control이 소유한다. Yee 모드의 버튼은
+다른 shell 조작과 같은 30 × 30 DIP이며 hover·누름 배경과 클릭 범위가 같은
+경계를 사용한다. 반지름은 8 DIP이고 버튼 바깥 여백은 입력 영역에서 제외한다.
+고대비·강제 색 모드에서는 native 크기·색상·상태 표시를 유지한다.
 상단 gutter와 Omnibox 사이에는 4 DIP가 남으므로 hover나
 focus 상태도 Browser Surface 외곽을 침범하지 않는다. 이 값은 Chromium layout에
 복제하지 않고 `yee::kSidebarMetrics`의 한 계산 계약을 사용한다.
@@ -222,6 +222,12 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   위험 보안 표시는 native 의미 색이 page-aware 배경에서 4.5:1 대비를 충족하면
   그대로 사용하고, 부족할 때만 의미 색을 대비 endpoint 쪽으로 보정한다.
   고대비 모드에서는 native 팔레트를 그대로 보존한다.
+- Omnibox의 origin·title 표면과 텍스트 AA 배경은 hover 애니메이션을 포함한
+  실제 주소줄 배경색을 함께 사용한다. 미디어 버튼은 같은 Header snapshot의
+  일반·disabled 역할색과 30 DIP shell control 규격을 사용한다. 미디어가 표시될
+  때만 앞에 1 × 18 DIP 구분선과 좌우 8 DIP 간격을 두고, 구분선 색은 같은
+  snapshot에서 도출한다. 구분선은 입력 대상에서 제외하고 native 창 이동 영역을
+  유지한다. 이 계약은 Windows·macOS·Linux가 공유한다.
 - 분할 상태에서는 active native Omnibox와 inactive 주소 표면이 각각 자신이 속한
   WebContents의 resolved color를 사용한다. 두 페이지 색이 다르면 좌우 주소 표면도
   다를 수 있다. active 상태는 주소 표면의 상시 border가 아니라 카드 전체 outline과
@@ -259,12 +265,18 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 - Sidebar Header와 Browser Surface Header는 기존 48 DIP 공통 shell 행을 유지한다.
   native 창 버튼은 Browser Surface Header 오른쪽에 통합하고 추가 행을 예약하지 않는다.
 - 카드의 12 DIP 곡률·6 DIP gutter와 34 DIP Omnibox는 유지한다. 창 버튼은
-  40 DIP Toolbar와 같은 축에 놓고 카드 오른쪽 안쪽으로 8 DIP 여백을 둔다.
+  세로 Sidebar에서 40 DIP Toolbar와 같은 축에 두고, 카드 오른쪽 경계에서
+  공통 control inset인 8 DIP 안쪽에 배치한다. 가로 탭에서는 이 내부 여백을
+  더하지 않고 본문 외곽선에 맞추며, 세로 위치는 탭 행의 중앙에 맞춘다.
+  Sidebar Header에서는 창 버튼 묶음 왼쪽에 공통 control inset인 8 DIP를 추가로
+  예약해 주소창·도구 버튼과 간격을 둔다. 이 여백은 창 버튼의 입력 영역에 넣지 않는다.
 - 창 버튼 폭과 이동용 여백은 native frame exclusion으로 주소줄·확장 버튼과
   분할 Pane Header에 전달한다. 카드와 WebContents 전체 폭을 줄이지 않는다.
-- Caption controls: native 순서 Minimize → Maximize → Close, 각 46 DIP 폭.
-  투명한 기본 바탕과 8 DIP 곡률의 hover 표면을 쓰고 실제 Header 팔레트를 따른다.
-  고대비·강제 색 모드는 native 색상과 상태 표시를 사용한다.
+- Caption controls: native 순서 Minimize → Maximize → Close, Yee의 30 × 30 DIP
+  공통 shell control 크기와 버튼 바깥 좌우 1 DIP 간격을 쓴다. hover와 클릭 범위는
+  같은 버튼 경계를 쓰며 바깥 여백에서 활성화하지 않는다. 투명한 기본 바탕과
+  8 DIP 곡률의 hover 표면은 실제 Header 팔레트를 따른다.
+  고대비·강제 색 모드는 native 크기·색상·상태 표시를 사용한다.
 - 최대화·복원 시에도 같은 행을 유지하고 전체 화면에서는 창 버튼과 exclusion을 숨긴다.
   Windows snap layout과 resize hit test는 native container가 계속 소유한다.
 - Omnibox: 34 DIP 높이, 12 DIP radius
@@ -552,8 +564,12 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
 - 현재 주소를 전체 선택하고 즉시 입력 가능한 상태로 만든다.
 - 패널 top은 실제 Omnibox top과 맞춰 Browser Surface 상단을 침범하지 않는다. 좌우와
   아래만 Omnibox bounds 바깥으로 2 DIP 확장해 하나의 연결된 표면처럼 감싼다. 투명
-  cutout은 실제 Omnibox와 같은 12 DIP 곡률을 사용하고 결과 목록은 Omnibox 아래
-  2 DIP부터 시작한다. cutout은 Omnibox의 page-aware 1 DIP focus outline을 덮지
+  cutout은 실제 Omnibox와 같은 12 DIP 곡률을 사용한다. 결과 목록은 Omnibox보다
+  2 DIP 아래의 1 DIP 구분선부터 시작하고, 구분선과 첫 결과·마지막 결과와 패널
+  하단에 각각 8 DIP 여백을 둔다. 결과 강조는 좌우 8 DIP 안쪽에 동일한 8 DIP
+  곡률로 그려 한쪽만 둥근 모양을 없앤다. 일반 모드에서는 선택 배경으로 현재 행을
+  표시하며, 왼쪽 전체 높이의 native 선택 막대는 고대비 모드에서만 유지한다.
+  cutout은 Omnibox의 page-aware 1 DIP focus outline을 덮지
   않는다. compact shell의 open/close opacity 전환은 140ms easing을 사용하며 별도
   화면 dim은 사용하지 않는다.
 - 중립 배경·텍스트·아이콘은 열리는 시점의 Browser Surface Header 색 역할을
@@ -574,10 +590,10 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
 | --- | ---: |
 | Left / width | 실제 Omnibox outer bounds에서 좌우 각 2 DIP 확장 |
 | Top | Omnibox top과 동일, 결과는 Omnibox bottom보다 2 DIP 아래 |
-| Radius | outer / Omnibox cutout 모두 12 DIP |
+| Radius | outer / Omnibox cutout 12 DIP, 결과 강조 네 모서리 8 DIP |
 | Search row | 46 DIP |
 | Result row | 최소 44 DIP |
-| Results padding | 10 DIP |
+| Results padding | 상하 8 DIP, 행 좌우 8 DIP; 위쪽 1 DIP 구분선 별도 |
 | Elevation | native MD elevation 4 상당의 얕은 shadow |
 | Workspace dim | 없음 |
 

@@ -29,6 +29,8 @@ UNIT_FILTER+=':BrowserSurfaceColorSampleTest.*'
 UNIT_FILTER+=':YeeNativePresentationTest.*:YeeTabIconPresentationTest.*'
 UNIT_FILTER+=':SplitPaneControlsTest.*:SplitPaneControlsTransitTest.*:SidePanelResizeGutterTest.*:SidePanelResizeGutterViewTest.*'
 INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets/*'
 RTL_FILTER='SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then

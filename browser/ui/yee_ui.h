@@ -31,6 +31,7 @@ class NativeTheme;
 
 namespace views {
 class Background;
+class Border;
 class View;
 }  // namespace views
 
@@ -70,6 +71,10 @@ struct SidebarMetrics {
   int toolbar_extension_container_margin = 2;
   int location_bar_margin = 5;
   int location_bar_focus_stroke_inset = 2;
+  int omnibox_popup_results_padding = 8;
+  int omnibox_popup_row_inset = 8;
+  int omnibox_popup_row_corner_radius = 8;
+  int omnibox_popup_separator_height = 1;
   int split_card_inset = 0;
   int split_card_corner_radius = 12;
   int split_pane_header_height = 42;
@@ -84,6 +89,8 @@ struct SidebarMetrics {
   int shell_control_size = 30;
   int shell_control_corner_radius = 8;
   int shell_control_horizontal_margin = 1;
+  int shell_control_separator_height = 18;
+  int shell_control_separator_margin = 8;
   int sidebar_header_control_top_padding = 4;
   int sidebar_footer_row_height = 50;
   int sidebar_footer_top_spacing = 6;
@@ -324,6 +331,12 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
     SkColor background_color,
     SkColor focus_stroke_color);
 
+// 입력창과 제안 목록을 분리하고 첫 행 위와 마지막 행 아래의 여백을 맞춘다.
+// 결과 행의 좌우 여백과 곡률은 같은 값을 사용한다.
+std::unique_ptr<views::Border> CreateBrowserSurfaceOmniboxResultsBorder();
+std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxResultBackground(
+    ui::ColorId color);
+
 // Native 강조색 계산에 실제 컨트롤 바탕을 전달한다.
 void SetBrowserSurfaceControlBackground(views::View& view,
                                         std::optional<SkColor> surface);
@@ -424,9 +437,14 @@ void UpdateOmniboxRestingTextView(
     std::u16string_view title,
     std::u16string_view origin,
     const BrowserSurfacePresentation& presentation,
-    bool visible);
+    bool visible,
+    std::optional<SkColor> control_background = std::nullopt);
 
 void ApplyShellControlStyle(ToolbarButton& button);
+std::unique_ptr<views::View> CreateShellControlDivider();
+void UpdateShellControlDivider(
+    views::View& divider,
+    const std::optional<BrowserSurfacePresentation>& presentation);
 
 // Yee's collapsed sidebar is an 8px edge target, not Chromium's 56px icon
 // rail. Tab, group, and favorites presentation therefore stays on the

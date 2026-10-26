@@ -21,6 +21,7 @@
 #include "ui/color/color_provider_manager.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/native_theme/native_theme_base.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -417,6 +418,42 @@ TEST_F(YeeRestingTextViewTest,
   EXPECT_EQ(presentation.secondary, title->GetEnabledColor());
 }
 
+TEST_F(YeeRestingTextViewTest, RestingTextSharesHoveredControlSurface) {
+  auto* resting = widget_->SetContentsView(CreateOmniboxRestingTextView());
+  for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorRED}) {
+    const auto presentation = ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+    for (SkColor background : {surface, presentation.location_hover, surface}) {
+      UpdateOmniboxRestingTextView(*resting, u"Title", u"example.test",
+                                   presentation, true, background);
+      EXPECT_EQ(background, resting->background()->color().ResolveToSkColor(
+                                resting->GetColorProvider()));
+      for (size_t index : {0u, 2u}) {
+        auto* label = views::AsViewClass<views::Label>(resting->children()[index]);
+        ASSERT_TRUE(label);
+        EXPECT_EQ(background, label->GetBackgroundColor());
+      }
+    }
+  }
+}
+
+TEST_F(YeeRestingTextViewTest, ControlDividerTracksSurfaceAndNativeReset) {
+  auto* divider = widget_->SetContentsView(CreateShellControlDivider());
+  EXPECT_EQ(gfx::Size(1, kSidebarMetrics.shell_control_separator_height),
+            divider->GetPreferredSize());
+  const auto native_color = divider->background()->color();
+  for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorRED}) {
+    const auto presentation = ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+    UpdateShellControlDivider(*divider, presentation);
+    EXPECT_EQ(presentation.resting_divider,
+              divider->background()->color().ResolveToSkColor(
+                  divider->GetColorProvider()));
+    UpdateShellControlDivider(*divider, UseNativeBrowserSurfaceColors(presentation));
+    EXPECT_EQ(native_color, divider->background()->color());
+  }
+  UpdateShellControlDivider(*divider, std::nullopt);
+  EXPECT_EQ(native_color, divider->background()->color());
+}
+
 TEST(YeeSurfaceGeometryTest, SplitAndSingleSurfacesShareCornerContract) {
   const gfx::RoundedCornersF corners = ResolveSplitPaneRoundedCorners();
   EXPECT_EQ(corners.upper_left(), kSidebarMetrics.content_corner_radius);
@@ -587,6 +624,9 @@ TEST(YeeSurfaceGeometryTest, WindowControlsDoNotEnlargeHorizontalTabRow) {
                 controls.y());
       EXPECT_EQ(kSidebarMetrics.toolbar_height, controls.height());
       EXPECT_EQ(138, controls.width());
+      EXPECT_EQ(leading ? frame.x() + kSidebarMetrics.content_gutter
+                        : frame.right() - kSidebarMetrics.content_gutter,
+                leading ? controls.x() : controls.right());
     }
   }
 }

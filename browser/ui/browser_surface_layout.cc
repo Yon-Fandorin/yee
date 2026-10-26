@@ -46,9 +46,12 @@ gfx::Rect ResolveBrowserWindowControlsBounds(const gfx::Rect& frame_bounds,
                                              int controls_width,
                                              bool leading,
                                              int horizontal_tab_strip_height) {
+  // 수평 탭은 본문 외곽선에, Sidebar는 Header 내부 조작 여백에 맞춘다.
   const int edge_inset =
       kSidebarMetrics.content_gutter +
-      kSidebarMetrics.browser_surface_header_control_edge_inset;
+      (horizontal_tab_strip_height > 0
+           ? 0
+           : kSidebarMetrics.browser_surface_header_control_edge_inset);
   const int width = std::clamp(
       controls_width, 0, std::max(0, frame_bounds.width() - 2 * edge_inset));
   return gfx::Rect(

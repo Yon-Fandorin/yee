@@ -48,6 +48,8 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 
 | 계약 | 자동 검증 |
 | --- | --- |
+| origin·title 표면과 AA 배경이 Rest→Hover→Rest의 실제 주소줄 색과 일치 | `YeeRestingTextViewTest.RestingTextSharesHoveredControlSurface` |
+| 미디어 구분선이 밝고 어두운 페이지색을 따르고 native 팔레트로 복귀 | `YeeRestingTextViewTest.ControlDividerTracksSurfaceAndNativeReset` |
 | 각 `WebContents`가 하나의 source identity와 transition timeline만 소유하고 Tab 재활성화는 현재 화면색에서 시작 | `BrowserSurfaceColorControllerTest.WebContentsOwnsOneStablePresentationSource`, `TabActivationTransitionsFromTheCurrentlyPresentedColor` |
 | 각 persistent content container가 현재 `WebContents` source 하나만 전달하고 detach 시 presentation을 즉시 비움 | `BrowserSurfaceColorControllerTest.ContainerBindingPublishesOnlyItsCurrentWebContentsSource`, `ContainerBindingClearsPresentationWhenContentsDetach` |
 | 테마 변경은 미확정 fallback을 갱신하고 page 재검증을 시작하되 확정된 page 색은 검증 전까지 보존 | `BrowserSurfaceColorControllerTest.ThemeChangesRevalidatePagesWithoutDiscardingTheirColor` |
@@ -133,11 +135,14 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | 계약 | 자동 검증 |
 | --- | --- |
 | native LocationBar 하나가 단일 Toolbar와 active Pane Header 사이를 이동해도 높이·중심축을 유지하고 분할 해제 시 원래 parent로 복귀 | `YeeSingleAndSplitHeadersShareLocationBarGeometry` |
+| 미디어 버튼이 흰색·검정·빨강 Header의 일반/disabled 색과 크기를 따르고, 표시 여부에 따라 구분선이 함께 사라지며 실제 Omnibox hover에서 origin·title 배경이 일치 | `YeeMediaButtonTracksHeaderAndVisibility` |
 | 단일 A → 분할 active A/inactive B → active B → popup B → 분할 해제 B 전환에서 주소 배경, 일반·disabled 버튼, IME inline·rich autocomplete·AI hint label, Pane Header 텍스트, location/security icon이 같은 source snapshot을 사용하고, 열린 popup은 animation의 최종 `popup_revision`에서만 한 번 갱신되며 native 모드에서 모든 물리색 override를 제거 | `YeePresentationFollowsSingleAndSplitSources` |
 | active pane 전환과 분할 해제에서 native LocationBar가 최종 parent로 이동하고 실제 host 변경 generation마다 layout/bounds 동기화를 정확히 한 번 수행 | `YeePresentationFollowsSingleAndSplitSources` |
 | 분할 생성·제거 중 Chromium의 focus 정책이 popup을 닫는 동작은 우회하지 않고, popup 색·anchor는 단일과 안정화된 각 분할 상태에서 별도로 검증 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
+| 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
+| WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 사례에서 WebPreferences를 독립 적용하고 실제 media query와 선택 행의 계산된 표시를 검사 |
 | macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
 | macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
 
@@ -149,6 +154,47 @@ AppKit 창을 캡처한다. 이동 전 overlay Widget의 오프스크린 NSWindo
 접기·펼치기 완료를, 전체화면 검사는 native Header의 재배치 완료를 기다린다.
 
 ## 3. 실제 화면에서만 확인할 것
+
+`--yee-media-header-capture-dir`는 미디어·주소줄의 Rest/Hover를 흰색·검정·빨강
+페이지에서 선택적으로 캡처한다. 이 색상 경로에는 OS 분기가 없으며 macOS의
+native glass와 Windows의 불투명 frame 차이는 별도 계약이다. macOS에서도
+실제 창 검증 전에는 재현 여부가 확인된 것으로 기록하지 않는다.
+Windows 캡처는 `--enable-pixel-output-in-tests --disable-gpu`로 실제 화면 출력을
+켜고, `--single-process-tests --test-launcher-preserve-desktop-windows`를 사용해
+각 exact case를 개별 프로세스로 실행한다. 출력 옵션 없는 검정 frame은 검수
+증거로 사용하지 않는다.
+
+2026-10-25 Windows 검수에서는 최종 단위 24개가 통과했고, 실제 미디어 Header의
+흰색·검정·빨강 Rest/Hover 캡처에서 주소줄의 직사각형 색 경계 제거와 미디어
+역할색·구분선을 확인했다. 미디어 native 검사 본문은 통과했으나 종료 시
+`ContentTestSuiteBase`의 접근성 COM `ghost_count=45` 검사가 실패했다. 캡처 없는
+미디어 사례와 기존 popup-following 사례도 같은 종료 지점에서 실패하므로 전체
+native suite 통과로 기록하지 않는다. macOS 실기 검수는 미실시다.
+
+같은 Windows 검수에서 기본 WebUI·기존 Views의 balanced-insets 사례 각 2개는
+밝은·파란 실제 페이지의 배치·마우스 오버·방향키·Escape 본문 검사를 통과했다.
+두 경로의 실제 팝업 PNG에서도 구분선, 균등한 상하/좌우 여백과 네 모서리 곡률을
+확인했다. 종료 시에는 같은 접근성 COM 정리 검사(`ghost_count=49/69`)가
+실패했으므로 이 4개 사례도 전체 통과로 기록하지 않는다.
+
+후속 Windows 검수에서는 접근성 클라이언트를 UI 스레드 종료 전에 정리하는
+Footer 회귀 검사를 추가했다. 기존 COM 누수 검사는 그대로 유지한 채 단위
+25개와 미디어·WebUI/Views 팝업·Footer의 실제 창 7종이 종료 단계까지 통과했다.
+Footer는 외부 UIA 조회와 닫힌 요소의 무효화를 포함해 3회 연속 통과했다.
+기존 42개 참조의 실제 보유 프로세스는 당시 기록으로 특정할 수 없지만, 같은
+실패가 외부 참조의 늦은 정리에서 53개로 재현되고 올바른 정리 뒤 0이 됐다.
+
+WebUI balanced-insets 검사는 DOM 결과가 생긴 것만으로 화면 좌표를 읽지 않는다.
+native WebView의 자동 크기 조절과 실제 frame 표시까지 기다린 뒤 hover를 보낸다.
+초기 1 DIP View를 기준으로 계산한 좌표가 팝업 밖을 가리키던 검사 경쟁 조건을
+해결하며, DOM 결과 교체 중에는 행이 다시 준비될 때까지 기다린다. 캡처 옵션
+없이 두 split 방향 모두 검증했다. macOS·Linux는 이번 실행에서 빌드하거나
+실기로 검사하지 않았다.
+
+2026-10-26 메인 통합 검토에서는 강제 색이 없는 대비 증가와 강제 색의
+custom·less에서도 선택 표시를 유지하도록 보완했다. 신규 WebUI 대비 행렬의
+실행과 이 보완본의 실제 앱 검수는 아직 미실시다. 앞선 balanced-insets 통과
+기록은 이 추가 접근성 사례의 실행 증거에 포함하지 않는다.
 
 테마 보강의 자동 검사와 빌드/실행 범위는
 [`theming-structural-audit.md`](../theming-structural-audit.md)를 따른다.

@@ -24,6 +24,7 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_divider.h"
 #include "chrome/browser/ui/views/yee/agent_bridge.h"
 #include "chrome/browser/ui/views/yee/agent_bridge_state.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
@@ -54,6 +55,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
+#include "ui/views/border.h"
 #include "ui/views/cascading_property.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
@@ -603,6 +605,7 @@ class YeeOmniboxRestingTextView : public views::View {
 
     if (background_color_ != background_color) {
       background_color_ = background_color;
+      // 마우스 오버 상태를 포함한 실제 컨트롤 배경으로 아래의 native URL을 덮는다.
       SetBackground(views::CreateSolidBackground(background_color));
       origin_->SetBackgroundColor(background_color);
       title_->SetBackgroundColor(background_color);
@@ -1194,6 +1197,21 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
                                                 focus_stroke_color);
 }
 
+std::unique_ptr<views::Border> CreateBrowserSurfaceOmniboxResultsBorder() {
+  return views::CreatePaddedBorder(
+      views::CreateSolidSidedBorder(
+          gfx::Insets::TLBR(kSidebarMetrics.omnibox_popup_separator_height,
+                            0, 0, 0),
+          kColorOmniboxBubbleOutline),
+      gfx::Insets::VH(kSidebarMetrics.omnibox_popup_results_padding, 0));
+}
+
+std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxResultBackground(
+    ui::ColorId color) {
+  return views::CreateRoundedRectBackground(
+      color, kSidebarMetrics.omnibox_popup_row_corner_radius);
+}
+
 void SetBrowserSurfaceControlBackground(views::View& view,
                                         std::optional<SkColor> surface) {
   if (surface) {
@@ -1527,9 +1545,11 @@ void UpdateOmniboxRestingTextView(
     std::u16string_view title,
     std::u16string_view origin,
     const BrowserSurfacePresentation& presentation,
-    bool visible) {
+    bool visible,
+    std::optional<SkColor> control_background) {
   static_cast<YeeOmniboxRestingTextView&>(view).Update(
-      title, origin, presentation.surface, presentation.primary,
+      title, origin, control_background.value_or(presentation.surface),
+      presentation.primary,
       presentation.secondary, presentation.resting_divider, visible);
 }
 
@@ -1547,6 +1567,33 @@ void ApplyShellControlStyle(ToolbarButton& button) {
   button.SetProperty(
       views::kMarginsKey,
       gfx::Insets::VH(0, kSidebarMetrics.shell_control_horizontal_margin));
+}
+
+std::unique_ptr<views::View> CreateShellControlDivider() {
+  // 구분선은 Chromium의 비대화형 창 이동 영역 판정을 유지한다.
+  auto divider = std::make_unique<ToolbarDivider>();
+  divider->SetPreferredSize(
+      gfx::Size(1, kSidebarMetrics.shell_control_separator_height));
+  divider->SetProperty(
+      views::kMarginsKey,
+      gfx::Insets::VH(0, kSidebarMetrics.shell_control_separator_margin));
+  divider->SetCanProcessEventsWithinSubtree(false);
+  divider->GetViewAccessibility().SetIsIgnored(true);
+  UpdateShellControlDivider(*divider, std::nullopt);
+  return divider;
+}
+
+void UpdateShellControlDivider(
+    views::View& divider,
+    const std::optional<BrowserSurfacePresentation>& presentation) {
+  if (presentation && presentation->palette_mode ==
+                          BrowserSurfacePresentation::PaletteMode::kCustomSurface) {
+    divider.SetBackground(
+        views::CreateSolidBackground(presentation->resting_divider));
+  } else {
+    divider.SetBackground(
+        views::CreateSolidBackground(kColorToolbarExtensionSeparatorEnabled));
+  }
 }
 
 std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
