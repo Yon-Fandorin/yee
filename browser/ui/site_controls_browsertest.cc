@@ -804,21 +804,41 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
-                       ServiceWorkerCachedResponseIsOutsideNetworkFilter) {
+                       ServiceWorkerCacheCannotBypassReenabledProtection) {
+  const GURL cached_url = AdURL("/cache-ad");
+  // HTTP 캐시를 우회해 서비스워커의 CacheStorage 응답만 확인한다.
+  const auto fetch = content::JsReplace(
+      "fetch($1, {cache: 'no-store'}).then(r => r.text(), () => 'blocked')",
+      cached_url);
+  const auto cached_response = content::JsReplace(
+      "caches.match($1).then(r => r ? r.text() : 'missing')", cached_url);
+
   Service()->SetEnabledForSite(WorkerURL(), false);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), WorkerURL()));
   StartServiceWorker();
   ASSERT_EQ(false, ServiceWorkerFetch(true));
   ASSERT_EQ(1, cached_ad_requests_->load());
+  ASSERT_EQ("allowed", content::EvalJs(Contents(), cached_response));
+  ASSERT_EQ("allowed", content::EvalJs(Contents(), fetch));
+  ASSERT_EQ(1, cached_ad_requests_->load());
+
   Service()->SetEnabledForSite(WorkerURL(), true);
-  // CacheStorage delivery never starts an HTTP URLLoaderFactory request.
-  // This boundary is recorded explicitly; it is not evidence of ad blocking.
-  EXPECT_EQ("allowed", content::EvalJs(
-                           Contents(),
-                           content::JsReplace(
-                               "fetch($1).then(r => r.text(), () => 'blocked')",
-                               AdURL("/cache-ad"))));
+  // 캐시를 삭제하지 않아도 응답을 반환하기 전 현재 정책으로 차단해야 한다.
+  EXPECT_EQ("blocked", content::EvalJs(Contents(), fetch));
+  EXPECT_EQ("allowed", content::EvalJs(Contents(), cached_response));
   EXPECT_EQ(1, cached_ad_requests_->load());
+
+  Service()->SetEnabledForSite(WorkerURL(), false);
+  EXPECT_EQ("allowed", content::EvalJs(Contents(), fetch));
+  EXPECT_EQ(1, cached_ad_requests_->load());
+
+  // 캐시를 비우면 같은 요청이 서버에 도달하는지 대조한다.
+  ASSERT_EQ(true, content::EvalJs(Contents(), content::JsReplace(R"(
+    caches.open('yee-regression').then(cache => cache.delete($1))
+  )",
+                                                                 cached_url)));
+  EXPECT_EQ("allowed", content::EvalJs(Contents(), fetch));
+  EXPECT_EQ(2, cached_ad_requests_->load());
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,

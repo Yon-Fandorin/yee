@@ -130,6 +130,13 @@ script factory에도 기존 embedder 정책을 연결한다. 제어되는 client
 새 factory를 fallback에 연결하지 않는다. top/frame 출처가 다른 문맥에는 임의의
 쿠키 문맥을 만들지 않고 빈 `SiteForCookies`를 사용한다.
 
+`SiteControlsBrowserTest.ServiceWorkerCacheCannotBypassReenabledProtection`은
+이 관문을 실제 CacheStorage 응답으로 확인한다. HTTP 캐시를 우회하는 요청으로
+사이트 예외에서 캐시 응답을 받은 뒤, 보호를 켜면 같은 요청이 차단되는지 확인한다.
+저장된 본문과 서버 요청 횟수는 그대로 유지돼야 하며, 예외를 다시 적용하면 같은
+캐시를 읽을 수 있어야 한다. 마지막에 캐시 항목을 삭제해 서버 요청 횟수가 실제로
+증가하는지도 대조한다.
+
 Chromium은 일반 정책 연결과 client 수명만 소유하고 Yee 필터·프로필 정책은 계속
 `browser/content_blocking/`에 둔다. 새로운 서비스 워커 동작 코드나 원격 JavaScript를
 다운로드하지 않는다. Windows 필터 생성은 입출력 UTF-8을 명시해 locale에 따른 실패를
