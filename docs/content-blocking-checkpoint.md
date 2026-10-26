@@ -206,10 +206,9 @@ Omnibox model과 Sidebar 구조, Agent/MCP 실행 코드에는 차단 정책을 
 
 ## 사이트 컨트롤
 
-일반 Yee 창의 주소창 오른쪽 shield는 Yee 소유 native Site Controls를 **Protection**
-탭으로 연다. 왼쪽 site identity는 같은 패널의 **Page info** 탭을 연다. Page info는
-현재 `WebContents`의 Chromium 보안 상태와 표시 URL을 읽고 해당 사이트 설정 화면으로
-이동하는 action을 제공하지만 Chromium Page Info bubble 자체를 제품 UI로 사용하지
+일반 Yee 창의 주소창 오른쪽 shield는 Yee 소유의 광고·트래커 차단 전용 Protection
+팝업을 연다. 왼쪽 site identity는 Chromium의 기존 Page Info bubble을 열어 실제
+연결·쿠키·권한·인증서 상태와 사이트 설정 action을 제공한다. 두 팝업을 탭으로 합치지
 않는다. 분할 화면에서도 Location Bar가 전달한 실제 `WebContents`를 기준으로 한다.
 
 Protection 토글은 프로필 pref에 정확한 hostname 예외를 저장한다. UI thread의 service는

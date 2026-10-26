@@ -109,6 +109,22 @@ function runningYeeExecutables() {
 function assertNoYee() {
   requireShutdown(runningYeeExecutables());
 }
+// 기존 고정 링크의 실행 대상·아이콘·앱 식별자는 업데이트와 재설치 뒤에도 같아야 한다.
+function pinnedShortcuts() {
+  const literal=executable.replaceAll("'","''");
+  const command=`$directory=Join-Path $env:APPDATA 'Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar';
+    $shell=New-Object -ComObject WScript.Shell; $application=New-Object -ComObject Shell.Application;
+    $items=@(if(Test-Path -LiteralPath $directory){Get-ChildItem -LiteralPath $directory -Filter '*.lnk' -File | ForEach-Object {
+      $link=$shell.CreateShortcut($_.FullName);
+      if($link.TargetPath -eq '${literal}'){
+        $item=$application.Namespace($_.DirectoryName).ParseName($_.Name);
+        [pscustomobject]@{name=$_.Name;target=$link.TargetPath;arguments=$link.Arguments;icon=$link.IconLocation;
+          appId=$item.ExtendedProperty('System.AppUserModel.ID');targetExists=(Test-Path -LiteralPath $link.TargetPath)}
+      }
+    }}); ConvertTo-Json -InputObject $items -Compress`;
+  return JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',command],
+    {encoding:'utf8',windowsHide:true})).sort((a,b)=>a.name.localeCompare(b.name));
+}
 async function runSetup(file, args, expected, label) {
   assertNoYee();
   const child = spawn(file, args, {windowsHide:true,stdio:'ignore'});
@@ -261,6 +277,13 @@ async function verifyUpgrade() {
   activeProfile=state.profile?.last_used||'Default';
   assert.match(activeProfile,/^(Default|Profile [0-9]+)$/,'검증할 프로필 경로');
   const before=await profileSettings();
+  const pinnedBefore=pinnedShortcuts();
+  assert.ok(pinnedBefore.length>0,'고정 아이콘 검증에는 기존의 정상 Yee 작업 표시줄 고정 항목이 필요하다.');
+  for(const shortcut of pinnedBefore) {
+    assert.equal(shortcut.targetExists,true,'고정 대상 실행 파일 존재');
+    assert.ok(shortcut.icon&&shortcut.appId,'기존 고정 아이콘 경로와 앱 식별자 확인');
+  }
+  await fs.writeFile(path.join(output,'pinned-before.json'),JSON.stringify(pinnedBefore,null,2));
   await fs.writeFile(path.join(output,'profile-before.json'),JSON.stringify({activeProfile,...before},null,2));
   await launchAndVerify(null,'before-upgrade');
   // 실제 사용자 설정은 수정하지 않고 별도 시험 프로필에 비어 있지 않은 데이터를 준비한다.
@@ -277,6 +300,7 @@ async function verifyUpgrade() {
   await runSetup(installer,['--do-not-launch-chrome'],[0],'upgrade');
   assert.match(queryRegistry(`HKCU\\Software\\${identity.profile_directory}`)||'',/InstallerError\s+REG_DWORD\s+0x2\b/i,'native 업데이트 상태 기록');
   await verifyPayload();
+  assert.deepEqual(pinnedShortcuts(),pinnedBefore,'업데이트 뒤 기존 작업 표시줄 고정 정보 보존');
   await launchAndVerify(token,'after-upgrade');
   assert.deepEqual(await profileSettings(),before,'기존 북마크·홈·시작·Yee 설정 보존');
   await launchAndVerify(token,'seeded-after-upgrade',fixtureOptions);
@@ -288,6 +312,9 @@ async function verifyUpgrade() {
   await runSetup(installer,['--do-not-launch-chrome'],[0],'repair-updated-version');
   assert.match(queryRegistry(`HKCU\\Software\\${identity.profile_directory}`)||'',/InstallerError\s+REG_DWORD\s+0x1\b/i);
   await verifyPayload();
+  const pinnedAfter=pinnedShortcuts();
+  assert.deepEqual(pinnedAfter,pinnedBefore,'같은 버전 재설치 뒤 고정 아이콘 대상·이미지 경로·앱 식별자 보존');
+  await fs.writeFile(path.join(output,'pinned-after-repair.json'),JSON.stringify(pinnedAfter,null,2));
   await launchAndVerify(token,'after-update-repair',{clearStorage:true});
   assert.deepEqual(await profileSettings(),before,'업데이트·수리 후 기존 사용자 설정 보존');
   await verifyInstalledFiltering();

@@ -28,14 +28,8 @@ class View;
 
 namespace yee {
 
-enum class SiteControlsSection {
-  kProtection,
-  kPageInfo,
-};
-
-// Location-bar action for Yee's combined protection and page-information
-// panel. The button observes only the active WebContents helper selected by
-// LocationBarView; it does not own browser tab state.
+// Yee 사이트 보호 팝업을 여는 주소창 버튼이다.
+// LocationBarView가 선택한 활성 WebContents의 helper만 관찰하며 탭 상태는 소유하지 않는다.
 class SiteControlsButton : public views::ImageButton,
                            public content::WebContentsObserver {
   METADATA_HEADER(SiteControlsButton, views::ImageButton)
@@ -51,7 +45,8 @@ class SiteControlsButton : public views::ImageButton,
       std::optional<BrowserSurfacePresentation> presentation);
 
  private:
-  void OnPressed();
+  void OnPressed(const ui::Event& event);
+  bool OnMousePressed(const ui::MouseEvent& event) override;
   void OnBlockingStateChanged();
   void RefreshVisualState();
   void StateChanged(ButtonState old_state) override;
@@ -65,14 +60,14 @@ class SiteControlsButton : public views::ImageButton,
   base::CallbackListSubscription service_subscription_;
   std::optional<BrowserSurfacePresentation> presentation_;
   size_t blocked_count_ = 0;
+  bool bubble_was_open_on_mouse_press_ = false;
 };
 
-// Opens the same Yee-owned panel from either the protection action or the site
-// identity icon. Chromium's PageInfo implementation remains untouched.
+// Yee 보호 팝업을 연다. 사이트 정보 아이콘은 Chromium PageInfo를 사용한다.
 bool ShowSiteControlsBubble(views::View* anchor,
                             Browser* browser,
-                            content::WebContents* contents,
-                            SiteControlsSection initial_section);
+                            content::WebContents* contents);
+void CloseSiteControlsBubble();
 bool IsSiteControlsBubbleShowing();
 
 }  // namespace yee

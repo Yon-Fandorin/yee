@@ -6,6 +6,14 @@
 
 ## 1. 정책과 순수 geometry
 
+그룹 종료·재실행은 Windows의
+`node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>`로 검사한다.
+실제 앱에서 그룹 두 개와 탭 다섯 개를 만들고 정상 종료한 뒤, 복원 강제 옵션 없이
+같은 격리 프로필을 재실행한다. 그룹 이름·색상·접힘과 탭 소속·순서를 비교하고,
+명시적 새 탭 시작 설정을 선택하면 이전 세션을 강제로 불러오지 않는지도 확인한다.
+`site_controls_browsertests --gtest_filter=SessionStartupPrefTest.*`는 기본값,
+사용자 시작 설정·관리자 정책의 우선순위와 Yee 비활성화 시 native 기본값을 검사한다.
+
 `test-sidebar.sh`의 기본값은 `unit`이며 `--no-build`만 줘도 단위 검사만 실행한다.
 기존 공통 테스트 source_set을 묶은 작은 `yee_layout_unittests`를 사용하며 전체
 Chromium `unit_tests`를 빌드하지 않는다. 기존 Sidebar 필터의 검사는 모두 유지한다.

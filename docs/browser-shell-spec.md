@@ -24,19 +24,18 @@ Tab Sidebar에서 이미 고른 UX 결정은
 
 ### 사이트 컨트롤과 페이지 정보
 
-Yee 일반 브라우저 창은 주소창 안에 하나의 Yee 소유 native 사이트 컨트롤 패널을
-사용한다. 왼쪽 site identity 아이콘은 패널의 **Page info** 탭을 열고, 오른쪽
-shield action은 같은 패널의 **Protection** 탭을 연다. compact shell에서 Chromium
-Page Info bubble을 제품 UI로 표시하지 않는다. 현재 `WebContents`, Chromium의 보안
-상태와 사이트 설정 화면은 데이터와 동작의 원본으로 계속 사용한다.
+주소창의 두 버튼은 각각 별도 팝업을 연다. 왼쪽 site identity 아이콘은 Chromium의
+기존 Page Info bubble을 열고, 오른쪽 shield action은 Yee 소유의 광고·트래커 차단
+전용 Protection 팝업을 연다. 두 기능을 한 팝업의 탭으로 합치지 않는다.
+방패 버튼은 Protection 팝업을 열고, 같은 버튼을 다시 누르면 팝업을 닫는다.
 
 - Protection은 현재 URL의 정확한 hostname 단위로 광고·트래커 차단을 켜거나 끈다.
   예외는 프로필에 저장하고 변경 직후 현재 탭을 다시 불러와 browser network filter와
   renderer document-start filter가 같은 설정을 받게 한다.
 - shield badge는 현재 primary page에서 network 단계가 실제 차단한 요청 수를 표시하며
   primary page가 바뀌면 0으로 초기화한다. cosmetic 처리 수는 badge에 합산하지 않는다.
-- Page info는 현재 연결 상태와 표시 URL을 보여 주고 Chromium의 해당 사이트 설정
-  화면으로 이동하는 명시적 action을 제공한다.
+- Page info는 Chromium의 실제 연결·쿠키·권한·인증서 상태와 사이트 설정 action을
+  그대로 사용한다. 별도의 보안 요약 UI를 복제하지 않는다.
 - HTTP(S)가 아닌 문서에서는 shield action을 숨긴다. 패널을 연 탭이 navigate되거나
   사라지면 패널을 닫아 이전 문서의 상태를 노출하지 않는다.
 

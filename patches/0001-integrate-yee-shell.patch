@@ -779,6 +779,122 @@ index 90e572fe4e..e89a9c55d5 100644
    CreateMetricsServices();
    SetupInitialPrefs();
    SetUpFieldTrials();
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+index 3b46ea7613..121ffc0f05 100644
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -533,6 +533,9 @@ source_set("util_impl") {
+     "//components/ukm",
+     "//components/url_formatter",
+   ]
++  if (is_win || is_linux || is_mac) {
++    deps += [ "//chrome/browser/ui/views/yee:shell_features" ]
++  }
+ }
+ 
+ source_set("unit_tests") {
+@@ -560,6 +563,7 @@ source_set("unit_tests") {
+     "//chrome/browser/profiles:profile_util",
+     "//chrome/browser/profiles:profiles_extra_parts",
+     "//chrome/browser/ssl",
++    "//chrome/browser/ui:ui_features",
+     "//chrome/common:constants",
+     "//chrome/common:non_code_constants",
+     "//chrome/test:test_support",
+diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
+index 0159cee9db..b852edaa67 100644
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -22,6 +22,10 @@
+ #include "chrome/browser/ui/startup/startup_tab.h"
+ #endif
+ 
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#endif
++
+ namespace {
+ 
+ // Converts a SessionStartupPref::Type to an integer written to prefs.
+@@ -67,6 +71,9 @@ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+   return SessionStartupPref::LAST;
+ #else
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++  if (yee::IsShellEnabled()) {
++    return SessionStartupPref::LAST;
++  }
+   if (features::kSetDefaultToContinueSession.Get()) {
+     return SessionStartupPref::LAST;
+   }
+diff --git a/chrome/browser/prefs/session_startup_pref_unittest.cc b/chrome/browser/prefs/session_startup_pref_unittest.cc
+index 4c248e338a..5369d95a32 100644
+--- a/chrome/browser/prefs/session_startup_pref_unittest.cc
++++ b/chrome/browser/prefs/session_startup_pref_unittest.cc
+@@ -4,8 +4,12 @@
+ 
+ #include <memory>
+ 
++#include "base/test/scoped_command_line.h"
++#include "base/test/scoped_feature_list.h"
+ #include "base/values.h"
++#include "build/build_config.h"
+ #include "chrome/browser/prefs/session_startup_pref.h"
++#include "chrome/browser/ui/ui_features.h"
+ #include "chrome/common/pref_names.h"
+ #include "components/pref_registry/pref_registry_syncable.h"
+ #include "components/sync_preferences/testing_pref_service_syncable.h"
+@@ -43,6 +47,51 @@ TEST_F(SessionStartupPrefTest, URLListIsFixedUp) {
+   EXPECT_EQ("http://chromium.org/", result.urls[1].spec());
+ }
+ 
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++// 새 Yee 프로필은 이전 탭과 그룹을 복원하고 명시적 사용자·관리자 설정을 따른다.
++TEST_F(SessionStartupPrefTest, YeeDefaultsToLastSessionAndKeepsOverrides) {
++  EXPECT_EQ(SessionStartupPref::LAST,
++            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
++  EXPECT_TRUE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
++
++  pref_service_->SetInteger(prefs::kRestoreOnStartup,
++                           SessionStartupPref::kPrefValueNewTab);
++  EXPECT_EQ(SessionStartupPref::DEFAULT,
++            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
++  EXPECT_FALSE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
++
++  pref_service_->SetManagedPref(
++      prefs::kRestoreOnStartup,
++      base::Value(SessionStartupPref::kPrefValueURLs));
++  EXPECT_EQ(SessionStartupPref::URLS,
++            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
++  EXPECT_TRUE(SessionStartupPref::TypeIsManaged(pref_service_.get()));
++}
++
++// 특정 시작 페이지를 고른 사용자에게는 이전 세션 복원을 강제하지 않는다.
++TEST_F(SessionStartupPrefTest, YeeKeepsExplicitStartupURLs) {
++  SessionStartupPref selected(SessionStartupPref::URLS);
++  selected.urls.push_back(GURL("https://example.test/start"));
++  SessionStartupPref::SetStartupPref(pref_service_.get(), selected);
++
++  const auto restored =
++      SessionStartupPref::GetStartupPref(pref_service_.get());
++  EXPECT_EQ(SessionStartupPref::URLS, restored.type);
++  EXPECT_EQ(selected.urls, restored.urls);
++  EXPECT_FALSE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
++}
++
++// Yee shell을 끄면 Chromium의 기본 시작 동작을 유지한다.
++TEST_F(SessionStartupPrefTest, DisabledYeeKeepsNativeStartupDefault) {
++  base::test::ScopedCommandLine command_line;
++  command_line.GetProcessCommandLine()->AppendSwitch("disable-yee-shell-scaffold");
++  base::test::ScopedFeatureList features;
++  features.InitAndDisableFeature(::features::kSessionRestoreInfobar);
++  EXPECT_EQ(SessionStartupPref::DEFAULT,
++            SessionStartupPref::GetDefaultStartupType());
++}
++#endif
++
+ TEST_F(SessionStartupPrefTest, URLListManagedOverridesUser) {
+   base::ListValue url_pref_list1;
+   url_pref_list1.Append("chromium.org");
 diff --git a/chrome/browser/profiles/BUILD.gn b/chrome/browser/profiles/BUILD.gn
 index 6be7b43b6a..fa2b3890ae 100644
 --- a/chrome/browser/profiles/BUILD.gn
@@ -20209,7 +20325,7 @@ index d15829cb54..9f22daf65e 100644
  
    if (toolkit_views) {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 07fdd70a0b..38d3759f20 100644
+index 07fdd70a0b..018aa072c8 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -20911,20 +21027,16 @@ index 07fdd70a0b..38d3759f20 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2099,6 +2472,12 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2099,6 +2472,8 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
-+  if (compact_shell_mode_ && browser_ &&
-+      contents->GetVisibleURL().SchemeIsHTTPOrHTTPS()) {
-+    return yee::ShowSiteControlsBubble(location_icon_view_, browser_, contents,
-+                                       yee::SiteControlsSection::kPageInfo);
-+  }
++  yee::CloseSiteControlsBubble();
 +
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2133,18 +2512,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2133,18 +2508,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -20978,7 +21090,7 @@ index 07fdd70a0b..38d3759f20 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2242,7 +2650,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2242,7 +2646,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -21144,30 +21256,10 @@ index ed7711207f..8aa2a95aed 100644
  
    // The focus manager associated with this view. The focus manager is expected
 diff --git a/chrome/browser/ui/views/location_bar/location_icon_view.cc b/chrome/browser/ui/views/location_bar/location_icon_view.cc
-index 9b355a4392..b0b2036454 100644
+index 9b355a4392..8185275b62 100644
 --- a/chrome/browser/ui/views/location_bar/location_icon_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_icon_view.cc
-@@ -22,6 +22,7 @@
- #include "chrome/browser/ui/views/location_bar/location_bar_util.h"
- #include "chrome/browser/ui/views/location_bar/location_icon_state_helper.h"
- #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
-+#include "chrome/browser/ui/views/yee/site_controls.h"
- #include "chrome/grit/browser_resources.h"
- #include "components/omnibox/browser/location_bar_model.h"
- #include "components/omnibox/browser/vector_icons.h"
-@@ -127,8 +128,9 @@ bool LocationIconView::ShowBubble(const ui::Event& event) {
- }
- 
- bool LocationIconView::IsBubbleShowing() const {
--  return PageInfoBubbleView::GetShownBubbleType() !=
--         PageInfoBubbleView::BUBBLE_NONE;
-+  return yee::IsSiteControlsBubbleShowing() ||
-+         PageInfoBubbleView::GetShownBubbleType() !=
-+             PageInfoBubbleView::BUBBLE_NONE;
- }
- 
- void LocationIconView::OnGestureEvent(ui::GestureEvent* event) {
-@@ -339,12 +341,17 @@ void LocationIconView::UpdateBackground() {
+@@ -339,12 +339,17 @@ void LocationIconView::UpdateBackground() {
    const bool is_text_dangerous =
        display_text == l10n_util::GetStringUTF16(IDS_DANGEROUS_VERBOSE_STATE);
  
@@ -21191,7 +21283,7 @@ index 9b355a4392..b0b2036454 100644
  
    if (is_text_dangerous) {
      ConfigureInkDropForRefresh2023(this, kColorOmniboxSecurityChipInkDropHover,
-@@ -355,6 +362,15 @@ void LocationIconView::UpdateBackground() {
+@@ -355,6 +360,15 @@ void LocationIconView::UpdateBackground() {
    }
  }
  
@@ -30275,6 +30367,58 @@ index aa744c53c0..56241a77db 100644
    }],
    // All devtools APIs are implemented by hand, so don't compile them.
    "devtools.inspectedWindow": {
+diff --git a/chrome/installer/setup/install_unittest.cc b/chrome/installer/setup/install_unittest.cc
+index 6a862ae08c..7c8098bd04 100644
+--- a/chrome/installer/setup/install_unittest.cc
++++ b/chrome/installer/setup/install_unittest.cc
+@@ -21,6 +21,7 @@
+ #include "base/strings/to_string.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/test/scoped_path_override.h"
++#include "base/test/test_reg_util_win.h"
+ #include "base/test/test_shortcut_win.h"
+ #include "base/win/scoped_com_initializer.h"
+ #include "base/win/shortcut.h"
+@@ -41,6 +42,10 @@ namespace {
+ class InstallShortcutTest : public testing::Test {
+  protected:
+   void SetUp() override {
++    // 실제 Yee와 앱 식별자가 같아도 사용자 작업 표시줄과 레지스트리는 건드리지 않는다.
++    SetCanPinToTaskbarDelegate([] { return false; });
++    ASSERT_NO_FATAL_FAILURE(
++        registry_override_manager_.OverrideRegistry(HKEY_CURRENT_USER));
+     ASSERT_TRUE(com_initializer_.Succeeded());
+     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
+     chrome_exe_ = temp_dir_.GetPath().Append(installer::kChromeExe);
+@@ -89,10 +94,8 @@ class InstallShortcutTest : public testing::Test {
+   }
+ 
+   void TearDown() override {
+-    // Try to unpin potentially pinned shortcuts (although pinning isn't tested,
+-    // the call itself might still have pinned the Start Menu shortcuts).
+-    UnpinShortcutFromTaskbar(user_start_menu_shortcut_);
+-    UnpinShortcutFromTaskbar(system_start_menu_shortcut_);
++    // 고정 자체를 검사하지 않으므로 실제 Shell의 고정·해제 API를 호출하지 않는다.
++    SetCanPinToTaskbarDelegate(nullptr);
+   }
+ 
+   installer::InitialPreferences* GetFakeInitialPrefs(
+@@ -106,6 +109,7 @@ class InstallShortcutTest : public testing::Test {
+          do_not_create_desktop_shortcut},
+         {installer::initial_preferences::kDoNotCreateQuickLaunchShortcut,
+          do_not_create_quick_launch_shortcut},
++        {installer::initial_preferences::kDoNotCreateTaskbarShortcut, true},
+     };
+ 
+     std::string initial_prefs("{\"distribution\":{");
+@@ -121,6 +125,7 @@ class InstallShortcutTest : public testing::Test {
+   }
+ 
+   base::win::ScopedCOMInitializer com_initializer_;
++  registry_util::RegistryOverrideManager registry_override_manager_;
+ 
+   base::win::ShortcutProperties expected_properties_;
+   base::win::ShortcutProperties expected_start_menu_properties_;
 diff --git a/chrome/renderer/BUILD.gn b/chrome/renderer/BUILD.gn
 index 94d46c0511..4612f1ee9d 100644
 --- a/chrome/renderer/BUILD.gn

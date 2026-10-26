@@ -65,6 +65,33 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 
 ## 2. 실제 native View 구조
 
+`SiteControlsBrowserTest.ProtectionButtonClosesOnSecondNativeClick`는 수평·수직
+탭 배치에서 실제 마우스로 방패 버튼을 연속 클릭해 열기→닫기→열기→닫기를 확인한다.
+버튼을 누르는 동안 팝업이 포커스를 잃고 닫혀도 손을 뗄 때 다시 열리지 않아야 한다.
+2026-10-26 Windows 실제 입력 검증에서 두 배치의 총 8회 클릭 assertion을 완료했다.
+아래 공통 COM `ghost_count` 종료 오류로 이 사례 역시 전체 통과로 기록하지 않는다.
+
+`SiteControlsBrowserTest.PageInfoAndProtectionUseSeparatePopups`는 수평·수직 탭
+배치에서 방패 버튼이 탭 없는 Protection 팝업을 열고, 사이트 정보 action은 별도의
+Chromium Page Info bubble을 여는지 확인한다. `PageInfoOpensNativeSiteSettings`는
+그 native 팝업에서 현재 사이트의 설정 화면으로 이동하는 경로를 확인한다.
+`--yee-site-controls-capture-dir`를 지정하면 두 배치의 각 팝업 PNG를 저장한다.
+Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다. 2026-10-26
+Windows 검증에서 앱·검사 실행 파일 빌드와 실제 팝업 캡처를 완료했다. 관련 8개
+사례의 기능 assertion은 완료됐지만, 모든 사례가 종료 시 공통 접근성 검사
+`content_test_suite_base.cc`의 COM `ghost_count` 오류로 실패했다. 전체 통과로
+기록하지 않으며 접근성 객체 정리 문제는 남아 있다.
+
+같은 날 후속 진단에서 방패 팝업을 열지 않는
+`InternalURLsBrowserTest.ProductAndNativeSettingsRoutes`도 같은 종료 오류를 재현했다.
+접근성 노드의 소유자 연결은 모두 해제됐지만 Windows UI Automation의 외부 COM
+참조가 남아 있었다.
+창을 명시적으로 닫은 진단 실행에서는 `ghost_count`가 44에서, 메시지를 처리하며
+5초 기다린 뒤 3으로 줄었다. `UiaDisconnectRootProviders`를 활성화한 별도 실행도
+44→3으로 같았다. 일부는 비동기 해제 지연이며, 나머지 참조가 영구 누수인지와
+안전한 수정 위치는 아직 확정하지 않았다. 전체 연결 해제와 개별 요소 해제 실험은
+오류를 해결하지 못해 모두 되돌렸다. 누수 검사·접근성 기능은 그대로 유지한다.
+
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
 렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
 단위·GUI 실행 모두 launcher retry를 0으로 고정한다.

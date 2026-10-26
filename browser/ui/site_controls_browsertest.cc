@@ -13,6 +13,7 @@
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
@@ -23,6 +24,9 @@
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
+#include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
+#include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
@@ -46,6 +50,7 @@
 #include "ui/base/test/ui_controls.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/test/test_utils.h"
+#include "ui/events/test/test_event.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/snapshot/snapshot.h"
@@ -58,6 +63,12 @@
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+
+#if BUILDFLAG(IS_WIN)
+#include "ui/aura/test/ui_controls_aurawin.h"
+#include "ui/gfx/image/image.h"
+#include "ui/snapshot/snapshot_aura.h"
+#endif
 
 namespace yee {
 namespace {
@@ -194,18 +205,20 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
                               ".display"));
   }
 
-  views::Widget* OpenControls(SiteControlsSection section,
-                              Browser* owner = nullptr) {
+  views::Widget* OpenControls(Browser* owner = nullptr) {
     if (!owner) {
       owner = browser();
     }
     auto* browser_view = BrowserView::GetBrowserViewForBrowser(owner);
-    EXPECT_TRUE(ShowSiteControlsBubble(
-        browser_view->GetLocationBarView(), owner,
-        owner->tab_strip_model()->GetActiveWebContents(), section));
+    auto* button = Button(owner);
+    if (!button) {
+      ADD_FAILURE() << "Protection 버튼이 없습니다";
+      return nullptr;
+    }
+    views::test::ButtonTestApi(button).NotifyDefaultMouseClick();
     for (views::Widget* widget : views::Widget::GetAllOwnedWidgets(
              browser_view->GetWidget()->GetNativeView())) {
-      if (FindView<views::TabbedPane>(widget->GetContentsView())) {
+      if (FindView<views::ToggleButton>(widget->GetContentsView())) {
         return widget;
       }
     }
@@ -217,7 +230,7 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
       owner = browser();
     }
     auto* contents = owner->tab_strip_model()->GetActiveWebContents();
-    auto* widget = OpenControls(SiteControlsSection::kProtection, owner);
+    auto* widget = OpenControls(owner);
     ASSERT_TRUE(widget);
     auto* toggle = FindView<views::ToggleButton>(widget->GetContentsView());
     ASSERT_TRUE(toggle);
@@ -333,26 +346,132 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, PersistsHostException) {
   CheckPage(true);
 }
 
-IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, PageInfoTabsAndSiteSettings) {
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       ProtectionButtonClosesOnSecondNativeClick) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
-  auto* widget = OpenControls(SiteControlsSection::kPageInfo);
-  ASSERT_TRUE(widget);
-  auto* tabs = FindView<views::TabbedPane>(widget->GetContentsView());
-  ASSERT_TRUE(tabs);
-  EXPECT_EQ(1u, tabs->GetSelectedTabIndex());
-  tabs->SelectTabAt(0, false);
-  EXPECT_EQ(0u, tabs->GetSelectedTabIndex());
-  tabs->SelectTabAt(1, false);
-  auto* settings =
-      FindView<views::MdTextButton>(tabs->GetTabContentsForTesting(1));
+  CheckPage(true);
+#if BUILDFLAG(IS_WIN)
+  aura::test::EnableUIControlsAuraWin();
+#else
+  ui_controls::EnableUIControls();
+#endif
+  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* state = tabs::VerticalTabStripStateController::From(browser());
+  const auto native_window = view->GetWidget()->GetNativeWindow();
+  for (bool vertical : {false, true}) {
+    SCOPED_TRACE(vertical);
+    state->SetVerticalTabsEnabled(vertical);
+    base::RunLoop().RunUntilIdle();
+    view->GetWidget()->LayoutRootViewIfNecessary();
+    auto* button = Button();
+    ASSERT_TRUE(button);
+    int click = 0;
+    for (bool expected_open : {true, false, true, false}) {
+      SCOPED_TRACE(++click);
+      SCOPED_TRACE(expected_open);
+      ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+          button->GetBoundsInScreen().CenterPoint(), native_window));
+      ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
+          ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
+          native_window));
+      base::RunLoop().RunUntilIdle();
+      ASSERT_EQ(expected_open, IsSiteControlsBubbleShowing());
+    }
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       PageInfoAndProtectionUseSeparatePopups) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* state = tabs::VerticalTabStripStateController::From(browser());
+  const auto capture_dir =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          "yee-site-controls-capture-dir");
+  const auto capture = [&](views::Widget* widget, const std::string& name) {
+    if (capture_dir.empty()) {
+      return;
+    }
+    widget->LayoutRootViewIfNecessary();
+    auto* compositor = widget->GetCompositor();
+    compositor->ScheduleFullRedraw();
+    ASSERT_TRUE(
+        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+#if BUILDFLAG(IS_WIN)
+    // DirectComposition 팝업은 PrintWindow로 캡처하면 비어 있을 수 있다.
+    // Windows에서는 실제 합성 프레임을 캡처한다.
+    base::test::TestFuture<gfx::Image> snapshot;
+    ui::GrabWindowSnapshotAura(
+        widget->GetNativeWindow(),
+        gfx::Rect(widget->GetWindowBoundsInScreen().size()),
+        snapshot.GetCallback());
+    auto png = snapshot.Take().As1xPNGBytes();
+#else
+    base::test::TestFuture<scoped_refptr<base::RefCountedMemory>> snapshot;
+    ui::GrabWindowSnapshotAsPNG(
+        widget->GetNativeWindow(),
+        gfx::Rect(widget->GetWindowBoundsInScreen().size()),
+        snapshot.GetCallback());
+    auto png = snapshot.Take();
+#endif
+    ASSERT_TRUE(png && png->size());
+    ASSERT_TRUE(base::WriteFile(capture_dir.AppendASCII(name),
+                                static_cast<base::span<const uint8_t>>(*png)));
+  };
+  for (bool vertical : {false, true}) {
+    SCOPED_TRACE(vertical);
+    state->SetVerticalTabsEnabled(vertical);
+    auto* protection = OpenControls();
+    ASSERT_TRUE(protection);
+    EXPECT_FALSE(FindView<views::TabbedPane>(protection->GetContentsView()));
+    EXPECT_FALSE(FindView<views::MdTextButton>(protection->GetContentsView()));
+    EXPECT_EQ(PageInfoBubbleView::BUBBLE_NONE,
+              PageInfoBubbleView::GetShownBubbleType());
+    capture(protection, vertical ? "protection-sidebar.png"
+                                 : "protection-horizontal.png");
+
+    auto* identity = view->GetLocationBarView()->location_icon_view();
+    ASSERT_TRUE(identity);
+    EXPECT_FALSE(identity->IsBubbleShowing());
+    ui::test::TestEvent event;
+    ASSERT_TRUE(identity->ShowBubble(event));
+    EXPECT_TRUE(identity->IsBubbleShowing());
+    EXPECT_FALSE(IsSiteControlsBubbleShowing());
+    ASSERT_EQ(PageInfoBubbleView::BUBBLE_PAGE_INFO,
+              PageInfoBubbleView::GetShownBubbleType());
+    auto* page_info = PageInfoBubbleView::GetPageInfoBubbleForTesting();
+    ASSERT_TRUE(page_info);
+    EXPECT_FALSE(FindView<views::TabbedPane>(page_info));
+    EXPECT_FALSE(FindView<views::ToggleButton>(page_info));
+    EXPECT_TRUE(page_info->GetViewByID(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_SITE_SETTINGS));
+    capture(page_info->GetWidget(), vertical ? "page-info-sidebar.png"
+                                            : "page-info-horizontal.png");
+    page_info->GetWidget()->CloseNow();
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, PageInfoOpensNativeSiteSettings) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  ASSERT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())
+                  ->GetLocationBarView()
+                  ->ShowPageInfoDialog());
+  auto* page_info = PageInfoBubbleView::GetPageInfoBubbleForTesting();
+  ASSERT_TRUE(page_info);
+  auto* settings = views::Button::AsButton(page_info->GetViewByID(
+      PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_SITE_SETTINGS));
   ASSERT_TRUE(settings);
+  content::WebContentsAddedObserver new_tab;
   views::test::ButtonTestApi(settings).NotifyDefaultMouseClick();
+  auto* settings_contents = new_tab.GetWebContents();
+  ASSERT_TRUE(settings_contents);
   ASSERT_EQ(2, browser()->tab_strip_model()->count());
-  ASSERT_TRUE(content::WaitForLoadStop(Contents()));
-  EXPECT_TRUE(Contents()->GetVisibleURL().spec().starts_with(
+  ASSERT_TRUE(content::WaitForLoadStop(settings_contents));
+  EXPECT_TRUE(settings_contents->GetVisibleURL().spec().starts_with(
       "chrome://settings/content/siteDetails?site="));
   EXPECT_NE(std::string::npos,
-            Contents()->GetVisibleURL().spec().find("yee-fixture.test"));
+            settings_contents->GetVisibleURL().spec().find("yee-fixture.test"));
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 }
@@ -363,7 +482,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, ButtonOutlivesDestroyedTab) {
   SiteControlsButton detached_button(browser());
   detached_button.Update(Contents(), false);
   ASSERT_TRUE(detached_button.GetVisible());
-  ASSERT_TRUE(OpenControls(SiteControlsSection::kProtection));
+  ASSERT_TRUE(OpenControls());
   content::WebContentsDestroyedWatcher destroyed(Contents());
   browser()->tab_strip_model()->CloseWebContentsAt(0, 0);
   destroyed.Wait();
@@ -378,11 +497,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, ButtonOutlivesDestroyedTab) {
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, WindowClosesWithControlsOpen) {
   Browser* second = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(second, FixtureURL()));
-  auto* view = BrowserView::GetBrowserViewForBrowser(second);
-  ASSERT_TRUE(
-      ShowSiteControlsBubble(view->GetLocationBarView(), second,
-                             second->tab_strip_model()->GetActiveWebContents(),
-                             SiteControlsSection::kProtection));
+  ASSERT_TRUE(OpenControls(second));
   CloseBrowserSynchronously(second);
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 }
@@ -433,7 +548,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
                   canvas.GetBitmap().getColor(center.x(), center.y())),
               color_utils::kMinimumReadableContrastRatio);
   }
-  ASSERT_TRUE(OpenControls(SiteControlsSection::kProtection));
+  ASSERT_TRUE(OpenControls());
   browser()->tab_strip_model()->ActivateTabAt(0);
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
@@ -492,7 +607,11 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
   }
   // 장식용 숫자 위의 native hover·클릭도 부모 버튼에 전달돼야 한다.
   // 명시적으로 요청한 시각 검사에서만 실제 입력을 활성화한다.
+#if BUILDFLAG(IS_WIN)
+  aura::test::EnableUIControlsAuraWin();
+#else
   ui_controls::EnableUIControls();
+#endif
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   auto* button = Button();
   auto* badge = FindView<views::Label>(button);
@@ -510,7 +629,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
   EXPECT_TRUE(IsSiteControlsBubbleShowing());
   for (views::Widget* widget :
        views::Widget::GetAllOwnedWidgets(view->GetWidget()->GetNativeView())) {
-    if (FindView<views::TabbedPane>(widget->GetContentsView())) {
+    if (FindView<views::ToggleButton>(widget->GetContentsView())) {
       widget->CloseNow();
     }
   }
@@ -564,7 +683,9 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   ASSERT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())
                   ->GetLocationBarView()
                   ->ShowPageInfoDialog());
-  EXPECT_TRUE(IsSiteControlsBubbleShowing());
+  EXPECT_FALSE(IsSiteControlsBubbleShowing());
+  EXPECT_EQ(PageInfoBubbleView::BUBBLE_PAGE_INFO,
+            PageInfoBubbleView::GetShownBubbleType());
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, MultipleWindowsKeepExactSite) {

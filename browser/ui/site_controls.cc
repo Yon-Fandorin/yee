@@ -12,16 +12,12 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_bubble_delegate_view.h"
 #include "chrome/browser/ui/views/yee/brand.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
-#include "components/security_state/content/security_state_tab_helper.h"
-#include "components/security_state/core/security_state.h"
-#include "components/url_formatter/elide_url.h"
 #include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/page.h"
@@ -38,12 +34,10 @@
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
-#include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/controls/tabbed_pane/tabbed_pane.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/layout/flex_layout.h"
@@ -63,24 +57,6 @@ constexpr int kButtonInset = 4;
 
 class SiteControlsBubble;
 SiteControlsBubble* g_site_controls_bubble = nullptr;
-
-std::u16string SecuritySummary(content::WebContents* contents) {
-  auto* helper = SecurityStateTabHelper::FromWebContents(contents);
-  if (!helper) {
-    return u"Connection information unavailable";
-  }
-  switch (helper->GetSecurityLevel()) {
-    case security_state::SECURE:
-      return u"Connection is secure";
-    case security_state::DANGEROUS:
-      return u"Connection is not secure";
-    case security_state::WARNING:
-      return u"Connection needs attention";
-    case security_state::NONE:
-    case security_state::SECURITY_LEVEL_COUNT:
-      return u"Connection information unavailable";
-  }
-}
 
 std::unique_ptr<views::Label> CreateBodyLabel(std::u16string text) {
   auto label = std::make_unique<views::Label>(std::move(text));
@@ -103,8 +79,7 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
  public:
   SiteControlsBubble(views::View* anchor,
                      Browser* browser,
-                     content::WebContents* contents,
-                     SiteControlsSection initial_section)
+                     content::WebContents* contents)
       : LocationBarBubbleDelegateView(anchor, contents),
         browser_(browser),
         contents_(contents),
@@ -119,21 +94,9 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     set_close_on_deactivate(true);
     SetLayoutManager(std::make_unique<views::FillLayout>());
 
-    auto tabbed_pane = std::make_unique<views::TabbedPane>(
-        views::TabbedPane::Orientation::kHorizontal,
-        views::TabbedPane::TabStripStyle::kWithIcon);
-    tabs_ = tabbed_pane.get();
-    tabs_->SetDrawTabDivider(true);
-    tabs_->AddTab(u"Protection", CreateProtectionSection(),
-                  &vector_icons::kShieldIcon);
-    tabs_->AddTab(u"Page info", CreatePageInfoSection(),
-                  &vector_icons::kInfoIcon);
-    tabs_->SelectTabAt(
-        initial_section == SiteControlsSection::kProtection ? 0 : 1, false);
-    AddChildView(std::move(tabbed_pane));
-
     yee::content_blocking::ContentBlockingTabHelper::CreateForWebContents(
         contents_);
+    AddChildView(CreateProtectionSection());
     auto* helper =
         yee::content_blocking::ContentBlockingTabHelper::FromWebContents(
             contents_);
@@ -202,28 +165,6 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     return section;
   }
 
-  std::unique_ptr<views::View> CreatePageInfoSection() {
-    auto section = CreateSection();
-
-    auto security = std::make_unique<views::Label>(SecuritySummary(contents_));
-    security->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    security->SetTextStyle(views::style::STYLE_HEADLINE_5);
-    section->AddChildView(std::move(security));
-
-    section->AddChildView(
-        CreateBodyLabel(url_formatter::FormatUrlForSecurityDisplay(url_)));
-
-    auto settings_button = std::make_unique<views::MdTextButton>(
-        base::BindRepeating(&SiteControlsBubble::OpenSiteSettings,
-                            base::Unretained(this)),
-        u"Site settings");
-    settings_button->SetStyle(ui::ButtonStyle::kDefault);
-    settings_button->SetProperty(views::kCrossAxisAlignmentKey,
-                                 views::LayoutAlignment::kStart);
-    section->AddChildView(std::move(settings_button));
-    return section;
-  }
-
   void OnProtectionToggled() {
     auto* service =
         yee::content_blocking::ContentBlockingServiceFactory::GetForProfile(
@@ -237,11 +178,6 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
                                      : u"Protection is off for this site");
     GetWidget()->Close();
     contents_->GetController().Reload(content::ReloadType::NORMAL, true);
-  }
-
-  void OpenSiteSettings() {
-    GetWidget()->Close();
-    chrome::ShowSiteSettings(browser_, url_);
   }
 
   void RefreshBlockedCount() {
@@ -283,7 +219,6 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
   const raw_ptr<Browser> browser_;
   raw_ptr<content::WebContents> contents_;
   const GURL url_;
-  raw_ptr<views::TabbedPane> tabs_ = nullptr;
   raw_ptr<views::Label> protection_heading_ = nullptr;
   raw_ptr<views::ToggleButton> protection_toggle_ = nullptr;
   raw_ptr<views::Label> blocked_label_ = nullptr;
@@ -361,10 +296,28 @@ void SiteControlsButton::SetSurfacePresentation(
   RefreshVisualState();
 }
 
-void SiteControlsButton::OnPressed() {
+bool SiteControlsButton::OnMousePressed(const ui::MouseEvent& event) {
+  // 마우스를 떼기 전에 포커스를 잃어 팝업이 닫힐 수 있다.
+  // 누를 때의 의도를 유지해 손을 뗄 때 다시 열리지 않게 한다.
+  bubble_was_open_on_mouse_press_ =
+      g_site_controls_bubble &&
+      g_site_controls_bubble->GetAnchorView() == this;
+  return views::ImageButton::OnMousePressed(event);
+}
+
+void SiteControlsButton::OnPressed(const ui::Event& event) {
+  const bool was_open_on_press =
+      std::exchange(bubble_was_open_on_mouse_press_, false);
+  if (g_site_controls_bubble &&
+      g_site_controls_bubble->GetAnchorView() == this) {
+    CloseSiteControlsBubble();
+    return;
+  }
+  if (event.IsMouseEvent() && was_open_on_press) {
+    return;
+  }
   if (web_contents() && browser_) {
-    ShowSiteControlsBubble(this, browser_, web_contents(),
-                           SiteControlsSection::kProtection);
+    ShowSiteControlsBubble(this, browser_, web_contents());
   }
 }
 
@@ -493,22 +446,24 @@ void SiteControlsButton::WebContentsDestroyed() {
 
 bool ShowSiteControlsBubble(views::View* anchor,
                             Browser* browser,
-                            content::WebContents* contents,
-                            SiteControlsSection initial_section) {
+                            content::WebContents* contents) {
   if (!anchor || !browser || !contents) {
     return false;
   }
   if (!contents->GetVisibleURL().SchemeIsHTTPOrHTTPS()) {
     return false;
   }
-  if (g_site_controls_bubble) {
-    g_site_controls_bubble->GetWidget()->CloseNow();
-  }
-  auto* bubble =
-      new SiteControlsBubble(anchor, browser, contents, initial_section);
+  CloseSiteControlsBubble();
+  auto* bubble = new SiteControlsBubble(anchor, browser, contents);
   views::BubbleDialogDelegateView::CreateBubble(bubble);
   bubble->ShowForReason(LocationBarBubbleDelegateView::USER_GESTURE);
   return true;
+}
+
+void CloseSiteControlsBubble() {
+  if (g_site_controls_bubble) {
+    g_site_controls_bubble->GetWidget()->CloseNow();
+  }
 }
 
 bool IsSiteControlsBubbleShowing() {

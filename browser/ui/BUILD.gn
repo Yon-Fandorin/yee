@@ -271,6 +271,7 @@ source_set("yee_ui") {
 # full browser_tests/interactive_ui_tests source lists.
 test("site_controls_browsertests") {
   sources = [
+    "//chrome/browser/prefs/session_startup_pref_unittest.cc",
     "bookmarks/bookmarks_browsertest.cc",
     "downloads/downloads_browsertest.cc",
     "extensions/extensions_browsertest.cc",
@@ -295,8 +296,10 @@ test("site_controls_browsertests") {
     "//chrome/browser/history",
     "//chrome/browser/policy",
     "//chrome/browser/policy:test_support",
+    "//chrome/browser/prefs:util",
     "//chrome/browser/profiles:profile_io_data",
     "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui:ui_features",
     "//chrome/browser/ui/bookmarks",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/startup",
@@ -320,6 +323,7 @@ test("site_controls_browsertests") {
     "//components/prefs",
     "//components/sessions",
     "//components/split_tabs",
+    "//components/sync_preferences:test_support",
     "//components/yee_branding",
     "//content/test:test_support",
     "//extensions/browser",
@@ -336,4 +340,7 @@ test("site_controls_browsertests") {
     "//chrome:packed_resources",
     "//ui/resources:ui_test_pak_data",
   ]
+  if (is_win) {
+    deps += [ "//ui/aura:test_support" ]
+  }
 }
