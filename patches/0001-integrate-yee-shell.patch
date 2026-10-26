@@ -33336,3 +33336,382 @@ index ecb7509bb1..c0643d89de 100644
    // Close all non browser windows now. Those includes notifications
    // and windows created by Ash (launcher, background, etc).
  
+diff --git a/chrome/installer/setup/taskbar_util_unittest.cc b/chrome/installer/setup/taskbar_util_unittest.cc
+index 24141dc5d6..746f7f05bb 100644
+--- a/chrome/installer/setup/taskbar_util_unittest.cc
++++ b/chrome/installer/setup/taskbar_util_unittest.cc
+@@ -4,9 +4,166 @@
+ 
+ #include "chrome/installer/util/taskbar_util.h"
+ 
++#include <wrl/implements.h>
++
++#include "base/base_paths.h"
++#include "base/files/file_path.h"
++#include "base/files/scoped_temp_dir.h"
++#include "base/path_service.h"
+ #include "base/test/test_reg_util_win.h"
++#include "base/win/scoped_com_initializer.h"
++#include "base/win/shortcut.h"
++#include "chrome/installer/util/taskbar_util_internal.h"
+ #include "testing/gtest/include/gtest/gtest.h"
+ 
++namespace {
++
++using taskbar_util::internal::IPinnedList3;
++using taskbar_util::internal::PinnedListModifyCaller;
++using taskbar_util::internal::SetPinnedListFactoryForTesting;
++
++// 실제 작업표시줄에 접근하지 않고 상태 조회와 고정 요청을 기록한다.
++class FakePinnedList
++    : public Microsoft::WRL::RuntimeClass<
++          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
++          IPinnedList3> {
++ public:
++  HRESULT STDMETHODCALLTYPE EnumObjects() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE GetPinnableInfo() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE IsPinnable() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE Resolve() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE LegacyModify() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE GetChangeCount() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE item) override {
++    ++query_count;
++    wchar_t path[MAX_PATH] = {};
++    EXPECT_TRUE(SHGetPathFromIDList(item, path));
++    queried_shortcut = base::FilePath(path);
++    return pin_status;
++  }
++  HRESULT STDMETHODCALLTYPE GetPinnedItem() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem() override {
++    return E_NOTIMPL;
++  }
++  HRESULT STDMETHODCALLTYPE ItemChangeNotify() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary() override {
++    return E_NOTIMPL;
++  }
++  HRESULT STDMETHODCALLTYPE PinShellLink() override { return E_NOTIMPL; }
++  HRESULT STDMETHODCALLTYPE GetPinnedItemForAppID() override {
++    return E_NOTIMPL;
++  }
++  HRESULT STDMETHODCALLTYPE Modify(PCIDLIST_ABSOLUTE unpin,
++                                   PCIDLIST_ABSOLUTE pin,
++                                   PinnedListModifyCaller caller) override {
++    ++modify_count;
++    EXPECT_EQ(nullptr, unpin);
++    EXPECT_EQ(PinnedListModifyCaller::kExplorer, caller);
++    wchar_t path[MAX_PATH] = {};
++    EXPECT_TRUE(SHGetPathFromIDList(pin, path));
++    requested_shortcut = base::FilePath(path);
++    return modify_result;
++  }
++
++  HRESULT pin_status = S_FALSE;
++  HRESULT modify_result = S_OK;
++  int query_count = 0;
++  int modify_count = 0;
++  base::FilePath queried_shortcut;
++  base::FilePath requested_shortcut;
++};
++
++FakePinnedList* g_pinned_list = nullptr;
++
++class TaskbarPinningTest : public testing::Test {
++ protected:
++  void SetUp() override {
++    ASSERT_TRUE(com_initializer_.Succeeded());
++    ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
++    shortcut_ = temp_dir_.GetPath().Append(L"Yee.lnk");
++    base::FilePath target;
++    ASSERT_TRUE(base::PathService::Get(base::FILE_EXE, &target));
++    base::win::ShortcutProperties properties;
++    properties.set_target(target);
++    properties.set_app_id(L"Yee.TaskbarPinningTest");
++    ASSERT_TRUE(base::win::CreateOrUpdateShortcutLink(
++        shortcut_, properties, base::win::ShortcutOperation::kCreateAlways));
++
++    pinned_list_ = Microsoft::WRL::Make<FakePinnedList>();
++    g_pinned_list = pinned_list_.Get();
++    SetPinnedListFactoryForTesting(
++        []() -> Microsoft::WRL::ComPtr<IPinnedList3> { return g_pinned_list; });
++  }
++
++  void TearDown() override {
++    SetCanPinToTaskbarDelegate(nullptr);
++    SetPinnedListFactoryForTesting(nullptr);
++    g_pinned_list = nullptr;
++  }
++
++  base::win::ScopedCOMInitializer com_initializer_;
++  base::ScopedTempDir temp_dir_;
++  base::FilePath shortcut_;
++  Microsoft::WRL::ComPtr<FakePinnedList> pinned_list_;
++};
++
++// 재설치 시 이미 고정된 앱에는 승인 요청을 다시 보내지 않는다.
++TEST_F(TaskbarPinningTest, AlreadyPinnedDoesNotRequestAgain) {
++  pinned_list_->pin_status = S_OK;
++  EXPECT_TRUE(PinShortcutToTaskbar(shortcut_));
++  EXPECT_EQ(1, pinned_list_->query_count);
++  EXPECT_EQ(shortcut_, pinned_list_->queried_shortcut);
++  EXPECT_EQ(0, pinned_list_->modify_count);
++}
++
++// 미등록이 확인된 바로가기만 같은 경로로 한 번 고정 요청한다.
++TEST_F(TaskbarPinningTest, UnpinnedRequestsSameShortcut) {
++  EXPECT_TRUE(PinShortcutToTaskbar(shortcut_));
++  EXPECT_EQ(1, pinned_list_->query_count);
++  EXPECT_EQ(shortcut_, pinned_list_->queried_shortcut);
++  EXPECT_EQ(1, pinned_list_->modify_count);
++  EXPECT_EQ(shortcut_, pinned_list_->requested_shortcut);
++}
++
++// 상태 조회가 실패하거나 해석할 수 없으면 기존 고정을 건드리지 않는다.
++TEST_F(TaskbarPinningTest, UnknownPinStateDoesNotRequest) {
++  for (HRESULT status : {E_FAIL, static_cast<HRESULT>(2)}) {
++    pinned_list_->pin_status = status;
++    EXPECT_FALSE(PinShortcutToTaskbar(shortcut_));
++  }
++  EXPECT_EQ(2, pinned_list_->query_count);
++  EXPECT_EQ(0, pinned_list_->modify_count);
++}
++
++TEST_F(TaskbarPinningTest, PinFailureIsReported) {
++  pinned_list_->modify_result = E_ACCESSDENIED;
++  EXPECT_FALSE(PinShortcutToTaskbar(shortcut_));
++  EXPECT_EQ(1, pinned_list_->modify_count);
++}
++
++TEST_F(TaskbarPinningTest, MissingShortcutDoesNotRequest) {
++  EXPECT_FALSE(
++      PinShortcutToTaskbar(temp_dir_.GetPath().Append(L"missing.lnk")));
++  EXPECT_EQ(0, pinned_list_->query_count);
++  EXPECT_EQ(0, pinned_list_->modify_count);
++}
++
++TEST_F(TaskbarPinningTest, UnavailablePinnedListDoesNotRequest) {
++  SetPinnedListFactoryForTesting(
++      []() -> Microsoft::WRL::ComPtr<IPinnedList3> { return nullptr; });
++  EXPECT_FALSE(PinShortcutToTaskbar(shortcut_));
++  EXPECT_EQ(0, pinned_list_->modify_count);
++}
++
++TEST_F(TaskbarPinningTest, PinningDisabledDoesNotQueryOrRequest) {
++  SetCanPinToTaskbarDelegate([] { return false; });
++  EXPECT_FALSE(PinShortcutToTaskbar(shortcut_));
++  EXPECT_EQ(0, pinned_list_->query_count);
++  EXPECT_EQ(0, pinned_list_->modify_count);
++}
++
++}  // namespace
++
+ // Test SetInstallerPinnedChromeToTaskbar and GetInstallerPinnedChromeToTaskbar.
+ TEST(TaskbarUtilTest, InstallerPinnedChromeToTaskbar) {
+   registry_util::RegistryOverrideManager registry_override_manager;
+diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
+index b42bb73601..1141ea5eab 100644
+--- a/chrome/installer/util/BUILD.gn
++++ b/chrome/installer/util/BUILD.gn
+@@ -170,6 +170,7 @@
+       "system_tracing_util.h",
+       "taskbar_util.cc",
+       "taskbar_util.h",
++      "taskbar_util_internal.h",
+     ]
+ 
+     public_deps += [
+diff --git a/chrome/installer/util/taskbar_util.cc b/chrome/installer/util/taskbar_util.cc
+index b44e60f1ab..fbfeab7bac 100644
+--- a/chrome/installer/util/taskbar_util.cc
++++ b/chrome/installer/util/taskbar_util.cc
+@@ -11,14 +11,20 @@
+ #include <wrl/client.h>
+ 
+ #include "base/files/file_path.h"
++#include "base/files/file_util.h"
++#include "base/logging.h"
+ #include "base/threading/scoped_blocking_call.h"
+ #include "base/win/registry.h"
+ #include "base/win/windows_version.h"
+ #include "chrome/install_static/install_util.h"
++#include "chrome/installer/util/taskbar_util_internal.h"
+ 
+ namespace {
+ 
+-enum class PinnedListModifyCaller { kExplorer = 4 };
++using taskbar_util::internal::IPinnedList3;
++using taskbar_util::internal::PinnedListModifyCaller;
++
++taskbar_util::internal::PinnedListFactory g_pinned_list_factory_for_testing;
+ 
+ constexpr GUID CLSID_TaskbandPin = {
+     0x90aa3a4e,
+@@ -31,28 +37,6 @@ constexpr wchar_t kInstallerPinned[] = L"InstallerPinned";
+ // Set by tests to control whether or not pinning to taskbar is allowed.
+ CanPinToTaskBarDelegateFunctionPtr g_can_pin_to_taskbar;
+ 
+-// Undocumented COM interface for manipulating taskbar pinned list.
+-class __declspec(uuid("0DD79AE2-D156-45D4-9EEB-3B549769E940")) IPinnedList3
+-    : public IUnknown {
+- public:
+-  virtual HRESULT STDMETHODCALLTYPE EnumObjects() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE IsPinnable() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE Resolve() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE LegacyModify() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE GetChangeCount() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE) = 0;
+-  virtual HRESULT STDMETHODCALLTYPE GetPinnedItem() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE ItemChangeNotify() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE PinShellLink() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE GetPinnedItemForAppID() = 0;
+-  virtual HRESULT STDMETHODCALLTYPE Modify(PCIDLIST_ABSOLUTE unpin,
+-                                           PCIDLIST_ABSOLUTE pin,
+-                                           PinnedListModifyCaller caller) = 0;
+-};
+-
+ // ScopedPIDLFromPath class, and the idea of using IPinnedList3::Modify,
+ // are thanks to Gee Law <https://geelaw.blog/entries/msedge-pins/>
+ class ScopedPIDLFromPath {
+@@ -71,8 +55,12 @@ class ScopedPIDLFromPath {
+ 
+ // Returns the taskbar pinned list if successful, an empty ComPtr otherwise.
+ Microsoft::WRL::ComPtr<IPinnedList3> GetTaskbarPinnedList() {
+-  if (base::win::GetVersion() < base::win::Version::WIN10_RS5)
++  if (g_pinned_list_factory_for_testing) {
++    return g_pinned_list_factory_for_testing();
++  }
++  if (base::win::GetVersion() < base::win::Version::WIN10_RS5) {
+     return nullptr;
++  }
+ 
+   Microsoft::WRL::ComPtr<IPinnedList3> pinned_list;
+   if (FAILED(CoCreateInstance(CLSID_TaskbandPin, nullptr, CLSCTX_INPROC_SERVER,
+@@ -87,11 +75,33 @@ Microsoft::WRL::ComPtr<IPinnedList3> GetTaskbarPinnedList() {
+ // Returns true if pinning was successful.
+ // static
+ bool PinShortcutWithIPinnedList3(const base::FilePath& shortcut) {
++  if (!base::PathExists(shortcut)) {
++    return false;
++  }
+   Microsoft::WRL::ComPtr<IPinnedList3> pinned_list = GetTaskbarPinnedList();
+-  if (!pinned_list)
++  if (!pinned_list) {
+     return false;
++  }
+ 
+   ScopedPIDLFromPath item_id_list(shortcut.value().data());
++  if (!item_id_list.Get()) {
++    return false;
++  }
++
++  // 같은 버전 수리도 이 경로를 호출한다. 기존 고정을 다시 요청하면 Windows가
++  // 승인 창을 반복 표시하므로 미등록이 확인된 경우에만 목록을 변경한다.
++  const HRESULT pin_status = pinned_list->IsPinned(item_id_list.Get());
++  if (pin_status == S_OK) {
++    VLOG(1) << "Shortcut already pinned to taskbar; skipping pin request: "
++            << shortcut.value();
++    return true;
++  }
++  if (pin_status != S_FALSE) {
++    LOG(WARNING) << "Cannot determine taskbar pin state; skipping pin request: "
++                 << pin_status;
++    return false;
++  }
++
+   HRESULT hr = pinned_list->Modify(nullptr, item_id_list.Get(),
+                                    PinnedListModifyCaller::kExplorer);
+   return SUCCEEDED(hr);
+@@ -132,10 +142,14 @@ bool UnpinShortcutFromTaskbar(const base::FilePath& shortcut) {
+ 
+ std::optional<bool> IsShortcutPinnedToTaskbar(const base::FilePath& shortcut) {
+   Microsoft::WRL::ComPtr<IPinnedList3> pinned_list = GetTaskbarPinnedList();
+-  if (!pinned_list.Get())
++  if (!pinned_list.Get()) {
+     return std::nullopt;
++  }
+ 
+   ScopedPIDLFromPath item_id_list(shortcut.value().data());
++  if (!item_id_list.Get()) {
++    return std::nullopt;
++  }
+   HRESULT hr = pinned_list->IsPinned(item_id_list.Get());
+   // S_OK means `shortcut` is pinned, S_FALSE means it's not pinned.
+   return SUCCEEDED(hr) ? std::optional<bool>(hr == S_OK) : std::nullopt;
+@@ -145,6 +159,11 @@ void SetCanPinToTaskbarDelegate(CanPinToTaskBarDelegateFunctionPtr delegate) {
+   g_can_pin_to_taskbar = delegate;
+ }
+ 
++void taskbar_util::internal::SetPinnedListFactoryForTesting(
++    PinnedListFactory factory) {
++  g_pinned_list_factory_for_testing = factory;
++}
++
+ bool SetInstallerPinnedChromeToTaskbar(bool installed) {
+   base::win::RegKey key;
+   if (key.Create(HKEY_CURRENT_USER, install_static::GetRegistryPath().c_str(),
+diff --git a/chrome/installer/util/taskbar_util.h b/chrome/installer/util/taskbar_util.h
+index 1be0b7ec13..a9c9411f35 100644
+--- a/chrome/installer/util/taskbar_util.h
++++ b/chrome/installer/util/taskbar_util.h
+@@ -20,6 +20,8 @@ bool CanPinShortcutToTaskbar();
+ // Pins a shortcut to the taskbar on supported platforms. The `shortcut` file
+ // must already exist and be a shortcut that points to an executable. The app id
+ // of the shortcut is used to group windows and must be set correctly.
++// 이미 고정된 경우 요청 없이 성공하며, 미등록이 확인될 때만 고정을 요청한다.
++// 상태를 확인하지 못한 경우 기존 고정을 변경하지 않고 false를 반환한다.
+ bool PinShortcutToTaskbar(const base::FilePath& shortcut);
+ 
+ // Unpins a shortcut from the Windows 7+ taskbar. `shortcut` must exist
+diff --git a/chrome/installer/util/taskbar_util_internal.h b/chrome/installer/util/taskbar_util_internal.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/installer/util/taskbar_util_internal.h
+@@ -0,0 +1,46 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef CHROME_INSTALLER_UTIL_TASKBAR_UTIL_INTERNAL_H_
++#define CHROME_INSTALLER_UTIL_TASKBAR_UTIL_INTERNAL_H_
++
++#include <shlobj.h>
++#include <wrl/client.h>
++
++namespace taskbar_util::internal {
++
++enum class PinnedListModifyCaller { kExplorer = 4 };
++
++// Windows의 비공개 작업표시줄 COM 계약이다. 사용하지 않는 메서드도 vtable
++// 순서를 유지해야 하며, 검사에서는 같은 계약을 구현해 실제 고정을 차단한다.
++class __declspec(uuid("0DD79AE2-D156-45D4-9EEB-3B549769E940")) IPinnedList3
++    : public IUnknown {
++ public:
++  virtual HRESULT STDMETHODCALLTYPE EnumObjects() = 0;
++  virtual HRESULT STDMETHODCALLTYPE GetPinnableInfo() = 0;
++  virtual HRESULT STDMETHODCALLTYPE IsPinnable() = 0;
++  virtual HRESULT STDMETHODCALLTYPE Resolve() = 0;
++  virtual HRESULT STDMETHODCALLTYPE LegacyModify() = 0;
++  virtual HRESULT STDMETHODCALLTYPE GetChangeCount() = 0;
++  virtual HRESULT STDMETHODCALLTYPE IsPinned(PCIDLIST_ABSOLUTE) = 0;
++  virtual HRESULT STDMETHODCALLTYPE GetPinnedItem() = 0;
++  virtual HRESULT STDMETHODCALLTYPE GetAppIDForPinnedItem() = 0;
++  virtual HRESULT STDMETHODCALLTYPE ItemChangeNotify() = 0;
++  virtual HRESULT STDMETHODCALLTYPE UpdateForRemovedItemsAsNecessary() = 0;
++  virtual HRESULT STDMETHODCALLTYPE PinShellLink() = 0;
++  virtual HRESULT STDMETHODCALLTYPE GetPinnedItemForAppID() = 0;
++  virtual HRESULT STDMETHODCALLTYPE Modify(PCIDLIST_ABSOLUTE unpin,
++                                           PCIDLIST_ABSOLUTE pin,
++                                           PinnedListModifyCaller caller) = 0;
++};
++
++using PinnedListFactory = Microsoft::WRL::ComPtr<IPinnedList3> (*)();
++
++// 검사가 실제 작업표시줄에 접근하지 않도록 COM 생성을 대체한다.
++// 검사 종료 시 nullptr로 복구해야 한다.
++void SetPinnedListFactoryForTesting(PinnedListFactory factory);
++
++}  // namespace taskbar_util::internal
++
++#endif  // CHROME_INSTALLER_UTIL_TASKBAR_UTIL_INTERNAL_H_
