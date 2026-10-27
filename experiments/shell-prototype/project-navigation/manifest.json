@@ -1,13 +1,13 @@
 {
   "schema": "yee-project-navigation-reference-v1",
-  "date_kst": "2026-10-26",
+  "date_kst": "2026-10-27",
   "branch": "codex/project-navigation-handoff",
-  "base_commit": "95f3e45c0f0d0cf89c9d91513c0f14ffff18387f",
+  "base_commit": "7966cf8250f046448a7cc6675c180381d0356d30",
   "reference_base_commit": "efc3e425bd80a8db507b89430cc5f9824a527d9b",
   "scope": "Branch-specific documentation and frozen project-navigation UX reference on top of integrated native UI refinements",
   "integration": {
     "native_ui_commit": "95f3e45c0f0d0cf89c9d91513c0f14ffff18387f",
-    "previous_ui_tip": "ab368ca2040cda10608c6be607d879c3ee18b096",
+    "previous_ui_tip": "2874d6c521b43050b8e65bd390b7b41fe0fcdf44",
     "previously_uncommitted_file_count": 13,
     "native_ui_changes_included_through_ancestry": true,
     "validation": {
@@ -20,10 +20,14 @@
       },
       "overlay_tool_cases_passed": 16,
       "independent_review": "no remaining actionable findings",
-      "windows_app_inspection": "deferred at user request on 2026-10-26",
-      "new_webui_contrast_matrix": "compiled; not run",
-      "macos_and_linux_build_and_app_inspection": "not run"
-    }
+      "windows_app_inspection": "passed: 40 isolated native UI cases through process exit on 2026-10-27; separate from the earlier unit/tool runs",
+      "new_webui_contrast_matrix": "passed: renderer media emulation and actual selected-row assertions; OS contrast propagation and screen readers not verified",
+      "macos_and_linux_build_and_app_inspection": "not run",
+      "windows_native_ui_cases_passed": 40,
+      "windows_execution_scope": "software rendering; default scale and explicit RTL 1.25 cases; off-display caption padding uses logical hit testing only",
+      "computer_use_url_detection": "unresolved; separate from native validation"
+    },
+    "validation_followup_commit": "7966cf8250f046448a7cc6675c180381d0356d30"
   },
   "priority": "Daily personal browser first; external agent execution and in-browser work also needed",
   "source": {
@@ -99,7 +103,6 @@
   "limits": [
     "All pages, project records and agent states are fictional sample data",
     "Mock UI-state memory does not persist full dynamic records or native browser sessions",
-    "Capture size is documentation preview geometry, not a native minimum window-size requirement",
-    "baseline-working-tree.json preserves the original dirty-checkout history; those 13 UI files are now included through the integrated pilot commit"
+    "Capture size is documentation preview geometry, not a native minimum window-size requirement"
   ]
 }

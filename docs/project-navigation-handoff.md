@@ -1,6 +1,6 @@
 # 프로젝트 탐색 UX 핸드오프
 
-2026-10-26 · 브랜치 `codex/project-navigation-handoff`
+2026-10-27 · 브랜치 `codex/project-navigation-handoff`
 
 사용자가 긍정적으로 본 프로젝트 탐색 흐름을 다음 작업에서 이어가기 위한 인계다.
 이 브랜치의 고유 변경은 문서, 시안 원본, 독립 실행용 시안과 캡처다.
@@ -23,7 +23,7 @@ AI 실행 기능의 구현을 모두 승인하는 것은 아니다.
 
 | 항목 | 값 |
 | --- | --- |
-| 현재 기반 | `pilot`의 `95f3e45c0f0d0cf89c9d91513c0f14ffff18387f` 위로 리베이스 |
+| 현재 기반 | `pilot`의 `7966cf8250f046448a7cc6675c180381d0356d30` 위로 리베이스 |
 | 최초 분기 기준 | `efc3e425bd80a8db507b89430cc5f9824a527d9b` |
 | 기존 13개 파일 | 위 `pilot` 커밋에 반영되어 이 브랜치의 기반에 모두 포함 |
 | Windows의 UI 작업 폴더 | `F:/yee/worktrees/project-navigation-handoff` — 다른 환경에서는 실제 체크아웃 루트 사용 |
@@ -34,9 +34,6 @@ Windows 창 버튼의 크기·입력 범위, 팝업 재구성 시 상태 유지�
 검토에서 발견한 고대비 선택 표시 문제도 함께 보완했다. 별도 파일 전달 없이 Git 기록으로
 가져올 수 있다.
 
-[최초 분기 당시 파일 목록과 해시](../experiments/shell-prototype/project-navigation/baseline-working-tree.json)는
-당시 상태를 남긴 역사적 기록이다. 내용 백업이나 현재 파일의 해시 기준으로 사용하지 않는다.
-그 기록의 ‘미커밋·미포함’ 상태는 위 통합 전의 상태이며, 현재 소스는 통합 커밋을 기준으로 읽는다.
 작업 폴더 위치는 `git worktree list`로 확인하고 해당 환경의 경로를 사용한다.
 
 ### 맥에서 최신 브랜치 받기
@@ -58,32 +55,50 @@ git fetch origin \
 git switch --create codex/project-navigation-handoff --track origin/codex/project-navigation-handoff
 ```
 
-이전 UI 끝점 `ab368ca2040cda10608c6be607d879c3ee18b096`을 기반으로 이미 작업했다면,
-그 브랜치의 백업을 만든 뒤 아래와 같이 로컬 추가 커밋만 새 원격 기반 위로 옮긴다.
-첫 명령이 성공해 옛 끝점이 조상임을 확인한 경우에만 두 번째 명령을 실행한다.
-이미 새 기반으로 갱신한 브랜치에는 이 옛 기준 명령을 다시 적용하지 않는다.
+기존 로컬 UI 브랜치는 새 기반으로 이력이 바뀌었으므로 일반 pull로 합치지 않는다.
+미커밋 변경을 먼저 보존하고, 로컬 브랜치가 있으면 백업을 만든다.
 
 ```sh
-git merge-base --is-ancestor ab368ca2040cda10608c6be607d879c3ee18b096 codex/project-navigation-handoff &&
-git rebase --onto origin/codex/project-navigation-handoff ab368ca2040cda10608c6be607d879c3ee18b096 codex/project-navigation-handoff
+git branch backup/project-navigation-before-20261027 codex/project-navigation-handoff
 ```
 
-### 통합 검증과 남은 검수
+이전 원격 끝점 `2874d6c521b43050b8e65bd390b7b41fe0fcdf44`을 받아 작업한 브랜치라면,
+아래 조상 확인이 성공한 경우에만 로컬 추가 커밋을 새 원격 기반 위로 옮긴다.
+추가 커밋이 없어도 같은 명령으로 새 끝점으로 옮길 수 있다.
+
+```sh
+git merge-base --is-ancestor 2874d6c521b43050b8e65bd390b7b41fe0fcdf44 codex/project-navigation-handoff &&
+git rebase --onto origin/codex/project-navigation-handoff 2874d6c521b43050b8e65bd390b7b41fe0fcdf44 codex/project-navigation-handoff
+```
+
+더 오래된 `ab368ca2040cda10608c6be607d879c3ee18b096`에서 아직 갱신하지 않았다면,
+위 두 명령의 옛 끝점을 이 해시로 바꾸고 동일하게 조상을 확인한 뒤 진행한다.
+이미 새 원격 끝점 기반인 브랜치에는 이 옛 기준 명령을 다시 적용하지 않는다.
+두 옛 끝점 모두 조상이 아니면 명령을 적용하지 말고 로컬 기록을 먼저 확인한다.
+
+### 통합 검증과 남은 범위
 
 | 항목 | 결과 |
 | --- | --- |
-| 최종 Windows 앱 및 관련 회귀 검사 실행 파일 빌드 | 성공 |
-| 단위 검사 | layout 27, geometry 18, Header 60, Aura 1: 총 106개 통과 |
+| Windows 앱 및 관련 회귀 검사 실행 파일 빌드 | 성공 |
+| 앞선 통합의 단위 검사 | layout 27, geometry 18, Header 60, Aura 1: 총 106개 통과 |
 | Overlay 도구 검사 | 16개 통과 |
 | 최종 독립 코드 검토 | 남은 수정 사항 없음 |
-| 최종본의 Windows 실제 앱 검수 | 사용자 요청에 따라 후속 작업으로 이월 |
-| 새 WebUI 대비 행렬 | 컴파일 성공, 실제 실행 미실시 |
-| macOS·Linux 빌드와 실제 앱 검수 | 이번 통합에서 미실시 |
+| 2026-10-27 Windows 실제 창 검사 | 40개를 각각 새 프로세스·별도 프로필에서 실행해 종료 단계까지 통과 |
+| 새 WebUI 대비 행렬 | 실제 팝업의 renderer media emulation과 선택 행 검사 통과 |
+| macOS·Linux 빌드와 실제 앱 검수 | 이번 후속 검수에서 미실시 |
 
-Windows 검수에서는 단일·분할 탭의 주소창 제안과 미디어 버튼, 가로·세로 탭의 창 버튼,
-팝업 재구성, 대비 증가·강제 색의 선택 표시를 확인한다. 새 WebUI 대비 행렬의 실행도 남아 있다.
-이 상태를 실제 앱 검수 완료로 간주하지 않는다. 기존 검증 기록과 새 보완본의 범위는
-[Header 검사 문서](header/test-coverage.md)를 함께 읽는다.
+Windows 40개는 미디어 표시·재생 4, WebUI·Views 제안 4, AI·맞춤설정 팝업 2,
+창 버튼 8, 분할·포커스·탭 상태 13, 수평 탭·테마·경계 9개다. 단위 106개와
+도구 16개를 여기에 합산하지 않는다. 제품 실행 파일·DLL은 `95f3e45` 검수본과
+동일하며, 이번 후속 커밋은 검사 코드와 문서 보완 및 완료 자료 정리를 담는다.
+
+실행 범위는 Windows software rendering, 기본 배율과 명시된 RTL 125% 사례다.
+renderer 대비 검사는 OS 대비 설정 전파나 화면 읽기 프로그램 검증을 의미하지 않는다.
+화면 밖 창 버튼 여백은 논리 hit-test만 확인한다. 완료된 검수 캡처·로그·보고서와
+오래된 13개 파일 해시 목록은 정리했으며, 다음 구현에 필요한 UX 시안은 유지한다.
+검사 코드·실행 조건·남은 플랫폼 및 전환 픽셀 한계는 [Header 검사 문서](header/test-coverage.md)를 따른다.
+Computer Use의 URL 인식 문제는 별도 미해결 사항이며 native 검사 통과로 해결됐다고 보지 않는다.
 
 `0001` 패치를 다시 생성할 때는 기존 `chrome/installer/util/BUILD.gn`과
 `chrome/installer/util/taskbar_util_internal.h` 블록을 보존한다. 현재 생성 도구는
@@ -218,7 +233,7 @@ branding과 공유하는 파일 및 등록되지 않은 새 연결 파일을 제
 
 | 단계 | 작업과 선행 조건 | 완료 조건 |
 | --- | --- | --- |
-| 0. 상세 계획 | 통합된 native UI 기반과 미실시 검수를 확인하고 위 결정, 책임·파일 배치, 저장 계약, 테스트와 변경 단위를 정리 | mock 상태와 native 구현을 구분한 계획. 명세 충돌과 예약 범위를 명시하고 미해결 정책을 숨기지 않음 |
+| 0. 상세 계획 | 통합된 native UI 기반과 검수 범위를 확인하고 위 결정, 책임·파일 배치, 저장 계약, 테스트와 변경 단위를 정리 | mock 상태와 native 구현을 구분한 계획. 명세 충돌과 예약 범위를 명시하고 미해결 정책을 숨기지 않음 |
 | 1. 첫 실제 흐름 | 단계 0의 저장·허브 호스팅 결정 후 프로젝트 생성/이름/탭 연결, 허브 왕복과 재시작 복원 구현 | 실제 탭 하나를 연결해 읽던 페이지·입력 내용을 잃지 않고 허브 왕복. 재시작 후 기록·탭 재연결이 중복 없이 복원됨 |
 | 2. 탐색 목록 | 단계 1의 동일 데이터로 세로 혼합 목록과 수평 프로젝트 목록 연결, 일반 그룹·미소속 탭 유지 | 이름과 화살표 역할이 일관됨. 배치 전환·탭 이동·닫기·재열기·다중 창에서 일관된 상태. 수평에 왼쪽 영역이 생기지 않음 |
 | 3. 대화 연결 | 실제 대화 provider와 저장 계약 후 허브 입력·대화 참조·패널 연결 | 현재 페이지 또는 허브를 유지하며 대화를 이어감. 참고 자료는 명시적이며 다른 탭으로 자동 교체되지 않음 |
@@ -242,14 +257,14 @@ branding과 공유하는 파일 및 등록되지 않은 새 연결 파일을 제
 - 시안의 320px 반응형 검사는 네이티브 앱의 최소 창 폭이나 모바일 지원을 확정한 것이 아니다.
 
 최초 시안 인계에서는 export된 시안과 캡처의 동선만 확인했다. 이후 기반에 포함한 네이티브
-UI 개선의 빌드·검사 결과와 남은 Windows 검수는 위 표에 별도로 기록했다. 프로젝트의 실제
+UI 개선의 빌드·검사 결과와 Windows 검수 범위는 위 표에 별도로 기록했다. 프로젝트의 실제
 영속 저장·재시작 복원, AI 실행·provider 연결은 아직 구현하거나 검증하지 않았다.
 
 ## 다음 대화에 전달할 문장
 
 > 이 저장소의 `codex/project-navigation-handoff` 브랜치에서 `docs/project-navigation-handoff.md`와
-> 작업 규칙을 읽고 이어가줘. 기반은 `pilot`의 `95f3e45`이며 기존 13개 UI 파일은 포함돼 있어.
-> Windows 실제 앱 검수와 새 WebUI 대비 행렬 실행은 후속으로 남겨둔 상태야. 캡처의 기본 UX를
+> 작업 규칙을 읽고 이어가줘. 기반은 `pilot`의 `7966cf8`이며 기존 13개 UI 파일은 포함돼 있어.
+> Windows 실제 창 40개 사례와 새 WebUI 대비 행렬은 통과했어. 인계의 검증 한계를 읽고 시안의 기본 UX를
 > 유지하면서 실제 코드에 근거한 상세 구현 계획부터 작성하고, 프로젝트 저장·탭 재연결·허브의
 > native 호스팅을 구체화해줘. 첫 구현 목표는 프로젝트 생성 → 실제 탭 연결 → 허브 왕복 →
 > 재시작 복원이야.
