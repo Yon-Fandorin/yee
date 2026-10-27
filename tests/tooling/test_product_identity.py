@@ -61,6 +61,32 @@ class ProductIdentityTest(unittest.TestCase):
         self.install(value)
         self.assertEqual(output.stat().st_mtime_ns, before)
 
+    def test_mac_identity_is_independent_and_generates_native_input(self):
+        """설치판 식별자는 표시 이름과 Windows 등록 값을 바꾸지 않는다."""
+        value = self.load()
+        self.install(value)
+        generated = (self.root / "chrome/app/yee_mac_identity.values").read_text()
+        self.assertIn("YEE_MAC_BUNDLE_ID=io.github.yon-fandorin.yee\n", generated)
+        self.assertIn("YEE_MAC_KEYCHAIN_SERVICE=Yee Safe Storage\n", generated)
+        self.assertIn("YEE_MAC_KEYCHAIN_ACCOUNT=Yee\n", generated)
+        self.assertEqual(value.windows.app_id, self.raw["windows"]["app_id"])
+
+    def test_rejects_mac_identity_collisions_and_template_injection(self):
+        """타 브라우저 ID와 native 입력을 깨뜨리는 값은 쓰기 전에 거부한다."""
+        for key, value in (("bundle_id", "org.chromium.Chromium"),
+                           ("bundle_id", "com.google.Chrome"),
+                           ("bundle_id", "yee"),
+                           ("bundle_id", "io.github.yee\nOTHER=value"),
+                           ("keychain_service", "Chromium Safe Storage"),
+                           ("keychain_service", 'Yee "Storage"'),
+                           ("keychain_account", "Chrome"),
+                           ("keychain_account", "Yee\nOTHER=value")):
+            with self.subTest(key=key, value=value):
+                raw = copy.deepcopy(self.raw)
+                raw["macos"][key] = value
+                with self.assertRaises(ValueError):
+                    self.load(raw)
+
     def test_rejects_reserved_paths_and_identifiers(self):
         for field, values in (("profile_directory", ("../Chromium", "chromium", "CON", "COM1", "Yee\\Data")),
                               ("product_id", ("chrome", "yee/other", ""))):

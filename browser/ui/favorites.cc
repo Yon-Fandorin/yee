@@ -303,7 +303,7 @@ gfx::Rect TabDragPreviewBoundsInTabStrip(
       &tab_strip,
       FavoritesDraggedTileInScreen(pointer_in_screen, grab_offset, row_size));
   // 드롭 판정에 쓸 물리 좌표이므로 leading 여백을 여기서 반영한다.
-  // Windows preview는 실제 Views 배치 경계에서 논리 bounds로 변환한다.
+  // preview는 실제 Views 배치 경계에서 논리 bounds로 변환한다.
   bounds.set_x(base::i18n::IsRTL() ? tab_strip.width() - pad -
                                          tab_leading_inset - row_size.width()
                                    : pad + tab_leading_inset);
@@ -987,21 +987,13 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
 
  private:
   gfx::Rect BoundsInTabStrip() const {
-#if BUILDFLAG(IS_WIN)
     return parent() ? parent()->GetMirroredRect(bounds()) : bounds();
-#else
-    return bounds();
-#endif
   }
 
   void ApplyBoundsInTabStrip(const gfx::Rect& bounds_in_tab_strip) {
-#if BUILDFLAG(IS_WIN)
-    // 드롭 판정과 애니메이션은 물리 좌표를 쓴다. Windows Views에 배치할
+    // 드롭 판정과 애니메이션은 물리 좌표를 쓴다. Views에 배치할
     // 때만 논리 bounds로 바꿔 RTL 반전이 중복되지 않게 한다.
     SetBoundsRect(parent()->GetMirroredRect(bounds_in_tab_strip));
-#else
-    SetBoundsRect(bounds_in_tab_strip);
-#endif
   }
 
   double CurrentGroupIndent() const {

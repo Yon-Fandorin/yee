@@ -9,6 +9,7 @@
 | --- | --- |
 | `ui/` | 창의 UI, Sidebar, 고정 탭, 분할 화면, Agent 상태와 입력 요청 |
 | `content_blocking/` | 네트워크 요청을 검사하고 허용된 요청을 Chromium에 전달 |
+| [`projects/`](projects/README.md) | 프로필의 프로젝트·페이지 참조 저장과 실제 탭의 UUID 연결 |
 
 새 제품 UI는 `ui/`에 둔다. Favorites 용량이나 그룹 표시 같은 제품 규칙은
 Chromium의 탭 모델에 넣지 않는다. 원본에 필요한 연결 변경은
@@ -20,6 +21,7 @@ Chromium의 탭 모델에 넣지 않는다. 원본에 필요한 연결 변경은
 | --- | --- |
 | `ui/` | `chrome/browser/ui/views/yee/` |
 | `content_blocking/` | `chrome/browser/yee_content_blocking/` |
+| `projects/` | `chrome/browser/yee_projects/` |
 
 경로는 [`build/overlay.json`](../build/overlay.json)에서 관리한다.
 이 README는 저장소 안내이므로 Chromium에 복사하지 않는다.

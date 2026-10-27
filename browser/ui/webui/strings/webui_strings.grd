@@ -450,6 +450,37 @@
       <message name="IDS_YEE_WEBUI_FOOTER_MENU_TITLE" desc="footerMenuTitle: native sidebar workspace menu." meaning="footerMenuTitle">Workspace and account menu</message>
       <message name="IDS_YEE_WEBUI_FOOTER_MENU_ACCESSIBLE_NAME" desc="Accessible name of the workspace menu trigger, including the current workspace and account." meaning="footerMenuAccessibleName"><ph name="WORKSPACE">$1<ex>Personal</ex></ph>, <ph name="ACCOUNT">$2<ex>Local profile</ex></ph>, workspace menu</message>
       <message name="IDS_YEE_WEBUI_FOOTER_BACK" desc="Accessible description for the native sidebar menu back button." meaning="footerBack">Back to workspace menu</message>
+      <message name="IDS_YEE_PROJECTS" desc="프로젝트 탐색 UI" translateable="true">Projects</message>
+      <message name="IDS_YEE_PROJECT_NEW" desc="프로젝트 탐색 UI" translateable="true">New project</message>
+      <message name="IDS_YEE_PROJECT_NAME" desc="프로젝트 탐색 UI" translateable="true">Project name</message>
+      <message name="IDS_YEE_PROJECT_CREATE" desc="프로젝트 탐색 UI" translateable="true">Create</message>
+      <message name="IDS_YEE_PROJECT_SAVE" desc="프로젝트 탐색 UI" translateable="true">Save</message>
+      <message name="IDS_YEE_PROJECT_RENAME" desc="프로젝트 탐색 UI" translateable="true">Edit project</message>
+      <message name="IDS_YEE_PROJECT_DELETE" desc="프로젝트 탐색 UI" translateable="true">Delete project</message>
+      <message name="IDS_YEE_PROJECT_DELETE_DESCRIPTION" desc="프로젝트 탐색 UI" translateable="true">Remove this project and its saved references? Your browser tabs will stay open.</message>
+      <message name="IDS_YEE_PROJECT_ADD_CURRENT" desc="프로젝트 탐색 UI" translateable="true">Add current tab</message>
+      <message name="IDS_YEE_PROJECT_REMOVE" desc="프로젝트 탐색 UI" translateable="true">Remove</message>
+      <message name="IDS_YEE_PROJECT_BACK" desc="프로젝트 탐색 UI" translateable="true">Back to page</message>
+      <message name="IDS_YEE_PROJECT_PICKER" desc="프로젝트 탐색 UI" translateable="true">Switch project</message>
+      <message name="IDS_YEE_PROJECT_PAGES" desc="프로젝트 탐색 UI" translateable="true">Pages</message>
+      <message name="IDS_YEE_PROJECT_EMPTY" desc="프로젝트 탐색 UI" translateable="true">No pages yet</message>
+      <message name="IDS_YEE_PROJECT_EMPTY_DESCRIPTION" desc="프로젝트 탐색 UI" translateable="true">Add your current web tab to keep it with this project. Saved pages stay here when you close their tabs.</message>
+      <message name="IDS_YEE_PROJECT_LIVE" desc="프로젝트 탐색 UI" translateable="true">Tab open</message>
+      <message name="IDS_YEE_PROJECT_SAVED" desc="프로젝트 탐색 UI" translateable="true">Saved</message>
+      <message name="IDS_YEE_PROJECT_MOVE" desc="프로젝트 탐색 UI" translateable="true">Move page to this project?</message>
+      <message name="IDS_YEE_PROJECT_MOVE_DESCRIPTION" desc="프로젝트 탐색 UI" translateable="true">This tab belongs to another project. Moving it will remove its reference from that project. The tab will stay open.</message>
+      <message name="IDS_YEE_PROJECT_MOVE_ACTION" desc="프로젝트 탐색 UI" translateable="true">Move</message>
+      <message name="IDS_YEE_PROJECT_READ_ONLY" desc="프로젝트 탐색 UI" translateable="true">Project data cannot be edited in this version. Your saved data has been preserved.</message>
+      <message name="IDS_YEE_PROJECT_OVERVIEW" desc="프로젝트 탐색 UI" translateable="true">Project overview</message>
+      <message name="IDS_YEE_PROJECT_CUSTOMIZE" desc="프로젝트 탐색 UI" translateable="true">Customize</message>
+      <message name="IDS_YEE_PROJECT_DESCRIPTION" desc="프로젝트 설명 입력란">Description (optional)</message>
+      <message name="IDS_YEE_PROJECT_TOGGLE_SIDEBAR" desc="허브의 사이드바 조작">Toggle sidebar</message>
+      <message name="IDS_YEE_CREATE_NEW_TAB" desc="셸 만들기 메뉴">New tab</message>
+      <message name="IDS_YEE_CREATE_NEW_GROUP" desc="셸 만들기 메뉴">New group</message>
+      <message name="IDS_YEE_PROJECT_REMOVE_TOOLTIP" desc="프로젝트 참조 제거 안내">Remove from project</message>
+      <message name="IDS_YEE_PROJECT_CLOSE_PAGE" desc="프로젝트 탐색 조작">Close tab</message>
+      <message name="IDS_YEE_PROJECT_MORE" desc="프로젝트 탐색 조작">Project options</message>
+      <message name="IDS_YEE_PROJECT_TOGGLE_PAGES" desc="프로젝트의 왼쪽 폴딩 조작">Expand or collapse project pages</message>
     </messages>
   </release>
 </grit>

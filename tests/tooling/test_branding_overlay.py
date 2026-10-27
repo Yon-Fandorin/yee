@@ -90,6 +90,8 @@ INPUT_PATHS = (
     "chrome/installer/setup/setup_util_unittest.cc",
     "chrome/installer/setup/BUILD.gn",
     "chrome/installer/setup/install_worker_unittest.cc",
+    "components/os_crypt/common/BUILD.gn",
+    "components/os_crypt/common/keychain_password_mac.mm",
 )
 ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 

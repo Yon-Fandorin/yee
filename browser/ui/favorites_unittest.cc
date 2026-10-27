@@ -320,7 +320,6 @@ TEST_F(FavoritesDragGeometryTest, RealPreviewUsesTheSharedTabGeometry) {
   EXPECT_FALSE(preview->GetVisible());
 }
 
-#if BUILDFLAG(IS_WIN)
 TEST_F(FavoritesDragGeometryTest, PreviewScreenBoundsMatchRowsInLtrAndRtl) {
   auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
       gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -350,7 +349,6 @@ TEST_F(FavoritesDragGeometryTest, PreviewScreenBoundsMatchRowsInLtrAndRtl) {
     }
   }
 }
-#endif  // BUILDFLAG(IS_WIN)
 
 TEST_F(FavoritesDragGeometryTest,
        ReducedMotionRetargetsPreviewImmediatelyInLtrAndRtl) {
@@ -375,11 +373,7 @@ TEST_F(FavoritesDragGeometryTest,
     views::View* preview =
         tab_strip().GetViewByID(kSidebarFavoritesDragPreviewViewId);
     ASSERT_NE(preview, nullptr);
-#if BUILDFLAG(IS_WIN)
     const gfx::Rect preview_bounds = preview->GetMirroredBounds();
-#else
-    const gfx::Rect preview_bounds = preview->bounds();
-#endif
     EXPECT_EQ(preview_bounds,
               TabDragPreviewBoundsInTabStrip(
                   tab_strip(), pointer_in_screen, /*tab_leading_inset=*/16,

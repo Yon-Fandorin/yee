@@ -1,0 +1,57 @@
+# Copyright 2026 The Yee Authors
+# Use of this source code is governed by a BSD-style license in LICENSE.
+
+import("//testing/test.gni")
+
+source_set("service") {
+  public = [ "project_service.h" ]
+  sources = [ "project_service.cc" ]
+  public_deps = [
+    "//base",
+    "//components/keyed_service/core",
+    "//url",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("tab_identity") {
+  public = [ "project_tab_helper.h" ]
+  sources = [ "project_tab_helper.cc" ]
+  public_deps = [ "//content/public/browser" ]
+  deps = [ "//base" ]
+}
+
+source_set("browser") {
+  public = [
+    "project_service_factory.h",
+    "project_tab_coordinator.h",
+  ]
+  sources = [
+    "project_service_factory.cc",
+    "project_tab_coordinator.cc",
+  ]
+  public_deps = [
+    ":service",
+    ":tab_identity",
+    "//chrome/browser/profiles:profile",
+    "//components/sessions:session_id",
+    "//components/tabs:public",
+  ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/browser_window",
+    "//components/pref_registry",
+    "//components/sessions",
+  ]
+}
+
+test("project_service_unittests") {
+  sources = [ "project_service_unittest.cc" ]
+  deps = [
+    ":service",
+    "//base/test:run_all_unittests",
+    "//components/prefs:test_support",
+    "//testing/gtest",
+  ]
+}

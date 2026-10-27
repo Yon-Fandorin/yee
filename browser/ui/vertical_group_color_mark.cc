@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "base/functional/bind.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -18,6 +19,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image_skia.h"
 
 namespace yee {
 namespace {
@@ -38,7 +40,10 @@ gfx::Size SlotSize() {
 
 }  // namespace
 
-VerticalGroupColorMark::VerticalGroupColorMark() {
+VerticalGroupColorMark::VerticalGroupColorMark()
+    : disclosure_arrow_(base::BindRepeating(
+          [](VerticalGroupColorMark* mark) { mark->SchedulePaint(); },
+          base::Unretained(this))) {
   SetCanProcessEventsWithinSubtree(false);
   halo_animation_.SetTweenType(gfx::Tween::EASE_IN_OUT);
   halo_animation_.SetThrobDuration(base::Milliseconds(900));
@@ -80,6 +85,25 @@ void VerticalGroupColorMark::SetUnread(bool unread) {
   SchedulePaint();
 }
 
+void VerticalGroupColorMark::SetDisclosureState(bool visible,
+                                                bool expanded,
+                                                SkColor foreground) {
+  if (disclosure_visible_ == visible && expanded_ == expanded &&
+      disclosure_color_ == foreground)
+    return;
+  disclosure_arrow_.SetExpanded(expanded,
+                                IsDrawn() && disclosure_visible_ && visible);
+  disclosure_visible_ = visible;
+  expanded_ = expanded;
+  disclosure_color_ = foreground;
+  SchedulePaint();
+}
+
+void VerticalGroupColorMark::SetDisclosureAppearance(bool expanded,
+                                                     SkColor foreground) {
+  SetDisclosureState(disclosure_visible_, expanded, foreground);
+}
+
 gfx::Size VerticalGroupColorMark::CalculatePreferredSize(
     const views::SizeBounds&) const {
   return SlotSize();
@@ -90,6 +114,12 @@ gfx::Size VerticalGroupColorMark::GetMinimumSize() const {
 }
 
 void VerticalGroupColorMark::OnPaint(gfx::Canvas* canvas) {
+  if (disclosure_visible_) {
+    const int size = kSidebarMetrics.group_mark_slot_size;
+    const auto image = disclosure_arrow_.GetImage(disclosure_color_);
+    canvas->DrawImageInt(image, (width() - size) / 2, (height() - size) / 2);
+    return;
+  }
   if (SkColorGetA(color_) == 0) {
     return;
   }
@@ -109,17 +139,17 @@ void VerticalGroupColorMark::OnPaint(gfx::Canvas* canvas) {
     const double throb = gfx::Animation::ShouldRenderRichAnimation()
                              ? halo_animation_.GetCurrentValue()
                              : 1.0;
-    const float scale = static_cast<float>(gfx::Tween::DoubleValueBetween(
-        throb, kAudioHaloMinScale, 1.0));
+    const float scale = static_cast<float>(
+        gfx::Tween::DoubleValueBetween(throb, kAudioHaloMinScale, 1.0));
     const float opacity = static_cast<float>(gfx::Tween::DoubleValueBetween(
         throb, kAudioHaloMinOpacity, kAudioHaloMaxOpacity));
     cc::PaintFlags halo_flags;
     halo_flags.setAntiAlias(true);
     halo_flags.setStyle(cc::PaintFlags::kFill_Style);
     halo_flags.setColor(SkColorSetA(
-        color_, static_cast<SkAlpha>(std::clamp(
-                    std::lround(kAudioHaloColorAlpha * opacity * 255.0f), 0L,
-                    255L))));
+        color_,
+        static_cast<SkAlpha>(std::clamp(
+            std::lround(kAudioHaloColorAlpha * opacity * 255.0f), 0L, 255L))));
     canvas->DrawCircle(center, (bounds.width() / 2.0f) * scale, halo_flags);
   }
 
@@ -172,9 +202,8 @@ void VerticalGroupColorMark::AnimationProgressed(
 }
 
 void VerticalGroupColorMark::UpdateHaloAnimation() {
-  const bool should_animate =
-      audio_active_ && !needs_input_ &&
-      gfx::Animation::ShouldRenderRichAnimation();
+  const bool should_animate = audio_active_ && !needs_input_ &&
+                              gfx::Animation::ShouldRenderRichAnimation();
   if (should_animate) {
     if (!halo_animation_.is_animating()) {
       halo_animation_.StartThrobbing(-1);

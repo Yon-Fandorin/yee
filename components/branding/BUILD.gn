@@ -32,3 +32,20 @@ test("internal_urls_unittests") {
     "//testing/gtest",
   ]
 }
+
+if (is_mac) {
+  process_version("mac_identity") {
+    sources = [ "//chrome/app/yee_mac_identity.values" ]
+    template_file = "mac_identity.h.in"
+    output = "$target_gen_dir/mac_identity.h"
+  }
+
+  test("mac_identity_unittests") {
+    sources = [ "mac_identity_unittest.cc" ]
+    deps = [
+      ":mac_identity",
+      "//base/test:run_all_unittests",
+      "//testing/gtest",
+    ]
+  }
+}

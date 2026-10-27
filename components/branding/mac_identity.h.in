@@ -1,0 +1,30 @@
+// Copyright 2026 The Yee Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// branding/identity.json에서 생성한 설치판 전용 식별자다.
+#ifndef COMPONENTS_YEE_BRANDING_MAC_IDENTITY_H_
+#define COMPONENTS_YEE_BRANDING_MAC_IDENTITY_H_
+
+#include <string_view>
+
+namespace yee::identity {
+
+inline constexpr char kMacBundleId[] = "@YEE_MAC_BUNDLE_ID@";
+inline constexpr char kMacKeychainService[] = "@YEE_MAC_KEYCHAIN_SERVICE@";
+inline constexpr char kMacKeychainAccount[] = "@YEE_MAC_KEYCHAIN_ACCOUNT@";
+
+// 개발 번들과 다른 브라우저는 기존 키체인으로 암호화한 데이터를 계속 읽는다.
+inline const char* KeychainServiceName(std::string_view bundle_id,
+                                       const char* fallback) {
+  return bundle_id == kMacBundleId ? kMacKeychainService : fallback;
+}
+
+inline const char* KeychainAccountName(std::string_view bundle_id,
+                                       const char* fallback) {
+  return bundle_id == kMacBundleId ? kMacKeychainAccount : fallback;
+}
+
+}  // namespace yee::identity
+
+#endif  // COMPONENTS_YEE_BRANDING_MAC_IDENTITY_H_

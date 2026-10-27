@@ -28,9 +28,11 @@
 #include "chrome/browser/ui/views/yee/agent_bridge.h"
 #include "chrome/browser/ui/views/yee/agent_bridge_state.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+#include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkRRect.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/menu_source_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -199,6 +201,7 @@ SkColor ResolveShellPaintColor(const views::View& view) {
 enum class ShellCreateCommand {
   kNewTab = 1,
   kNewGroup,
+  kNewProject,
   kChat,
 };
 
@@ -677,34 +680,41 @@ class YeeShellAddButton : public ui::SimpleMenuModel::Delegate,
                           public YeeShellToolbarButton {
  public:
   YeeShellAddButton(yee::ShellCreateCallback callback,
-                    yee::SidebarPopupLockCallback acquire_popup_lock)
+                    yee::SidebarPopupLockCallback acquire_popup_lock,
+                    bool projects_enabled)
       : YeeShellToolbarButton(base::BindRepeating(&YeeShellAddButton::OpenMenu,
                                                   base::Unretained(this)),
                               std::make_unique<SidebarCreateMenuModel>(
                                   this,
                                   std::move(acquire_popup_lock))),
-        callback_(std::move(callback)) {
+        callback_(std::move(callback)), projects_enabled_(projects_enabled) {
     auto* const menu = static_cast<ui::SimpleMenuModel*>(menu_model());
     menu->AddItemWithIcon(
-        static_cast<int>(ShellCreateCommand::kNewTab), u"New tab",
+        static_cast<int>(ShellCreateCommand::kNewTab), l10n_util::GetStringUTF16(IDS_YEE_CREATE_NEW_TAB),
         ui::ImageModel::FromVectorIcon(kTabIcon, ui::kColorMenuIcon,
                                        kShellMenuIconSize));
     menu->AddItemWithIcon(
-        static_cast<int>(ShellCreateCommand::kNewGroup), u"New group",
+        static_cast<int>(ShellCreateCommand::kNewGroup), l10n_util::GetStringUTF16(IDS_YEE_CREATE_NEW_GROUP),
         ui::ImageModel::FromVectorIcon(kGroupCustomIcon, ui::kColorMenuIcon,
                                        kShellMenuIconSize));
+    menu->AddItem(static_cast<int>(ShellCreateCommand::kNewProject),
+                  l10n_util::GetStringUTF16(IDS_YEE_PROJECT_NEW));
     menu->AddItemWithIcon(
         static_cast<int>(ShellCreateCommand::kChat), u"Chat",
         ui::ImageModel::FromVectorIcon(vector_icons::kChatIcon,
                                        ui::kColorMenuIcon, kShellMenuIconSize));
 
-    SetTooltipText(u"Create");
-    GetViewAccessibility().SetName(u"Create");
+    SetTooltipText(l10n_util::GetStringUTF16(IDS_YEE_PROJECT_CREATE));
+    GetViewAccessibility().SetName(l10n_util::GetStringUTF16(IDS_YEE_PROJECT_CREATE));
   }
 
   YeeShellAddButton(const YeeShellAddButton&) = delete;
   YeeShellAddButton& operator=(const YeeShellAddButton&) = delete;
   ~YeeShellAddButton() override = default;
+
+  bool IsCommandIdEnabled(int command_id) const override {
+    return command_id != static_cast<int>(ShellCreateCommand::kNewProject) || projects_enabled_;
+  }
 
   void ExecuteCommand(int command_id, int event_flags) override {
     switch (static_cast<ShellCreateCommand>(command_id)) {
@@ -713,6 +723,9 @@ class YeeShellAddButton : public ui::SimpleMenuModel::Delegate,
         return;
       case ShellCreateCommand::kNewGroup:
         callback_.Run(yee::ShellCreateAction::kNewGroup, event_flags);
+        return;
+      case ShellCreateCommand::kNewProject:
+        callback_.Run(yee::ShellCreateAction::kNewProject, event_flags);
         return;
       case ShellCreateCommand::kChat:
         callback_.Run(yee::ShellCreateAction::kChat, event_flags);
@@ -727,6 +740,7 @@ class YeeShellAddButton : public ui::SimpleMenuModel::Delegate,
   }
 
   yee::ShellCreateCallback callback_;
+  const bool projects_enabled_;
 };
 
 class YeeAgentToolbarButton : public YeeShellToolbarButton {
@@ -895,10 +909,11 @@ public:
   YeeSidebarHeaderActionsView(
       yee::ShellCreateCallback create_callback,
       views::Button::PressedCallback agent_callback,
-      yee::SidebarPopupLockCallback acquire_popup_lock) {
+      yee::SidebarPopupLockCallback acquire_popup_lock,
+      bool projects_enabled) {
     SetID(yee::kSidebarHeaderActionsViewId);
     auto add_button = yee::CreateShellAddButton(std::move(create_callback),
-                                                std::move(acquire_popup_lock));
+                                                std::move(acquire_popup_lock), projects_enabled);
     add_button->SetVectorIcon(kAddIcon);
     add_button->SetID(yee::kSidebarHeaderCreateViewId);
     add_button_ = AddChildView(std::move(add_button));
@@ -1603,9 +1618,9 @@ std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
 
 std::unique_ptr<ToolbarButton> CreateShellAddButton(
     ShellCreateCallback callback,
-    SidebarPopupLockCallback acquire_popup_lock) {
+    SidebarPopupLockCallback acquire_popup_lock, bool projects_enabled) {
   return std::make_unique<YeeShellAddButton>(std::move(callback),
-                                             std::move(acquire_popup_lock));
+                                             std::move(acquire_popup_lock), projects_enabled);
 }
 
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
@@ -1616,10 +1631,10 @@ std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
 std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
     ShellCreateCallback create_callback,
     views::Button::PressedCallback agent_callback,
-    SidebarPopupLockCallback acquire_popup_lock) {
+    SidebarPopupLockCallback acquire_popup_lock, bool projects_enabled) {
   return std::make_unique<YeeSidebarHeaderActionsView>(
       std::move(create_callback), std::move(agent_callback),
-      std::move(acquire_popup_lock));
+      std::move(acquire_popup_lock), projects_enabled);
 }
 
 int GetSidebarHeaderMinimumWidth(int leading_exclusion) {

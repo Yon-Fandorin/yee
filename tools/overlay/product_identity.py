@@ -29,10 +29,18 @@ class WindowsIdentity:
 
 
 @dataclass(frozen=True)
+class MacIdentity:
+    bundle_id: str
+    keychain_service: str
+    keychain_account: str
+
+
+@dataclass(frozen=True)
 class ProductIdentity:
     product_id: str
     profile_directory: str
     windows: WindowsIdentity
+    macos: MacIdentity
 
     @property
     def windows_policy_key(self):
@@ -49,7 +57,7 @@ class ProductIdentity:
 def load_identity(config_path=CONFIG_PATH):
     raw = json.loads(Path(config_path).read_text(encoding="utf-8"))
     if (not isinstance(raw, dict)
-            or set(raw) != {"schema_version", "product_id", "profile_directory", "windows"}
+            or set(raw) != {"schema_version", "product_id", "profile_directory", "windows", "macos"}
             or type(raw["schema_version"]) is not int or raw["schema_version"] != 1):
         raise ValueError("Unsupported identity.json schema")
     for key in ("product_id", "profile_directory"):
@@ -93,7 +101,21 @@ def load_identity(config_path=CONFIG_PATH):
         raise ValueError("Windows registration GUIDs must not reuse Chromium identity")
     if windows["browser_prog_id_prefix"].lower() == windows["pdf_prog_id_prefix"].lower():
         raise ValueError("Browser and PDF ProgIDs must be distinct")
-    return ProductIdentity(raw["product_id"], raw["profile_directory"], WindowsIdentity(**windows))
+    macos = raw["macos"]
+    if not isinstance(macos, dict) or set(macos) != set(MacIdentity.__dataclass_fields__):
+        raise ValueError("Invalid macOS identity fields")
+    bundle_id = macos["bundle_id"]
+    if (not isinstance(bundle_id, str) or len(bundle_id) > 200
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*){2,}", bundle_id)
+            or bundle_id.lower().startswith(("org.chromium.", "com.google."))):
+        raise ValueError("Invalid or reserved macOS bundle ID")
+    for key in ("keychain_service", "keychain_account"):
+        value = macos[key]
+        if (not isinstance(value, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9 -]{0,79}", value)
+                or value != value.strip() or value.lower().startswith(("chromium", "chrome", "google"))):
+            raise ValueError(f"Invalid or reserved macOS {key}")
+    return ProductIdentity(raw["product_id"], raw["profile_directory"],
+                           WindowsIdentity(**windows), MacIdentity(**macos))
 
 
 def guid_initializer(value):
@@ -130,6 +152,10 @@ def generated_inputs(identity):
         header.append(f"inline constexpr GUID k{name} = {guid_initializer(value)};")
     header += ["}  // namespace yee::identity", "#endif", ""]
     return {
+        "chrome/app/yee_mac_identity.values": (
+            f"YEE_MAC_BUNDLE_ID={identity.macos.bundle_id}\n"
+            f"YEE_MAC_KEYCHAIN_SERVICE={identity.macos.keychain_service}\n"
+            f"YEE_MAC_KEYCHAIN_ACCOUNT={identity.macos.keychain_account}\n"),
         "chrome/app/yee_product_identity.h": "\n".join(header),
         "chrome/app/yee_product_identity.gni": (
             "# branding/identity.json에서 생성.\n"

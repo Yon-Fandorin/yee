@@ -125,6 +125,19 @@ macOS 앱 서비스에 접근할 수 있는 일반 터미널에서 실행한다.
 새 빌드의 실제 앱 확인 전에는 [`AGENTS.md`](../../AGENTS.md)에 따라 모든 개발 브라우저의
 정상 종료를 확인하고 새 앱을 실행한다.
 
+## macOS 설치 파일
+
+```sh
+./tools/dev/package-macos.sh
+./tools/dev/package-macos.sh --skip-build
+node tools/dev/test-macos-installer.mjs PACKAGE_DIRECTORY
+```
+
+`.local-build/releases/`에 드래그 설치용 DMG·메타데이터·설치 안내를 만든다.
+기본 명령은 전체 앱을 먼저 빌드하며 `--skip-build`도 버전과 번들 구성을 검사한다.
+현재는 ad-hoc 서명한 테스트판이며 Developer ID 서명과 Apple 공증은 포함하지 않는다.
+독립 프로필, 설치·교체와 검수 범위는 [macOS 테스트판](../../docs/macos-test-release.md)을 참고한다.
+
 ## Windows 준비 사항
 
 현재 `doctor.ps1`이 확인하는 준비 사항은 다음과 같다.

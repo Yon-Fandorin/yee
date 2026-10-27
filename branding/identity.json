@@ -2,6 +2,11 @@
   "schema_version": 1,
   "product_id": "yee",
   "profile_directory": "Yee",
+  "macos": {
+    "bundle_id": "io.github.yon-fandorin.yee",
+    "keychain_service": "Yee Safe Storage",
+    "keychain_account": "Yee"
+  },
   "windows": {
     "application_name": "Yee",
     "app_id": "Yee",

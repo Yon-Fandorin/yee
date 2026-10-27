@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_VERTICAL_GROUP_COLOR_MARK_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_VERTICAL_GROUP_COLOR_MARK_H_
 
+#include "chrome/browser/ui/views/yee/disclosure_arrow.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/animation/animation_delegate.h"
@@ -30,6 +31,9 @@ class VerticalGroupColorMark : public views::View,
   void SetNeedsInput(bool needs_input);
   void SetAudioActive(bool audio_active);
   void SetUnread(bool unread);
+  // 같은 leading 칸에서 hover/focus 때에만 펼침 조작을 표시한다.
+  void SetDisclosureState(bool visible, bool expanded, SkColor foreground);
+  void SetDisclosureAppearance(bool expanded, SkColor foreground);
 
   // views::View:
   gfx::Size CalculatePreferredSize(
@@ -44,9 +48,13 @@ class VerticalGroupColorMark : public views::View,
   void UpdateHaloAnimation();
 
   SkColor color_ = SK_ColorTRANSPARENT;
+  SkColor disclosure_color_ = SK_ColorTRANSPARENT;
+  bool disclosure_visible_ = false;
+  bool expanded_ = false;
   bool needs_input_ = false;
   bool audio_active_ = false;
   bool unread_ = false;
+  DisclosureArrow disclosure_arrow_;
   gfx::ThrobAnimation halo_animation_{this};
 };
 

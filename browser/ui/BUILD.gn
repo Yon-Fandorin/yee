@@ -12,6 +12,58 @@ source_set("shell_features") {
   deps = [ "//base" ]
 }
 
+source_set("project_navigation") {
+  friend = [ ":site_controls_browsertests" ]
+  public = [
+    "projects/project_navigation_controller.h",
+    "projects/project_navigation_presentation.h",
+  ]
+  sources = [
+    "projects/project_controls.cc",
+    "projects/project_controls.h",
+    "projects/project_hub_view.cc",
+    "projects/project_hub_view.h",
+    "projects/project_navigation_controller.cc",
+    "projects/project_navigation_view.cc",
+    "projects/project_navigation_view.h",
+    "projects/project_page_button.cc",
+    "projects/project_page_button.h",
+    "projects/project_row_view.cc",
+    "projects/project_row_view.h",
+  ]
+  public_deps = [
+    ":yee_ui",
+    "//base",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//ui/base/unowned_user_data",
+    "//ui/views",
+  ]
+  deps = [
+    "webui:strings",
+    "//chrome/app:command_ids",
+    "//chrome/app/vector_icons",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/favicon",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/color:color_headers",
+    "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/views/tabs/tab",
+    "//chrome/browser/ui/views/toolbar",
+    "//chrome/browser/yee_projects:browser",
+    "//components/favicon/content",
+    "//components/favicon/core",
+    "//components/favicon_base",
+    "//components/vector_icons",
+    "//content/public/browser",
+    "//skia",
+    "//ui/base",
+    "//ui/color",
+    "//ui/compositor",
+  ]
+}
+
 source_set("side_panel_colors") {
   public = [ "side_panel_colors.h" ]
   sources = [ "side_panel_colors.cc" ]
@@ -66,9 +118,9 @@ source_set("default_browser_prompt") {
   public_deps = [ "//ui/base" ]
   deps = [
     ":product_logo",
+    "webui:strings",
     "//base",
     "//base/version_info",
-    "webui:strings",
   ]
 }
 
@@ -99,15 +151,37 @@ source_set("page_viewport_migration") {
 }
 
 source_set("agent_browser_contract") {
-  public = [ "agent_browser_contract.h", "agent_input_request.h", "agent_request_timing.h", "agent_task_permissions.h", "agent_request_ledger.h" ]
-  sources = [ "agent_browser_contract.cc", "agent_input_request.cc", "agent_request_ledger.cc" ]
-  public_deps = [ "//base", "//url" ]
+  public = [
+    "agent_browser_contract.h",
+    "agent_input_request.h",
+    "agent_request_ledger.h",
+    "agent_request_timing.h",
+    "agent_task_permissions.h",
+  ]
+  sources = [
+    "agent_browser_contract.cc",
+    "agent_input_request.cc",
+    "agent_request_ledger.cc",
+  ]
+  public_deps = [
+    "//base",
+    "//url",
+  ]
 }
 
 source_set("agent_tab_activity") {
-  public = [ "agent_tab_activity.h", "agent_bridge_state.h" ]
-  sources = [ "agent_tab_activity.cc", "agent_bridge_state.cc" ]
-  public_deps = [ "//components/tabs:public", "//base" ]
+  public = [
+    "agent_bridge_state.h",
+    "agent_tab_activity.h",
+  ]
+  sources = [
+    "agent_bridge_state.cc",
+    "agent_tab_activity.cc",
+  ]
+  public_deps = [
+    "//base",
+    "//components/tabs:public",
+  ]
 }
 
 source_set("agent_bridge_prompt") {
@@ -150,21 +224,21 @@ source_set("browser_surface_transition") {
 
 test("multi_contents_geometry_unittests") {
   sources = [
-    "multi_contents_geometry_unittest.cc",
-    "browser_surface_transition_unittest.cc",
     "agent_browser_contract_unittest.cc",
-    "agent_task_permissions_unittest.cc",
     "agent_input_request_unittest.cc",
     "agent_request_ledger_unittest.cc",
     "agent_tab_activity_unittest.cc",
+    "agent_task_permissions_unittest.cc",
+    "browser_surface_transition_unittest.cc",
+    "multi_contents_geometry_unittest.cc",
     "page_viewport_geometry_unittest.cc",
     "page_viewport_migration_unittest.cc",
   ]
   deps = [
-    ":multi_contents_geometry",
-    ":browser_surface_transition",
     ":agent_browser_contract",
     ":agent_tab_activity",
+    ":browser_surface_transition",
+    ":multi_contents_geometry",
     ":page_viewport_geometry",
     ":page_viewport_migration",
     "//base/test:run_all_unittests",
@@ -180,34 +254,35 @@ source_set("yee_ui") {
     "browser_surface_layout.h",
     "browser_surface_presentation.h",
     "browser_surface_presentation_binding.h",
+    "disclosure_arrow.h",
     "favorites.h",
     "group_mark_signals.h",
-    "tab_group_presentation.h",
     "horizontal_tab_presentation.h",
     "immersive_header.h",
-    "omnibox_popup_style.h",
     "multi_contents_geometry.h",
-    "page_viewport_migration.h",
+    "omnibox_popup_style.h",
     "page_viewport_hosts.h",
+    "page_viewport_migration.h",
     "sidebar_footer.h",
     "sidebar_presentation.h",
     "sidebar_sections.h",
     "site_controls.h",
     "split_pane_controls.h",
+    "tab_group_presentation.h",
     "vertical_group_color_mark.h",
     "vertical_tab_text_view.h",
     "yee_ui.h",
   ]
   sources = [
-    "brand.h",
     "agent_bridge.cc",
     "agent_bridge_script.h",
+    "brand.h",
     "browser_surface_color_controller.cc",
     "browser_surface_layout.cc",
     "browser_surface_presentation_binding.cc",
+    "disclosure_arrow.cc",
     "favorites.cc",
     "group_mark_signals.cc",
-    "tab_group_presentation.cc",
     "horizontal_tab_presentation.cc",
     "immersive_header.cc",
     "omnibox_popup_style.cc",
@@ -217,6 +292,7 @@ source_set("yee_ui") {
     "sidebar_sections.cc",
     "site_controls.cc",
     "split_pane_controls.cc",
+    "tab_group_presentation.cc",
     "vertical_group_color_mark.cc",
     "vertical_tab_text_view.cc",
     "yee_ui.cc",
@@ -224,13 +300,13 @@ source_set("yee_ui") {
 
   public_deps = [
     ":agent_bridge_prompt",
-    ":shell_features",
     ":agent_browser_contract",
     ":agent_tab_activity",
     ":browser_surface_transition",
     ":multi_contents_geometry",
     ":page_viewport_geometry",
     ":page_viewport_migration",
+    ":shell_features",
     "//content/public/browser",
     "//ui/gfx/animation",
     "//ui/views",
@@ -275,20 +351,24 @@ test("site_controls_browsertests") {
   sources = [
     "//chrome/browser/prefs/session_startup_pref_unittest.cc",
     "bookmarks/bookmarks_browsertest.cc",
+    "disclosure_arrow_unittest.cc",
     "downloads/downloads_browsertest.cc",
     "extensions/extensions_browsertest.cc",
     "history/history_browsertest.cc",
     "internal_urls_browsertest.cc",
+    "projects/project_navigation_browsertest.cc",
     "site_controls_browsertest.cc",
     "youtube_live_browsertest.cc",
   ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   deps = [
+    ":project_navigation",
     ":yee_ui",
     "bookmarks",
     "downloads",
     "extensions",
     "history",
+    "webui:strings",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
@@ -300,14 +380,21 @@ test("site_controls_browsertests") {
     "//chrome/browser/policy:test_support",
     "//chrome/browser/prefs:util",
     "//chrome/browser/profiles:profile_io_data",
+    "//chrome/browser/sessions:test_support",
     "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui:ui_features",
+    "//chrome/browser/ui/animation",
     "//chrome/browser/ui/bookmarks",
     "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/color:color_headers",
     "//chrome/browser/ui/startup",
+    "//chrome/browser/ui/tabs",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/views/animations",
     "//chrome/browser/ui/views/page_info",
+    "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/yee_content_blocking:browser",
+    "//chrome/browser/yee_projects:browser",
     "//chrome/renderer",
     "//chrome/test:browser_tests_runner",
     "//chrome/test:test_support",
@@ -318,9 +405,11 @@ test("site_controls_browsertests") {
     "//components/bookmarks/test",
     "//components/crx_file",
     "//components/download/public/common:public",
+    "//components/favicon/content",
     "//components/history/core/browser",
     "//components/history/core/common",
     "//components/history/core/test",
+    "//components/javascript_dialogs",
     "//components/omnibox/browser",
     "//components/policy/core/common:test_support",
     "//components/prefs",
@@ -329,9 +418,9 @@ test("site_controls_browsertests") {
     "//components/sync_preferences:test_support",
     "//components/yee_branding",
     "//content/test:test_support",
+    "//extensions:test_support",
     "//extensions/browser",
     "//extensions/common",
-    "//extensions:test_support",
     "//net:test_support",
     "//testing/gtest",
     "//ui/compositor:test_support",
@@ -344,8 +433,16 @@ test("site_controls_browsertests") {
     "//chrome:packed_resources",
     "//ui/resources:ui_test_pak_data",
   ]
+  if (is_mac) {
+    sources += [
+      "projects/project_navigation_browsertest_mac.mm",
+      "projects/project_navigation_test_util.h",
+    ]
+  }
   if (is_win) {
-    sources += [ "//chrome/browser/accessibility/leaked_node_detection_browsertest.cc" ]
+    sources += [
+      "//chrome/browser/accessibility/leaked_node_detection_browsertest.cc",
+    ]
     deps += [
       "//chrome/browser/accessibility:test_support",
       "//chrome/browser/lifetime",

@@ -8,15 +8,16 @@
 | 파일 | 역할 |
 | --- | --- |
 | `brand.json` | 표시 이름, 내부 URL 접두어, 이름 확정 여부, SVG 원본·배색·생성 자산 경로 |
-| `identity.json` | 표시 이름과 독립적인 제품 ID·프로필 이름·Windows 설치 등록 식별자 |
+| `identity.json` | 제품 ID·프로필 이름·Windows 등록·Mac 설치판 Bundle ID와 키체인 식별자 |
 | `VERSION` | 설치·업데이트 순서에 사용하는 제품의 네 자리 배포 버전 |
 | `strings.json` | 제품 문구·번역 생성 범위와 보존 규칙 |
 | `surfaces.json` | 브랜딩 대상의 소스 위치, 처리 상태, 보존 이유와 테스트 항목 |
 
 `provisional`은 이름이 아직 확정되지 않았는지 표시한다.
 `identity.json`은 표시 이름을 바꿀 때 수정하지 않는다. 식별자 변경은 기존 설치·사용자
-데이터 접근에 영향을 주므로 별도의 이전 작업이 필요하다. Windows 테스트판은 새 Yee
-프로필을 사용하고 Chromium 데이터를 자동 이전하지 않는다.
+데이터 접근에 영향을 주므로 별도의 이전 작업이 필요하다. Windows와 Mac 설치판은
+독립 Yee 프로필을 사용하고 Chromium 데이터를 자동 이전하지 않는다.
+Mac 개발 번들의 기존 키체인은 유지하며, 패키징한 설치판에서만 Yee 식별자를 사용한다.
 `VERSION`은 `product_version.py`가 공통 Chromium 빌드 입력 `chrome/VERSION`에 적용한다.
 Yee 변경을 배포할 때도 이전 배포보다 큰 버전으로 올린다. 앞 세 자리는 checkout 원본의
 Chromium major/minor/build와 같아야 하고 마지막 자리는 엔진 patch 이상이어야 한다.

@@ -285,6 +285,7 @@ inline constexpr int kSidebarHeaderAgentViewId = 92014;
 enum class ShellCreateAction {
   kNewTab,
   kNewGroup,
+  kNewProject,
   kChat,
 };
 
@@ -475,7 +476,8 @@ std::unique_ptr<ToolbarButton> CreateShellToolbarButton(
     views::Button::PressedCallback callback);
 std::unique_ptr<ToolbarButton> CreateShellAddButton(
     ShellCreateCallback callback,
-    SidebarPopupLockCallback acquire_popup_lock = {});
+    SidebarPopupLockCallback acquire_popup_lock = {},
+    bool projects_enabled = true);
 std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
     views::Button::PressedCallback callback);
 
@@ -486,7 +488,8 @@ std::unique_ptr<ToolbarButton> CreateAgentToolbarButton(
 std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
     ShellCreateCallback create_callback,
     views::Button::PressedCallback agent_callback,
-    SidebarPopupLockCallback acquire_popup_lock = {});
+    SidebarPopupLockCallback acquire_popup_lock = {},
+    bool projects_enabled = true);
 // 최소 폭은 움직이지 않는 창 버튼 영역을 기준으로 하여 hover 중에도 유지한다.
 int GetSidebarHeaderMinimumWidth(int leading_exclusion);
 void SetSidebarHeaderActionsLeadingExclusion(views::View &view,
