@@ -142,7 +142,7 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
-| WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 사례에서 WebPreferences를 독립 적용하고 실제 media query와 선택 행의 계산된 표시를 검사 |
+| WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 실제 팝업의 renderer에 media emulation을 적용하고 실제 media query와 선택 행의 계산된 표시를 검사. Windows 대비 설정 전파 검증과는 별도 |
 | macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
 | macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
 
@@ -164,37 +164,33 @@ Windows 캡처는 `--enable-pixel-output-in-tests --disable-gpu`로 실제 화�
 각 exact case를 개별 프로세스로 실행한다. 출력 옵션 없는 검정 frame은 검수
 증거로 사용하지 않는다.
 
-2026-10-25 Windows 검수에서는 최종 단위 24개가 통과했고, 실제 미디어 Header의
-흰색·검정·빨강 Rest/Hover 캡처에서 주소줄의 직사각형 색 경계 제거와 미디어
-역할색·구분선을 확인했다. 미디어 native 검사 본문은 통과했으나 종료 시
-`ContentTestSuiteBase`의 접근성 COM `ghost_count=45` 검사가 실패했다. 캡처 없는
-미디어 사례와 기존 popup-following 사례도 같은 종료 지점에서 실패하므로 전체
-native suite 통과로 기록하지 않는다. macOS 실기 검수는 미실시다.
+Footer 회귀 검사는 외부 UIA 조회와 닫힌 요소의 무효화를 확인하고 접근성
+클라이언트를 UI 스레드 종료 전에 정리한다. 기존 COM 누수 검사는 유지한다.
 
-같은 Windows 검수에서 기본 WebUI·기존 Views의 balanced-insets 사례 각 2개는
-밝은·파란 실제 페이지의 배치·마우스 오버·방향키·Escape 본문 검사를 통과했다.
-두 경로의 실제 팝업 PNG에서도 구분선, 균등한 상하/좌우 여백과 네 모서리 곡률을
-확인했다. 종료 시에는 같은 접근성 COM 정리 검사(`ghost_count=49/69`)가
-실패했으므로 이 4개 사례도 전체 통과로 기록하지 않는다.
+WebUI balanced-insets 검사는 DOM 결과뿐 아니라 native WebView의 자동 크기 조절과
+실제 frame 표시를 기다린 뒤 hover를 보낸다. DOM 결과 교체 중에는 행이 다시
+준비될 때까지 기다리며, 캡처 옵션 없이도 두 split 방향의 검증을 수행한다.
 
-후속 Windows 검수에서는 접근성 클라이언트를 UI 스레드 종료 전에 정리하는
-Footer 회귀 검사를 추가했다. 기존 COM 누수 검사는 그대로 유지한 채 단위
-25개와 미디어·WebUI/Views 팝업·Footer의 실제 창 7종이 종료 단계까지 통과했다.
-Footer는 외부 UIA 조회와 닫힌 요소의 무효화를 포함해 3회 연속 통과했다.
-기존 42개 참조의 실제 보유 프로세스는 당시 기록으로 특정할 수 없지만, 같은
-실패가 외부 참조의 늦은 정리에서 53개로 재현되고 올바른 정리 뒤 0이 됐다.
+2026-10-27 Windows 후속 검수에서는 동일한 최종 검사 빌드로 40개 exact case를
+각각 새 프로세스와 별도 프로필에서 실행해 모두 종료 단계까지 통과했다.
+미디어 표시·실제 재생 4개, WebUI·Views 제안 4개, AI·맞춤설정 팝업 2개,
+창 버튼 8개, 분할·포커스·탭 상태 13개, 수평 탭·테마·경계 9개다.
+기본·RTL 125%·통합 탭바를 포함한다. 별도로 통과한 단위 106개와 도구 검사
+16개는 이 실제 창 검사 수에 합산하지 않는다.
 
-WebUI balanced-insets 검사는 DOM 결과가 생긴 것만으로 화면 좌표를 읽지 않는다.
-native WebView의 자동 크기 조절과 실제 frame 표시까지 기다린 뒤 hover를 보낸다.
-초기 1 DIP View를 기준으로 계산한 좌표가 팝업 밖을 가리키던 검사 경쟁 조건을
-해결하며, DOM 결과 교체 중에는 행이 다시 준비될 때까지 기다린다. 캡처 옵션
-없이 두 split 방향 모두 검증했다. macOS·Linux는 이번 실행에서 빌드하거나
-실기로 검사하지 않았다.
+제품 실행 파일과 `chrome.dll`은 `95f3e45` 검수본과 동일하며 검사 코드만 보완했다.
+WebUI 대비 행렬은 Blink의 색상 캐시도 갱신하는 정식 media emulation을 사용하고,
+실제 선택 행의 Down·Up 결과를 확인한다. 맞춤설정은 로컬 페이지의 탐색을 완료한
+뒤 실제 WebView와 활성 select를 제한 시간 안에서 확인하며 기존 6회의 native
+팝업 위치·Escape 검증을 유지한다. Rest 표면·구분선의 픽셀 검사 전에는 실제
+커서를 본문으로 옮기고 필요한 hover 종료를 기다린다. 모니터 밖 창 버튼 여백은
+논리 hit-test만 검증한다.
 
-2026-10-26 메인 통합 검토에서는 강제 색이 없는 대비 증가와 강제 색의
-custom·less에서도 선택 표시를 유지하도록 보완했다. 신규 WebUI 대비 행렬의
-실행과 이 보완본의 실제 앱 검수는 아직 미실시다. 앞선 balanced-insets 통과
-기록은 이 추가 접근성 사례의 실행 증거에 포함하지 않는다.
+대비 행렬은 renderer의 CSS 반응 검증이며 Windows 자체 대비 설정 전파나
+화면 읽기 프로그램 동작을 검증한 결과는 아니다. 이번 실행은 Windows의
+software rendering 경로이며 macOS·Linux 실기 결과를 의미하지 않는다.
+완료된 검수의 일회성 프로필·로그·캡처·보고서는 보관하지 않는다. 재검증에는
+저장소의 검사 코드와 위 실행 조건을 사용한다.
 
 테마 보강의 자동 검사와 빌드/실행 범위는
 [`theming-structural-audit.md`](../theming-structural-audit.md)를 따른다.
@@ -221,3 +217,27 @@ Site Controls의 숫자 칩은 같은 Header snapshot을 받으며, 실제 칩 �
 밝게·어둡게 native 창 캡처를 선택적으로 생성한다. 이 선택적 실행에서만 실제
 숫자 영역의 hover·클릭 전달·키보드 focus와 눌림·보호 해제·99+ 표시를 추가로
 확인한다. 일반 실행에서 캡처나 시스템 마우스 입력을 반복하지 않는다.
+
+## 4. Browser Surface에 남은 검증 범위
+
+구조별 구현·테스트 연결은 [레이아웃 검토](../browser-surface-layout-design-audit.md)를
+따른다. 과거 macOS 검수의 완료된 캡처·녹화·실행 이력은 정리했으며, 아래 한계는
+이번 Windows 40개 사례의 통과로 해소된 것으로 간주하지 않는다.
+
+- 전체화면의 제어된 전환 중간 픽셀과 실제 OS callback 타이밍. 안정된 전체화면
+  화면이나 결정적 epoch 검사가 실제 OS 전환의 모든 프레임을 증명하지 않는다.
+- Side Panel 전환은 제어된 compositor 읽기로 검증했지만, 당시 잠긴 세션 때문에
+  수정 후 새 OS 캡처를 얻지 못했다. 이후 해당 경로 변경 시 실제 창에서 재확인한다.
+- 전체 hard-clip 행렬의 Windows 배율별 실행과 Linux 200% 실행. 과거 macOS의
+  DSF 1/1.25/1.5/2 결과와 이번 Windows 기본·RTL 125% 사례는 범위가 다르다.
+- Status Bubble의 실제 hover 픽셀·포인터 전환, 실제 AI WebUI 제어와 pane 기준
+  탭 모달 픽셀. 기존 기하 검사나 before-unload 표시·Cancel만으로 대체하지 않는다.
+- Data Protection·Indigo·Actor의 실제 상태와 남은 Windows/Linux native-host·
+  compositor 조합. Glic·Lens·DevTools·Read Anything·Sad Tab 생명주기 검사와 구분한다.
+- `YeeSplitPanelDevToolsNoticeKeepOwningPane`는 Side Panel·분할·세 DevTools dock
+  전략·InfoBar의 적용 기하를 검사하며 실제 DevTools frontend 검증은 아니다.
+- 과거 `NativePlannerMatchesAppliedAnimationFramesAndReversal`의 Header 전경 픽셀은
+  간헐 실패 뒤 assertion 수정 없이 최종 재실행을 통과했다. 간헐 실패의 원인은 미확정이다.
+
+예약 Sidebar 슬롯 Pins·Bookmarks·Chat·Agent의 활성화는 제품 결정이며 검수를 위해
+임의로 켜지 않는다. 구조 검토의 `built`는 전체 플랫폼 독립 검증을 의미하지 않는다.

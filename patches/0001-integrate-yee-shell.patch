@@ -10016,10 +10016,10 @@ index 219734679c..7afe3c2317 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..b838de8f04 100644
+index 243d80a02d..221d4a3a4f 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,328 @@
+@@ -2,83 +2,330 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -10158,6 +10158,8 @@ index 243d80a02d..b838de8f04 100644
  #include "ui/base/interaction/interactive_test_definitions.h"
  #include "ui/base/pointer/touch_ui_controller.h"
 +#include "ui/base/test/ui_controls.h"
++#include "ui/display/display.h"
++#include "ui/display/screen.h"
 +#include "ui/color/color_provider.h"
 +#include "ui/color/color_provider_key.h"
 +#include "ui/compositor/canvas_painter.h"
@@ -10353,7 +10355,7 @@ index 243d80a02d..b838de8f04 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -95,9 +340,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -95,9 +342,10 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    auto ReplaceAndShowSidePanel(
        SidePanelType type,
@@ -10366,7 +10368,7 @@ index 243d80a02d..b838de8f04 100644
            // Note: there is a registry at browser level and one per tab; we want
            // the tab-specific one.
            auto* const registry =
-@@ -120,6 +366,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -120,6 +368,11 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                /*default_content_width_callback=*/base::NullCallback())));
            browser()->GetFeatures().side_panel_ui()->Show(
                SidePanelEntry::Id::kCustomizeChrome);
@@ -10378,7 +10380,7 @@ index 243d80a02d..b838de8f04 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -349,6 +600,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +602,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -10405,7 +10407,7 @@ index 243d80a02d..b838de8f04 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +637,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +639,164 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -10570,7 +10572,7 @@ index 243d80a02d..b838de8f04 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +1002,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +1004,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -10600,7 +10602,7 @@ index 243d80a02d..b838de8f04 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,195 +1052,4477 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,195 +1054,4507 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -10681,6 +10683,8 @@ index 243d80a02d..b838de8f04 100644
 -#endif
 -      break;
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
++  const auto displays = display::Screen::Get()->GetAllDisplays();
++  ASSERT_FALSE(displays.empty());
 +  const auto captures =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +          "yee-caption-input-capture-dir");
@@ -10755,6 +10759,13 @@ index 243d80a02d..b838de8f04 100644
 +      EXPECT_NE(HTMINBUTTON, component);
 +      EXPECT_NE(HTMAXBUTTON, component);
 +      EXPECT_NE(HTCLOSE, component);
++      // 최대화된 창 위쪽처럼 모니터 밖인 좌표는 OS가 화면 안으로 보정한다.
++      // 논리 hit-test는 유지하고 실제 마우스는 도달 가능한 화면점만 검사한다.
++      if (!std::ranges::any_of(displays, [&](const display::Display& display) {
++            return display.bounds().Contains(padding);
++          })) {
++        continue;
++      }
 +      ASSERT_TRUE(ui_controls::SendMouseMove(padding.x(), padding.y(), window));
 +      ASSERT_TRUE(base::test::RunUntil(
 +          [&]() { return button->GetState() == views::Button::STATE_NORMAL; }));
@@ -11320,7 +11331,6 @@ index 243d80a02d..b838de8f04 100644
 -  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
 -  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
 -      observation_{this};
--};
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -11361,6 +11371,27 @@ index 243d80a02d..b838de8f04 100644
 +    const auto* styling = tab_styling(tab);
 +    ASSERT_TRUE(styling);
 +    ASSERT_TRUE(group_marker());
++    // 경계 구분선은 hover 때 사라지므로 이전 입력 위치의 영향을 제거한다.
++    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
++    const auto window_bounds = view->GetBoundsInScreen();
++    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(gfx::Point(
++        window_bounds.CenterPoint().x(), window_bounds.bottom() - 80)));
++    const auto not_hovered = [](const TabStyleViewDelegate* item) {
++      return !item ||
++             (!item->IsHovering() && item->GetHoverAnimationValue() == 0.0f);
++    };
++    const auto* delegate = styling->delegate();
++    ASSERT_TRUE(base::test::RunUntil([&]() {
++      return not_hovered(delegate) &&
++             not_hovered(delegate->GetAdjacentTab(true)) &&
++             not_hovered(delegate->GetAdjacentTab(false));
++    }));
++    SCOPED_TRACE(testing::Message()
++                 << "index=" << index << " preceding=" << preceding
++                 << " active=" << delegate->IsActive()
++                 << " selected=" << delegate->IsSelected()
++                 << " hovered=" << delegate->IsHovering()
++                 << " hover_value=" << delegate->GetHoverAnimationValue());
 +    const float scale =
 +        tab->GetWidget()->GetCompositor()->device_scale_factor();
 +    gfx::Canvas canvas(tab->size(), scale, false);
@@ -14542,7 +14573,7 @@ index 243d80a02d..b838de8f04 100644
 +    command_line->AppendSwitchASCII("force-ui-direction", "rtl");
 +    command_line->AppendSwitchASCII("force-device-scale-factor", "1.25");
 +  }
-+};
+ };
 +#endif  // BUILDFLAG(IS_MAC)
 +
 +IN_PROC_BROWSER_TEST_F(
@@ -15244,7 +15275,7 @@ index 243d80a02d..b838de8f04 100644
  
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
-@@ -871,10 +5576,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +5608,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16203,7 +16234,7 @@ index 243d80a02d..b838de8f04 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +6535,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +6567,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16221,7 +16252,7 @@ index 243d80a02d..b838de8f04 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +6599,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +6631,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16239,7 +16270,7 @@ index 243d80a02d..b838de8f04 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +6619,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +6651,16 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -17501,10 +17532,10 @@ index 91de47263b..8d07454e32 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index 959386b621..22a421a88d 100644
+index 959386b621..3dc6ba492c 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-@@ -4,20 +4,41 @@
+@@ -4,20 +4,43 @@
  
  #include "chrome/browser/ui/views/frame/multi_contents_view.h"
  
@@ -17512,11 +17543,13 @@ index 959386b621..22a421a88d 100644
 +#include <array>
 +#include <cstdint>
 +#include <optional>
++#include <string_view>
 +#include <utility>
 +
 +#include "base/command_line.h"
 +#include "base/files/file_util.h"
  #include "base/functional/bind.h"
++#include "base/functional/callback_helpers.h"
 +#include "base/logging.h"
  #include "base/numerics/clamped_math.h"
  #include "base/numerics/ranges.h"
@@ -17546,7 +17579,7 @@ index 959386b621..22a421a88d 100644
  #include "chrome/browser/ui/toolbar/app_menu_model.h"
  #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -32,17 +53,37 @@
+@@ -32,38 +55,113 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
@@ -17584,11 +17617,11 @@ index 959386b621..22a421a88d 100644
  #include "components/split_tabs/split_tab_visual_data.h"
  #include "components/tabs/public/split_tab_collection.h"
  #include "content/public/test/browser_test.h"
-@@ -50,20 +91,75 @@
+ #include "content/public/test/browser_test_utils.h"
++#include "content/public/test/test_devtools_protocol_client.h"
  #include "net/dns/mock_host_resolver.h"
  #include "net/test/embedded_test_server/embedded_test_server.h"
  #include "third_party/blink/public/common/input/web_mouse_event.h"
-+#include "third_party/blink/public/common/web_preferences/web_preferences.h"
  #include "ui/actions/actions.h"
  #include "ui/base/accelerators/accelerator.h"
  #include "ui/base/interaction/state_observer.h"
@@ -17660,7 +17693,7 @@ index 959386b621..22a421a88d 100644
  class ViewBoundsChangedObserver : public views::ViewObserver,
                                    public ui::test::StateObserver<int> {
   public:
-@@ -299,6 +395,199 @@ class MultiContentsViewUiTest
+@@ -299,6 +397,199 @@ class MultiContentsViewUiTest
                            }),
                   WaitForState(kSidePanelViewObserver, true));
    }
@@ -17860,7 +17893,7 @@ index 959386b621..22a421a88d 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -422,6 +711,908 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -422,6 +713,948 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -17983,6 +18016,7 @@ index 959386b621..22a421a88d 100644
 +
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 +                       YeeMediaButtonTracksHeaderAndVisibility) {
++  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  ASSERT_TRUE(ui_test_utils::NavigateToURL(
 +      browser(), embedded_test_server()->GetURL("/title1.html")));
 +  tab_strip_model()->GetActiveWebContents()->Focus();
@@ -18059,6 +18093,13 @@ index 959386b621..22a421a88d 100644
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 +                       YeePresentationFollowsSingleAndSplitSources) {
 +  ASSERT_TRUE(yee::IsShellEnabled());
++  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
++  const auto window_bounds =
++      BrowserView::GetBrowserViewForBrowser(browser())->GetBoundsInScreen();
++  // 분할 Header가 이동해도 Rest 색상 검사 중 커서가 Header 위에 놓이지 않게
++  // 한다.
++  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(gfx::Point(
++      window_bounds.CenterPoint().x(), window_bounds.bottom() - 80)));
 +  const SkColor kSurfaceA = SkColorSetRGB(0x18, 0x22, 0x34);
 +  const SkColor kSurfaceB = SkColorSetRGB(0xE4, 0xD8, 0xC4);
 +  const SkColor kSurfaceC = SkColorSetRGB(0x36, 0x58, 0x72);
@@ -18118,6 +18159,9 @@ index 959386b621..22a421a88d 100644
 +  RunTestSequence(
 +      Do([&]() {
 +        SetYeeSurfaceColorForTab(0, kSurfaceA);
++        ASSERT_TRUE(base::test::RunUntil([&]() {
++          return location_bar()->GetBackgroundColorForTesting() == kSurfaceA;
++        }));
 +        presentation_a = YeeSurfaceSourceForTab(0)->GetPresentation();
 +        rehost_sync_count =
 +            location_bar()->GetCompactShellRehostSyncCountForTesting();
@@ -18452,6 +18496,7 @@ index 959386b621..22a421a88d 100644
 +
 +IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
 +                       YeeOmniboxSuggestionsHaveBalancedInsets) {
++  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  ASSERT_TRUE(ui_test_utils::NavigateToURL(
 +      browser(), embedded_test_server()->GetURL("/title1.html")));
 +  const auto capture_dir =
@@ -18516,24 +18561,34 @@ index 959386b621..22a421a88d 100644
 +      capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
 +              prefix + "-selected-window.png");
 +      capture(popup_widget, prefix + "-selected-popup.png");
-+      // 대비 증가와 강제 색을 독립적으로 적용해 실제 선택 표시를 검사한다.
-+      const auto original_preferences = contents->GetOrCreateWebPreferences();
-+      using Contrast = blink::mojom::PreferredContrast;
++      // WebPreferences의 inForcedColors만 바꾸면 Blink의 색상 캐시가
++      // 무효화되지 않는다. 정식 media emulation 경로로 CSS 반응을 검사한다.
++      content::TestDevToolsProtocolClient media_emulation;
++      media_emulation.AttachToWebContents(contents);
++      base::ScopedClosureRunner detach_media_emulation(base::BindOnce(
++          &content::TestDevToolsProtocolClient::DetachProtocolClient,
++          base::Unretained(&media_emulation)));
 +      for (const auto& [forced_colors, contrast] :
-+           {std::pair(false, Contrast::kMore),
-+            std::pair(true, Contrast::kCustom),
-+            std::pair(true, Contrast::kLess),
-+            std::pair(false, Contrast::kNoPreference)}) {
-+        SCOPED_TRACE(testing::Message()
-+                     << "forced_colors=" << forced_colors
-+                     << " contrast=" << static_cast<int>(contrast));
-+        auto preferences = original_preferences;
-+        preferences.in_forced_colors = forced_colors;
-+        preferences.is_forced_colors_disabled = false;
-+        preferences.preferred_contrast = contrast;
-+        contents->SetWebPreferences(preferences);
++           {std::pair(false, std::string_view("more")),
++            std::pair(true, std::string_view("custom")),
++            std::pair(true, std::string_view("less")),
++            std::pair(false, std::string_view("no-preference"))}) {
++        SCOPED_TRACE(testing::Message() << "forced_colors=" << forced_colors
++                                        << " contrast=" << contrast);
++        base::ListValue features;
++        features.Append(base::DictValue()
++                            .Set("name", "forced-colors")
++                            .Set("value", forced_colors ? "active" : "none"));
++        features.Append(base::DictValue()
++                            .Set("name", "prefers-contrast")
++                            .Set("value", contrast));
++        ASSERT_TRUE(media_emulation.SendCommandSync(
++            "Emulation.setEmulatedMedia",
++            base::DictValue().Set("features", std::move(features))));
 +        EXPECT_TRUE(base::test::RunUntil([&] {
-+          return content::EvalJs(contents, content::JsReplace(R"(
++          return content::EvalJs(
++                     contents,
++                     content::JsReplace(R"(
 +            (() => {
 +              const match = yeePopupRowsForTesting()
 +                  .map(row => row.getRootNode().host)
@@ -18543,12 +18598,18 @@ index 959386b621..22a421a88d 100644
 +                  matchMedia('(prefers-contrast: more)').matches === $2 &&
 +                  indicator && getComputedStyle(indicator).display === $3;
 +            })()
-+          )", forced_colors, contrast == Contrast::kMore,
-+              forced_colors || contrast == Contrast::kMore ? "block" : "none"))
++          )",
++                                        forced_colors, contrast == "more",
++                                        forced_colors || contrast == "more"
++                                            ? "block"
++                                            : "none"))
 +              .ExtractBool();
 +        }));
 +      }
-+      contents->SetWebPreferences(original_preferences);
++      ASSERT_TRUE(media_emulation.SendCommandSync(
++          "Emulation.setEmulatedMedia",
++          base::DictValue().Set("features", base::ListValue())));
++      detach_media_emulation.RunAndReset();
 +      // DOM 결과가 먼저 생겨도 native WebView는 아직 1 DIP일 수 있다.
 +      // 자동 크기 조절을 마친 뒤 실제 화면 좌표를 구한다.
 +      ASSERT_TRUE(base::test::RunUntil([&] {
@@ -18592,8 +18653,20 @@ index 959386b621..22a421a88d 100644
 +      capture(popup_widget, prefix + "-hover-popup.png");
 +      ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_DOWN,
 +                                                  false, false, false, false));
++      EXPECT_TRUE(base::test::RunUntil([&]() {
++        return content::EvalJs(contents, R"(
++          yeePopupRowsForTesting()[1]?.getRootNode().host.matches('[selected]') === true
++        )")
++            .ExtractBool();
++      }));
 +      ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_UP, false,
 +                                                  false, false, false));
++      EXPECT_TRUE(base::test::RunUntil([&]() {
++        return content::EvalJs(contents, R"(
++          yeePopupRowsForTesting()[0]?.getRootNode().host.matches('[selected]') === true
++        )")
++            .ExtractBool();
++      }));
 +      for (int attempt = 0;
 +           attempt < 2 && location_bar()->GetOmniboxController()->IsPopupOpen();
 +           ++attempt) {
@@ -18769,7 +18842,7 @@ index 959386b621..22a421a88d 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -567,16 +1758,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -567,16 +1800,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -18795,7 +18868,7 @@ index 959386b621..22a421a88d 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -671,9 +1861,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -671,9 +1903,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -18809,7 +18882,7 @@ index 959386b621..22a421a88d 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -688,8 +1879,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -688,8 +1921,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -18824,7 +18897,7 @@ index 959386b621..22a421a88d 100644
        }));
  }
  
-@@ -711,15 +1906,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -711,15 +1948,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -18844,7 +18917,7 @@ index 959386b621..22a421a88d 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -735,8 +1928,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -735,8 +1970,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -18857,7 +18930,7 @@ index 959386b621..22a421a88d 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -752,31 +1947,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -752,31 +1989,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -18910,7 +18983,7 @@ index 959386b621..22a421a88d 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -796,8 +1992,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -796,8 +2034,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -18923,7 +18996,7 @@ index 959386b621..22a421a88d 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -807,23 +2005,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -807,23 +2047,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -18963,7 +19036,7 @@ index 959386b621..22a421a88d 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -867,12 +2066,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -867,12 +2108,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -18983,7 +19056,7 @@ index 959386b621..22a421a88d 100644
                  }));
  }
  #endif
-@@ -880,11 +2082,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -880,11 +2124,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -31752,7 +31825,7 @@ index 7a8c2af15f..de1c69616c 100644
    SetThemeEditable(bool is_theme_editable);
    // Scrolls side panel to |section|. Possibly a response to a call to
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc
-index 2064ed276b..44b5cb8976 100644
+index 2064ed276b..0351a95613 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc
 @@ -2,7 +2,12 @@
@@ -31768,7 +31841,7 @@ index 2064ed276b..44b5cb8976 100644
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/browser/browser_process.h"
  #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
-@@ -13,20 +18,34 @@
+@@ -13,20 +18,36 @@
  #include "chrome/browser/ui/side_panel/side_panel_action_callback.h"
  #include "chrome/browser/ui/side_panel/side_panel_enums.h"
  #include "chrome/browser/ui/ui_features.h"
@@ -31793,6 +31866,7 @@ index 2064ed276b..44b5cb8976 100644
  #include "content/public/test/url_loader_interceptor.h"
  #include "extensions/browser/install_verifier.h"
  #include "extensions/test/test_extension_dir.h"
++#include "net/test/embedded_test_server/embedded_test_server.h"
  #include "ui/actions/actions.h"
 +#include "ui/base/test/ui_controls.h"
 +#if BUILDFLAG(IS_WIN)
@@ -31800,66 +31874,95 @@ index 2064ed276b..44b5cb8976 100644
 +#endif
 +#include "ui/views/controls/native/native_view_host.h"
 +#include "ui/views/controls/webview/webview.h"
++#include "ui/views/interaction/element_tracker_views.h"
  
  namespace {
  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kNewTabElementId);
-@@ -285,6 +304,126 @@ IN_PROC_BROWSER_TEST_F(CustomizeChromeInteractiveTest,
+@@ -285,6 +306,151 @@ IN_PROC_BROWSER_TEST_F(CustomizeChromeInteractiveTest,
  }
  
  #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 +#if BUILDFLAG(IS_WIN)
 +IN_PROC_BROWSER_TEST_F(CustomizeChromeInteractiveTest,
 +                       YeeTabLayoutSelectPopupFollowsItsHost) {
-+  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kCustomizationContents);
-+  const DeepQuery selector = {"customize-chrome-app", "yee-tab-layout",
-+                              "#layout"};
++  base::test::ScopedRunLoopTimeout test_timeout(FROM_HERE, base::Seconds(45));
 +  auto* const browser_widget =
 +      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
 +  const auto original_z_order = browser_widget->GetZOrderLevel();
 +  browser_widget->SetZOrderLevel(ui::ZOrderLevel::kFloatingWindow);
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
-+  RunTestSequence(
-+      OpenCustomizeChromeSidePanel(kCustomizationContents),
-+      WaitForElementExists(kCustomizationContents, selector),
-+      WithView(kCustomizeChromeSidePanelWebViewElementId, [&](views::WebView*
-+                                                                  view) {
-+        base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(15));
-+        auto* const contents = view->GetWebContents();
-+        ASSERT_TRUE(content::WaitForLoadStop(contents));
-+        content::SimulateEndOfPaintHoldingOnPrimaryMainFrame(contents);
-+        auto* const host =
-+            contents->GetPrimaryMainFrame()->GetRenderWidgetHost();
-+        const gfx::Point initial_position =
-+            browser_widget->GetWindowBoundsInScreen().origin();
-+        // 첫 popup은 창 이동으로 좌표를 미리 갱신하지 않고 두 번 확인한다.
-+        for (const gfx::Point position :
-+             {initial_position, initial_position, gfx::Point(40, 40),
-+              gfx::Point(40, 40), gfx::Point(240, 120), gfx::Point(240, 120)}) {
-+          auto* const widget =
-+              BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
-+          gfx::Rect bounds = widget->GetWindowBoundsInScreen();
-+          if (bounds.origin() != position) {
-+            bounds.set_origin(position);
-+            widget->SetBounds(bounds);
-+            widget->LayoutRootViewIfNecessary();
-+          }
-+          SCOPED_TRACE(position.ToString());
-+          // 표시 위치뿐 아니라 select가 참조하는 native 원점도 확인한다.
-+          EXPECT_EQ(view->holder()->GetBoundsInScreen(),
-+                    contents->GetRenderWidgetHostView()->GetViewBounds());
-+          auto* const native_view =
-+              contents->GetRenderWidgetHostView()->GetNativeView();
-+          EXPECT_EQ(view->holder()->GetBoundsInScreen(),
-+                    native_view->GetBoundsInScreenWithoutTransform());
-+          SCOPED_TRACE(
-+              "native=" + native_view->bounds().ToString() + " untransformed=" +
-+              native_view->GetBoundsInScreenWithoutTransform().ToString() +
-+              " parent=" + native_view->parent()->bounds().ToString() +
-+              " parent_untransformed=" +
-+              native_view->parent()
-+                  ->GetBoundsInScreenWithoutTransform()
-+                  .ToString());
-+          const auto rect = content::EvalJs(contents, R"JS(
++  ASSERT_TRUE(embedded_test_server()->Start());
++  // 패널 등록에 필요한 새 탐색을 로컬 페이지로 완료해 NTP 제공자에 의존하지
++  // 않는다.
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), embedded_test_server()->GetURL("/title1.html")));
++  ASSERT_TRUE(chrome::ExecuteCommandWithContext(
++      browser(), IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL,
++      actions::ActionInvocationContext::Builder()
++          .SetProperty(
++              kSidePanelOpenTriggerKey,
++              static_cast<std::underlying_type_t<SidePanelOpenTrigger>>(
++                  SidePanelOpenTrigger::kToolbarButton))
++          .Build()));
++  views::WebView* view = nullptr;
++  ASSERT_TRUE(base::test::RunUntil([&]() {
++    view = views::ElementTrackerViews::GetInstance()
++               ->GetUniqueViewAs<views::WebView>(
++                   kCustomizeChromeSidePanelWebViewElementId,
++                   views::ElementTrackerViews::GetContextForWidget(
++                       browser_widget));
++    return view && view->IsDrawn();
++  }));
++  base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(15));
++  auto* const contents = view->GetWebContents();
++  ASSERT_TRUE(content::WaitForLoadStop(contents));
++  ASSERT_TRUE(base::test::RunUntil([&]() {
++    return content::EvalJs(contents, R"JS(
++            (() => {
++              const select = document.querySelector('customize-chrome-app')
++                ?.shadowRoot?.querySelector('yee-tab-layout')
++                ?.shadowRoot?.querySelector('#layout');
++              return Boolean(select && !select.disabled);
++            })();
++          )JS")
++        .ExtractBool();
++  })) << content::EvalJs(contents, R"JS(
++          JSON.stringify({url: location.href, ready: document.readyState,
++            component: Boolean(customElements.get('yee-tab-layout')),
++            customization: document.querySelector('customize-chrome-app')
++              ?.yeeCustomization_})
++        )JS");
++  content::SimulateEndOfPaintHoldingOnPrimaryMainFrame(contents);
++  auto* const host = contents->GetPrimaryMainFrame()->GetRenderWidgetHost();
++  const gfx::Point initial_position =
++      browser_widget->GetWindowBoundsInScreen().origin();
++  // 첫 popup은 창 이동으로 좌표를 미리 갱신하지 않고 두 번 확인한다.
++  for (const gfx::Point position :
++       {initial_position, initial_position, gfx::Point(40, 40),
++        gfx::Point(40, 40), gfx::Point(240, 120), gfx::Point(240, 120)}) {
++    auto* const widget =
++        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
++    gfx::Rect bounds = widget->GetWindowBoundsInScreen();
++    if (bounds.origin() != position) {
++      bounds.set_origin(position);
++      widget->SetBounds(bounds);
++      widget->LayoutRootViewIfNecessary();
++    }
++    SCOPED_TRACE(position.ToString());
++    // 표시 위치뿐 아니라 select가 참조하는 native 원점도 확인한다.
++    EXPECT_EQ(view->holder()->GetBoundsInScreen(),
++              contents->GetRenderWidgetHostView()->GetViewBounds());
++    auto* const native_view =
++        contents->GetRenderWidgetHostView()->GetNativeView();
++    EXPECT_EQ(view->holder()->GetBoundsInScreen(),
++              native_view->GetBoundsInScreenWithoutTransform());
++    SCOPED_TRACE(
++        "native=" + native_view->bounds().ToString() + " untransformed=" +
++        native_view->GetBoundsInScreenWithoutTransform().ToString() +
++        " parent=" + native_view->parent()->bounds().ToString() +
++        " parent_untransformed=" +
++        native_view->parent()->GetBoundsInScreenWithoutTransform().ToString());
++    const auto rect = content::EvalJs(contents, R"JS(
 +            (() => {
 +              const select = document.querySelector('customize-chrome-app')
 +                .shadowRoot.querySelector('yee-tab-layout')
@@ -31871,58 +31974,55 @@ index 2064ed276b..44b5cb8976 100644
 +                      Math.ceil(r.width), Math.ceil(r.height)];
 +            })();
 +          )JS")
-+                                .ExtractList()
-+                                .Clone();
-+          const gfx::Rect local(rect[0].GetInt(), rect[1].GetInt(),
-+                                rect[2].GetInt(), rect[3].GetInt());
-+          gfx::Rect anchor = local;
-+          anchor.Offset(
-+              view->holder()->GetBoundsInScreen().origin().OffsetFromOrigin());
-+          int popup_routing_id = -1;
-+          const auto popup_bounds = [&]() -> std::optional<gfx::Rect> {
-+            auto hosts = content::RenderWidgetHost::GetRenderWidgetHosts();
-+            while (auto* candidate = hosts->GetNextHost()) {
-+              if (candidate->GetRoutingID() == popup_routing_id &&
-+                  candidate->GetProcess() == host->GetProcess() &&
-+                  candidate->GetView() && candidate->GetView()->IsShowing()) {
-+                return candidate->GetView()->GetViewBounds();
-+              }
-+            }
-+            return std::nullopt;
-+          };
-+          view->RequestFocus();
-+          ASSERT_TRUE(base::test::RunUntil([&]() {
-+            return contents->GetRenderWidgetHostView()->HasFocus();
-+          }));
-+          content::ShowPopupWidgetWaiter popup_waiter(
-+              contents, contents->GetPrimaryMainFrame());
-+          // showPicker도 Blink의 실제 native popup 경로와 화면 좌표 변환을
-+          // 쓴다.
-+          ASSERT_TRUE(content::ExecJs(contents, R"JS(
++                          .ExtractList()
++                          .Clone();
++    const gfx::Rect local(rect[0].GetInt(), rect[1].GetInt(), rect[2].GetInt(),
++                          rect[3].GetInt());
++    gfx::Rect anchor = local;
++    anchor.Offset(
++        view->holder()->GetBoundsInScreen().origin().OffsetFromOrigin());
++    int popup_routing_id = -1;
++    const auto popup_bounds = [&]() -> std::optional<gfx::Rect> {
++      auto hosts = content::RenderWidgetHost::GetRenderWidgetHosts();
++      while (auto* candidate = hosts->GetNextHost()) {
++        if (candidate->GetRoutingID() == popup_routing_id &&
++            candidate->GetProcess() == host->GetProcess() &&
++            candidate->GetView() && candidate->GetView()->IsShowing()) {
++          return candidate->GetView()->GetViewBounds();
++        }
++      }
++      return std::nullopt;
++    };
++    view->RequestFocus();
++    ASSERT_TRUE(base::test::RunUntil(
++        [&]() { return contents->GetRenderWidgetHostView()->HasFocus(); }));
++    content::ShowPopupWidgetWaiter popup_waiter(
++        contents, contents->GetPrimaryMainFrame());
++    // showPicker도 Blink의 실제 native popup 경로와 화면 좌표 변환을
++    // 쓴다.
++    ASSERT_TRUE(content::ExecJs(contents, R"JS(
 +            document.querySelector('customize-chrome-app').shadowRoot
 +              .querySelector('yee-tab-layout').shadowRoot
 +              .querySelector('#layout').showPicker();
 +          )JS"));
-+          popup_waiter.Wait();
-+          popup_routing_id = popup_waiter.last_routing_id();
-+          ASSERT_TRUE(base::test::RunUntil(
-+              [&]() { return popup_bounds().has_value(); }));
-+          const gfx::Rect popup = *popup_bounds();
-+          SCOPED_TRACE(
-+              "host=" + view->holder()->GetBoundsInScreen().ToString() +
-+              " select=" + anchor.ToString() +
-+              " request=" + popup_waiter.last_initial_rect().ToString() +
-+              " popup=" + popup.ToString());
-+          EXPECT_GE(anchor.CenterPoint().x(), popup.x());
-+          EXPECT_LT(anchor.CenterPoint().x(), popup.right());
-+          EXPECT_LE(popup.y(), anchor.bottom() + anchor.height());
-+          EXPECT_GE(popup.bottom(), anchor.y() - anchor.height());
-+          ASSERT_TRUE(ui_controls::SendKeyPress(widget->GetNativeWindow(),
-+                                                ui::VKEY_ESCAPE, false, false,
-+                                                false, false));
-+          ASSERT_TRUE(base::test::RunUntil([&]() { return !popup_bounds(); }));
-+        }
-+      }));
++    popup_waiter.Wait();
++    popup_routing_id = popup_waiter.last_routing_id();
++    ASSERT_TRUE(
++        base::test::RunUntil([&]() { return popup_bounds().has_value(); }));
++    const gfx::Rect popup = *popup_bounds();
++    SCOPED_TRACE("host=" + view->holder()->GetBoundsInScreen().ToString() +
++                 " select=" + anchor.ToString() +
++                 " request=" + popup_waiter.last_initial_rect().ToString() +
++                 " popup=" + popup.ToString());
++    EXPECT_GE(anchor.CenterPoint().x(), popup.x());
++    EXPECT_LT(anchor.CenterPoint().x(), popup.right());
++    EXPECT_LE(popup.y(), anchor.bottom() + anchor.height());
++    EXPECT_GE(popup.bottom(), anchor.y() - anchor.height());
++    ASSERT_TRUE(ui_controls::SendKeyPress(widget->GetNativeWindow(),
++                                          ui::VKEY_ESCAPE, false, false, false,
++                                          false));
++    ASSERT_TRUE(base::test::RunUntil([&]() { return !popup_bounds(); }));
++  }
 +  browser_widget->SetZOrderLevel(original_z_order);
 +}
 +#endif  // BUILDFLAG(IS_WIN)

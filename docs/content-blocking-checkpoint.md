@@ -591,7 +591,7 @@ snapshot을 갱신한다. 외부 HTTPS 목록의 구독·사용 여부·삭제�
 | 필터 호환성 | 엔진이 제공하는 procedural/action 연결은 완료. nested procedural·추가 operator 등 엔진의 미지원 문법은 이후 후보다. |
 | 외부 배포 | 나중 단계. 사용자에게 보이는 고지·source 접근 안내가 필요하며 개발 앱과 배포판의 검증을 구분한다. |
 
-별도 UI·Agent 작업의 판정은 [Browser Surface 검증](browser-surface-validation/results.md)과
+별도 UI·Agent 작업의 판정은 [Browser Surface 검사 범위](header/test-coverage.md)와
 [Agent 다음 작업](agent-browser-worklist.md)을 따른다.
 
 ## 제어와 현재 한계

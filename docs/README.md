@@ -21,10 +21,11 @@
 
 ## 테스트 기록 읽기
 
-[Browser Surface 기록](browser-surface-validation/README.md)과
-[Agent 실행 기록](agent-browser-validation/README.md)은 당시 수행한 테스트의 근거다.
-날짜, 통과한 범위와 확인하지 못한 부분을 함께 읽는다.
-현재 코드의 결과를 확인하려면 해당 테스트를 다시 실행해야 한다.
+Browser Surface의 검사 기준·최근 통과 범위·남은 한계는
+[Header 검사](header/test-coverage.md)와 [Sidebar 검사](sidebar/test-coverage.md)에 유지한다.
+완료된 일회성 화면 검수 자료는 보관하지 않는다.
+[Agent 실행 기록](agent-browser-validation/README.md)은 현재 비교·다음 작업의 기준이므로
+날짜와 검증 범위를 함께 읽는다. 현재 코드의 결과는 해당 테스트를 다시 실행해 확인한다.
 
 제품 규칙은 명세와 주제별 결정 문서, 작업 절차는 [`AGENTS.md`](../AGENTS.md)를 따른다.
 문서와 현재 구현이 충돌하면 사용자의 최신 요청을 확인하고 제품 명세를 임의로 바꾸지 않는다.

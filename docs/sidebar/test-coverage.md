@@ -282,6 +282,8 @@ AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바
 `CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*`는
 이벤트를 버튼에 직송하지 않고 실제 화면 좌표에서 마우스를 이동한다. 가로·세로,
 밝음·어두움, 일반·최대화의 각 조합을 새 창에서 검사한다. 버튼의 중앙과 양쪽 끝에서
-hover와 native hit-test를, 사방 여백에서 비활성 상태를 확인한다. 가로 탭의
+hover와 native hit-test를 확인한다. 사방 여백의 hit-test와 화면 안 여백의 실제
+비활성 상태도 확인한다. 최대화된 창의 화면 바깥 여백은 OS가 마우스 좌표를
+화면 안으로 보정하므로 논리 hit-test만 검사한다. 가로 탭의
 본문 경계 정렬은 geometry 검사도 함께 쓰며, Sidebar에서만 예약하는 버튼 왼쪽
 간격은 native frame exclusion으로 확인한다.
