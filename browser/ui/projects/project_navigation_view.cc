@@ -136,19 +136,19 @@ void ProjectSidebarView::SetProjects(
         kGridViewIcon,
         l10n_util::GetStringUTF16(IDS_YEE_PROJECT_OVERVIEW) + u": " +
             project.name);
-    auto* hub_button = heading->AddChildView(std::move(hub));
-    heading->AddTrailing(hub_button, true);
+    auto* hub_button = hub.get();
+    heading->AddTrailing(std::move(hub), true);
     focus_targets_["hub:" + project.id] = hub_button;
-    auto* more = heading->AddChildView(CreateProjectIconButton(
+    auto more = CreateProjectIconButton(
         {}, kMoreVertIcon,
-        l10n_util::GetStringUTF16(IDS_YEE_PROJECT_MORE) + u": " +
-            project.name));
+        l10n_util::GetStringUTF16(IDS_YEE_PROJECT_MORE) + u": " + project.name);
+    auto* more_button = more.get();
     more->SetEnabled(writable);
     more->SetCallback(base::BindRepeating(&ProjectSidebarView::ShowMoreMenu,
                                           base::Unretained(this), project.id,
-                                          more));
-    heading->AddTrailing(more, true);
-    focus_targets_["more:" + project.id] = more;
+                                          more_button));
+    heading->AddTrailing(std::move(more), true);
+    focus_targets_["more:" + project.id] = more_button;
     auto* page_list = body->AddChildView(std::make_unique<views::View>());
     page_list->SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kVertical,
@@ -180,8 +180,8 @@ void ProjectSidebarView::SetProjects(
             page.title;
         close->SetTooltipText(label);
         close->GetViewAccessibility().SetName(label);
-        auto* close_button = row->AddChildView(std::move(close));
-        row->AddTrailing(close_button, true);
+        auto* close_button = close.get();
+        row->AddTrailing(std::move(close), true);
         focus_targets_["close:" + page.id] = close_button;
       }
     }

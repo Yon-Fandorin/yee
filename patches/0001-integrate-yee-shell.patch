@@ -3571,7 +3571,7 @@ index 6a1b79d4b2..7534fdb899 100644
    tint_view_.layer.backgroundColor =
        [NSColor colorWithSRGBRed:r green:g blue:b alpha:a].CGColor;
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm
-index 9988856179..d760d6e886 100644
+index 9988856179..6b7bf47593 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm
 @@ -6,9 +6,16 @@
@@ -3591,23 +3591,28 @@ index 9988856179..d760d6e886 100644
  #include "chrome/browser/ui/browser.h"
  #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/layout_constants.h"
-@@ -17,6 +24,7 @@
+@@ -16,7 +23,10 @@
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/ui_features.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/top_container_view.h"
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 +#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/test/base/in_process_browser_test.h"
  #include "chrome/test/base/interactive_test_utils.h"
  #include "chrome/test/base/ui_test_utils.h"
-@@ -25,6 +33,7 @@
+@@ -25,6 +35,9 @@
  #include "ui/color/color_id.h"
  #include "ui/color/color_provider.h"
  #include "ui/compositor/layer.h"
++#include "ui/gfx/canvas.h"
 +#include "ui/snapshot/snapshot.h"
++#include "ui/views/background.h"
  #include "ui/views/cocoa/native_widget_mac_ns_window_host.h"
  #include "ui/views/widget/native_widget_mac.h"
  
-@@ -175,7 +184,7 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest, ActiveInactiveTintOpacit
+@@ -175,7 +188,7 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest, ActiveInactiveTintOpacit
  }
  
  IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest,
@@ -3616,7 +3621,7 @@ index 9988856179..d760d6e886 100644
    if (!features::IsGlassFrameEnabled()) {
      GTEST_SKIP() << "Glass frame feature is disabled.";
    }
-@@ -190,6 +199,28 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest,
+@@ -190,6 +203,44 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest,
    auto [glass_view, tint_view] = GetGlassViews(content_view);
    ASSERT_NE(glass_view, nil);
  
@@ -3638,6 +3643,22 @@ index 9988856179..d760d6e886 100644
 +                NSMinX(content_view.bounds));
 +      EXPECT_EQ(NSMaxY(current_views.glass_view.frame),
 +                NSMaxY(content_view.bounds));
++      ASSERT_TRUE(browser_view->background());
++      gfx::Canvas canvas(browser_view->size(), 1.f, false);
++      browser_view->background()->Paint(&canvas, browser_view);
++      const SkAlpha shell_alpha =
++          SkColorGetA(canvas.GetBitmap().getColor(0, 0));
++      EXPECT_GT(shell_alpha, SK_AlphaTRANSPARENT);
++      EXPECT_LT(shell_alpha, SK_AlphaOPAQUE);
++      if (!vertical) {
++        // 불투명 Header가 빈 수평 탭 행을 덮어 native glass를 가리면 안 된다.
++        const gfx::Rect strip_bounds =
++            browser_view->tab_strip_view()->GetBoundsInScreen();
++        EXPECT_LE(
++            strip_bounds.bottom() -
++                GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
++            browser_view->top_container()->GetBoundsInScreen().y());
++      }
 +    }
 +    return;
 +  }
@@ -3645,7 +3666,7 @@ index 9988856179..d760d6e886 100644
    const auto top_element_info = browser_view->GetFrameElementInfo();
    int expected_height = top_element_info.top_area_height() +
                          top_element_info.toolbar_preferred_height;
-@@ -217,11 +248,39 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest,
+@@ -217,11 +268,39 @@ IN_PROC_BROWSER_TEST_F(BrowserNativeWidgetMacGlassTest,
    auto [glass_view, tint_view] = GetGlassViews(content_view);
    EXPECT_NE(glass_view, nil);
  
@@ -6408,10 +6429,46 @@ index 07db7b582b..f5bccc798f 100644
    PrefChangeRegistrar pref_change_registrar_;
    bool is_glass_frame_enabled_ = true;
 diff --git a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
-index 1a465bdac4..31b0759d2a 100644
+index 1a465bdac4..4259063c7d 100644
 --- a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
-@@ -486,6 +486,13 @@ void HorizontalTabStripRegionViewOld::InitializeTabStrip() {
+@@ -44,6 +44,8 @@
+ #include "chrome/browser/ui/views/tabs/tab_strip_nudge_button.h"
+ #include "chrome/browser/ui/views/tabs/tab_style_views.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
++#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+ #include "chrome/common/buildflags.h"
+ #include "chrome/grit/generated_resources.h"
+@@ -62,6 +64,7 @@
+ #include "ui/views/actions/action_view_controller.h"
+ #include "ui/views/border.h"
+ #include "ui/views/cascading_property.h"
++#include "ui/views/controls/menu/menu_runner.h"
+ #include "ui/views/interaction/view_subregion_anchor.h"
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/layout/flex_layout_types.h"
+@@ -384,7 +387,7 @@ void HorizontalTabStripRegionViewOld::Layout(PassKey) {
+ 
+   views::View* button_to_paint_to_layer = new_tab_button_;
+ 
+-  if (button_to_paint_to_layer) {
++  if (button_to_paint_to_layer && !yee::IsShellEnabled()) {
+     // The button needs to be layered on top of the tabstrip to achieve
+     // negative margins.
+     gfx::Size button_size = button_to_paint_to_layer->GetPreferredSize();
+@@ -456,7 +459,8 @@ gfx::Size HorizontalTabStripRegionViewOld::GetMinimumSize() const {
+   const int max_min_width = 520;
+   tab_strip_min_size.set_width(
+       std::min(max_min_width, tab_strip_min_size.width()));
+-  return tab_strip_min_size;
++  return yee::ResolveHorizontalTabStripMinimumSize(*this, *tab_strip_,
++                                                   tab_strip_min_size);
+ }
+ 
+ gfx::Size HorizontalTabStripRegionViewOld::CalculatePreferredSize(
+@@ -486,6 +490,13 @@ void HorizontalTabStripRegionViewOld::InitializeTabStrip() {
  }
  
  void HorizontalTabStripRegionViewOld::ResetTabStrip() {
@@ -6425,7 +6482,128 @@ index 1a465bdac4..31b0759d2a 100644
    tab_strip_set_ = false;
    static_cast<BrowserTabStripController*>(tab_strip_->controller())->Reset();
    tab_strip_->Reset();
-@@ -1008,20 +1015,25 @@ bool HorizontalTabStripRegionViewNew::ComputeIsUnpinnedTabsScrollable(
+@@ -636,7 +647,8 @@ void HorizontalTabStripRegionViewOld::UpdateButtonBorders() {
+     UpdateBorderInsetsIfNeeded(combo_button_, border_insets);
+   }
+   if (new_tab_button_) {
+-    UpdateBorderInsetsIfNeeded(new_tab_button_, border_insets);
++    UpdateBorderInsetsIfNeeded(
++        new_tab_button_, yee::IsShellEnabled() ? gfx::Insets() : border_insets);
+   }
+   if (unfocus_button_) {
+     UpdateBorderInsetsIfNeeded(unfocus_button_, border_insets);
+@@ -665,11 +677,25 @@ void HorizontalTabStripRegionViewOld::UpdateTabStripMargin() {
+     button_to_paint_to_layer->layer()->SetFillsBoundsOpaquely(false);
+     // Inset between the tabstrip and new tab button should be reduced to
+     // account for extra spacing.
+-    button_to_paint_to_layer->SetProperty(views::kViewIgnoredByLayoutKey, true);
+-
+-    tab_strip_right_margin =
+-        button_to_paint_to_layer->GetPreferredSize().width() +
+-        GetLayoutConstant(LayoutConstant::kTabStripPadding);
++    if (yee::IsShellEnabled()) {
++      // 실제 sibling으로 예약해 좁은 폭에서도 마지막 탭과 입력 범위가 겹치지
++      // 않는다.
++      button_to_paint_to_layer->SetProperty(views::kViewIgnoredByLayoutKey,
++                                            false);
++      button_to_paint_to_layer->SetProperty(views::kCrossAxisAlignmentKey,
++                                            views::LayoutAlignment::kCenter);
++      button_to_paint_to_layer->SetProperty(
++          views::kMarginsKey,
++          gfx::Insets::TLBR(
++              0, yee::kSidebarMetrics.horizontal_tab_minimum_icon_gap, 0, 0));
++      tab_strip_right_margin = 0;
++    } else {
++      button_to_paint_to_layer->SetProperty(views::kViewIgnoredByLayoutKey,
++                                            true);
++      tab_strip_right_margin =
++          button_to_paint_to_layer->GetPreferredSize().width() +
++          GetLayoutConstant(LayoutConstant::kTabStripPadding);
++    }
+   }
+ 
+   // If the tab search button is before the tab strip, it also overlaps the
+@@ -782,9 +808,24 @@ HorizontalTabStripRegionViewNew::HorizontalTabStripRegionViewNew(
+   if (browser && ShouldShowNewTabButton(browser)) {
+     auto new_tab_button = std::make_unique<shared::NewTabButton>(
+         browser,
+-        GetLayoutConstant(LayoutConstant::kVerticalTabStripNewTabButtonSize),
+-        GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
++        yee::IsShellEnabled()
++            ? yee::kSidebarMetrics.shell_control_size
++            : GetLayoutConstant(
++                  LayoutConstant::kVerticalTabStripNewTabButtonSize),
++        yee::IsShellEnabled()
++            ? TabStripControlButton::kIconSize
++            : GetLayoutConstant(
++                  LayoutConstant::kVerticalTabStripButtonIconSize));
+     new_tab_button_ = AddChildView(std::move(new_tab_button));
++    if (yee::IsShellEnabled()) {
++      new_tab_button_->set_context_menu_controller(this);
++      new_tab_button_->SetProperty(views::kCrossAxisAlignmentKey,
++                                   views::LayoutAlignment::kCenter);
++      new_tab_button_->SetProperty(
++          views::kMarginsKey,
++          gfx::Insets::TLBR(
++              0, yee::kSidebarMetrics.horizontal_tab_minimum_icon_gap, 0, 0));
++    }
+   }
+ 
+   reserved_grab_handle_space_ =
+@@ -799,6 +840,8 @@ HorizontalTabStripRegionViewNew::HorizontalTabStripRegionViewNew(
+ }
+ 
+ HorizontalTabStripRegionViewNew::~HorizontalTabStripRegionViewNew() {
++  context_menu_runner_.reset();
++  context_menu_model_.reset();
+   if (combo_button_) {
+     RemoveChildViewT(std::exchange(combo_button_, nullptr));
+   }
+@@ -862,6 +905,24 @@ views::View::Views HorizontalTabStripRegionViewNew::GetChildrenInZOrder() {
+   return children;
+ }
+ 
++void HorizontalTabStripRegionViewNew::ShowContextMenuForViewImpl(
++    views::View* source,
++    const gfx::Point& point,
++    ui::mojom::MenuSourceType source_type) {
++  if (!base::FeatureList::IsEnabled(features::kNewTabButtonContextMenu)) {
++    return;
++  }
++  context_menu_runner_.reset();
++  context_menu_model_ =
++      std::make_unique<NewTabButtonMenuModel>(browser_view()->browser());
++  context_menu_runner_ = std::make_unique<views::MenuRunner>(
++      context_menu_model_.get(),
++      views::MenuRunner::HAS_MNEMONICS | views::MenuRunner::CONTEXT_MENU);
++  context_menu_runner_->RunMenuAt(
++      source->GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
++      views::MenuAnchorPosition::kTopLeft, source_type);
++}
++
+ void HorizontalTabStripRegionViewNew::Layout(PassKey) {
+   views::LayoutManagerBase* layout_manager =
+       static_cast<views::LayoutManagerBase*>(GetLayoutManager());
+@@ -881,13 +942,17 @@ gfx::Size HorizontalTabStripRegionViewNew::GetMinimumSize() const {
+     const int max_min_width = 520;
+     tab_strip_min_size.set_width(
+         std::min(max_min_width, tab_strip_min_size.width()));
+-    return tab_strip_min_size;
++    return yee::ResolveHorizontalTabStripMinimumSize(*this, *tab_strip_view(),
++                                                     tab_strip_min_size);
+   }
+   return gfx::Size();
+ }
+ 
+ gfx::Size HorizontalTabStripRegionViewNew::CalculatePreferredSize(
+     const views::SizeBounds& available_size) const {
++  if (yee::IsShellEnabled()) {
++    return GetLayoutManager()->GetPreferredSize(this, available_size);
++  }
+   if (tab_strip_view()) {
+     return tab_strip_view()->GetPreferredSize(available_size);
+   }
+@@ -1008,20 +1073,25 @@ bool HorizontalTabStripRegionViewNew::ComputeIsUnpinnedTabsScrollable(
        static_cast<views::LayoutManagerBase*>(GetLayoutManager())
            ->GetProposedLayout(size());
  
@@ -10138,10 +10316,10 @@ index 219734679c..7afe3c2317 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 243d80a02d..682575401c 100644
+index 243d80a02d..edfd352f03 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -2,83 +2,337 @@
+@@ -2,83 +2,340 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -10200,6 +10378,7 @@ index 243d80a02d..682575401c 100644
  #include "chrome/browser/ui/tabs/public/tab_features.h"
  #include "chrome/browser/ui/tabs/split_tab_metrics.h"
 +#include "chrome/browser/ui/tabs/tab_group_model.h"
++#include "chrome/browser/ui/tabs/tab_group_theme.h"
 +#include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/ui_features.h"
@@ -10236,6 +10415,7 @@ index 243d80a02d..682575401c 100644
 +#include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_view.h"
++#include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
 +#include "chrome/browser/ui/views/tabs/tab.h"
 +#include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
 +#include "chrome/browser/ui/views/tabs/tab_container_impl.h"
@@ -10316,6 +10496,7 @@ index 243d80a02d..682575401c 100644
 +#include "ui/views/animation/ink_drop_host.h"
 +#include "ui/views/background.h"
 +#include "ui/views/controls/focus_ring.h"
++#include "ui/views/controls/highlight_path_generator.h"
 +#include "ui/views/controls/image_view.h"
 +#include "ui/views/controls/label.h"
 +#include "ui/views/controls/resize_area.h"
@@ -10484,7 +10665,7 @@ index 243d80a02d..682575401c 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -95,15 +349,17 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -95,15 +352,17 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    auto ReplaceAndShowSidePanel(
        SidePanelType type,
@@ -10505,7 +10686,7 @@ index 243d80a02d..682575401c 100644
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -119,7 +375,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -119,7 +378,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                }),
                /*default_content_width_callback=*/base::NullCallback())));
            browser()->GetFeatures().side_panel_ui()->Show(
@@ -10519,7 +10700,7 @@ index 243d80a02d..682575401c 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -349,6 +610,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -349,6 +613,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -10546,7 +10727,7 @@ index 243d80a02d..682575401c 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -366,11 +647,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -366,11 +650,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -10718,7 +10899,7 @@ index 243d80a02d..682575401c 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -578,18 +1019,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -578,18 +1022,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -10748,7 +10929,7 @@ index 243d80a02d..682575401c 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -629,195 +1069,4586 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -629,195 +1072,4877 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -11149,7 +11330,7 @@ index 243d80a02d..682575401c 100644
 -    BrowserViewTabbedLayoutImplUiTest::TearDownOnMainThread();
 -  }
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
-+                       YeeWindowsHorizontalTabsKeepThemePaintAboveHeader) {
++                       YeeWindowsHorizontalTabsConnectPageSurfaceToHeader) {
 +  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
 +  auto* const widget = view->GetWidget();
 +  auto* const state = tabs::VerticalTabStripStateController::From(browser());
@@ -11250,10 +11431,15 @@ index 243d80a02d..682575401c 100644
 +          gfx::RectF(seam_in_root), compositor->device_scale_factor()));
 +      ASSERT_TRUE(
 +          gfx::Rect(bitmap.width(), bitmap.height()).Contains(seam_pixels));
-+      const SkColor tab_surface = tab->GetColorProvider()->GetColor(
-+          widget->ShouldPaintAsActive()
-+              ? kColorTabBackgroundActiveFrameActive
-+              : kColorTabBackgroundActiveFrameInactive);
++      // 기본 선택 탭은 Header의 페이지 면과 연결하고 native 테마는 보존한다.
++      const bool native_theme = yee::ShouldUseNativeHorizontalTabTheme(
++          *tab->GetNativeTheme(), tab->GetThemeProvider());
++      const SkColor tab_surface =
++          native_theme ? tab->GetColorProvider()->GetColor(
++                             widget->ShouldPaintAsActive()
++                                 ? kColorTabBackgroundActiveFrameActive
++                                 : kColorTabBackgroundActiveFrameInactive)
++                       : surface;
 +      size_t different_pixels = 0;
 +      // 두 표면 경계에 걸친 소수 배율의 한 픽셀은 제외하고 완전히 포함된
 +      // 실제 합성 픽셀을 각각 확인한다.
@@ -11766,6 +11952,97 @@ index 243d80a02d..682575401c 100644
 +    RunScheduledLayouts();
 +    expect_preview({SK_ColorRED, SK_ColorGREEN, SK_ColorBLUE});
 +    EXPECT_EQ(1, overflow_count());
++    if (!vertical) {
++      auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
++      const auto original_scheme = theme->GetBrowserColorScheme();
++      ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
++      const auto native_window = view->GetWidget()->GetNativeWindow();
++      for (bool dark : {false, true}) {
++        SCOPED_TRACE(dark);
++        theme->SetBrowserColorScheme(
++            dark ? ThemeService::BrowserColorScheme::kDark
++                 : ThemeService::BrowserColorScheme::kLight);
++        RunScheduledLayouts();
++        auto* heading = group_header();
++        views::Label* name = nullptr;
++        const auto find_name = [&](auto&& self, views::View* item) -> void {
++          if (auto* label = views::AsViewClass<views::Label>(item);
++              label && label->GetText() == u"Research") {
++            name = label;
++          }
++          for (views::View* child : item->children()) {
++            self(self, child);
++          }
++        };
++        find_name(find_name, heading);
++        ASSERT_TRUE(name);
++        views::View* chip = views::IsViewClass<TabGroupHeader>(heading)
++                                ? name->parent()
++                                : heading;
++        const auto size = chip->size();
++        const auto header_size = heading->size();
++        // 실제 포인터 왕복은 색만 바꾸며 접힌 파비콘 영역을 재차 늘리지 않는다.
++        for (bool hovered : {false, true, false, true, false}) {
++          const auto target =
++              hovered ? name->GetBoundsInScreen().CenterPoint()
++                      : view->toolbar()->GetBoundsInScreen().CenterPoint();
++          ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(target, native_window));
++          SCOPED_TRACE(testing::Message()
++                       << "hovered=" << hovered
++                       << ", header=" << heading->GetClassName());
++          // macOS 입력 도구는 NSView 사이의 tracking-area exit를 만들지 않는다.
++          // 같은 Chrome NSView의 주소줄로 이동하고 실제 paint 갱신까지
++          // 확인한다.
++          ASSERT_TRUE(base::test::RunUntil([&] {
++            if (heading->IsMouseHovered() != hovered || !chip->background()) {
++              return false;
++            }
++            gfx::Canvas frame(chip->size(), 1.f, false);
++            chip->background()->Paint(&frame, chip);
++            const auto alpha = SkColorGetA(frame.GetBitmap().getColor(
++                chip->width() / 2, chip->height() / 2));
++            const auto colors = yee::ResolveHorizontalTabGroupColors(
++                *heading,
++                heading->GetColorProvider()->GetColor(
++                    GetTabGroupTabStripColorId(
++                        group_color,
++                        heading->GetWidget()->ShouldPaintAsActive())),
++                hovered);
++            return colors &&
++                   color_utils::GetContrastRatio(name->GetEnabledColor(),
++                                                 colors->background) >=
++                       color_utils::kMinimumReadableContrastRatio &&
++                   (hovered ? alpha > 0 && alpha < SK_AlphaOPAQUE : alpha == 0);
++          }));
++          RunScheduledLayouts();
++          EXPECT_EQ(size, chip->size());
++          EXPECT_EQ(header_size, heading->size());
++          ASSERT_TRUE(chip->background());
++          gfx::Canvas canvas(chip->size(), 1.f, false);
++          chip->background()->Paint(&canvas, chip);
++          const auto alpha = SkColorGetA(canvas.GetBitmap().getColor(
++              chip->width() / 2, chip->height() / 2));
++          if (hovered) {
++            EXPECT_GT(alpha, SK_AlphaTRANSPARENT);
++            EXPECT_LT(alpha, SK_AlphaOPAQUE);
++          } else {
++            EXPECT_EQ(SK_AlphaTRANSPARENT, alpha);
++          }
++          const auto colors = yee::ResolveHorizontalTabGroupColors(
++              *heading,
++              heading->GetColorProvider()->GetColor(GetTabGroupTabStripColorId(
++                  group_color, heading->GetWidget()->ShouldPaintAsActive())),
++              hovered);
++          ASSERT_TRUE(colors);
++          // native가 해석한 실제 제목색의 최소 가독성 대비를 보장한다.
++          EXPECT_GE(color_utils::GetContrastRatio(name->GetEnabledColor(),
++                                                  colors->background),
++                    color_utils::kMinimumReadableContrastRatio);
++        }
++      }
++      theme->SetBrowserColorScheme(original_scheme);
++      RunScheduledLayouts();
++    }
 +    if (vertical) {
 +      // 장식용 아이콘의 native hover·클릭은 그룹 행으로 전달돼야 한다.
 +      ASSERT_TRUE(visible_preview);
@@ -11861,7 +12138,6 @@ index 243d80a02d..682575401c 100644
 +              tab_groups::TabGroupVisualData(std::u16string(title_case.title),
 +                                             group_color, collapsed));
 +          RunScheduledLayouts();
-+#if BUILDFLAG(IS_WIN)
 +          if (constrained && !vertical) {
 +            // 긴 이름과 접힘 상태에 따라 native 그룹의 고정 폭과 창 최소 폭도
 +            // 바뀐다. 각 상태의 현재 최소 폭에서 검사하고 이전 폭을 강제하지
@@ -11872,7 +12148,61 @@ index 243d80a02d..682575401c 100644
 +            EXPECT_LT(view->GetWidget()->GetSize().width(),
 +                      original_bounds.width());
 +          }
-+#endif
++          if (!vertical) {
++            auto* const new_tab =
++                views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
++                    kNewTabButtonElementId,
++                    views::ElementTrackerViews::GetContextForView(view), true);
++            ASSERT_TRUE(new_tab);
++            const gfx::Rect button_bounds = new_tab->GetBoundsInScreen();
++            const gfx::Rect strip_bounds =
++                view->tab_strip_view()->GetTabStripView()->GetBoundsInScreen();
++            EXPECT_TRUE(view->GetBoundsInScreen().Contains(button_bounds));
++            EXPECT_EQ(yee::kSidebarMetrics.shell_control_size,
++                      button_bounds.width());
++            EXPECT_EQ(yee::kSidebarMetrics.shell_control_size,
++                      button_bounds.height());
++            EXPECT_EQ(gfx::Size(yee::kSidebarMetrics.shell_control_size,
++                                yee::kSidebarMetrics.shell_control_size),
++                      new_tab->GetContentsBounds().size());
++            auto* generator =
++                new_tab->GetProperty(views::kHighlightPathGeneratorKey);
++            ASSERT_TRUE(generator);
++            SkRRect highlight;
++            ASSERT_TRUE(
++                generator->GetHighlightPath(new_tab).isRRect(&highlight));
++            EXPECT_EQ(yee::kSidebarMetrics.shell_control_corner_radius,
++                      highlight.radii(SkRRect::kUpperLeft_Corner).x());
++            EXPECT_FALSE(button_bounds.Intersects(strip_bounds))
++                << "button=" << button_bounds.ToString()
++                << ", strip=" << strip_bounds.ToString();
++            if (constrained && collapsed &&
++                std::string_view(title_case.name) == "short") {
++              const int count_before = model->count();
++              const int active_before = model->active_index();
++              const auto native_window = view->GetWidget()->GetNativeWindow();
++              ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
++                  button_bounds.CenterPoint(), native_window));
++              ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
++                  ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
++                  native_window));
++              ASSERT_TRUE(base::test::RunUntil(
++                  [&] { return model->count() == count_before + 1; }));
++              model->CloseWebContentsAt(
++                  model->active_index(),
++                  TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
++              model->ActivateTabAt(active_before);
++              // native 새 탭 생성으로 펼쳐진 그룹을 이번 검사 상태로 복원한다.
++              model->ChangeTabGroupVisuals(
++                  group, tab_groups::TabGroupVisualData(
++                             std::u16string(title_case.title), group_color,
++                             collapsed));
++              ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
++                  view->toolbar()->GetBoundsInScreen().CenterPoint(),
++                  native_window));
++              RunScheduledLayouts();
++            }
++          }
 +          auto* const header = group_header();
 +          if (!header && !capture_directory.empty()) {
 +            CaptureYeeWindowFrame(
@@ -11956,9 +12286,10 @@ index 243d80a02d..682575401c 100644
 +                                                  group_marker());
 +            }
 +            const auto capsule_pixels = capsule_canvas.GetBitmap();
-+            EXPECT_EQ(SK_AlphaOPAQUE, SkColorGetA(capsule_pixels.getColor(
-+                                          capsule_pixels.width() / 2,
-+                                          capsule_pixels.height() / 2)));
++            const auto alpha = SkColorGetA(capsule_pixels.getColor(
++                capsule_pixels.width() / 2, capsule_pixels.height() / 2));
++            EXPECT_GT(alpha, SK_AlphaTRANSPARENT);
++            EXPECT_LT(alpha, SK_AlphaOPAQUE);
 +          }
 +          const auto& accessible_name =
 +              header->GetViewAccessibility().GetCachedName();
@@ -11974,6 +12305,47 @@ index 243d80a02d..682575401c 100644
 +            EXPECT_GT(title_label->GetPreferredSize().width(),
 +                      title_label->width());
 +          }
++          if (!vertical) {
++            ASSERT_TRUE(group_marker());
++            gfx::Rect interior = group_marker()->GetBoundsInScreen();
++            interior.Inset(gfx::Insets::VH(
++                0, yee::kSidebarMetrics.group_header_horizontal_inset));
++            if (!title_case.title.empty()) {
++              EXPECT_TRUE(interior.Contains(title_label->GetBoundsInScreen()))
++                  << "title=" << title_label->GetBoundsInScreen().ToString()
++                  << ", group interior=" << interior.ToString();
++            }
++            // 접힌 요약과 펼친 실제 탭의 16 DIP glyph를 모두 확인한다.
++            // 사각형 경계를 잘라 넘친 부분을 숨기는 것으로 대체하지 않는다.
++            const auto expect_glyphs = [&](auto&& self,
++                                           views::View* current) -> void {
++              if (current->IsDrawn() &&
++                  ((collapsed &&
++                    views::IsViewClass<views::ImageView>(current)) ||
++                   views::IsViewClass<TabIcon>(current))) {
++                gfx::Rect glyph = current->GetContentsBounds();
++                if (!glyph.IsEmpty()) {
++                  views::View::ConvertRectToScreen(current, &glyph);
++                  EXPECT_TRUE(interior.Contains(glyph))
++                      << current->GetClassName()
++                      << " glyph=" << glyph.ToString()
++                      << ", group interior=" << interior.ToString();
++                }
++              }
++              for (views::View* child : current->children()) {
++                self(self, child);
++              }
++            };
++            if (collapsed) {
++              expect_glyphs(expect_glyphs, visible_preview);
++            } else {
++              for (int index : tab_group->ListTabs().ToIntVector()) {
++                expect_glyphs(
++                    expect_glyphs,
++                    view->tab_strip_view()->GetTabAnchorViewAt(index));
++              }
++            }
++          }
 +          if (constrained && !capture_directory.empty()) {
 +            CaptureYeeWindowFrame(
 +                view->GetWidget(),
@@ -11982,24 +12354,80 @@ index 243d80a02d..682575401c 100644
 +                    title_case.name, collapsed ? "collapsed" : "expanded")));
 +          }
 +          if (constrained && !vertical) {
-+            // 접힌 그룹 옆의 일반 탭도 정지 상태에서 아이콘끼리 겹치지 않는다.
-+            std::vector<gfx::Rect> favicons;
++            // 긴 그룹 뒤의 탭은 native가 가릴 수 있다. 그룹 앞에 인접한
++            // 비활성 일반 탭 두 개를 두어 실제 보이는 아이콘 간격을 검사한다.
++            chrome::AddTabAt(browser(), GURL("about:blank"), 1, false);
++            chrome::AddTabAt(browser(), GURL("about:blank"), 2, false);
++            auto* const first_gap_tab = model->GetTabAtIndex(1);
++            auto* const second_gap_tab = model->GetTabAtIndex(2);
++            set_favicon(1, SK_ColorCYAN);
++            set_favicon(2, SK_ColorMAGENTA);
++            RunTestSequence(ResizeToMinimumWidth());
++            RunScheduledLayouts();
++            if (auto* unified = views::AsViewClass<TabStripView>(
++                    view->tab_strip_view()->GetTabStripView())) {
++              unified->ScrollToFitViews(
++                  view->tab_strip_view()->GetTabAnchorViewAt(1),
++                  view->tab_strip_view()->GetTabAnchorViewAt(2));
++              unified->GetUnpinnedTabsScrollViewForTesting()
++                  ->InvalidateLayout();
++              // 스크롤 요청은 여러 post-layout callback에 걸쳐 완료된다.
++              // native 소유자가 두 추적 대상을 해제한 뒤 가시 영역을 읽는다.
++              ASSERT_TRUE(base::test::RunUntil([&] {
++                RunScheduledLayouts();
++                return !unified->GetPrimaryScrollTargetForTesting() &&
++                       !unified->GetSecondaryScrollTargetForTesting();
++              }));
++              RunScheduledLayouts();
++            }
++            for (int index : {1, 2}) {
++              EXPECT_FALSE(model->IsTabPinned(index));
++              EXPECT_FALSE(model->GetTabGroupForTab(index));
++              EXPECT_NE(model->active_index(), index);
++              EXPECT_TRUE(
++                  view->tab_strip_view()->GetTabAnchorViewAt(index)->IsDrawn());
++            }
++            std::vector<std::pair<int, gfx::Rect>> favicons;
 +            for (int index = 0; index < model->count(); ++index) {
 +              if (model->GetTabGroupForTab(index)) {
 +                continue;
 +              }
++              const size_t icons_before = favicons.size();
 +              const auto inspect_icon = [&](auto&& self,
 +                                            views::View* current) -> void {
 +                if (auto* icon = views::AsViewClass<TabIcon>(current);
 +                    icon && icon->IsDrawn()) {
 +                  gfx::Rect bounds = icon->GetContentsBounds();
++                  EXPECT_FALSE(bounds.IsEmpty());
++                  const gfx::Rect visible = icon->GetVisibleBounds();
++                  if (!capture_directory.empty()) {
++                    LOG(INFO)
++                        << "간격 검사 favicon: index=" << index
++                        << ", contents=" << bounds.ToString()
++                        << ", visible=" << visible.ToString()
++                        << ", screen=" << icon->GetBoundsInScreen().ToString();
++                  }
++                  if (index == 1 || index == 2) {
++                    EXPECT_TRUE(visible.Contains(bounds))
++                        << "index=" << index
++                        << ", favicon=" << bounds.ToString()
++                        << ", visible=" << visible.ToString();
++                  }
++                  // IsDrawn은 스크롤 viewport 밖에서도 참이다. 두 명시적
++                  // 탭은 전부 보여야 하며 나머지는 실제 보이는 부분을 비교한다.
++                  bounds.Intersect(visible);
++                  if (bounds.IsEmpty()) {
++                    return;
++                  }
 +                  views::View::ConvertRectToScreen(icon, &bounds);
-+                  for (const auto& other : favicons) {
++                  for (const auto& [other_index, other] : favicons) {
 +                    EXPECT_FALSE(bounds.Intersects(other))
-+                        << "favicon=" << bounds.ToString()
++                        << "index=" << index
++                        << ", favicon=" << bounds.ToString()
++                        << ", adjacent index=" << other_index
 +                        << ", adjacent=" << other.ToString();
 +                  }
-+                  favicons.push_back(bounds);
++                  favicons.emplace_back(index, bounds);
 +                }
 +                for (views::View* child : current->children()) {
 +                  self(self, child);
@@ -12007,8 +12435,26 @@ index 243d80a02d..682575401c 100644
 +              };
 +              inspect_icon(inspect_icon,
 +                           view->tab_strip_view()->GetTabAnchorViewAt(index));
++              if (index == 1 || index == 2) {
++                EXPECT_EQ(icons_before + 1, favicons.size());
++              }
 +            }
 +            EXPECT_GE(favicons.size(), 2u);
++            if (!capture_directory.empty()) {
++              CaptureYeeWindowFrame(
++                  view->GetWidget(),
++                  capture_directory.AppendASCII(base::StringPrintf(
++                      "gap-%s-%s.png", title_case.name,
++                      collapsed ? "collapsed" : "expanded")));
++            }
++            model->CloseWebContentsAt(model->GetIndexOfTab(second_gap_tab),
++                                      TabCloseTypes::CLOSE_NONE);
++            model->CloseWebContentsAt(model->GetIndexOfTab(first_gap_tab),
++                                      TabCloseTypes::CLOSE_NONE);
++            RunTestSequence(ResizeToMinimumWidth());
++            RunScheduledLayouts();
++            EXPECT_EQ(count, model->count());
++            EXPECT_EQ(active_handle, model->GetActiveTab()->GetHandle());
 +          }
 +          if (!vertical && !collapsed) {
 +            capture_group(base::StringPrintf("title-%s-%s", title_case.name,
@@ -12079,13 +12525,32 @@ index 243d80a02d..682575401c 100644
 +    };
 +    expect_caption_contrast();
 +#endif
-+    const auto theme_tab = yee::ResolveHorizontalTabColors(
++    const auto current_tab = yee::ResolveHorizontalTabColors(
 +        *tab->GetColorProvider(), true, true, 0.0,
-+        view->GetWidget()->ShouldPaintAsActive());
-+    // 페이지 Header와 분리된 테마색으로 전환 직후부터 제목을 표시한다.
-+    expect_title(theme_tab.foreground);
++        view->GetWidget()->ShouldPaintAsActive(), std::nullopt, false,
++        view->GetYeeHeaderPresentation()->surface);
++    // 연결된 선택 탭은 페이지 Header와 같은 면과 대비로 전환한다.
++    expect_title(current_tab.foreground);
 +    const auto* styling = tab_styling(tab);
 +    ASSERT_TRUE(styling);
++    ASSERT_TRUE(model->IsTabPinned(0));
++    ASSERT_NE(0, model->active_index());
++    const auto* pinned_styling =
++        tab_styling(view->tab_strip_view()->GetTabAnchorViewAt(0));
++    ASSERT_TRUE(pinned_styling);
++    // 통합 호스트의 비활성 고정 탭도 같은 hover 곡률을 사용한다.
++    for (const auto* shape_style : {styling, pinned_styling}) {
++      SkRRect hover_shape;
++      ASSERT_TRUE(shape_style->GetPath(TabStyle::PathType::kHighlight, 1.f, {})
++                      .isRRect(&hover_shape));
++      for (SkRRect::Corner corner :
++           {SkRRect::kUpperLeft_Corner, SkRRect::kUpperRight_Corner,
++            SkRRect::kLowerRight_Corner, SkRRect::kLowerLeft_Corner}) {
++        const float radius = hover_shape.radii(corner).x();
++        EXPECT_TRUE(radius == 0 ||
++                    radius == yee::kSidebarMetrics.content_corner_radius);
++      }
++    }
 +    // 계산된 tint만 검사하면 native 기본 paint가 비활성 멤버를 생략해도 모른다.
 +    // hover 없이 실제 배경 paint를 검사한다.
 +    auto* const member = view->tab_strip_view()->GetTabAnchorViewAt(1);
@@ -12115,17 +12580,21 @@ index 243d80a02d..682575401c 100644
 +    ASSERT_TRUE(focus_ring);
 +    EXPECT_TRUE(focus_ring->ShouldPaintForTesting());
 +    for (SkColor surface :
-+         {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x13, 0x4E, 0x4A)}) {
++         {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x82, 0x82, 0x82),
++          SkColorSetRGB(0x13, 0x4E, 0x4A)}) {
 +      source->SetPageSurfaceColorForTesting(surface);
 +      ASSERT_TRUE(view->GetYeeHeaderPresentation());
 +      const auto presentation = *view->GetYeeHeaderPresentation();
 +      EXPECT_EQ(surface, presentation.surface);
++      const auto page_tab = yee::ResolveHorizontalTabColors(
++          *tab->GetColorProvider(), true, true, 0.0,
++          view->GetWidget()->ShouldPaintAsActive(), std::nullopt, false,
++          surface);
 +      EXPECT_EQ(original_path,
 +                styling->GetPath(TabStyle::PathType::kActiveTab, 1.f, {}));
-+      expect_title(theme_tab.foreground);
-+      EXPECT_EQ(theme_tab.background,
-+                styling->CalculateTargetColors().background_color);
-+      EXPECT_EQ(theme_tab.foreground,
++      expect_title(page_tab.foreground);
++      EXPECT_EQ(surface, styling->CalculateTargetColors().background_color);
++      EXPECT_EQ(page_tab.foreground,
 +                styling->CalculateTargetColors().foreground_color);
 +#if BUILDFLAG(IS_WIN)
 +      expect_caption_contrast();
@@ -12133,7 +12602,7 @@ index 243d80a02d..682575401c 100644
 +      ASSERT_TRUE(focus_ring->GetColorId());
 +      EXPECT_GE(color_utils::GetContrastRatio(tab->GetColorProvider()->GetColor(
 +                                                  *focus_ring->GetColorId()),
-+                                              theme_tab.background),
++                                              surface),
 +                color_utils::kMinimumVisibleContrastRatio);
 +    }
 +  };
@@ -12638,9 +13107,14 @@ index 243d80a02d..682575401c 100644
 +            marker->background()->Paint(&group_canvas, marker);
 +          }
 +          const SkBitmap pixels = group_canvas.GetBitmap();
-+          EXPECT_EQ(SK_AlphaOPAQUE,
-+                    SkColorGetA(pixels.getColor(pixels.width() / 2,
-+                                                pixels.height() / 2)));
++          const auto capsule_paint =
++              pixels.getColor(pixels.width() / 2, pixels.height() / 2);
++          EXPECT_GT(SkColorGetA(capsule_paint), SK_AlphaTRANSPARENT);
++          EXPECT_LT(SkColorGetA(capsule_paint), SK_AlphaOPAQUE);
++          const SkColor surface = color_utils::GetResultingPaintColor(
++              capsule_paint, yee::ResolveShellBackgroundColor(
++                                 *marker->GetColorProvider(),
++                                 marker->GetWidget()->ShouldPaintAsActive()));
 +          EXPECT_EQ(SK_AlphaTRANSPARENT, SkColorGetA(pixels.getColor(0, 0)));
 +          const auto inspect_title = [&](auto&& self,
 +                                         views::View* child) -> void {
@@ -12652,11 +13126,9 @@ index 243d80a02d..682575401c 100644
 +              EXPECT_TRUE(local.Contains(title))
 +                  << "capsule=" << local.ToString()
 +                  << ", title=" << title.ToString();
-+              EXPECT_GE(
-+                  color_utils::GetContrastRatio(
-+                      label->GetEnabledColor(),
-+                      pixels.getColor(pixels.width() / 2, pixels.height() / 2)),
-+                  color_utils::kMinimumReadableContrastRatio);
++              EXPECT_GE(color_utils::GetContrastRatio(label->GetEnabledColor(),
++                                                      surface),
++                        color_utils::kMinimumReadableContrastRatio);
 +            }
 +            for (views::View* descendant : child->children()) {
 +              self(self, descendant);
@@ -15497,7 +15969,7 @@ index 243d80a02d..682575401c 100644
  
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
-@@ -871,10 +5702,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -871,10 +5996,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16456,7 +16928,7 @@ index 243d80a02d..682575401c 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -883,8 +6661,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -883,8 +6955,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16474,7 +16946,7 @@ index 243d80a02d..682575401c 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -940,8 +6725,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -940,8 +7019,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16492,7 +16964,7 @@ index 243d80a02d..682575401c 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -953,7 +6745,302 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -953,7 +7039,372 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -16575,8 +17047,23 @@ index 243d80a02d..682575401c 100644
 +      auto* unified = views::AsViewClass<TabGroupView>(heading->parent());
 +      return unified ? unified->group_line() : nullptr;
 +    };
-+    // 새 그룹의 생성·배치 전환이 끝난 상태에서 닫기 자체를 검사한다.
-+    ASSERT_TRUE(base::test::RunUntil([&] {
++    const auto painted_capsule_bounds = [&]() {
++      auto* const capsule = marker();
++      if (!capsule) {
++        return gfx::Rect();
++      }
++      gfx::Canvas canvas(capsule->size(), 1.f, false);
++      yee::PaintHorizontalTabGroupCapsule(canvas, *capsule, SK_ColorBLUE);
++      const SkBitmap bitmap = canvas.GetBitmap();
++      gfx::Rect painted;
++      for (int y = 0; y < capsule->height(); ++y) {
++        if (SkColorGetA(bitmap.getColor(capsule->width() / 2, y)) > 0) {
++          painted.Union(gfx::Rect(0, y, capsule->width(), 1));
++        }
++      }
++      return painted;
++    };
++    const auto layout_settled = [&] {
 +      RunScheduledLayouts();
 +      auto* heading = header();
 +      if (!heading) {
@@ -16586,11 +17073,22 @@ index 243d80a02d..682575401c 100644
 +              views::AsViewClass<TabContainerImpl>(heading->parent())) {
 +        return !legacy->IsAnimating();
 +      }
-+      auto* unified = views::AsViewClass<TabGroupView>(heading->parent());
-+      return unified && !static_cast<TabCollectionAnimatingLayoutManager*>(
-+                             unified->GetLayoutManager())
-+                             ->is_animating();
-+    }));
++      // 그룹은 상위 unpinned 폭을 따라 다시 목표를 잡을 수 있다.
++      // 두 소유자가 모두 멈춘 뒤 기준 폭과 최종 폭을 비교한다.
++      for (auto* parent = heading->parent(); parent;
++           parent = parent->parent()) {
++        if ((views::IsViewClass<TabGroupView>(parent) ||
++             views::IsViewClass<UnpinnedTabContainerView>(parent)) &&
++            static_cast<TabCollectionAnimatingLayoutManager*>(
++                parent->GetLayoutManager())
++                ->is_animating()) {
++          return false;
++        }
++      }
++      return true;
++    };
++    // 새 그룹의 생성·배치 전환이 끝난 상태에서 닫기 자체를 검사한다.
++    ASSERT_TRUE(base::test::RunUntil(layout_settled));
 +    const auto group_name = [&]() -> views::Label* {
 +      views::Label* label = nullptr;
 +      const auto find = [&](auto&& self, views::View* current) -> void {
@@ -16656,12 +17154,13 @@ index 243d80a02d..682575401c 100644
 +    ASSERT_EQ(first_member + 2, model->count());
 +    ASSERT_TRUE(base::test::RunUntil(
 +        [&] { return !closing.view() && !next_closing.view(); }));
-+    RunScheduledLayouts();
++    ASSERT_TRUE(base::test::RunUntil(layout_settled));
 +    ASSERT_TRUE(marker());
 +    const int expanded_width = marker()->width();
 +    for (bool collapsed : {true, false}) {
 +      SCOPED_TRACE(testing::Message() << "collapsed=" << collapsed);
 +      std::set<int> sampled_widths;
++      std::set<int> sampled_heights;
 +      const int start_width = marker()->width();
 +      model->ChangeTabGroupVisuals(
 +          group,
@@ -16672,6 +17171,10 @@ index 243d80a02d..682575401c 100644
 +        ASSERT_TRUE(marker());
 +        EXPECT_TRUE(marker()->GetVisible());
 +        sampled_widths.insert(marker()->width());
++        const gfx::Rect painted = painted_capsule_bounds();
++        sampled_heights.insert(painted.height());
++        EXPECT_LE(std::abs(marker()->height() / 2 - painted.CenterPoint().y()),
++                  1);
 +        if (collapsed) {
 +          auto* member =
 +              view->tab_strip_view()->GetTabAnchorViewAt(first_member);
@@ -16690,6 +17193,17 @@ index 243d80a02d..682575401c 100644
 +          capture(collapsed ? "collapsing" : "expanding", i);
 +        }
 +      }
++      ASSERT_TRUE(base::test::RunUntil(layout_settled));
++      const int final_height =
++          collapsed
++              ? yee::kSidebarMetrics.horizontal_group_collapsed_capsule_height
++              : yee::kSidebarMetrics.horizontal_group_capsule_height;
++      EXPECT_EQ(final_height, painted_capsule_bounds().height());
++      EXPECT_TRUE(std::ranges::any_of(sampled_heights, [&](int height) {
++        return height > yee::kSidebarMetrics
++                            .horizontal_group_collapsed_capsule_height &&
++               height < yee::kSidebarMetrics.horizontal_group_capsule_height;
++      })) << "알약이 접힘·펼침 사이의 실제 중간 높이를 거치지 않음";
 +      const int end_width = marker()->width();
 +      EXPECT_TRUE(std::ranges::any_of(sampled_widths, [&](int width) {
 +        return width > std::min(start_width, end_width) &&
@@ -16697,10 +17211,38 @@ index 243d80a02d..682575401c 100644
 +      })) << "알약이 양 끝 사이의 실제 중간 폭을 거치지 않음";
 +      if (collapsed) {
 +        EXPECT_LT(marker()->width(), expanded_width);
++        // 접힌 모델은 native 테마를 거쳐도 작은 장식 높이로 복귀한다.
++        ui::MockOsSettingsProvider os_settings;
++        os_settings.SetPreferredContrast(
++            ui::NativeTheme::PreferredContrast::kMore);
++        RunScheduledLayouts();
++        EXPECT_FALSE(yee::UsesHorizontalTabGroupCapsule(*marker()));
++        os_settings.SetPreferredContrast(
++            ui::NativeTheme::PreferredContrast::kNoPreference);
++        RunScheduledLayouts();
++        ASSERT_TRUE(yee::UsesHorizontalTabGroupCapsule(*marker()));
++        EXPECT_EQ(final_height, painted_capsule_bounds().height());
 +      } else {
 +        EXPECT_EQ(marker()->width(), expanded_width);
 +      }
 +    }
++    // 빠른 재클릭에서도 현재 그린 높이에서 되돌리고 시작점으로 튀지 않는다.
++    model->ChangeTabGroupVisuals(
++        group, tab_groups::TabGroupVisualData(
++                   u"Group motion", tab_groups::TabGroupColorId::kBlue, true));
++    for (int i = 0; i < 4; ++i) {
++      tick();
++    }
++    const int turning_height = painted_capsule_bounds().height();
++    model->ChangeTabGroupVisuals(
++        group, tab_groups::TabGroupVisualData(
++                   u"Group motion", tab_groups::TabGroupColorId::kBlue, false));
++    EXPECT_EQ(turning_height, painted_capsule_bounds().height());
++    for (int i = 0; i < 20; ++i) {
++      tick();
++    }
++    EXPECT_EQ(yee::kSidebarMetrics.horizontal_group_capsule_height,
++              painted_capsule_bounds().height());
 +    // 마지막 멤버는 헤더와 함께 사라지며 다른 탭의 닫기 경로를 유지한다.
 +    model->CloseWebContentsAt(first_member,
 +                              TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
@@ -28580,7 +29122,7 @@ index acff73cee8..3a0f6eb6d0 100644
        WaitForState(kScrollOffsetPoller, 0),
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f..d876a53c11 100644
+index cfaf18f54f..77e8ed90a6 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -17,12 +17,17 @@
@@ -28826,7 +29368,7 @@ index cfaf18f54f..d876a53c11 100644
      attention_indicator_->SetVisible(true);
      attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
          kDefaultTouchFaviconMaskCustomIcon, GetForegroundColor(),
-@@ -673,14 +701,126 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -673,14 +701,129 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
@@ -28910,9 +29452,12 @@ index cfaf18f54f..d876a53c11 100644
 +    UpdateForegroundColor(
 +        colors ? colors->foreground
 +               : color_utils::GetColorWithMaxContrast(group_color));
++    const gfx::Insets capsule_insets =
++        GetInteriorMargin() -
++        gfx::Insets::VH(0, yee::kSidebarMetrics.group_header_horizontal_inset);
 +    SetBackground(colors
 +                      ? yee::CreateHorizontalTabGroupBackground(
-+                            colors->background, hovered)
++                            group_color, hovered, capsule_insets)
 +                      : views::CreateRoundedRectBackground(
 +                            group_color,
 +                            yee::kSidebarMetrics.group_header_corner_radius));
@@ -29146,7 +29691,7 @@ index 7614f6f43b..fb01225328 100644
    EXPECT_FALSE(header->collapse_icon_for_testing()->GetVisible());
  }
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_view.cc
-index 008b41bc39..6405d654b9 100644
+index 008b41bc39..8f8326a55b 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view.cc
 @@ -7,8 +7,11 @@
@@ -29200,13 +29745,17 @@ index 008b41bc39..6405d654b9 100644
  
    // If the tab group is not collapsed update child visibility immediately. This
    // allows tabs to be visible as they are animated in.
-@@ -253,14 +267,61 @@ void TabGroupView::OnDataChanged() {
+@@ -253,14 +267,65 @@ void TabGroupView::OnDataChanged() {
    if (GetColorProvider()) {
      SkColor color = GetColorProvider()->GetColor(GetTabGroupTabStripColorId(
          tab_group_visual_data_.color(), GetWidget()->ShouldPaintAsActive()));
 -    group_line_->SetBackground(views::CreateRoundedRectBackground(
 -        color, gfx::RoundedCornersF(0, kGroupLineCornerRadius,
 -                                    kGroupLineCornerRadius, 0)));
++    if (collection_node_->orientation() == TabStripOrientation::kHorizontal) {
++      yee::SetHorizontalTabGroupCapsuleCollapsed(
++          *group_line_, tab_group_visual_data_.is_collapsed());
++    }
 +    if (collection_node_->orientation() == TabStripOrientation::kHorizontal &&
 +        yee::UsesHorizontalTabGroupCapsule(*group_line_)) {
 +      ReorderChildView(group_line_, 0);
@@ -29265,7 +29814,7 @@ index 008b41bc39..6405d654b9 100644
  void TabGroupView::SetIsCollapsed(bool is_collapsed) {
    if (is_collapsed_ == is_collapsed) {
      return;
-@@ -337,6 +398,9 @@ std::optional<BrowserRootView::DropIndex> TabGroupView::GetLinkDropIndex(
+@@ -337,6 +402,9 @@ std::optional<BrowserRootView::DropIndex> TabGroupView::GetLinkDropIndex(
    for (const auto& child_node : collection_node_->children()) {
      auto* view = child_node->view();
      CHECK(view);
@@ -30165,7 +30714,7 @@ index b85a9a5d21..c690b21960 100644
    layouts.child_layouts.emplace_back(unpinned_tabs_scroll_view,
                                       unpinned_tabs_scroll_view->GetVisible(),
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
-index c223b50fab..130edb7cb2 100644
+index c223b50fab..f5fbed9186 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
 @@ -12,6 +12,7 @@
@@ -30382,21 +30931,29 @@ index c223b50fab..130edb7cb2 100644
    paint_as_active_subscription_ = {};
    UpdateHovered(false);
  }
-@@ -761,8 +847,11 @@ gfx::Size TabView::GetMinimumSize() const {
+@@ -760,9 +846,18 @@ gfx::Size TabView::GetMinimumSize() const {
+       return gfx::Size(tab_styling()->tab_style()->GetPinnedWidth(split_),
                         tab_styling()->tab_style()->GetStandardHeight());
      }
-     const int min_width =
+-    const int min_width =
 -        active_ ? tab_styling()->tab_style()->GetMinimumActiveWidth(split_)
 -                : tab_styling()->tab_style()->GetMinimumInactiveWidth();
++    int min_width =
 +        active_
 +            ? tab_styling()->tab_style()->GetMinimumActiveWidth(split_)
 +            : yee::ResolveHorizontalTabMinimumInactiveWidth(
 +                  *this, tab_styling()->tab_style()->GetMinimumInactiveWidth(),
 +                  tab_styling()->tab_style()->GetTabOverlap());
++    const auto* tab = GetTabInterface();
++    if (!split_ && tab && tab->GetGroup()) {
++      min_width = yee::ResolveHorizontalTabGroupMinimumWidth(
++          *this, min_width, tab_styling()->GetContentsInsets().left(),
++          tab_styling()->tab_style()->GetBottomCornerRadius());
++    }
      return gfx::Size(min_width,
                       tab_styling()->tab_style()->GetStandardHeight());
    }
-@@ -812,11 +901,9 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
+@@ -812,11 +907,9 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
    int preferred_height;
    if (config.expand) {
      preferred_width = container.width() - config.padding;
@@ -30411,7 +30968,7 @@ index c223b50fab..130edb7cb2 100644
    } else {
      const gfx::Size preferred_size = config.view->GetPreferredSize();
      preferred_width = preferred_size.width();
-@@ -843,7 +930,22 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
+@@ -843,7 +936,22 @@ gfx::Rect TabView::GetChildBounds(const gfx::Rect& container,
  
  bool TabView::IsChildVisible(const views::View* child_view,
                               const int width) const {
@@ -30435,7 +30992,7 @@ index c223b50fab..130edb7cb2 100644
      // Pinned titles should be visible in the expand on hover state when the
      // width is sufficient to show the title.
      return !pinned_ || IsInExpandOnHover(width);
-@@ -867,6 +969,18 @@ bool TabView::IsChildVisible(const views::View* child_view,
+@@ -867,6 +975,18 @@ bool TabView::IsChildVisible(const views::View* child_view,
      if (pinned_) {
        return false;
      }
@@ -30454,7 +31011,7 @@ index c223b50fab..130edb7cb2 100644
  
      // When uncollapsing the tabstrip, intentionally start showing the close
      // button on active non-hovered tabs a little bit sooner than reaching the
-@@ -875,12 +989,13 @@ bool TabView::IsChildVisible(const views::View* child_view,
+@@ -875,12 +995,13 @@ bool TabView::IsChildVisible(const views::View* child_view,
      constexpr int kUncollapsedMinWidthThreshold = 3;
  
      if (width < UncollapsedMinWidth() - kUncollapsedMinWidthThreshold) {
@@ -30472,19 +31029,18 @@ index c223b50fab..130edb7cb2 100644
    }
  
    NOTREACHED() << "Unknown tab child view";
-@@ -897,7 +1012,10 @@ views::ProposedLayout TabView::CalculateProposedLayout(
+@@ -895,9 +1016,7 @@ views::ProposedLayout TabView::CalculateProposedLayout(
+     } else {
+       const int preferred_width =
            tab_styling()->tab_style()->GetStandardWidth(split_);
-       const int minimum_width =
-           active_ ? tab_styling()->tab_style()->GetMinimumActiveWidth(split_)
+-      const int minimum_width =
+-          active_ ? tab_styling()->tab_style()->GetMinimumActiveWidth(split_)
 -                  : tab_styling()->tab_style()->GetMinimumInactiveWidth();
-+                  : yee::ResolveHorizontalTabMinimumInactiveWidth(
-+                        *this,
-+                        tab_styling()->tab_style()->GetMinimumInactiveWidth(),
-+                        tab_styling()->tab_style()->GetTabOverlap());
++      const int minimum_width = GetMinimumSize().width();
        width = std::clamp(size_bounds.width().value_or(preferred_width),
                           minimum_width, preferred_width);
      }
-@@ -905,11 +1023,19 @@ views::ProposedLayout TabView::CalculateProposedLayout(
+@@ -905,11 +1024,19 @@ views::ProposedLayout TabView::CalculateProposedLayout(
      width = size_bounds.width().value_or(
          VerticalTabStripRegionView::kUncollapsedMaxWidth);
    }
@@ -30505,7 +31061,7 @@ index c223b50fab..130edb7cb2 100644
    views::ProposedLayout layouts;
    layouts.host_size = gfx::Size(width, height);
  
-@@ -918,7 +1044,18 @@ views::ProposedLayout TabView::CalculateProposedLayout(
+@@ -918,7 +1045,18 @@ views::ProposedLayout TabView::CalculateProposedLayout(
  
    // If the tab is collapsed but animating with a wider width then we shouldn't
    // center the contents.
@@ -30525,7 +31081,7 @@ index c223b50fab..130edb7cb2 100644
  
    int placed_children = 0;
    for (const auto& child : tab_children_configs_) {
-@@ -1031,6 +1168,15 @@ views::BubbleBorder::Arrow TabView::GetAnchorPosition() const {
+@@ -1031,6 +1169,15 @@ views::BubbleBorder::Arrow TabView::GetAnchorPosition() const {
    return views::BubbleBorder::Arrow::LEFT_TOP;
  }
  
@@ -30541,7 +31097,7 @@ index c223b50fab..130edb7cb2 100644
  views::BubbleAnchor TabView::GetAnchor() {
    if (split_ && !collapsed_) {
      return views::BubbleAnchor(parent());
-@@ -1097,7 +1243,8 @@ void TabView::OnAXNameChanged(ax::mojom::StringAttribute attribute,
+@@ -1097,7 +1244,8 @@ void TabView::OnAXNameChanged(ax::mojom::StringAttribute attribute,
  
  void TabView::OnCollapseStateChanged(
      tabs::VerticalTabStripCollapseState state) {
@@ -30551,7 +31107,7 @@ index c223b50fab..130edb7cb2 100644
  }
  
  void TabView::OnTabStateChanged() {
-@@ -1145,7 +1292,8 @@ void TabView::SetSelection(bool selected) {
+@@ -1145,7 +1293,8 @@ void TabView::SetSelection(bool selected) {
    }
  
    selected_ = selected;
@@ -30561,7 +31117,7 @@ index c223b50fab..130edb7cb2 100644
  }
  
  void TabView::UpdateTabData(const tabs::TabInterface* tab) {
-@@ -1163,6 +1311,7 @@ void TabView::UpdateTabData(const tabs::TabInterface* tab) {
+@@ -1163,6 +1312,7 @@ void TabView::UpdateTabData(const tabs::TabInterface* tab) {
    icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
                        tab_data_.needs_attention);
    UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
@@ -30569,7 +31125,7 @@ index c223b50fab..130edb7cb2 100644
    alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
    SetHoverCardDataFrom(tab_data_);
  }
-@@ -1179,6 +1328,7 @@ void TabView::SetDataForTesting(tabs::TabData data) {
+@@ -1179,6 +1329,7 @@ void TabView::SetDataForTesting(tabs::TabData data) {
    icon_->SetAttention(TabIcon::AttentionType::kTabWantsAttentionStatus,
                        tab_data_.needs_attention);
    UpdateTitle(tab_data_.title, tab_data_.should_render_loading_title);
@@ -30577,7 +31133,7 @@ index c223b50fab..130edb7cb2 100644
    alert_indicator_->TransitionToAlertState(tab_data_.alert_state);
    SetHoverCardDataFrom(tab_data_);
  }
-@@ -1192,10 +1342,39 @@ void TabView::UpdateTitle(std::u16string title,
+@@ -1192,10 +1343,39 @@ void TabView::UpdateTitle(std::u16string title,
    } else {
      title = WindowMetadataController::FormatTitleForDisplay(title);
    }
@@ -30618,7 +31174,7 @@ index c223b50fab..130edb7cb2 100644
    if (pinned_ && orientation_ == TabStripOrientation::kVertical) {
      if (split_) {
        // Insets for border handled by the `SplitTabView`.
-@@ -1220,13 +1399,29 @@ void TabView::UpdateColors() {
+@@ -1220,13 +1400,29 @@ void TabView::UpdateColors() {
          ThemeProperties::SHOULD_FILL_BACKGROUND_TAB_COLOR);
    }
    TabStyle::TabColors colors = tab_styling()->CalculateTargetColors();
@@ -30650,7 +31206,7 @@ index c223b50fab..130edb7cb2 100644
    SchedulePaint();
  }
  
-@@ -1312,6 +1507,9 @@ bool TabView::IsFrameActive() const {
+@@ -1312,6 +1508,9 @@ bool TabView::IsFrameActive() const {
  }
  
  TabStyle::TabSelectionState TabView::GetSelectionState() const {
@@ -30660,7 +31216,7 @@ index c223b50fab..130edb7cb2 100644
    return active_ ? TabStyle::TabSelectionState::kActive
                   : (selected_ ? TabStyle::TabSelectionState::kSelected
                                : TabStyle::TabSelectionState::kInactive);
-@@ -1354,10 +1552,16 @@ const tabs::TabInterface* TabView::GetTabInterface() const {
+@@ -1354,10 +1553,16 @@ const tabs::TabInterface* TabView::GetTabInterface() const {
  
  void TabView::UpdateHoverCard(HoverCardAnchorTarget* target,
                                int hover_card_update_type) {
@@ -30877,7 +31433,7 @@ index d51e78f504..8659c5f105 100644
          return StartSystemDnDSessionIfNecessary(attached_context_,
                                                  point_in_screen);
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
-index 8b5b96fe5e..98f48df87a 100644
+index 8b5b96fe5e..e5d90a3f83 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 @@ -12,19 +12,24 @@
@@ -30913,7 +31469,7 @@ index 8b5b96fe5e..98f48df87a 100644
  #include "base/test/test_timeouts.h"
  #include "base/threading/thread_restrictions.h"
  #include "build/build_config.h"
-@@ -52,10 +58,12 @@
+@@ -52,17 +58,21 @@
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
@@ -30926,7 +31482,16 @@ index 8b5b96fe5e..98f48df87a 100644
  #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
  #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
  #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
-@@ -91,15 +99,19 @@
+ #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_test_mixin.h"
+ #include "chrome/browser/ui/views/tabs/dragging/window_finder.h"
+ #include "chrome/browser/ui/views/tabs/tab.h"
++#include "chrome/browser/ui/views/tabs/tab_group_underline.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
++#include "chrome/browser/ui/views/yee/tab_group_presentation.h"
+ #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
+ #include "chrome/browser/web_applications/model/display_override.h"
+ #include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
+@@ -91,15 +101,21 @@
  #include "testing/gmock/include/gmock/gmock.h"
  #include "third_party/blink/public/common/features.h"
  #include "ui/aura/env.h"
@@ -30942,11 +31507,13 @@ index 8b5b96fe5e..98f48df87a 100644
  #include "ui/display/screen.h"
  #include "ui/display/screen_base.h"
  #include "ui/gfx/animation/animation_test_api.h"
++#include "ui/gfx/canvas.h"
++#include "ui/native_theme/native_theme.h"
 +#include "ui/snapshot/snapshot.h"
  #include "ui/views/accessibility/view_accessibility.h"
  #include "ui/views/controls/native/native_view_host.h"
  #include "ui/views/test/widget_activation_waiter.h"
-@@ -619,6 +631,11 @@ TabDragControllerTest::~TabDragControllerTest() = default;
+@@ -619,6 +635,11 @@ TabDragControllerTest::~TabDragControllerTest() = default;
  
  void TabDragControllerTest::StopAnimating(TabStrip* tab_strip) {
    tab_strip->StopAnimating();
@@ -30958,7 +31525,7 @@ index 8b5b96fe5e..98f48df87a 100644
  }
  
  void TabDragControllerTest::AddTabsAndResetBrowser(Browser* browser,
-@@ -732,6 +749,19 @@ void TabDragControllerTest::SetUp() {
+@@ -732,6 +753,19 @@ void TabDragControllerTest::SetUp() {
    InProcessBrowserTest::SetUp();
  }
  
@@ -30978,7 +31545,187 @@ index 8b5b96fe5e..98f48df87a 100644
  namespace {
  
  int GetDetachY(TabStrip* tab_strip) {
-@@ -1381,9 +1411,10 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -1326,6 +1360,179 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+             gfx::Range(0, 3));
+ }
+ 
++// 그룹 앞·가운데·끝에서 실제 드래그 중인 탭 주위에 배경을 중복 합성하지 않는다.
++IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
++                       YeeGroupDragKeepsSingleCapsuleAtEveryPosition) {
++  // 탭바 끝에서 그룹을 벗어나는 native 경계와 그룹 내부의 끝 슬롯을 구분한다.
++  AddTabsAndResetBrowser(browser(), 4);
++  auto* const strip = GetTabStripForBrowser(browser());
++  auto* const model = browser()->tab_strip_model();
++  const auto group = model->AddToNewGroup({0, 1, 2});
++  auto* const first = model->GetWebContentsAt(0);
++  auto* const middle = model->GetWebContentsAt(1);
++  auto* const last = model->GetWebContentsAt(2);
++  auto* const moving = model->GetWebContentsAt(3);
++  StopAnimating(strip);
++  EnsureFocusToTabStrip(strip);
++  strip->GetWidget()->LayoutRootViewIfNecessary();
++  StopAnimating(strip);
++  auto* const group_views =
++      strip->tab_container_for_testing()->GetGroupViews(group);
++  auto* const background = group_views->underline();
++  auto* const drag_background = group_views->drag_underline();
++  ASSERT_TRUE(yee::UsesHorizontalTabGroupCapsule(*background));
++
++  const auto maximum_alpha = [](const SkBitmap& bitmap) {
++    SkAlpha alpha = SK_AlphaTRANSPARENT;
++    for (int y = 0; y < bitmap.height(); ++y) {
++      for (int x = 0; x < bitmap.width(); ++x) {
++        alpha = std::max(
++            alpha, static_cast<SkAlpha>(SkColorGetA(bitmap.getColor(x, y))));
++      }
++    }
++    return alpha;
++  };
++  const auto check_background = [&] {
++    EXPECT_TRUE(background->GetVisible());
++    gfx::Canvas canvas(background->size(), 1.f, false);
++    background->OnPaint(&canvas);
++    const SkAlpha base_alpha = maximum_alpha(canvas.GetBitmap());
++    EXPECT_GT(base_alpha, SK_AlphaTRANSPARENT);
++    EXPECT_LT(base_alpha, SK_AlphaOPAQUE);
++    if (drag_background->GetVisible()) {
++      gfx::Canvas drag_canvas(drag_background->size(), 1.f, false);
++      drag_background->OnPaint(&drag_canvas);
++      EXPECT_EQ(SK_AlphaTRANSPARENT, maximum_alpha(drag_canvas.GetBitmap()));
++      gfx::Point origin;
++      views::View::ConvertPointToTarget(drag_background, background, &origin);
++      canvas.Save();
++      canvas.Translate(gfx::Vector2d(origin.x(), origin.y()));
++      drag_background->OnPaint(&canvas);
++      canvas.Restore();
++    }
++    EXPECT_EQ(base_alpha, maximum_alpha(canvas.GetBitmap()));
++  };
++  const auto capture_directory =
++      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
++          "yee-group-marker-capture-dir");
++  const auto capture = [&](const std::string& phase) {
++    if (capture_directory.empty()) {
++      return;
++    }
++    ASSERT_TRUE(base::CreateDirectory(capture_directory));
++    auto* const widget =
++        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
++    widget->GetCompositor()->ScheduleFullRedraw();
++    ASSERT_TRUE(ui::WaitForNextFrameToBePresented(widget->GetCompositor(),
++                                                  base::Seconds(5)));
++    base::test::TestFuture<scoped_refptr<base::RefCountedMemory>> snapshot;
++    ui::GrabWindowSnapshotAsPNG(
++        widget->GetNativeWindow(),
++        gfx::Rect(widget->GetWindowBoundsInScreen().size()),
++        snapshot.GetCallback());
++    const auto png = snapshot.Take();
++    ASSERT_TRUE(png && png->size());
++    ASSERT_TRUE(base::WriteFile(
++        capture_directory.AppendASCII("group-drag-" + phase + ".png"),
++        static_cast<base::span<const uint8_t>>(*png)));
++  };
++  const auto check_native_roundtrip = [&] {
++    auto* const native_theme = strip->GetNativeTheme();
++    const auto original_contrast = native_theme->preferred_contrast();
++    base::ScopedClosureRunner restore_theme(base::BindLambdaForTesting([&] {
++      native_theme->set_preferred_contrast(original_contrast);
++      native_theme->NotifyOnNativeThemeUpdated();
++    }));
++    native_theme->set_preferred_contrast(
++        ui::NativeTheme::PreferredContrast::kMore);
++    native_theme->NotifyOnNativeThemeUpdated();
++    ASSERT_TRUE(base::test::RunUntil([&] {
++      return !yee::UsesHorizontalTabGroupCapsule(*background) &&
++             background->GetVisible() && drag_background->GetVisible();
++    }));
++    gfx::Canvas marker(drag_background->size(), 1.f, false);
++    drag_background->OnPaint(&marker);
++    EXPECT_GT(maximum_alpha(marker.GetBitmap()), SK_AlphaTRANSPARENT);
++    restore_theme.RunAndReset();
++    ASSERT_TRUE(base::test::RunUntil(
++        [&] { return yee::UsesHorizontalTabGroupCapsule(*background); }));
++    check_background();
++  };
++
++  const std::array<content::WebContents*, 3> targets = {middle, first, last};
++  const std::array<int, 3> expected_positions = {1, 0, 3};
++  const std::array<const char*, 3> phases = {"middle", "first", "last"};
++  for (size_t i = 0; i < targets.size(); ++i) {
++    SCOPED_TRACE(phases[i]);
++    strip->GetWidget()->LayoutRootViewIfNecessary();
++    StopAnimating(strip);
++    ASSERT_TRUE(PressInputAtCenter(
++        strip->tab_at(model->GetIndexOfWebContents(moving))));
++    base::ScopedClosureRunner release_input(
++        base::BindLambdaForTesting([&] { EXPECT_TRUE(ReleaseInput()); }));
++    if (i == 1) {
++      // 첫 멤버의 이전 중앙은 그룹 바깥 슬롯이 될 수 있다. 기존 편입 검사처럼
++      // 반 칸만 이동해 그룹 안쪽의 첫 위치를 선택한다.
++      const int distance =
++          strip->tab_at(model->GetIndexOfWebContents(first))->width() / 2;
++      ASSERT_TRUE(DragInputToCenter(
++          strip->tab_at(model->GetIndexOfWebContents(moving)),
++          gfx::Vector2d((base::i18n::IsRTL() ? 1 : -1) * distance, 0)));
++    } else {
++      ASSERT_TRUE(DragInputToCenter(
++          strip->tab_at(model->GetIndexOfWebContents(targets[i]))));
++    }
++    ASSERT_TRUE(HasDragStarted(strip));
++    SCOPED_TRACE("order=" + IDString(model) + " moving_index=" +
++                 base::NumberToString(model->GetIndexOfWebContents(moving)) +
++                 " grouped=" +
++                 base::NumberToString(
++                     model->GetTabGroupForTab(
++                         model->GetIndexOfWebContents(moving)) == group));
++    ASSERT_TRUE(base::test::RunUntil([&] {
++      return model->GetIndexOfWebContents(moving) == expected_positions[i] &&
++             model->GetTabGroupForTab(expected_positions[i]) == group;
++    }));
++    EXPECT_EQ(4u,
++              model->group_model()->GetTabGroup(group)->ListTabs().length());
++    check_background();
++    capture(phases[i]);
++    if (i == targets.size() - 1) {
++      check_native_roundtrip();
++    }
++    release_input.RunAndReset();
++    // 다음 목표의 좌표는 native 드롭 애니메이션이 끝난 뒤에 읽는다.
++    StopAnimating(strip);
++    check_background();
++    EXPECT_EQ(moving, model->GetActiveWebContents());
++  }
++  EXPECT_EQ(5, model->count());
++
++  // 헤더가 drag container로 옮겨진 뒤 포인터를 멈춘 상태에서도 native marker로
++  // 복귀해야 한다. 처음부터 남긴 그룹 밖 탭으로 전체 창 drag도 방지한다.
++  StopAnimating(strip);
++  EnsureFocusToTabStrip(strip);
++  ASSERT_TRUE(PressInputAtCenter(strip->group_header(group)));
++  base::ScopedClosureRunner release_header(
++      base::BindLambdaForTesting([&] { EXPECT_TRUE(ReleaseInput()); }));
++  ASSERT_TRUE(
++      DragInputToCenter(strip->group_header(group),
++                        gfx::Vector2d(base::i18n::IsRTL() ? -20 : 20, 0)));
++  ASSERT_TRUE(HasDragStarted(strip));
++  check_background();
++  check_native_roundtrip();
++  capture("header-stationary");
++  release_header.RunAndReset();
++  StopAnimating(strip);
++  check_background();
++  EXPECT_EQ(5, model->count());
++  EXPECT_EQ(4u, model->group_model()->GetTabGroup(group)->ListTabs().length());
++  for (auto* member : {first, middle, last, moving}) {
++    EXPECT_EQ(group,
++              model->GetTabGroupForTab(model->GetIndexOfWebContents(member)));
++  }
++}
++
+ // Creates a browser with four tabs. The first tab is in a Tab Group. Dragging
+ // the only tab in that group will retain the group.
+ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -1381,9 +1588,10 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // lands in the slot between the tab in the zero-th index and the group
    // header to the left of the zero-th index.
    ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(1)));
@@ -30992,7 +31739,7 @@ index 8b5b96fe5e..98f48df87a 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -1464,6 +1495,131 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -1464,6 +1672,131 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    EXPECT_EQ(group_model->GetTabGroup(group2)->ListTabs(), gfx::Range(0, 1));
  }
  
@@ -31124,7 +31871,7 @@ index 8b5b96fe5e..98f48df87a 100644
  // Creates a browser with five tabs. The last two tabs are in a Tab Group.
  // Dragging the first tab past the last slot should allow it to exit the group.
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-@@ -4521,9 +4677,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4521,9 +4854,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the last tab to the left should cause it to swap places with the
    // collapsed group header.
    ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(3)));
@@ -31139,7 +31886,7 @@ index 8b5b96fe5e..98f48df87a 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -4558,12 +4716,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4558,12 +4893,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the first tab to the right should cause it to swap places with the
    // collapsed group header.
    const gfx::NativeWindow window_hint = GetWindowHint(tab_strip);
@@ -31265,22 +32012,35 @@ index ebc301e4be..01e8481d18 100644
      "//components/prefs",
      "//ui/actions",
 diff --git a/chrome/browser/ui/views/tabs/shared/new_tab_button.cc b/chrome/browser/ui/views/tabs/shared/new_tab_button.cc
-index 4954f02c24..8bafb873eb 100644
+index 4954f02c24..9c57021d31 100644
 --- a/chrome/browser/ui/views/tabs/shared/new_tab_button.cc
 +++ b/chrome/browser/ui/views/tabs/shared/new_tab_button.cc
-@@ -9,6 +9,8 @@
+@@ -9,6 +9,9 @@
  #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 +#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 +#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "ui/actions/actions.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
  #include "ui/compositor/layer.h"
-@@ -46,6 +48,15 @@ NewTabButton::NewTabButton(BrowserWindowInterface* browser,
+@@ -46,6 +49,27 @@ NewTabButton::NewTabButton(BrowserWindowInterface* browser,
  
  NewTabButton::~NewTabButton() = default;
  
++gfx::RoundedCornersF NewTabButton::GetButtonCornerRadii() const {
++  if (browser_ && yee::IsShellEnabled() &&
++      yee::GetBrowserSurfaceMode(*browser_) ==
++          yee::BrowserSurfaceMode::kConnectedTabs &&
++      !yee::ShouldUseNativeHorizontalTabTheme(*GetNativeTheme(),
++                                              GetThemeProvider())) {
++    return gfx::RoundedCornersF(
++        yee::kSidebarMetrics.shell_control_corner_radius);
++  }
++  return TabStripFlatEdgeButton::GetButtonCornerRadii();
++}
++
 +void NewTabButton::OnPaintBackground(gfx::Canvas* canvas) {
 +  if (yee::GetBrowserSurfaceMode(*browser_) !=
 +          yee::BrowserSurfaceMode::kConnectedTabs ||
@@ -31294,19 +32054,22 @@ index 4954f02c24..8bafb873eb 100644
    if (event->IsOnlyMiddleMouseButton()) {
      if (event->type() == ui::EventType::kMousePressed) {
 diff --git a/chrome/browser/ui/views/tabs/shared/new_tab_button.h b/chrome/browser/ui/views/tabs/shared/new_tab_button.h
-index 90cc65e56c..22b3c3b293 100644
+index 90cc65e56c..02f9eaec98 100644
 --- a/chrome/browser/ui/views/tabs/shared/new_tab_button.h
 +++ b/chrome/browser/ui/views/tabs/shared/new_tab_button.h
-@@ -30,6 +30,7 @@ class NewTabButton : public TabStripFlatEdgeButton {
+@@ -30,6 +30,10 @@ class NewTabButton : public TabStripFlatEdgeButton {
  
    // views::View:
    void OnMouseEvent(ui::MouseEvent* event) override;
 +  void OnPaintBackground(gfx::Canvas* canvas) override;
++
++ protected:
++  gfx::RoundedCornersF GetButtonCornerRadii() const override;
  
   private:
    std::unique_ptr<views::ActionViewController> action_view_controller_;
 diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
-index 7a769bd170..78f619eed5 100644
+index 7a769bd170..00c19f8063 100644
 --- a/chrome/browser/ui/views/tabs/tab.cc
 +++ b/chrome/browser/ui/views/tabs/tab.cc
 @@ -53,6 +53,10 @@
@@ -31422,18 +32185,27 @@ index 7a769bd170..78f619eed5 100644
    paint_as_active_subscription_ = {};
  }
  
-@@ -953,7 +984,9 @@ TabSlotView::ViewType Tab::GetTabSlotViewType() const {
+@@ -951,10 +982,17 @@ TabSlotView::ViewType Tab::GetTabSlotViewType() const {
+ }
+ 
  TabSizeInfo Tab::GetTabSizeInfo() const {
++  int inactive_width = yee::ResolveHorizontalTabMinimumInactiveWidth(
++      *this, tab_style()->GetMinimumInactiveWidth(),
++      tab_style()->GetTabOverlap());
++  if (group() && !split()) {
++    inactive_width = yee::ResolveHorizontalTabGroupMinimumWidth(
++        *this, inactive_width, tab_style_views()->GetContentsInsets().left(),
++        tab_style()->GetBottomCornerRadius());
++  }
    return {tab_style()->GetPinnedWidth(split().has_value()),
            tab_style()->GetMinimumActiveWidth(split().has_value()),
 -          tab_style()->GetMinimumInactiveWidth(),
-+          yee::ResolveHorizontalTabMinimumInactiveWidth(
-+              *this, tab_style()->GetMinimumInactiveWidth(),
-+              tab_style()->GetTabOverlap()),
-           tab_style()->GetStandardWidth(split().has_value())};
+-          tab_style()->GetStandardWidth(split().has_value())};
++          inactive_width, tab_style()->GetStandardWidth(split().has_value())};
  }
  
-@@ -1235,7 +1268,10 @@ void Tab::UpdateIconVisibility() {
+ void Tab::SetGroup(std::optional<tab_groups::TabGroupId> group) {
+@@ -1235,7 +1273,10 @@ void Tab::UpdateIconVisibility() {
    // collapsed, but some favicon functionality can escape the bounds of the tab
    // causing artifacts. Fix this by explicitly disabling the visibility of the
    // views in the tab if the width is such that it is collapsed.
@@ -31445,7 +32217,7 @@ index 7a769bd170..78f619eed5 100644
      showing_icon_ = false;
      showing_alert_indicator_ = false;
      showing_close_button_ = false;
-@@ -1303,6 +1339,23 @@ void Tab::UpdateIconVisibility() {
+@@ -1303,6 +1344,23 @@ void Tab::UpdateIconVisibility() {
    const int close_button_width =
        GetLayoutConstant(LayoutConstant::kTabCloseButtonSize) +
        GetLayoutConstant(LayoutConstant::kTabAfterTitlePadding);
@@ -31469,7 +32241,7 @@ index 7a769bd170..78f619eed5 100644
    const bool large_enough_for_close_button =
        available_width >= (touch_ui ? kTouchMinimumContentsWidthForCloseButtons
                                     : kMinimumContentsWidthForCloseButtons);
-@@ -1432,6 +1485,9 @@ int Tab::GetWidthOfLargestSelectableRegion() const {
+@@ -1432,6 +1490,9 @@ int Tab::GetWidthOfLargestSelectableRegion() const {
  
  void Tab::UpdateForegroundColors() {
    TabStyle::TabColors colors = tab_style_views()->CalculateTargetColors();
@@ -31480,13 +32252,14 @@ index 7a769bd170..78f619eed5 100644
    close_button_->SetColors(colors);
    alert_indicator_button_->OnParentTabButtonColorChanged();
 diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
-index d0ca51b8e2..3e6d509573 100644
+index d0ca51b8e2..a4ed541628 100644
 --- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/tab/BUILD.gn
-@@ -67,6 +67,7 @@ source_set("impl") {
+@@ -67,6 +67,8 @@ source_set("impl") {
      "//chrome/browser/ui/tabs/saved_tab_groups",
      "//chrome/browser/ui/user_education",
      "//chrome/browser/ui/views/permissions/chip",
++    "//chrome/browser/ui/views/yee:project_navigation",
 +    "//chrome/browser/ui/views/yee:yee_ui",
      "//chrome/browser/ui/window_metadata",
      "//chrome/common",
@@ -31650,7 +32423,7 @@ index 601cf56eef..77e63b6e1b 100644
    void PaintChildren(const views::PaintInfo& paint_info) override;
    gfx::Size GetMinimumSize() const override;
 diff --git a/chrome/browser/ui/views/tabs/tab_group_header.cc b/chrome/browser/ui/views/tabs/tab_group_header.cc
-index 6d0543941b..654187a646 100644
+index 6d0543941b..7b2fd01509 100644
 --- a/chrome/browser/ui/views/tabs/tab_group_header.cc
 +++ b/chrome/browser/ui/views/tabs/tab_group_header.cc
 @@ -33,6 +33,8 @@
@@ -31662,7 +32435,27 @@ index 6d0543941b..654187a646 100644
  #include "chrome/grit/generated_resources.h"
  #include "components/data_sharing/public/features.h"
  #include "components/saved_tab_groups/public/tab_group_sync_service.h"
-@@ -453,7 +455,11 @@ views::BubbleBorder::Arrow TabGroupHeader::GetAnchorPosition() const {
+@@ -344,6 +346,7 @@ void TabGroupHeader::OnMouseReleased(const ui::MouseEvent& event) {
+ }
+ 
+ void TabGroupHeader::OnMouseEntered(const ui::MouseEvent& event) {
++  UpdateHoverColors(true);
+   if (features::IsTabGroupHoverCardsEnabled()) {
+     tab_slot_controller_->UpdateHoverCard(
+         this, TabSlotController::HoverCardUpdateType::kHover);
+@@ -353,6 +356,11 @@ void TabGroupHeader::OnMouseEntered(const ui::MouseEvent& event) {
+   }
+ }
+ 
++void TabGroupHeader::OnMouseExited(const ui::MouseEvent& event) {
++  TabSlotView::OnMouseExited(event);
++  UpdateHoverColors(false);
++}
++
+ void TabGroupHeader::OnGestureEvent(ui::GestureEvent* event) {
+   tab_slot_controller_->UpdateHoverCard(
+       nullptr, TabSlotController::HoverCardUpdateType::kEvent);
+@@ -453,7 +461,11 @@ views::BubbleBorder::Arrow TabGroupHeader::GetAnchorPosition() const {
  }
  
  void TabGroupHeader::OnGroupContentsChanged() {
@@ -31675,7 +32468,19 @@ index 6d0543941b..654187a646 100644
    UpdateTooltipText();
  }
  
-@@ -537,6 +543,12 @@ void TabGroupHeader::VisualsChanged() {
+@@ -528,15 +540,21 @@ void TabGroupHeader::VisualsChanged() {
+   // Update collapsed state before changing any UI.
+   SetCollapsedState();
+ 
+-  UpdateTitleView();
+-  UpdateSyncIconView();
+-  UpdateAttentionIndicatorView();
++  UpdateTitleView(IsMouseHovered());
++  UpdateSyncIconView(IsMouseHovered());
++  UpdateAttentionIndicatorView(IsMouseHovered());
+   if (group_title_.empty()) {
+     CreateHeaderWithoutTitle();
+   } else {
      CreateHeaderWithTitle();
    }
  
@@ -31688,36 +32493,69 @@ index 6d0543941b..654187a646 100644
    // Expand the clip by 1 DIP to prevent clipping the title chip's anti-aliased
    // rrect background at fractional display scales. This won't paint over
    // anything else since nothing is painted outside the background region.
-@@ -629,7 +641,8 @@ void TabGroupHeader::UpdateTitleView() {
+@@ -625,15 +643,24 @@ void TabGroupHeader::SetCollapsedState() {
+   }
+ }
+ 
+-void TabGroupHeader::UpdateTitleView() {
++void TabGroupHeader::UpdateHoverColors(bool hovered) {
++  // enter/exit의 payload는 View의 최종 hover 플래그보다 먼저 전달된다.
++  yee::UpdateHorizontalTabGroupChipColors(*this, *title_chip_, color_, hovered);
++  UpdateTitleView(hovered);
++  UpdateSyncIconView(hovered);
++  UpdateAttentionIndicatorView(hovered);
++}
++
++void TabGroupHeader::UpdateTitleView(bool hovered) {
    title_->SetText(group_title_);
  
    if (!group_title_.empty()) {
 -    title_->SetEnabledColor(color_utils::GetColorWithMaxContrast(color_));
 +    title_->SetEnabledColor(
-+        yee::ResolveHorizontalTabGroupForeground(*this, color_));
++        yee::ResolveHorizontalTabGroupForeground(*this, color_, hovered));
    }
  }
  
-@@ -642,7 +655,7 @@ void TabGroupHeader::UpdateSyncIconView() {
+-void TabGroupHeader::UpdateSyncIconView() {
++void TabGroupHeader::UpdateSyncIconView(bool hovered) {
+   sync_icon_->SetVisible(should_show_header_icon_);
+   if (should_show_header_icon_) {
+     bool use_share_icon = SupportsDataSharing();
+@@ -642,12 +669,12 @@ void TabGroupHeader::UpdateSyncIconView() {
                                                             : kPeopleGroupOldIcon
          : features::IsRoundedIconsEnabled() ? vector_icons::kSyncIcon
                                              : kTabGroupsSyncOldIcon,
 -        color_utils::GetColorWithMaxContrast(color_),
-+        yee::ResolveHorizontalTabGroupForeground(*this, color_),
++        yee::ResolveHorizontalTabGroupForeground(*this, color_, hovered),
          group_style_->GetSyncIconWidth()));
    }
  }
-@@ -659,7 +672,7 @@ void TabGroupHeader::UpdateAttentionIndicatorView() {
+ 
+-void TabGroupHeader::UpdateAttentionIndicatorView() {
++void TabGroupHeader::UpdateAttentionIndicatorView(bool hovered) {
+   const bool supports_attention_indicator = SupportsDataSharing();
+   if (!supports_attention_indicator) {
+     attention_indicator_->SetVisible(false);
+@@ -659,7 +686,7 @@ void TabGroupHeader::UpdateAttentionIndicatorView() {
    if (should_show_attention_indicator) {
      attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
          kDefaultTouchFaviconMaskCustomIcon,
 -        color_utils::GetColorWithMaxContrast(color_),
-+        yee::ResolveHorizontalTabGroupForeground(*this, color_),
++        yee::ResolveHorizontalTabGroupForeground(*this, color_, hovered),
          group_style_->GetAttentionIndicatorWidth()));
    }
  }
+@@ -880,7 +907,7 @@ void TabGroupHeader::OnTabGroupDataChanged() {
+   const tabs::TabGroupData& tab_group_data =
+       tab_group_data_observer_->tab_group_data();
+   SetHoverCardDataFrom(tab_group_data);
+-  UpdateAttentionIndicatorView();
++  UpdateAttentionIndicatorView(IsMouseHovered());
+   UpdateAccessibleName();
+ }
+ 
 diff --git a/chrome/browser/ui/views/tabs/tab_group_underline.cc b/chrome/browser/ui/views/tabs/tab_group_underline.cc
-index dbeb90d65f..d63028643a 100644
+index dbeb90d65f..a4946e786c 100644
 --- a/chrome/browser/ui/views/tabs/tab_group_underline.cc
 +++ b/chrome/browser/ui/views/tabs/tab_group_underline.cc
 @@ -4,6 +4,7 @@
@@ -31747,7 +32585,7 @@ index dbeb90d65f..d63028643a 100644
  
  void TabGroupUnderline::UpdateBounds(const views::View* const leading_view,
                                       const views::View* const trailing_view) {
-@@ -52,15 +56,24 @@ void TabGroupUnderline::UpdateBounds(const views::View* const leading_view,
+@@ -52,15 +56,28 @@ void TabGroupUnderline::UpdateBounds(const views::View* const leading_view,
    }
  
    SetVisible(
@@ -31767,14 +32605,18 @@ index dbeb90d65f..d63028643a 100644
  
  void TabGroupUnderline::OnPaint(gfx::Canvas* canvas) {
 +  if (yee::UsesHorizontalTabGroupCapsule(*this)) {
-+    yee::PaintHorizontalTabGroupCapsule(*canvas, *this,
-+                                        tab_group_views_->GetGroupColor());
++    // 기본 장식이 드래그 멤버까지 포함한다. native의 두 marker는 유지하되,
++    // 반투명 캡슐은 한 번만 그려 탭 주위의 중복 채움을 막는다.
++    if (this == tab_group_views_->underline()) {
++      yee::PaintHorizontalTabGroupCapsule(*canvas, *this,
++                                          tab_group_views_->GetGroupColor());
++    }
 +    return;
 +  }
    SkPath path = style_->GetUnderlinePath(GetLocalBounds());
    cc::PaintFlags flags;
    flags.setAntiAlias(true);
-@@ -71,13 +84,17 @@ void TabGroupUnderline::OnPaint(gfx::Canvas* canvas) {
+@@ -71,13 +88,17 @@ void TabGroupUnderline::OnPaint(gfx::Canvas* canvas) {
  
  gfx::Insets TabGroupUnderline::GetInsetsForUnderline(
      const views::View* const sibling_view) const {
@@ -31794,7 +32636,7 @@ index dbeb90d65f..d63028643a 100644
    }
  
    const Tab* const tab = views::AsViewClass<Tab>(sibling_view);
-@@ -89,10 +106,7 @@ gfx::Insets TabGroupUnderline::GetInsetsForUnderline(
+@@ -89,10 +110,7 @@ gfx::Insets TabGroupUnderline::GetInsetsForUnderline(
    }
  
    // Inactive tabs are inset like group headers.
@@ -31806,7 +32648,7 @@ index dbeb90d65f..d63028643a 100644
  }
  
  gfx::Rect TabGroupUnderline::CalculateTabGroupUnderlineBounds(
-@@ -112,9 +126,15 @@ gfx::Rect TabGroupUnderline::CalculateTabGroupUnderlineBounds(
+@@ -112,9 +130,15 @@ gfx::Rect TabGroupUnderline::CalculateTabGroupUnderlineBounds(
    gfx::Rect group_bounds = ToEnclosingRect(leading_bounds);
    group_bounds.UnionEvenIfEmpty(ToEnclosingRect(trailing_bounds));
  
@@ -31826,7 +32668,7 @@ index dbeb90d65f..d63028643a 100644
                     kStrokeThickness);
  }
 diff --git a/chrome/browser/ui/views/tabs/tab_style_views.cc b/chrome/browser/ui/views/tabs/tab_style_views.cc
-index 24194fdde6..70a025c3f4 100644
+index 24194fdde6..982ddcdb4e 100644
 --- a/chrome/browser/ui/views/tabs/tab_style_views.cc
 +++ b/chrome/browser/ui/views/tabs/tab_style_views.cc
 @@ -32,6 +32,9 @@
@@ -31881,8 +32723,8 @@ index 24194fdde6..70a025c3f4 100644
 +        *view->GetColorProvider(), delegate_->IsActive(),
 +        delegate_->IsSelected(), GetHoverAnimationValue(),
 +        !view->GetWidget() || view->GetWidget()->ShouldPaintAsActive(),
-+        delegate_->GetGroupColor(),
-+        delegate_->IsSplit() && !UsesGroupCapsule());
++        delegate_->GetGroupColor(), delegate_->IsSplit() && !UsesGroupCapsule(),
++        presentation->surface);
 +    colors.foreground_color = resolved.foreground;
 +    colors.background_color = resolved.background;
 +    colors.focus_ring_color = yee::ResolveBrowserSurfaceFocusColorId(
@@ -31957,7 +32799,7 @@ index 24194fdde6..70a025c3f4 100644
    return cp->GetColor(delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
                            ? kColorTabDividerFrameActive
                            : kColorTabDividerFrameInactive);
-@@ -804,6 +869,16 @@ SkColor HorizontalTabStyleViews::GetCurrentTabBackgroundColor(
+@@ -804,6 +869,17 @@ SkColor HorizontalTabStyleViews::GetCurrentTabBackgroundColor(
            ? delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
            : true;
    const bool frame_glass = delegate_->IsGlassFrame();
@@ -31968,13 +32810,14 @@ index 24194fdde6..70a025c3f4 100644
 +               selection_state == TabStyle::TabSelectionState::kSelected,
 +               hovered ? GetHoverAnimationValue() : 0.0, frame_active,
 +               delegate_->GetGroupColor(),
-+               delegate_->IsSplit() && !UsesGroupCapsule())
++               delegate_->IsSplit() && !UsesGroupCapsule(),
++               presentation->surface)
 +        .background;
 +  }
    return tab_style()->GetCurrentTabBackgroundColor(
        selection_state, hovered, GetHoverAnimationValue(), frame_active,
        frame_glass, delegate_->GetView()->GetColorProvider());
-@@ -837,6 +912,15 @@ void HorizontalTabStyleViews::PaintTabBackground(
+@@ -837,6 +913,15 @@ void HorizontalTabStyleViews::PaintTabBackground(
  
    PaintBackgroundStroke(canvas, group_color.value_or(tab_stroke_color));
    PaintSeparators(canvas);
@@ -31990,7 +32833,7 @@ index 24194fdde6..70a025c3f4 100644
  }
  
  void HorizontalTabStyleViews::PaintTabBackgroundFill(
-@@ -935,10 +1019,13 @@ void HorizontalTabStyleViews::PaintSeparators(gfx::Canvas* canvas) const {
+@@ -935,10 +1020,13 @@ void HorizontalTabStyleViews::PaintSeparators(gfx::Canvas* canvas) const {
    TabStyle::SeparatorBounds separator_bounds = GetSeparatorBounds(scale);
  
    const SkColor separator_base_color = GetTabSeparatorColor();
@@ -32006,7 +32849,7 @@ index 24194fdde6..70a025c3f4 100644
    };
  
    cc::PaintFlags flags;
-@@ -955,10 +1042,48 @@ BrowserFrameView* HorizontalTabStyleViews::GetBrowserFrameView() const {
+@@ -955,10 +1043,48 @@ BrowserFrameView* HorizontalTabStyleViews::GetBrowserFrameView() const {
    return delegate_->GetBrowserFrameView();
  }
  
@@ -32432,7 +33275,7 @@ index 0fcdbfa57b..2c25d60149 100644
    std::optional<Button::ScopedAnchorHighlight> menu_anchor_higlight_;
  
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 09b381e46e..5d09903816 100644
+index 09b381e46e..74231524bf 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -19,9 +19,11 @@
@@ -32455,16 +33298,15 @@ index 09b381e46e..5d09903816 100644
  #include "chrome/browser/ui/views/frame/custom_corners_background.h"
  #include "chrome/browser/ui/views/frame/top_container_view.h"
  #include "chrome/browser/ui/views/glic/glic_button_interface.h"
-@@ -109,6 +112,8 @@
+@@ -109,6 +112,7 @@
  #include "chrome/browser/ui/views/toolbar/toolbar_icon_container_view.h"
  #include "chrome/browser/ui/views/toolbar/webui_back_forward_control.h"
  #include "chrome/browser/ui/views/toolbar/webui_toolbar_web_view.h"
-+#include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 +#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/browser/ui/views/zoom/zoom_view_controller.h"
  #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
-@@ -148,6 +153,7 @@
+@@ -148,6 +152,7 @@
  #include "ui/gfx/image/canvas_image_source.h"
  #include "ui/gfx/paint_vector_icon.h"
  #include "ui/gfx/scoped_canvas.h"
@@ -32472,7 +33314,7 @@ index 09b381e46e..5d09903816 100644
  #include "ui/views/accessibility/view_accessibility.h"
  #include "ui/views/actions/action_view_controller.h"
  #include "ui/views/background.h"
-@@ -211,6 +217,31 @@ constexpr int kLargeSpaceBetweenButtons = 6;
+@@ -211,6 +216,31 @@ constexpr int kLargeSpaceBetweenButtons = 6;
  constexpr int kInsideBorderAroundGlicButtons = 2;
  constexpr int kOutsideBorderAroundGlicButtons = 11;
  constexpr int kGlicButtonMargin = 5;
@@ -32504,7 +33346,7 @@ index 09b381e46e..5d09903816 100644
  
  // Returns whether `point` should be treated as part of the caption area in
  // `view`. Recursively traverses into icon containers to correctly handle
-@@ -305,6 +336,352 @@ ToolbarView::~ToolbarView() {
+@@ -305,6 +335,348 @@ ToolbarView::~ToolbarView() {
    }
  }
  
@@ -32690,10 +33532,6 @@ index 09b381e46e..5d09903816 100644
 +    presentation = yee::UseNativeBrowserSurfaceColors(*presentation);
 +  }
 +  location_bar_view_->SetCompactShellSurfacePresentation(presentation);
-+  if (auto* projects =
-+          yee::projects::ProjectNavigationController::From(browser_)) {
-+    projects->SetToolbarSurfacePresentation(presentation);
-+  }
 +
 +  std::optional<SkColor> foreground;
 +  std::optional<SkColor> disabled_foreground;
@@ -32857,7 +33695,7 @@ index 09b381e46e..5d09903816 100644
  void ToolbarView::Init() {
  #if defined(USE_AURA)
    // Avoid generating too many occlusion tracking calculation events before this
-@@ -540,6 +917,7 @@ void ToolbarView::Init() {
+@@ -540,6 +912,7 @@ void ToolbarView::Init() {
    if (features::IsWebUIMediaButtonEnabled()) {
      media_button_ = toolbar_webview_->GetMediaToolbarButton();
    } else if (media_button) {
@@ -32865,24 +33703,7 @@ index 09b381e46e..5d09903816 100644
      media_button_ = AddChildView(std::move(media_button));
    }
  
-@@ -653,6 +1031,16 @@ void ToolbarView::Init() {
-     UpdateGlicButtonVisibility();
-   }
- 
-+  if (auto* projects =
-+          yee::projects::ProjectNavigationController::From(browser_)) {
-+    if (auto navigation = projects->CreateNavigationView()) {
-+      const size_t index =
-+          location_bar_view_ && location_bar_view_->parent() == this
-+              ? GetIndexOf(location_bar_view_).value()
-+              : children().size();
-+      AddChildViewAt(std::move(navigation), index);
-+    }
-+  }
-   InitLayout();
- 
-   for (auto* button : std::array<views::Button*, 5>{back_, forward_, reload_,
-@@ -686,6 +1074,9 @@ void ToolbarView::InitGlicContainer() {
+@@ -686,6 +1059,9 @@ void ToolbarView::InitGlicContainer() {
  void ToolbarView::OnVerticalTabStripModeChanged(
      tabs::VerticalTabStripStateController* controller) {
    should_display_vertical_tabs_ = controller->ShouldDisplayVerticalTabs();
@@ -32892,7 +33713,7 @@ index 09b381e46e..5d09903816 100644
    UpdateGlicButtonVisibility();
    UpdateGlicActorVisibility();
  }
-@@ -1269,6 +1660,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
+@@ -1269,6 +1645,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
  
  bool ToolbarView::IsPositionInWindowCaption(
      const gfx::Point& test_point) const {
@@ -32903,7 +33724,7 @@ index 09b381e46e..5d09903816 100644
    return IsPositionInWindowCaptionForView(this, test_point);
  }
  
-@@ -1419,6 +1814,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1419,6 +1799,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
              default_margin + overflow_button_->GetMinimumSize().width(), 0);
        }
    }
@@ -32920,7 +33741,7 @@ index 09b381e46e..5d09903816 100644
    size.set_height(size.height() * size_animation_.GetCurrentValue());
    return size;
  }
-@@ -1439,10 +1844,11 @@ void ToolbarView::Layout(PassKey) {
+@@ -1439,10 +1829,11 @@ void ToolbarView::Layout(PassKey) {
    }
  
    if (display_mode_ == DisplayMode::kNormal) {
@@ -32933,7 +33754,7 @@ index 09b381e46e..5d09903816 100644
      // Need to determine whether the overflow button should be visible, and only
      // update it if the visibility changes.
      const bool was_overflow_button_visible =
-@@ -1493,6 +1899,9 @@ void ToolbarView::ChildPreferredSizeChanged(views::View* child) {
+@@ -1493,6 +1884,9 @@ void ToolbarView::ChildPreferredSizeChanged(views::View* child) {
  }
  
  void ToolbarView::ChildVisibilityChanged(views::View* child) {
@@ -32943,7 +33764,7 @@ index 09b381e46e..5d09903816 100644
    if (child == home_) {
      if (!home_->GetVisible() && show_home_button_.GetValue()) {
        base::UmaHistogramBoolean("Toolbar.Overflow.HomeButton", true);
-@@ -1519,21 +1928,15 @@ void ToolbarView::InitLayout() {
+@@ -1519,21 +1913,15 @@ void ToolbarView::InitLayout() {
    // Shift previously flex-able elements' order by `kOrderOffset`.
    // This will cause them to be the first ones to drop out or shrink to minimum.
    // Order 1 - kOrderOffset will be assigned to new flex-able elements.
@@ -32969,7 +33790,7 @@ index 09b381e46e..5d09903816 100644
  
    layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
  
-@@ -1633,7 +2036,7 @@ void ToolbarView::InitLayout() {
+@@ -1633,7 +2021,7 @@ void ToolbarView::InitLayout() {
            views::kFlexBehaviorKey,
            toolbar_webview_->GetFlexSpecification(
                toolbar_controller_->webui_toolbar_button_flex_order(),
@@ -32978,7 +33799,7 @@ index 09b381e46e..5d09903816 100644
      } else {
        // If `toolbar_controller_` is nullptr, then the WebUI toolbar is managing
        // all controls, so don't need to worry about integrating with
-@@ -1704,6 +2107,10 @@ void ToolbarView::LayoutCommon() {
+@@ -1704,6 +2092,10 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
@@ -32989,7 +33810,7 @@ index 09b381e46e..5d09903816 100644
    layout_manager_->SetInteriorMargin(interior_margin);
  
    // Extend buttons to the window edge if we're either in a maximized or
-@@ -1751,7 +2158,9 @@ void ToolbarView::LayoutCommon() {
+@@ -1751,7 +2143,9 @@ void ToolbarView::LayoutCommon() {
  
    if (toolbar_divider_ && extensions_container_) {
      views::ManualLayoutUtil(layout_manager_)
@@ -33000,7 +33821,7 @@ index 09b381e46e..5d09903816 100644
    }
    // Cast button visibility is controlled externally.
  }
-@@ -1931,7 +2340,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
+@@ -1931,7 +2325,6 @@ ReloadControl* ToolbarView::GetReloadButton() {
    return reload_;
  }
  
@@ -33008,7 +33829,7 @@ index 09b381e46e..5d09903816 100644
  ToolbarButton* ToolbarView::GetDownloadButton() {
    return pinned_toolbar_actions_container_
               ? pinned_toolbar_actions_container_->GetButtonFor(
-@@ -1988,7 +2396,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
+@@ -1988,7 +2381,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
  
  void ToolbarView::OnShowHomeButtonChanged() {
    if (home_) {
@@ -33017,7 +33838,7 @@ index 09b381e46e..5d09903816 100644
    }
  }
  
-@@ -2004,8 +2412,12 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2004,8 +2397,12 @@ void ToolbarView::OnTouchUiChanged() {
      layout_manager_->SetDefault(views::kMarginsKey,
                                  gfx::Insets::VH(0, default_margin));
      if (location_bar_view_) {
@@ -33032,7 +33853,7 @@ index 09b381e46e..5d09903816 100644
      }
  
      LoadImages();
-@@ -2014,6 +2426,9 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2014,6 +2411,9 @@ void ToolbarView::OnTouchUiChanged() {
  }
  
  void ToolbarView::SetForwardButtonVisibility(bool visible) {
@@ -37278,3 +38099,415 @@ index 13a9987aae..5195d59180 100644
    views::ProposedLayout CalculateHorizontalLayout(
        const TabStripView* tab_strip_view,
        const views::SizeBounds& size_bounds) const;
+diff --git a/chrome/browser/ui/views/tabs/new_tab_button.h b/chrome/browser/ui/views/tabs/new_tab_button.h
+index 7eb01eca2a..6e3f257a49 100644
+--- a/chrome/browser/ui/views/tabs/new_tab_button.h
++++ b/chrome/browser/ui/views/tabs/new_tab_button.h
+@@ -37,6 +37,8 @@ class NewTabButton : public TabStripControlButton,
+   NewTabButton& operator=(const NewTabButton&) = delete;
+   ~NewTabButton() override;
+ 
++  int GetCornerRadius() const override;
++
+   // views::ContextMenuController
+   void ShowContextMenuForViewImpl(
+       View* source,
+@@ -74,6 +76,8 @@ class NewTabButtonMenuModel : public ui::SimpleMenuModel,
+   void AddNewTabInGroupItem();
+   void AddNewSplitTabItem();
+ 
++  bool IsProjectMenuContainer(int command_id) const;
++  std::unique_ptr<ui::SimpleMenuModel> project_menu_;
+   raw_ptr<BrowserWindowInterface> browser_;
+ };
+ 
+diff --git a/chrome/browser/ui/views/tabs/new_tab_button.cc b/chrome/browser/ui/views/tabs/new_tab_button.cc
+index 6580b5fb13..f913545e60 100644
+--- a/chrome/browser/ui/views/tabs/new_tab_button.cc
++++ b/chrome/browser/ui/views/tabs/new_tab_button.cc
+@@ -17,6 +17,9 @@
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
++#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
++#include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/tabs/public/tab_group.h"
+ #include "ui/base/interaction/element_identifier.h"
+@@ -42,11 +45,22 @@ NewTabButton::NewTabButton(PressedCallback callback,
+                             animated_flat_edge),
+       browser_(browser) {
+   set_context_menu_controller(this);
++  if (yee::IsShellEnabled()) {
++    SetPreferredSize(gfx::Size(yee::kSidebarMetrics.shell_control_size,
++                               yee::kSidebarMetrics.shell_control_size));
++  }
+   SetProperty(views::kElementIdentifierKey, kNewTabButtonElementId);
+ }
+ 
+ NewTabButton::~NewTabButton() = default;
+ 
++int NewTabButton::GetCornerRadius() const {
++  return yee::IsShellEnabled() && !yee::ShouldUseNativeHorizontalTabTheme(
++                                      *GetNativeTheme(), GetThemeProvider())
++             ? yee::kSidebarMetrics.shell_control_corner_radius
++             : TabStripControlButton::GetCornerRadius();
++}
++
+ void NewTabButton::ShowContextMenuForViewImpl(
+     View* source,
+     const gfx::Point& point,
+@@ -91,12 +105,19 @@ NewTabButtonMenuModel::NewTabButtonMenuModel(BrowserWindowInterface* browser)
+ 
+   AddSeparator(ui::NORMAL_SEPARATOR);
+   AddNewSplitTabItem();
++  if (auto* projects =
++          yee::projects::ProjectNavigationController::From(browser_)) {
++    project_menu_ = projects->AppendNavigationMenu(*this);
++  }
+ }
+ 
+ NewTabButtonMenuModel::~NewTabButtonMenuModel() = default;
+ 
+ void NewTabButtonMenuModel::ExecuteCommand(int command_id, int event_flags) {
+   CHECK(browser_);
++  if (IsProjectMenuContainer(command_id)) {
++    return;
++  }
+ 
+   switch (command_id) {
+     case IDC_NEW_TAB:
+@@ -131,6 +152,9 @@ void NewTabButtonMenuModel::ExecuteCommand(int command_id, int event_flags) {
+ bool NewTabButtonMenuModel::GetAcceleratorForCommandId(
+     int command_id,
+     ui::Accelerator* accelerator) const {
++  if (IsProjectMenuContainer(command_id)) {
++    return false;
++  }
+   CHECK(browser_);
+   if (command_id < 0) {
+     // This is a non-interactive title.
+@@ -142,6 +166,12 @@ bool NewTabButtonMenuModel::GetAcceleratorForCommandId(
+       ->GetAcceleratorForCommandId(command_id, accelerator);
+ }
+ 
++bool NewTabButtonMenuModel::IsProjectMenuContainer(int command_id) const {
++  const auto index = GetIndexOfCommandId(command_id);
++  return project_menu_ && index &&
++         GetSubmenuModelAt(*index) == project_menu_.get();
++}
++
+ void NewTabButtonMenuModel::AddNewTabInGroupItem() {
+   TabStripModel* tab_strip_model = browser_->GetTabStripModel();
+   CHECK(tab_strip_model);
+diff --git a/chrome/browser/ui/views/tabs/tab_group_views.cc b/chrome/browser/ui/views/tabs/tab_group_views.cc
+index 409cdae2d4..0ca4bec553 100644
+--- a/chrome/browser/ui/views/tabs/tab_group_views.cc
++++ b/chrome/browser/ui/views/tabs/tab_group_views.cc
+@@ -16,6 +16,7 @@
+ #include "chrome/browser/ui/views/tabs/tab_slot_controller.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
++#include "chrome/browser/ui/views/yee/tab_group_presentation.h"
+ #include "components/tab_groups/tab_group_id.h"
+ #include "third_party/skia/include/core/SkColor.h"
+ #include "ui/gfx/geometry/rect.h"
+@@ -38,6 +39,9 @@ TabGroupViews::TabGroupViews(views::View* container_view,
+       std::make_unique<TabGroupUnderline>(this, group_, *style));
+   drag_underline_ = drag_container_view->AddChildView(
+       std::make_unique<TabGroupUnderline>(this, group_, *style));
++  const bool collapsed = tab_slot_controller_->IsGroupCollapsed(group_);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*underline_, collapsed);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*drag_underline_, collapsed);
+   highlight_ = drag_container_view->AddChildView(
+       std::make_unique<TabGroupHighlight>(this, group_, *style));
+   highlight_->SetVisible(false);
+@@ -57,6 +61,11 @@ void TabGroupViews::UpdateBounds() {
+     return;
+   }
+ 
++  // native 테마 왕복 때 사라진 장식 상태도 현재 모델에서 복원한다.
++  const bool collapsed = tab_slot_controller_->IsGroupCollapsed(group_);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*underline_, collapsed);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*drag_underline_, collapsed);
++
+   auto [leading_group_view, trailing_group_view] =
+       GetLeadingTrailingGroupViews();
+   underline_->UpdateBounds(leading_group_view, trailing_group_view);
+@@ -106,6 +115,9 @@ void TabGroupViews::OnGroupVisualsChanged() {
+   }
+ 
+   header_->VisualsChanged();
++  const bool collapsed = tab_slot_controller_->IsGroupCollapsed(group_);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*underline_, collapsed);
++  yee::SetHorizontalTabGroupCapsuleCollapsed(*drag_underline_, collapsed);
+   underline_->SchedulePaint();
+   drag_underline_->SchedulePaint();
+ }
+diff --git a/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h b/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h
+index 37bfed74a1..5381a5d625 100644
+--- a/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h
++++ b/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h
+@@ -61,6 +61,9 @@ class TabStripFlatEdgeButton : public views::LabelButton,
+ 
+   FlatEdge flat_edge_for_testing() const { return flat_edge_; }
+ 
++ protected:
++  virtual gfx::RoundedCornersF GetButtonCornerRadii() const;
++
+  private:
+   // views::View:
+   void AddedToWidget() override;
+@@ -70,7 +73,7 @@ class TabStripFlatEdgeButton : public views::LabelButton,
+   ui::ColorId GetForegroundColor() const;
+   ui::ColorId GetBackgroundColor() const;
+   SkRRect GetButtonShape() const;
+-  gfx::RoundedCornersF GetButtonCornerRadii() const;
++  void UpdateButtonShape();
+ 
+   // Updates the label visibility and padding based on whether it should be
+   // shown.
+diff --git a/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc b/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc
+index 74f9b8fb0b..86251636c5 100644
+--- a/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc
++++ b/chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.cc
+@@ -148,15 +148,7 @@ void TabStripFlatEdgeButton::SetFlatEdgeFactor(float factor) {
+     return;
+   }
+   flat_edge_factor_ = factor;
+-
+-  SetProperty(views::kHighlightPathGeneratorKey,
+-              std::make_unique<views::RoundRectHighlightPathGenerator>(
+-                  gfx::Insets(), GetButtonCornerRadii()));
+-  // The ink drop doesn't automatically pick up on rounded corner changes, so │
+-  // we need to manually notify it here.
+-  views::InkDrop::Get(this)->GetInkDrop()->HostSizeChanged(size());
+-
+-  SchedulePaint();
++  UpdateButtonShape();
+ }
+ 
+ void TabStripFlatEdgeButton::SetShouldShowLabel(bool show_label) {
+@@ -192,6 +184,7 @@ void TabStripFlatEdgeButton::OnPaintBackground(gfx::Canvas* canvas) {
+ 
+ void TabStripFlatEdgeButton::OnThemeChanged() {
+   views::LabelButton::OnThemeChanged();
++  UpdateButtonShape();
+   const std::optional<ui::ImageModel>& model =
+       GetImageModel(views::Button::STATE_NORMAL);
+   if (model && model->IsVectorIcon()) {
+@@ -212,12 +205,7 @@ void TabStripFlatEdgeButton::SetFlatEdge(FlatEdge flat_edge) {
+     return;
+   }
+   flat_edge_ = flat_edge;
+-
+-  SetProperty(views::kHighlightPathGeneratorKey,
+-              std::make_unique<views::RoundRectHighlightPathGenerator>(
+-                  gfx::Insets(), GetButtonCornerRadii()));
+-
+-  SchedulePaint();
++  UpdateButtonShape();
+ }
+ 
+ void TabStripFlatEdgeButton::SetIconSize(int icon_size) {
+@@ -243,6 +231,7 @@ void TabStripFlatEdgeButton::SetLabelText(const std::u16string& text) {
+ 
+ void TabStripFlatEdgeButton::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+   UpdateLabel(width() > CalculatePreferredSize({}).width());
++  UpdateButtonShape();
+ }
+ 
+ void TabStripFlatEdgeButton::AddedToWidget() {
+@@ -292,6 +281,15 @@ gfx::RoundedCornersF TabStripFlatEdgeButton::GetButtonCornerRadii() const {
+   }
+ }
+ 
++void TabStripFlatEdgeButton::UpdateButtonShape() {
++  SetProperty(views::kHighlightPathGeneratorKey,
++              std::make_unique<views::RoundRectHighlightPathGenerator>(
++                  gfx::Insets(), GetButtonCornerRadii()));
++  // 배경·입력 경계와 hover/focus가 테마·배치 전환 뒤에도 같은 모서리를 쓴다.
++  views::InkDrop::Get(this)->GetInkDrop()->HostSizeChanged(size());
++  SchedulePaint();
++}
++
+ SkRRect TabStripFlatEdgeButton::GetButtonShape() const {
+   const gfx::RoundedCornersF corners = GetButtonCornerRadii();
+   const SkRect rect = gfx::RectToSkRect(GetLocalBounds());
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h
+index e5741fd040..d071e2e779 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h
++++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h
+@@ -88,6 +88,9 @@ class TabContextMenuController : public ui::SimpleMenuModel::Delegate {
+   TabMenuModel* GetTabMenuModel() { return tab_menu_model_; }
+ 
+  private:
++  bool IsProjectMenuContainer(int command_id) const;
++
++  std::unique_ptr<ui::SimpleMenuModel> project_menu_;
+   std::unique_ptr<ui::SimpleMenuModel> model_;
+   std::unique_ptr<views::MenuRunner> menu_runner_;
+   tabs::TabHandle tab_handle_;
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+index a06ae50455..37eec9b3af 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
+ 
+ #include "chrome/browser/ui/tabs/tab_menu_model.h"
++#include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/controls/menu/menu_runner.h"
+@@ -24,7 +25,16 @@ void TabContextMenuController::LoadModel(
+     std::unique_ptr<ui::SimpleMenuModel> model,
+     TabMenuModel* tab_menu_model,
+     base::RepeatingClosure on_menu_closed) {
++  menu_runner_.reset();
++  model_.reset();
++  project_menu_.reset();
+   model_ = std::move(model);
++  if (auto* tab = tab_handle_.Get()) {
++    if (auto* projects = yee::projects::ProjectNavigationController::From(
++            tab->GetBrowserWindowInterface())) {
++      project_menu_ = projects->AppendNavigationMenu(*model_);
++    }
++  }
+ 
+   tab_menu_model_ = nullptr;
+   if (tab_menu_model && tab_menu_model == model_.get()) {
+@@ -52,6 +62,9 @@ void TabContextMenuController::CloseMenu() {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
++  if (IsProjectMenuContainer(command_id)) {
++    return false;
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -65,6 +78,9 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
++  if (IsProjectMenuContainer(command_id)) {
++    return tab_handle_.Get() != nullptr;
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -93,11 +109,17 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
++  if (IsProjectMenuContainer(command_id)) {
++    return false;
++  }
+   return delegate_->IsContextMenuCommandAlerted(
+       static_cast<TabStripModel::ContextMenuCommand>(command_id));
+ }
+ 
+ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
++  if (IsProjectMenuContainer(command_id)) {
++    return;
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -123,5 +145,16 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+ bool TabContextMenuController::GetAcceleratorForCommandId(
+     int command_id,
+     ui::Accelerator* accelerator) const {
++  if (IsProjectMenuContainer(command_id)) {
++    return false;
++  }
+   return delegate_->GetContextMenuAccelerator(command_id, accelerator);
+ }
++
++bool TabContextMenuController::IsProjectMenuContainer(int command_id) const {
++  if (!project_menu_ || !model_) {
++    return false;
++  }
++  const auto index = model_->GetIndexOfCommandId(command_id);
++  return index && model_->GetSubmenuModelAt(*index) == project_menu_.get();
++}
+diff --git a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h
+index b9dcc71899..2201b4e630 100644
+--- a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h
++++ b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h
+@@ -16,14 +16,17 @@
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/base/pointer/touch_ui_controller.h"
+ #include "ui/views/accessible_pane_view.h"
++#include "ui/views/context_menu_controller.h"
+ 
+ class BrowserView;
+ 
+ namespace views {
+ class ActionViewController;
+ class Button;
++class MenuRunner;
+ }
+ class NewTabButton;
++class NewTabButtonMenuModel;
+ class TabStripActionContainer;
+ class TabStripComboButton;
+ class TabStrip;
+@@ -138,7 +141,8 @@ class HorizontalTabStripRegionViewOld : public TabStripRegionView {
+           base::Unretained(this)));
+ };
+ 
+-class HorizontalTabStripRegionViewNew : public BaseTabStripRegionView {
++class HorizontalTabStripRegionViewNew : public BaseTabStripRegionView,
++                                        public views::ContextMenuController {
+   METADATA_HEADER(HorizontalTabStripRegionViewNew, BaseTabStripRegionView)
+ 
+  public:
+@@ -171,6 +175,10 @@ class HorizontalTabStripRegionViewNew : public BaseTabStripRegionView {
+   }
+ 
+  private:
++  void ShowContextMenuForViewImpl(
++      views::View* source,
++      const gfx::Point& point,
++      ui::mojom::MenuSourceType source_type) override;
+   void OnTabStripViewSet() override;
+   void OnTabStripViewWillClear() override;
+   // Computes if the unpinned container would be scrollable
+@@ -182,6 +190,8 @@ class HorizontalTabStripRegionViewNew : public BaseTabStripRegionView {
+   raw_ptr<views::Button> new_tab_button_ = nullptr;
+   raw_ptr<TabScrollButtonContainer> scroll_button_container_ = nullptr;
+ 
++  std::unique_ptr<NewTabButtonMenuModel> context_menu_model_;
++  std::unique_ptr<views::MenuRunner> context_menu_runner_;
+   std::unique_ptr<views::ActionViewController> action_view_controller_;
+ };
+ 
+diff --git a/chrome/browser/ui/views/tabs/tab_group_header.h b/chrome/browser/ui/views/tabs/tab_group_header.h
+index 8c7b62e00a..412974c580 100644
+--- a/chrome/browser/ui/views/tabs/tab_group_header.h
++++ b/chrome/browser/ui/views/tabs/tab_group_header.h
+@@ -66,6 +66,7 @@ class TabGroupHeader : public TabSlotView,
+   bool OnMouseDragged(const ui::MouseEvent& event) override;
+   void OnMouseReleased(const ui::MouseEvent& event) override;
+   void OnMouseEntered(const ui::MouseEvent& event) override;
++  void OnMouseExited(const ui::MouseEvent& event) override;
+   void OnGestureEvent(ui::GestureEvent* event) override;
+   void OnFocus() override;
+   void OnBlur() override;
+@@ -126,9 +127,10 @@ class TabGroupHeader : public TabSlotView,
+   // Updates the local is_collapsed_ state.
+   void SetCollapsedState();
+ 
+-  void UpdateTitleView();
+-  void UpdateSyncIconView();
+-  void UpdateAttentionIndicatorView();
++  void UpdateHoverColors(bool hovered);
++  void UpdateTitleView(bool hovered);
++  void UpdateSyncIconView(bool hovered);
++  void UpdateAttentionIndicatorView(bool hovered);
+   void UpdateIsCollapsed();
+ 
+   // Creates a squircle (cross between a square and a circle).

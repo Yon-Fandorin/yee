@@ -196,8 +196,10 @@ struct SidebarMetrics {
   int horizontal_group_chip_height = 20;
   int horizontal_group_capsule_top_inset = 4;
   int horizontal_group_capsule_height = 32;
+  int horizontal_group_collapsed_capsule_height = 24;
   int horizontal_group_capsule_padding = 2;
-  float horizontal_group_tint_opacity = 0.12f;
+  float horizontal_group_tint_opacity = 0.24f;
+  float horizontal_group_hover_tint_opacity = 0.34f;
   int group_header_horizontal_inset = 8;
   int group_mark_size = 8;
   int group_mark_slot_size = 16;

@@ -12,10 +12,49 @@ macOS 호스트는 좌표와 수명을 관리하고, 색상 callback은 마지�
 구조를 유지한다. Split 진입 직후의 임시 그리기 억제는 다음 레이아웃의
 resolved 결과로 확정한다.
 
-수평 탭의 배경·제목·아이콘·포커스는 브라우저 테마색을 사용한다. 페이지 표면색 변경은
-주소줄과 Pane Header에만 적용하며 탭 색을 다시 결정하지 않는다. 세로 Sidebar도 기존
-테마색을 유지한다. `HorizontalTabsFollowThemeAndKeepReadableStates`와 실제 페이지색
-전환을 포함한 수평 native 사례가 이 경계를 검사한다.
+수평의 선택 탭은 연결된 Header의 페이지 표면색을 사용하고 제목·닫기·아이콘·포커스는
+그 바탕의 대비를 따른다. 나머지 탭과 세로 Sidebar는 기존 테마색을 유지한다.
+`HorizontalTabsFollowThemeAndKeepReadableStates`와 실제 페이지색 전환을 포함한
+수평 native 사례가 밝은·어두운·중간 페이지색과 제목 대비를 검사한다.
+작은 주요 문자·아이콘은 가능한 면에서7:1을 확보하고 중간 밝기에서는 물리적
+검정·흰색의 최대 대비까지 사용한다. 보조 문자는4.5:1 기준을 유지한다.
+
+같은 수평 사례는 현재 창 최소 폭에서도 새 탭 버튼이 탭 본문과 겹치지 않고 전체가
+보이는지, 실제 클릭이 마지막 탭을 닫지 않고 새 탭을 추가하는지 확인한다. legacy와
+unified 모두 버튼의 고정 폭과 간격을 본문 최소 폭과 별도로 예약한다.
+`YeeHorizontalGroupTransitionsKeepHeaderClear`은 중간 폭과 실제 그린 높이·중앙축,
+빠른 반전의 연속성을 검사한다. `HorizontalCapsuleRestoresCompactWithoutHidingGlass`는
+동작 줄이기의 즉시 전환, 최초 복원의 접힌 높이와 반투명 채움을 검사한다.
+모션 사례는 접힌 채로 native 테마를 왕복한 뒤 높이 복원도 확인한다. 같은 수평
+사례는 legacy·unified의 실제 light/dark 포인터 왕복에서 반투명 hover, 제목 대비와
+파비콘 요약의 폭 유지도 확인한다.
+macOS의 `GlassViewGeometryMatchesShellPolicy`는 native glass가 가로·세로 전환에도
+창 전체에 남고, Shell의 반투명 채움과 Header가 탭 행을 가리지 않는지 검사한다.
+일반·고정 탭 hover와 그룹의 바깥 장식은 연결된 선택 탭의 content 곡률12 DIP를
+따른다. native 좁은 탭의 곡률 제한과 입력 경계는 유지한다.
+
+수평 프로젝트 탐색은 주소줄에 별도 버튼을 두지 않고 새 탭·탭 우클릭의
+`프로젝트` 하위 메뉴를 사용한다. `NavigationFollowsTabLayoutWithoutMetadataChanges`는
+주소줄 버튼 부재, 배치별 메뉴와 Sidebar, 전체 menu tree의 명령 ID 유일성과 native
+명령 경계를 검사한다. `NavigationMenusKeepHubIndependentFromPageSurface`는 메뉴 선택의
+허브 진입과 독립 색을, `ProjectPageMenuUsesNativeTabSourceInBothLayouts`는 실제 프로젝트
+행·새 탭 메뉴의 열림을 검사한다. `LocalTitleRefreshesWhenSharedMetadataIsUnchanged`의
+허브 선택기와 `OffTheRecordCannotAccessProjects`의 저장소·메뉴 차단도 유지한다.
+동적 페이지 제목·프로젝트명에 포함된 `&`와 `&&`는 접근키로 해석하지 않고 원문을
+유지한다. 같은 메뉴 선택 검사가 두 제목의 원문과 mnemonic 비활성도 확인한다.
+
+`SidebarCustomizationSharesOneHeaderDecoration`은 세로 맞춤설정의 연결 Header가
+자동 숨김 전체화면에서 사라지면 본문 카드 윤곽을 유지하는 조건도 검사한다.
+그룹 모션의 중간 폭 검사는 유지하며, 통합 호스트의 기준·최종 폭은 그룹과 상위
+unpinned 컨테이너의 애니메이션이 모두 끝난 뒤 비교한다.
+최소 폭의 favicon 간격은 스크롤 viewport에 실제 보이는 영역으로 비교한다.
+그룹 앞의 비활성 일반 탭 두 개는 전체 아이콘이 보이고 각각 비교에 기여해야 하며,
+검사 후 임시 탭만 닫아 원래 탭 개수와 활성 탭을 복원한다.
+같은 수평 사례는 긴 이름·짧은 이름·이름 없음의 접힘/펼침에서 제목과
+favicon 전체가 공통 배경의 안쪽 여백에 들어오는지 확인한다. 접힌 요약과
+펼친 일반 그룹 멤버 모두 실제 glyph bounds를 사용하며 잘라 숨기지 않는다.
+`HorizontalGroupHoverStaysInsideCapsule`은 LTR·RTL의 접힘·펼침에서 hover 채움이
+공통 배경 바깥으로 나오지 않고 중앙의 조작 강조는 유지하는지 실제 raster로 확인한다.
 
 수평 분할 탭은 한 쌍의 캡슐로 표시하고 독립된 Pane Header 위에 시각적인
 간격을 남긴다. 기본 native hit target은 탭 행 아래까지 유지한다. 기존 수평
@@ -30,6 +69,14 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 표시한다. 그룹 바깥 구분선에는 간격을 두며 안쪽 구분선은 기존 위치를 쓴다.
 공통 배경은 입력 대상에서 제외하고 선택·hover·키보드 포커스와 접힌 그룹의
 파비콘 요약은 native 경로를 유지한다.
+
+`YeeGroupDragKeepsSingleCapsuleAtEveryPosition`은 실제 포인터를 누른 채 일반 탭을
+그룹의 가운데·처음·끝으로 옮긴다. 기본 캡슐이 드래그 멤버까지 포함하며 두 번째
+배경이 겹쳐 진해지지 않는지 장식의 실제 paint와 합성 alpha로 검사한다.
+일반 탭과 정지한 헤더 드래그의 접근성 native 테마 왕복도 확인한다.
+드롭 후의 멤버 identity·개수·활성 탭은 기존 정책을 유지한다.
+`horizontal` 게이트의 기본 방향·RTL 125% 실행에 포함하며,
+`--yee-group-marker-capture-dir`로 드래그 도중의 세 위치를 캡처할 수 있다.
 
 기존 수평 통합 사례는 별도 기능 플래그 없이 기본·RTL125%·통합 탭바에서
 이 표현이 적용됨을 확인한다. 실제 배율의 raster로 배경의 라운드, 모든

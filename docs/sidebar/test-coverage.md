@@ -166,11 +166,12 @@ Windows 수평 모드에서는 검색·새 탭 버튼·드래그 여백과 창 �
 favicon 요약과 native 펼치기 아이콘을 포함하며, 모든 자식의 실제 경계를 검사한다.
 수평 창 버튼의 색상은 페이지 Header가 아닌 shell 탭 행을 기준으로 검사하고,
 밝은·어두운·유색 페이지로 바뀐 뒤에도 최소 아이콘 대비를 유지해야 한다.
-`YeeWindowsHorizontalTabsKeepThemePaintAboveHeader`는 Windows의 실제 선택 탭 아래쪽과
-본문 Header 위쪽을 비교한다. 일반·최대화와 밝은·어두운 창에서 탭 행과
-반대색인 Header 표면을 적용하고, 탭은 테마색·Header는 페이지색으로 실제 합성되는지
-검사한다. 소수 배율에서는 경계에 걸친 픽셀 대신 각 표면 안에 포함된 픽셀을 읽는다.
-native Toolbar overlap 행은 위에서 그리는 탭 표면에 포함하고, 그 아래 Header는 페이지색을 확인한다.
+`YeeWindowsHorizontalTabsConnectPageSurfaceToHeader`는 Windows의 실제 선택 탭 아래쪽과
+본문 Header 위쪽을 비교한다. 일반·최대화와 밝은·어두운 창에서 창 테마와
+반대인 페이지 표면을 적용하고, 일반 Yee 선택 탭과 Header가 같은 페이지색으로
+연결되는지 검사한다. native 이미지·접근성 테마의 fallback에서는 provider의 탭
+테마색 기대를 유지한다. 소수 배율은 경계에 걸친 픽셀 대신 표면 안의 픽셀을 읽는다.
+native Toolbar overlap 행은 위에서 그리는 탭 표면에 포함한다.
 실제 탭 밑에 다른 바탕이 끼는 경우도 실패해야 한다. 같은 검사를 기본·RTL 125%·통합 탭바에서
 실행하며, 세로 Sidebar의 기존 창 버튼 조작 축은 유지한다.
 창 버튼 배치는 두 모드를 구분한다. 수평 탭에서는 본문 외곽선의 6 DIP gutter,
@@ -312,3 +313,9 @@ bounds를 따라 폭을 보간한다. 접힘 순간 멤버의 제목·아이콘 
 재사용하지 않는다. `ProjectTabsAppearOnceAndReturnToNativeNavigation`은 빈 일반 영역의
 overflow·스크롤 범위·offset이 0이며 drop 영역은 viewport를 채우는지 확인한다.
 창 높이 변경 뒤에도 반복하고, 일반 행이 돌아와 실제로 넘치면 스크롤이 다시 작동하는지 검사한다.
+
+`SidebarHeadingActionsKeepStateLayersInsideTheirButtons`는 프로젝트 보조 조작을 처음
+표시하거나 이름·허브 상태로 행을 다시 만들 때 실제 native InkDrop 컨테이너와 배경
+레이어가 버튼 크기·원점에 맞는지 검사한다. Hover·pressed·keyboard focus·disabled·leave를
+구분하고, RTL 125%에서도 제목이나 배경이 보조 버튼의 슬롯 밖으로 밀리지 않아야 한다.
+`--yee-project-paint-capture-dir`로 같은 상태의 실제 창을 저장할 수 있다.

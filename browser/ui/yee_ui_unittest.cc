@@ -2,17 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/ui/views/yee/yee_ui.h"
+
 #include <algorithm>
 #include <array>
 #include <memory>
 #include <utility>
 
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
+#include "base/i18n/rtl.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/theme_resources.h"
 #include "chrome/test/base/test_theme_provider.h"
 #include "chrome/test/views/chrome_views_test_base.h"
@@ -20,6 +24,8 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_manager.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/native_theme/native_theme_base.h"
 #include "ui/views/background.h"
@@ -81,13 +87,17 @@ void SetSidebarPaletteForTesting(ui::ColorProvider& provider, bool dark) {
 
 TEST(YeeSurfaceColorTest, HeaderRolesRemainReadableOnLightAndDarkPages) {
   for (SkColor surface :
-       {SkColorSetRGB(0xFA, 0xF4, 0xE5), SkColorSetRGB(0x18, 0x1A, 0x1F)}) {
+       {SkColorSetRGB(0xFA, 0xF4, 0xE5), SkColorSetRGB(0x18, 0x1A, 0x1F),
+        SkColorSetRGB(0x82, 0x82, 0x82), SkColorSetRGB(0x31, 0x76, 0x77)}) {
     const BrowserSurfaceHeaderColors colors =
         ResolveBrowserSurfaceHeaderColors(surface);
     EXPECT_EQ(SkColorGetA(colors.primary), SK_AlphaOPAQUE);
     EXPECT_EQ(SkColorGetA(colors.secondary), SK_AlphaOPAQUE);
+    const float strongest =
+        std::max(color_utils::GetContrastRatio(SK_ColorBLACK, surface),
+                 color_utils::GetContrastRatio(SK_ColorWHITE, surface));
     EXPECT_GE(color_utils::GetContrastRatio(colors.primary, surface),
-              color_utils::kMinimumReadableContrastRatio);
+              std::min(7.0f, strongest));
     EXPECT_GE(color_utils::GetContrastRatio(colors.secondary, surface),
               color_utils::kMinimumReadableContrastRatio);
     EXPECT_GT(color_utils::GetContrastRatio(colors.primary, surface),
@@ -399,6 +409,67 @@ TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
   auto* view = widget_->SetContentsView(std::make_unique<views::View>());
   EXPECT_EQ(38, ResolveHorizontalTabMinimumInactiveWidth(*view, 32, 18));
   EXPECT_EQ(64, ResolveHorizontalTabMinimumInactiveWidth(*view, 64, 18));
+  EXPECT_EQ(gfx::Insets::TLBR(0, 18, 0, 18),
+            ResolveHorizontalTabGroupHeaderInsets(*view, 8, 12, true));
+  EXPECT_EQ(gfx::Insets::TLBR(0, 18, 0, 8),
+            ResolveHorizontalTabGroupHeaderInsets(*view, 8, 12, false));
+  EXPECT_EQ(54, ResolveHorizontalTabGroupMinimumWidth(*view, 38, 20, 12));
+  EXPECT_EQ(64, ResolveHorizontalTabGroupMinimumWidth(*view, 64, 20, 12));
+}
+
+TEST_F(YeeRestingTextViewTest, HorizontalGroupHoverStaysInsideCapsule) {
+  auto* view = widget_->SetContentsView(std::make_unique<views::View>());
+  view->SetBounds(0, 0, 120, 40);
+  const bool original_rtl = base::i18n::IsRTL();
+  for (bool rtl : {false, true}) {
+    base::i18n::SetRTLForTesting(rtl);
+    for (bool collapsed : {false, true}) {
+      const auto background = CreateHorizontalTabGroupBackground(
+          SK_ColorGREEN, true, gfx::Insets::TLBR(0, 10, 0, collapsed ? 10 : 0));
+      gfx::Canvas canvas(view->size(), 1.f, false);
+      background->Paint(&canvas, view);
+      const SkBitmap bitmap = canvas.GetBitmap();
+      const SkAlpha alpha = SkColorGetA(bitmap.getColor(60, 20));
+      EXPECT_EQ(SK_AlphaTRANSPARENT,
+                SkColorGetA(bitmap.getColor(rtl ? 119 : 0, 20)));
+      // 둥근 외곽의 끝 픽셀은 anti-alias되므로 한 픽셀 안쪽의 채움을 본다.
+      EXPECT_EQ(collapsed ? SK_AlphaTRANSPARENT : alpha,
+                SkColorGetA(bitmap.getColor(rtl ? 1 : 118, 20)));
+      EXPECT_EQ(SK_AlphaTRANSPARENT,
+                SkColorGetA(bitmap.getColor(rtl ? 0 : 119, 8)));
+      EXPECT_GT(alpha, SK_AlphaTRANSPARENT);
+      EXPECT_LT(alpha, SK_AlphaOPAQUE);
+    }
+  }
+  base::i18n::SetRTLForTesting(original_rtl);
+}
+
+TEST_F(YeeRestingTextViewTest,
+       HorizontalCapsuleRestoresCompactWithoutHidingGlass) {
+  const bool original_motion = gfx::Animation::PrefersReducedMotion();
+  base::ScopedClosureRunner restore_motion(base::BindOnce(
+      &gfx::Animation::SetPrefersReducedMotionForTesting, original_motion));
+  gfx::Animation::SetPrefersReducedMotionForTesting(true);
+  auto* view = widget_->SetContentsView(std::make_unique<views::View>());
+  view->SetBounds(0, 0, 120, kSidebarMetrics.horizontal_group_capsule_height);
+  for (bool collapsed : {true, false, true}) {
+    SetHorizontalTabGroupCapsuleCollapsed(*view, collapsed);
+    gfx::Canvas canvas(view->size(), 1.f, false);
+    PaintHorizontalTabGroupCapsule(canvas, *view, SK_ColorGREEN);
+    const SkBitmap bitmap = canvas.GetBitmap();
+    const SkAlpha center = SkColorGetA(bitmap.getColor(60, 16));
+    EXPECT_GT(center, SK_AlphaTRANSPARENT);
+    EXPECT_LT(center, SK_AlphaOPAQUE);
+    EXPECT_EQ(collapsed ? SK_AlphaTRANSPARENT : center,
+              SkColorGetA(bitmap.getColor(60, 0)));
+    EXPECT_EQ(collapsed ? SK_AlphaTRANSPARENT : center,
+              SkColorGetA(bitmap.getColor(60, 31)));
+    EXPECT_EQ(center, SkColorGetA(bitmap.getColor(60, 4)));
+    // 탭과 같은 외곽 곡률로 모서리의 사각 채움을 남기지 않는다.
+    EXPECT_EQ(SK_AlphaTRANSPARENT,
+              SkColorGetA(bitmap.getColor(2, collapsed ? 5 : 1)));
+    EXPECT_EQ(center, SkColorGetA(bitmap.getColor(4, collapsed ? 9 : 5)));
+  }
 }
 
 TEST_F(YeeRestingTextViewTest,
@@ -611,6 +682,17 @@ TEST(YeeSurfaceColorTest, HorizontalTabsFollowThemeAndKeepReadableStates) {
       EXPECT_EQ(surface, ResolveHorizontalTabColors(colors, true, true, 1.0,
                                                     frame_active, SK_ColorBLUE)
                              .background);
+      // 전역 테마와 반대인 페이지도 실제 Header 색과 같은 면으로 이어진다.
+      for (SkColor page :
+           {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x7E, 0x7E, 0x7E),
+            SkColorSetRGB(0x13, 0x4E, 0x4A)}) {
+        const auto connected = ResolveHorizontalTabColors(
+            colors, true, true, 1.0, frame_active, SK_ColorBLUE, false, page);
+        EXPECT_EQ(page, connected.background);
+        EXPECT_GE(color_utils::GetContrastRatio(connected.foreground,
+                                                connected.background),
+                  color_utils::kMinimumReadableContrastRatio);
+      }
       EXPECT_GE(
           color_utils::GetContrastRatio(active.foreground, active.background),
           color_utils::kMinimumReadableContrastRatio);
@@ -901,6 +983,27 @@ TEST(YeeSurfaceGeometryTest, SidebarCustomizationSharesOneHeaderDecoration) {
   EXPECT_EQ(frame.header_bounds.width(),
             frame.decoration.combined_outline_bounds.width());
   EXPECT_TRUE(frame.decoration.side_panel_divider_x);
+
+  // 자동 숨김 전체화면에서는 연결할 Header가 없어 본문 카드 윤곽을 유지한다.
+  const auto visible_header_input = input;
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), false, false, 42});
+  input.native_notice_flow_allocation = gfx::Rect(250, 6, 568, 788);
+  input.native_body_allocation = input.native_notice_flow_allocation;
+  input.connected_side_panel_resize_gutter = gfx::Rect(818, 6, 8, 788);
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_TRUE(frame.header_bounds.IsEmpty());
+  EXPECT_TRUE(frame.decoration.combined_outline_visible);
+  EXPECT_TRUE(frame.decoration.draw_outer_outline);
+  EXPECT_FALSE(frame.decoration.side_panel_joins_header);
+  EXPECT_FALSE(frame.decoration.side_panel_divider_x);
+  EXPECT_EQ(BrowserSurfaceHeaderSeparatorOwner::kNone,
+            frame.decoration.header_separator_owner);
+  EXPECT_EQ(frame.main_surface_bounds,
+            frame.decoration.combined_outline_bounds);
+  input.mode = BrowserSurfaceMode::kConnectedTabs;
+  EXPECT_FALSE(ResolveBrowserSurfaceFrame(input).decoration.draw_outer_outline);
+  input = visible_header_input;
 
   // 다른 세로 패널로 전환하면 원래 카드의 윤곽과 폭으로 복귀한다.
   input.connected_side_panel_resize_gutter.reset();

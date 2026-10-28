@@ -153,7 +153,8 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
       !result.split && !result.main_surface_bounds.IsEmpty();
   const bool connected_header =
       input.mode == BrowserSurfaceMode::kConnectedTabs ||
-      input.connected_side_panel_resize_gutter.has_value();
+      (input.connected_side_panel_resize_gutter.has_value() &&
+       !result.header_bounds.IsEmpty());
   result.decoration.draw_outer_outline =
       result.decoration.combined_outline_visible && !connected_header;
   result.decoration.show_shadow =

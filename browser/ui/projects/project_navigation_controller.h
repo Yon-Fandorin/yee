@@ -23,6 +23,11 @@ class BrowserView;
 class BrowserWindowInterface;
 class TabStripModel;
 
+namespace ui {
+class MenuModel;
+class SimpleMenuModel;
+}  // namespace ui
+
 namespace views {
 class View;
 class MenuRunner;
@@ -50,12 +55,11 @@ class ProjectNavigationController : public TabStripModelObserver {
   // 세로 프로젝트 참조가 실제로 제공되는 동안만 일반 native 행을 생략한다.
   static bool ShouldShowNativeTab(const tabs::TabInterface* tab);
 
-  std::unique_ptr<views::View> CreateNavigationView();
+  // 기존 탐색 목록을 native 메뉴에 붙이고 하위 모델의 수명을 호출자에게 넘긴다.
+  std::unique_ptr<ui::SimpleMenuModel> AppendNavigationMenu(
+      ui::SimpleMenuModel& parent);
   std::unique_ptr<views::View> CreateSidebarView();
   void SetSidebarExpandedPresentation(bool expanded);
-  // 주소줄이 결정한 색을 페이지 선택기에만 전달한다. 허브 색은 독립적이다.
-  void SetToolbarSurfacePresentation(
-      const std::optional<BrowserSurfacePresentation>& presentation);
   bool can_create_project() const;
   void AttachBrowserView(BrowserView* view);
   void AfterBrowserLayout();
@@ -82,6 +86,9 @@ class ProjectNavigationController : public TabStripModelObserver {
   void InvalidateNativeTabLayouts();
   void ShowPicker();
   void OpenSelectedHub();
+  std::unique_ptr<ProjectPicker> CreateNavigationMenu(
+      const ui::MenuModel* parent = nullptr,
+      int container_command = -1);
   void RenameProject(std::string project_id);
   void DeleteProject(std::string project_id);
   void AttachCurrentPage();
@@ -113,7 +120,6 @@ class ProjectNavigationController : public TabStripModelObserver {
   base::CallbackListSubscription session_subscription_;
   std::vector<base::CallbackListSubscription> modal_subscriptions_;
   views::ViewTracker browser_view_tracker_;
-  views::ViewTracker navigation_tracker_;
   views::ViewTracker sidebar_tracker_;
   views::ViewTracker hub_tracker_;
   views::ViewTracker hub_toolbar_tracker_;
@@ -125,7 +131,6 @@ class ProjectNavigationController : public TabStripModelObserver {
   std::string rendered_hub_project_id_;
   std::string revealed_page_id_;
   std::string revealed_project_id_;
-  std::optional<BrowserSurfacePresentation> toolbar_presentation_;
   bool showing_hub_ = false;
   bool sidebar_expanded_ = true;
   bool refresh_pending_ = false;

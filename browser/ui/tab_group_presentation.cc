@@ -11,6 +11,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -26,8 +27,11 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/color/color_provider.h"
+#include "ui/gfx/animation/animation_delegate.h"
+#include "ui/gfx/animation/slide_animation.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/favicon_size.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
@@ -45,15 +49,57 @@ struct HorizontalTabGroupClosingHeader {
   explicit HorizontalTabGroupClosingHeader(views::View& view) : header(&view) {}
   views::ViewTracker header;
 };
+
+class HorizontalTabGroupCapsuleAnimation : public gfx::AnimationDelegate {
+ public:
+  HorizontalTabGroupCapsuleAnimation(views::View& decoration, bool collapsed)
+      : decoration_(&decoration), collapsed_(collapsed), animation_(this) {
+    animation_.Reset(collapsed ? 0.0 : 1.0);
+    animation_.SetSlideDuration(base::Milliseconds(200));
+    animation_.SetTweenType(gfx::Tween::EASE_IN_OUT);
+  }
+
+  void SetCollapsed(bool collapsed) {
+    const bool animate = gfx::Animation::ShouldRenderRichAnimation() &&
+                         !gfx::Animation::PrefersReducedMotion();
+    if (collapsed_ == collapsed && (animate || !animation_.is_animating())) {
+      return;
+    }
+    collapsed_ = collapsed;
+    if (!animate) {
+      animation_.Reset(collapsed ? 0.0 : 1.0);
+    } else if (collapsed) {
+      animation_.Hide();
+    } else {
+      animation_.Show();
+    }
+    decoration_->SchedulePaint();
+  }
+
+  double expansion() const { return animation_.GetCurrentValue(); }
+
+ private:
+  void AnimationProgressed(const gfx::Animation*) override {
+    decoration_->SchedulePaint();
+  }
+
+  raw_ptr<views::View> decoration_;
+  bool collapsed_;
+  gfx::SlideAnimation animation_;
+};
 }  // namespace yee
 
 DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
 DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
+DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleAnimation*)
+DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleAnimation*)
 
 namespace yee {
 namespace {
 DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupClosingHeader,
                                    kHorizontalTabGroupClosingHeaderKey)
+DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupCapsuleAnimation,
+                                   kHorizontalTabGroupCapsuleAnimationKey)
 constexpr int kMaxIcons = 3;
 constexpr int kIconSize = 16;
 constexpr int kIconBox = 20;
@@ -98,30 +144,49 @@ class PreviewIcon final : public views::ImageView {
 BEGIN_METADATA(PreviewIcon)
 END_METADATA
 
+SkAlpha GroupCapsuleAlpha() {
+  return kSidebarMetrics.horizontal_group_tint_opacity * SK_AlphaOPAQUE;
+}
+
+SkAlpha GroupHeaderHoverAlpha() {
+  const float opacity = (kSidebarMetrics.horizontal_group_hover_tint_opacity -
+                         kSidebarMetrics.horizontal_group_tint_opacity) /
+                        (1.0f - kSidebarMetrics.horizontal_group_tint_opacity);
+  return opacity * SK_AlphaOPAQUE;
+}
+
 class HorizontalGroupBackground : public views::Background {
  public:
-  HorizontalGroupBackground(SkColor color, bool hovered)
-      : color_(color), hovered_(hovered) {}
+  HorizontalGroupBackground(SkColor group_color,
+                            bool hovered,
+                            gfx::Insets insets)
+      : group_color_(group_color), hovered_(hovered), insets_(insets) {}
 
   void Paint(gfx::Canvas* canvas, views::View* view) const override {
     if (UsesHorizontalTabGroupCapsule(*view) && !hovered_) {
       return;
     }
     gfx::Rect chip = view->GetLocalBounds();
+    chip.Inset(insets_);
+    chip = view->GetMirroredRect(chip);
     chip.ClampToCenteredSize(gfx::Size(
         chip.width(),
         std::min(chip.height(), kSidebarMetrics.horizontal_group_chip_height)));
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
-    flags.setColor(color_);
+    // 기본 캡슐의 alpha 위에 필요한 차이만 더해 총 hover tint를 맞춘다.
+    flags.setColor(UsesHorizontalTabGroupCapsule(*view)
+                       ? SkColorSetA(group_color_, GroupHeaderHoverAlpha())
+                       : group_color_);
     flags.setStyle(cc::PaintFlags::kFill_Style);
     canvas->DrawRoundRect(gfx::RectF(chip),
-                          kSidebarMetrics.group_header_corner_radius, flags);
+                          kSidebarMetrics.content_corner_radius, flags);
   }
 
  private:
-  const SkColor color_;
+  const SkColor group_color_;
   const bool hovered_;
+  const gfx::Insets insets_;
 };
 
 class HorizontalGroupCapsuleBackground : public views::Background {
@@ -157,12 +222,24 @@ gfx::Insets ResolveHorizontalTabGroupHeaderInsets(const views::View& header,
                                                   int native_content_inset,
                                                   int native_tab_paint_inset,
                                                   bool collapsed) {
-  const int leading_padding = collapsed
-                                  ? 0
-                                  : ResolveHorizontalTabGroupEdgeInset(
-                                        header, 0, native_tab_paint_inset);
-  return gfx::Insets::TLBR(0, native_content_inset + leading_padding, 0,
-                           native_content_inset);
+  const int edge_inset =
+      ResolveHorizontalTabGroupEdgeInset(header, 0, native_tab_paint_inset);
+  return gfx::Insets::TLBR(0, native_content_inset + edge_inset, 0,
+                           native_content_inset + (collapsed ? edge_inset : 0));
+}
+
+int ResolveHorizontalTabGroupMinimumWidth(const views::View& tab,
+                                          int native_minimum_width,
+                                          int native_content_inset,
+                                          int native_tab_paint_inset) {
+  if (!UsesHorizontalTabGroupCapsule(tab)) {
+    return native_minimum_width;
+  }
+  const int edge_inset =
+      ResolveHorizontalTabGroupEdgeInset(tab, 0, native_tab_paint_inset);
+  return std::max(native_minimum_width,
+                  native_content_inset + gfx::kFaviconSize + edge_inset +
+                      kSidebarMetrics.group_header_horizontal_inset);
 }
 
 int ResolveHorizontalTabGroupSeparatorOffset(
@@ -210,19 +287,42 @@ gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds) {
   return group_bounds;
 }
 
+void SetHorizontalTabGroupCapsuleCollapsed(views::View& decoration,
+                                           bool collapsed) {
+  if (!UsesHorizontalTabGroupCapsule(decoration)) {
+    decoration.ClearProperty(kHorizontalTabGroupCapsuleAnimationKey);
+    return;
+  }
+  if (auto* animation =
+          decoration.GetProperty(kHorizontalTabGroupCapsuleAnimationKey)) {
+    animation->SetCollapsed(collapsed);
+  } else {
+    decoration.SetProperty(kHorizontalTabGroupCapsuleAnimationKey,
+                           std::make_unique<HorizontalTabGroupCapsuleAnimation>(
+                               decoration, collapsed));
+  }
+}
+
 void PaintHorizontalTabGroupCapsule(gfx::Canvas& canvas,
                                     const views::View& decoration,
                                     SkColor group_color) {
-  const auto* widget = decoration.GetWidget();
-  const SkColor shell = ResolveShellBackgroundColor(
-      *decoration.GetColorProvider(), !widget || widget->ShouldPaintAsActive());
+  gfx::Rect bounds = decoration.GetLocalBounds();
+  if (const auto* animation =
+          decoration.GetProperty(kHorizontalTabGroupCapsuleAnimationKey)) {
+    const int collapsed_height =
+        std::min(bounds.height(),
+                 kSidebarMetrics.horizontal_group_collapsed_capsule_height);
+    const int height = gfx::Tween::IntValueBetween(
+        animation->expansion(), collapsed_height, bounds.height());
+    bounds.ClampToCenteredSize(gfx::Size(bounds.width(), height));
+  }
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
-  flags.setColor(color_utils::AlphaBlend(
-      group_color, shell, kSidebarMetrics.horizontal_group_tint_opacity));
+  // 실제 native glass를 남기고, 전경 대비 계산만 공통 Shell proxy를 사용한다.
+  flags.setColor(SkColorSetA(group_color, GroupCapsuleAlpha()));
   canvas.DrawRoundRect(
-      gfx::RectF(decoration.GetLocalBounds()),
-      std::min(decoration.height() / 2.f,
+      gfx::RectF(bounds),
+      std::min(bounds.height() / 2.f,
                static_cast<float>(kSidebarMetrics.content_corner_radius)),
       flags);
 }
@@ -432,9 +532,13 @@ std::optional<HorizontalTabColors> ResolveHorizontalTabGroupColors(
   const auto* widget = header.GetWidget();
   const SkColor shell = ResolveShellBackgroundColor(
       *header.GetColorProvider(), !widget || widget->ShouldPaintAsActive());
-  const SkColor background = color_utils::AlphaBlend(
-      group_color, shell,
-      hovered ? 0.26f : kSidebarMetrics.horizontal_group_tint_opacity);
+  // 실제 두 paint의 8-bit alpha를 같은 순서로 합성해 대비를 계산한다.
+  SkColor background = color_utils::GetResultingPaintColor(
+      SkColorSetA(group_color, GroupCapsuleAlpha()), shell);
+  if (hovered) {
+    background = color_utils::GetResultingPaintColor(
+        SkColorSetA(group_color, GroupHeaderHoverAlpha()), background);
+  }
   return HorizontalTabColors{background,
                              color_utils::BlendForMinContrast(
                                  group_color, background, std::nullopt,
@@ -443,9 +547,11 @@ std::optional<HorizontalTabColors> ResolveHorizontalTabGroupColors(
 }
 
 std::unique_ptr<views::Background> CreateHorizontalTabGroupBackground(
-    SkColor color,
-    bool hovered) {
-  return std::make_unique<HorizontalGroupBackground>(color, hovered);
+    SkColor group_color,
+    bool hovered,
+    gfx::Insets insets) {
+  return std::make_unique<HorizontalGroupBackground>(group_color, hovered,
+                                                     insets);
 }
 
 void UpdateTabGroupPreview(views::View& header,
@@ -473,11 +579,35 @@ void UpdateTabGroupPreviewColors(views::View& header, bool hovered) {
 }
 
 SkColor ResolveHorizontalTabGroupForeground(const views::View& header,
-                                            SkColor group_color) {
+                                            SkColor group_color,
+                                            bool hovered) {
   const auto colors =
-      ResolveHorizontalTabGroupColors(header, group_color, false);
+      ResolveHorizontalTabGroupColors(header, group_color, hovered);
   return colors ? colors->foreground
                 : color_utils::GetColorWithMaxContrast(group_color);
+}
+
+void UpdateHorizontalTabGroupChipColors(views::View& header,
+                                        views::View& chip,
+                                        SkColor group_color,
+                                        bool hovered) {
+  if (!IsShellEnabled()) {
+    return;
+  }
+  UpdateTabGroupPreviewColors(header, hovered);
+  const auto colors =
+      ResolveHorizontalTabGroupColors(header, group_color, hovered);
+  if (colors) {
+    chip.SetBackground(
+        CreateHorizontalTabGroupBackground(group_color, hovered));
+  }
+  if (auto* ring = views::FocusRing::Get(&header)) {
+    ring->SetColorId(colors
+                         ? std::make_optional(ResolveBrowserSurfaceFocusColorId(
+                               *header.GetColorProvider(), colors->background,
+                               ui::kColorSysStateFocusRing))
+                         : std::nullopt);
+  }
 }
 
 void UpdateHorizontalTabGroupChip(views::View& header,
@@ -507,18 +637,8 @@ void UpdateHorizontalTabGroupChip(views::View& header,
     bounds.set_width(preview->bounds().right() + kPreviewGap - bounds.x());
     chip.SetBoundsRect(bounds);
   }
-  const auto colors =
-      ResolveHorizontalTabGroupColors(header, group_color, false);
-  if (colors) {
-    chip.SetBackground(CreateHorizontalTabGroupBackground(colors->background));
-  }
-  if (auto* ring = views::FocusRing::Get(&header)) {
-    ring->SetColorId(colors
-                         ? std::make_optional(ResolveBrowserSurfaceFocusColorId(
-                               *header.GetColorProvider(), colors->background,
-                               ui::kColorSysStateFocusRing))
-                         : std::nullopt);
-  }
+  UpdateHorizontalTabGroupChipColors(header, chip, group_color,
+                                     header.IsMouseHovered());
   if (header.GetProperty(kGroupChipWidthKey) != chip.width()) {
     header.SetProperty(kGroupChipWidthKey, chip.width());
     header.InvalidateLayout();

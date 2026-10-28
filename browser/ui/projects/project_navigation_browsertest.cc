@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license in LICENSE.
 
 #include <algorithm>
+#include <set>
 #include <string_view>
 
 #include "base/check.h"
@@ -9,6 +10,7 @@
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/i18n/rtl.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/run_until.h"
@@ -23,6 +25,7 @@
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/side_panel/side_panel_ui.h"
@@ -47,8 +50,10 @@
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/new_tab_button.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_close_button.h"
+#include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
 #include "chrome/browser/ui/views/tabs/tab_style_views.h"
@@ -76,6 +81,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/accessibility/ax_node_data.h"
+#include "ui/base/accelerators/accelerator.h"
 #include "ui/base/hit_test.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -113,6 +119,7 @@
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/scrollbar/scroll_bar.h"
 #include "ui/views/focus/focus_manager.h"
+#include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/layout/layout_manager_base.h"
 #include "ui/views/paint_info.h"
 #include "ui/views/test/button_test_api.h"
@@ -126,6 +133,58 @@
 
 namespace yee::projects {
 namespace {
+
+ui::MenuModel* FindSubmenu(ui::MenuModel& model, std::u16string_view title) {
+  for (size_t i = 0; i < model.GetItemCount(); ++i) {
+    if (model.GetLabelAt(i) == title) {
+      return model.GetSubmenuModelAt(i);
+    }
+  }
+  return nullptr;
+}
+
+void ExpectUniqueMenuCommands(const ui::MenuModel& model) {
+  std::set<int> commands;
+  const auto inspect = [&](auto&& self, const ui::MenuModel& current) -> void {
+    for (size_t i = 0; i < current.GetItemCount(); ++i) {
+      if (current.GetTypeAt(i) != ui::MenuModel::TYPE_SEPARATOR) {
+        EXPECT_TRUE(commands.insert(current.GetCommandIdAt(i)).second)
+            << current.GetCommandIdAt(i);
+      }
+      if (auto* child = current.GetSubmenuModelAt(i)) {
+        self(self, *child);
+      }
+    }
+  };
+  inspect(inspect, model);
+}
+
+class ProjectMenuNativeDelegate : public TabContextMenuController::Delegate {
+ public:
+  bool IsContextMenuCommandChecked(TabStripModel::ContextMenuCommand) override {
+    ++requests;
+    return false;
+  }
+  bool IsContextMenuCommandEnabled(tabs::TabInterface*,
+                                   TabStripModel::ContextMenuCommand) override {
+    ++requests;
+    return false;
+  }
+  bool IsContextMenuCommandAlerted(TabStripModel::ContextMenuCommand) override {
+    ++requests;
+    return false;
+  }
+  void ExecuteContextMenuCommand(tabs::TabInterface*,
+                                 TabStripModel::ContextMenuCommand,
+                                 int) override {
+    ++requests;
+  }
+  bool GetContextMenuAccelerator(int, ui::Accelerator*) override {
+    ++requests;
+    return false;
+  }
+  int requests = 0;
+};
 
 views::LabelButton* FindButton(views::View* root, std::u16string_view title) {
   if (auto* button = views::AsViewClass<views::LabelButton>(root);
@@ -350,8 +409,10 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       view->tab_strip_view()->GetTabStripView());
   ASSERT_TRUE(strip);
   auto* scroll = strip->unpinned_tabs_scroll_view();
+  // Mac의 idle observer 안에서 RunUntil을 중첩하지 않는다.
+  layout();
   ASSERT_TRUE(base::test::RunUntil([&] {
-    layout();
+    view->GetWidget()->LayoutRootViewIfNecessary();
     return scroll->vertical_scroll_bar()->GetVisible();
   }));
   EXPECT_GT(scroll->contents()->height(), scroll->GetVisibleRect().height());
@@ -810,6 +871,112 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   EXPECT_TRUE(view->GetFocusManager()->RestoreFocusedView());
   EXPECT_TRUE(header->Contains(view->GetFocusManager()->GetFocusedView()));
   EXPECT_FALSE(FindButton(FindProjectSidebar(view), u"분리 페이지")->IsDrawn());
+}
+
+// RTL에서도 보조 버튼의 아이콘과 상태 면은 같은 버튼 안에 남아야 한다.
+IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
+                       SidebarHeadingActionsKeepStateLayersInsideTheirButtons) {
+  auto project = service()->CreateProject(u"새 소속");
+  ASSERT_TRUE(project);
+  auto* model = browser()->tab_strip_model();
+  ASSERT_TRUE(coordinator()->Attach(*model->GetActiveTab(), *project, {}));
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* controller = ProjectNavigationController::From(browser());
+  tabs::VerticalTabStripStateController::From(browser())
+      ->SetVerticalTabsEnabled(true);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !BrowserAnimationController::From(browser())->IsAnimating(
+        TabStripAnimations::kVerticalTabStrip);
+  }));
+  view->GetFocusManager()->SetKeyboardAccessible(true);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  const auto check_heading = [&](int revision) {
+    view->GetWidget()->LayoutRootViewIfNecessary();
+    auto* sidebar = FindProjectSidebar(view);
+    const auto& title = service()->FindProject(*project)->name;
+    auto* name = FindButton(sidebar, title);
+    auto* toggle = FindButton(
+        sidebar, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_TOGGLE_PAGES) +
+                     u": " + title);
+    ASSERT_TRUE(name && toggle);
+    auto* row = views::AsViewClass<ProjectRowView>(name->parent());
+    ASSERT_TRUE(row);
+    const auto title_bounds = name->GetBoundsInScreen();
+    if (base::i18n::IsRTL()) {
+      EXPECT_GE(toggle->GetBoundsInScreen().x(), title_bounds.right());
+    } else {
+      EXPECT_LE(toggle->GetBoundsInScreen().right(), title_bounds.x());
+    }
+    ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::Point(),
+                         gfx::Point(), base::TimeTicks::Now(), 0, 0);
+    ui::MouseEvent leave(ui::EventType::kMouseExited, gfx::Point(),
+                         gfx::Point(), base::TimeTicks::Now(), 0, 0);
+    static_cast<views::View*>(row)->OnMouseEntered(enter);
+    view->GetWidget()->LayoutRootViewIfNecessary();
+    int action = 0;
+    for (int label : {IDS_YEE_PROJECT_OVERVIEW, IDS_YEE_PROJECT_MORE}) {
+      auto* button =
+          FindButton(sidebar, l10n_util::GetStringUTF16(label) + u": " + title);
+      ASSERT_TRUE(button && button->IsDrawn());
+      auto* ink = views::InkDrop::Get(button)->GetInkDrop();
+      for (auto state :
+           {views::Button::STATE_HOVERED, views::Button::STATE_PRESSED}) {
+        SCOPED_TRACE(testing::Message()
+                     << "revision=" << revision << ", action=" << action
+                     << ", state=" << state);
+        button->SetState(state);
+        ink->SetHovered(true);
+        view->GetWidget()->LayoutRootViewIfNecessary();
+        views::InkDropContainerView* container = nullptr;
+        for (views::View* child : button->children()) {
+          if (auto* found =
+                  views::AsViewClass<views::InkDropContainerView>(child)) {
+            container = found;
+          }
+        }
+        ASSERT_TRUE(container);
+        EXPECT_EQ(button->GetLocalBounds(), container->bounds());
+        views::test::InkDropImplTestApi api(
+            static_cast<views::InkDropImpl*>(ink));
+        auto* root = api.GetRootLayer();
+        ASSERT_TRUE(root && button->layer());
+        EXPECT_EQ(button->layer(), root->parent());
+        EXPECT_EQ(button->GetLocalBounds(), root->bounds());
+        EXPECT_EQ(button->GetLocalBounds(), root->GetTargetBounds());
+        EXPECT_TRUE(root->GetTargetTransform().IsIdentity());
+        EXPECT_EQ(title_bounds, name->GetBoundsInScreen());
+        CaptureFrame("project-heading-action-" + std::to_string(revision) +
+                     "-" + std::to_string(action) + "-" +
+                     std::to_string(state));
+      }
+      ink->SetHovered(false);
+      button->SetState(views::Button::STATE_NORMAL);
+      button->RequestFocus();
+      ASSERT_TRUE(views::FocusRing::Get(button));
+      EXPECT_TRUE(views::FocusRing::Get(button)->GetVisible());
+      CaptureFrame("project-heading-action-focus-" + std::to_string(revision) +
+                   "-" + std::to_string(action));
+      view->GetFocusManager()->ClearFocus();
+      button->SetEnabled(false);
+      CaptureFrame("project-heading-action-disabled-" +
+                   std::to_string(revision) + "-" + std::to_string(action));
+      button->SetEnabled(true);
+      ++action;
+    }
+    static_cast<views::View*>(row)->OnMouseExited(leave);
+    CaptureFrame("project-heading-actions-leave-" + std::to_string(revision));
+  };
+  ASSERT_NO_FATAL_FAILURE(check_heading(0));
+  ASSERT_TRUE(service()->RenameProject(*project, u"새 소속 갱신"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    auto* sidebar = FindProjectSidebar(view);
+    return sidebar && FindButton(sidebar, u"새 소속 갱신");
+  }));
+  ASSERT_NO_FATAL_FAILURE(check_heading(1));
+  controller->ShowHub(*project);
+  base::RunLoop().RunUntilIdle();
+  ASSERT_NO_FATAL_FAILURE(check_heading(2));
 }
 
 // 펼침·접힘 뒤 허브가 행을 갱신해도 실제 일반 탭의 시작 위치가 움직이지 않는다.
@@ -1382,6 +1549,32 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     EXPECT_TRUE(controller->showing_hub());
     EXPECT_EQ(tab, browser()->tab_strip_model()->GetActiveTab());
     controller->ExitHub();
+    if (!vertical &&
+        base::FeatureList::IsEnabled(features::kNewTabButtonContextMenu)) {
+      view->DeprecatedLayoutImmediately();
+      auto* button =
+          views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
+              kNewTabButtonElementId,
+              views::ElementTrackerViews::GetContextForView(view), true);
+      ASSERT_TRUE(button && button->context_menu_controller());
+      auto show_new_tab_menu = base::BindOnce(
+          [](views::View* button) {
+            button->context_menu_controller()->ShowContextMenuForView(
+                button, button->GetBoundsInScreen().CenterPoint(),
+                ui::mojom::MenuSourceType::kMouse);
+          },
+          base::Unretained(button));
+#if BUILDFLAG(IS_MAC)
+      EXPECT_TRUE(RunWithNativeContextMenuAutoCloseForTesting(
+          std::move(show_new_tab_menu)));
+#else
+      std::move(show_new_tab_menu).Run();
+#endif
+      if (auto* menu = views::MenuController::GetActiveInstance()) {
+        menu->Cancel(views::MenuController::ExitType::kAll);
+      }
+      EXPECT_EQ(tab, browser()->tab_strip_model()->GetActiveTab());
+    }
   }
 }
 
@@ -1590,7 +1783,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   }
 }
 
-// 데이터 갱신 없이 배치를 바꿔도 수평 선택기와 세로 목록의 표시가 즉시 바뀐다.
+// 데이터 갱신 없이 배치를 바꿔도 메뉴 탐색과 세로 목록이 맞고 주소줄은 비운다.
 IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                        NavigationFollowsTabLayoutWithoutMetadataChanges) {
   auto project = service()->CreateProject(u"방향 전환");
@@ -1600,8 +1793,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* controller = ProjectNavigationController::From(browser());
   auto* orientation = tabs::VerticalTabStripStateController::From(browser());
   ASSERT_FALSE(orientation->IsCollapsed());
-  auto* name = FindButton(view->toolbar(), u"방향 전환");
-  ASSERT_TRUE(name);
+  EXPECT_FALSE(FindButton(view->toolbar(), u"방향 전환"));
   auto* sidebar = FindProjectSidebar(view);
   ASSERT_TRUE(sidebar);
   for (bool hub : {false, true}) {
@@ -1611,7 +1803,38 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       orientation->SetVerticalTabsEnabled(vertical);
       view->DeprecatedLayoutImmediately();
       base::RunLoop().RunUntilIdle();
-      EXPECT_EQ(!vertical && !hub, name->IsDrawn());
+      EXPECT_FALSE(FindButton(view->toolbar(), u"방향 전환"));
+      NewTabButtonMenuModel new_tab_menu(browser());
+      const auto label = l10n_util::GetStringUTF16(IDS_YEE_PROJECTS);
+      auto* projects = FindSubmenu(new_tab_menu, label);
+      EXPECT_EQ(!vertical, projects != nullptr);
+      ExpectUniqueMenuCommands(new_tab_menu);
+      if (!vertical) {
+        ASSERT_TRUE(projects);
+        ProjectMenuNativeDelegate delegate;
+        ui::SimpleMenuModel nested(nullptr);
+        nested.AddItem(2, u"기존 하위 명령");
+        TabContextMenuController context(
+            browser()->tab_strip_model()->GetActiveTab()->GetHandle(),
+            &delegate);
+        auto root = std::make_unique<ui::SimpleMenuModel>(&context);
+        root->AddItem(1, u"기존 native 명령");
+        root->AddSubMenu(3, u"기존 하위 메뉴", &nested);
+        context.LoadModel(std::move(root));
+        auto* menu = context.GetMenuModel();
+        ASSERT_TRUE(FindSubmenu(*menu, label));
+        ExpectUniqueMenuCommands(*menu);
+        const size_t index = menu->GetItemCount() - 1;
+        const int command = menu->GetCommandIdAt(index);
+        const int requests = delegate.requests;
+        ui::Accelerator accelerator;
+        EXPECT_TRUE(context.IsCommandIdEnabled(command));
+        EXPECT_FALSE(context.IsCommandIdChecked(command));
+        EXPECT_FALSE(context.IsCommandIdAlerted(command));
+        EXPECT_FALSE(context.GetAcceleratorForCommandId(command, &accelerator));
+        context.ExecuteCommand(command, 0);
+        EXPECT_EQ(requests, delegate.requests);
+      }
       sidebar = FindProjectSidebar(view);
       if (vertical) {
         ASSERT_TRUE(sidebar);
@@ -1685,99 +1908,62 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   }
 }
 
-// 페이지 선택기는 주소줄의 실제 전경색을 따르고 허브 선택기는 허브 색을
-// 유지한다.
+// 동적 제목의 &를 그대로 표시하고 허브 선택기의 독립 색을 유지한다.
 IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
-                       NavigationFollowsPageSurfaceWithoutRecoloringHub) {
-  auto project = service()->CreateProject(u"색상 검수");
+                       NavigationMenusKeepHubIndependentFromPageSurface) {
+  const std::u16string project_name = u"색상 & 검수 && 유지";
+  const std::u16string page_title = u"페이지 & 비교 && 유지";
+  auto project = service()->CreateProject(project_name);
   ASSERT_TRUE(project);
+  auto* const tab = browser()->tab_strip_model()->GetActiveTab();
+  ASSERT_TRUE(content::ExecJs(tab->GetContents(),
+                              "document.title='페이지 & 비교 && 유지';"));
+  ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
   base::RunLoop().RunUntilIdle();
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* controller = ProjectNavigationController::From(browser());
   tabs::VerticalTabStripStateController::From(browser())
       ->SetVerticalTabsEnabled(false);
   view->DeprecatedLayoutImmediately();
-  auto* name = FindButton(view->toolbar(), u"색상 검수");
-  ASSERT_TRUE(name);
-  auto* picker = views::AsViewClass<views::MdTextButton>(
-      name->parent()->children().back());
-  ASSERT_TRUE(picker);
   uint64_t revision = 0;
   for (SkColor surface : {SK_ColorWHITE, SkColorSetRGB(0x18, 0x1A, 0x1F)}) {
-    auto* ink_drop = views::InkDrop::Get(name)->GetInkDrop();
-    ink_drop->SetHovered(true);
     ++revision;
-    auto presentation =
+    const auto presentation =
         ResolveBrowserSurfacePresentation(surface, 1, revision, revision);
     view->toolbar()->SetCompactShellSurfacePresentation(presentation);
-    EXPECT_EQ(presentation.primary, name->GetCurrentTextColor());
-    EXPECT_GE(
-        color_utils::GetContrastRatio(name->GetCurrentTextColor(), surface),
-        color_utils::kMinimumReadableContrastRatio);
-    ASSERT_TRUE(picker->GetImageModel(views::Button::STATE_NORMAL));
-    EXPECT_EQ(presentation.primary,
-              picker->GetImageModel(views::Button::STATE_NORMAL)
-                  ->GetVectorIcon()
-                  .color()
-                  .ResolveToSkColor(picker->GetColorProvider()));
-    EXPECT_EQ(presentation.location_hover,
-              views::InkDrop::Get(name)->GetBaseColor());
-    views::test::InkDropImplTestApi ink_api(
-        static_cast<views::InkDropImpl*>(ink_drop));
-    ASSERT_TRUE(ink_api.IsHighlightFadingInOrVisible());
-    auto* highlight = const_cast<views::InkDropHighlight*>(ink_api.highlight());
-    ASSERT_TRUE(highlight && highlight->layer()->delegate());
-    // 실제 표시 중인 highlight의 paint delegate도 새 바탕색이어야 한다.
-    EXPECT_EQ(presentation.location_hover,
-              static_cast<views::BasePaintedLayerDelegate*>(
-                  highlight->layer()->delegate())
-                  ->color());
-    for (auto state :
-         {views::Button::STATE_HOVERED, views::Button::STATE_PRESSED,
-          views::Button::STATE_NORMAL}) {
-      picker->SetState(state);
-      EXPECT_EQ(presentation.primary,
-                picker->GetImageModel(views::Button::STATE_NORMAL)
-                    ->GetVectorIcon()
-                    .color()
-                    .ResolveToSkColor(picker->GetColorProvider()));
-      picker->RequestFocus();
-      view->DeprecatedLayoutImmediately();
-      // 실제 layout은 Header 소유자의 snapshot을 다시 적용한다.
-      // 다음 상태 검사는 이 함수가 주입한 동일 snapshot으로 시작한다.
-      view->toolbar()->SetCompactShellSurfacePresentation(presentation);
+    EXPECT_FALSE(FindButton(view->toolbar(), project_name));
+    NewTabButtonMenuModel menu(browser());
+    auto* projects =
+        FindSubmenu(menu, l10n_util::GetStringUTF16(IDS_YEE_PROJECTS));
+    ASSERT_TRUE(projects);
+    ExpectUniqueMenuCommands(menu);
+    bool found_page = false;
+    std::optional<size_t> project_index;
+    for (size_t i = 0; i < projects->GetItemCount(); ++i) {
+      if (projects->GetLabelAt(i) == page_title) {
+        EXPECT_FALSE(projects->MayHaveMnemonicsAt(i));
+        found_page = true;
+      }
+      if (projects->GetLabelAt(i) == project_name) {
+        EXPECT_FALSE(projects->MayHaveMnemonicsAt(i));
+        project_index = i;
+      }
     }
-    const auto focus_color = views::FocusRing::Get(name)->GetColorId();
-    ASSERT_TRUE(focus_color);
-    EXPECT_GE(color_utils::GetContrastRatio(
-                  name->GetColorProvider()->GetColor(*focus_color), surface),
-              color_utils::kMinimumVisibleContrastRatio);
-    controller->ShowHub(*project);
+    ASSERT_TRUE(found_page);
+    ASSERT_TRUE(project_index);
+    projects->ActivatedAt(*project_index, 0);
+    ASSERT_TRUE(
+        base::test::RunUntil([&] { return controller->showing_hub(); }));
     auto* header =
         view->GetViewByID(ProjectNavigationController::kHubHeaderViewId);
     ASSERT_TRUE(header);
-    auto* hub_name = FindButton(header, u"색상 검수");
+    auto* hub_name = FindButton(header, project_name);
     ASSERT_TRUE(hub_name);
     view->toolbar()->SetCompactShellSurfacePresentation(presentation);
     EXPECT_EQ(hub_name->GetColorProvider()->GetColor(ui::kColorSysOnSurface),
               hub_name->GetCurrentTextColor());
     controller->ExitHub();
   }
-  auto* native_ink_drop = views::InkDrop::Get(name)->GetInkDrop();
-  native_ink_drop->SetHovered(true);
-  view->toolbar()->SetCompactShellSurfacePresentation(std::nullopt);
-  EXPECT_EQ(name->GetColorProvider()->GetColor(kColorToolbarButtonText),
-            name->GetCurrentTextColor());
-  EXPECT_FALSE(views::FocusRing::Get(name)->GetColorId());
-  views::test::InkDropImplTestApi native_ink_api(
-      static_cast<views::InkDropImpl*>(native_ink_drop));
-  auto* native_highlight =
-      const_cast<views::InkDropHighlight*>(native_ink_api.highlight());
-  ASSERT_TRUE(native_highlight && native_highlight->layer()->delegate());
-  EXPECT_EQ(name->GetColorProvider()->GetColor(ui::kColorSysStateHoverOnSubtle),
-            static_cast<views::BasePaintedLayerDelegate*>(
-                native_highlight->layer()->delegate())
-                ->color());
 }
 
 // Mac의 별도 Toolbar Widget을 포함해 전체화면 왕복에서 허브와 실제 탭을
@@ -1893,6 +2079,11 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* private_profile = browser()->GetProfile()->GetPrimaryOTRProfile(true);
   EXPECT_EQ(nullptr, ProjectServiceFactory::GetForProfile(private_profile));
   EXPECT_EQ(nullptr, ProjectTabCoordinator::GetForProfile(private_profile));
+  auto* private_browser = CreateBrowser(private_profile);
+  tabs::VerticalTabStripStateController::From(private_browser)
+      ->SetVerticalTabsEnabled(false);
+  NewTabButtonMenuModel menu(private_browser);
+  EXPECT_FALSE(FindSubmenu(menu, l10n_util::GetStringUTF16(IDS_YEE_PROJECTS)));
 }
 
 // 닫기 경고를 취소한 탭은 계속 열림 상태이며 UUID와 내용 교체 관찰을 유지한다.

@@ -159,8 +159,8 @@ ProjectHubView::ProjectHubView(Profile* profile,
         page.title;
     unlink->SetTooltipText(remove_label);
     unlink->GetViewAccessibility().SetName(remove_label);
-    auto* remove = row->AddChildView(std::move(unlink));
-    row->AddTrailing(remove, true);
+    auto* remove = unlink.get();
+    row->AddTrailing(std::move(unlink), true);
     remove_buttons_[page.id] = remove;
   }
 }

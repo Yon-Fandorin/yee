@@ -4,6 +4,7 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_PROJECTS_PROJECT_ROW_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_PROJECTS_PROJECT_ROW_VIEW_H_
 
+#include <memory>
 #include <vector>
 
 #include "base/callback_list.h"
@@ -52,7 +53,8 @@ class ProjectRowView : public views::View,
   void SetActivationAction(base::RepeatingClosure action);
   void SetMiddleClickAction(base::RepeatingClosure action);
   void SetPrimary(views::MdTextButton* button);
-  void AddTrailing(views::LabelButton* button, bool reveal_on_hover);
+  void AddTrailing(std::unique_ptr<views::LabelButton> button,
+                   bool reveal_on_hover);
   void SetLeadingDisclosure(views::MdTextButton* button,
                             ui::ImageModel resting_icon,
                             bool expanded);

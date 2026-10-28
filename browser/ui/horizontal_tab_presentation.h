@@ -39,6 +39,11 @@ int ResolveHorizontalTabMinimumInactiveWidth(const views::View& tab,
                                              int native_minimum_width,
                                              int native_overlap);
 
+// 탭 본문의 native 최소 폭에 같은 행의 고정 조작 폭을 한 번만 더한다.
+gfx::Size ResolveHorizontalTabStripMinimumSize(const views::View& region,
+                                               const views::View& strip,
+                                               gfx::Size native_minimum_size);
+
 // 그리기 전에 구조를 Header에 적용한다. 전체화면에서 다른 Widget으로
 // 이동한 뒤에도 View가 이 상태를 유지한다.
 void ApplyBrowserSurfaceHeaderDecoration(
@@ -57,7 +62,8 @@ struct HorizontalTabColors {
   SkColor foreground;
 };
 
-// 수평 탭은 페이지색과 분리된 native 테마와 기존 Shell 대비 역할을 따른다.
+// 선택 탭은 연결된 Header의 페이지색을 따르고, 나머지는 Shell 위의 상태색을
+// 쓴다.
 HorizontalTabColors ResolveHorizontalTabColors(
     const ui::ColorProvider& color_provider,
     bool active,
@@ -65,7 +71,8 @@ HorizontalTabColors ResolveHorizontalTabColors(
     double hover_progress,
     bool frame_active,
     std::optional<SkColor> group_color = std::nullopt,
-    bool split = false);
+    bool split = false,
+    std::optional<SkColor> page_surface = std::nullopt);
 
 // 분할 멤버가 공통 구분선의 범위를 canvas 픽셀로 전달한다.
 // 불투명한 계산 색으로 어느 멤버를 먼저 그려도 같은 결과를 유지한다.

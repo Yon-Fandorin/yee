@@ -29,6 +29,7 @@
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/views/background.h"
 #include "ui/views/view.h"
+#include "ui/views/view_class_properties.h"
 
 namespace yee {
 struct HorizontalTabColorRefreshCallback {
@@ -112,6 +113,27 @@ int ResolveHorizontalTabMinimumInactiveWidth(const views::View& tab,
   return std::max(native_minimum_width,
                   native_overlap + gfx::kFaviconSize +
                       kSidebarMetrics.horizontal_tab_minimum_icon_gap);
+}
+
+gfx::Size ResolveHorizontalTabStripMinimumSize(const views::View& region,
+                                               const views::View& strip,
+                                               gfx::Size native_minimum_size) {
+  if (!IsShellEnabled()) {
+    return native_minimum_size;
+  }
+  const auto* strip_margins = strip.GetProperty(views::kMarginsKey);
+  int width = native_minimum_size.width() + region.GetInsets().width() +
+              (strip_margins ? strip_margins->width() : 0);
+  for (const views::View* child : region.children()) {
+    if (child != &strip && child->GetVisible() &&
+        !child->GetProperty(views::kViewIgnoredByLayoutKey)) {
+      const auto* margins = child->GetProperty(views::kMarginsKey);
+      width +=
+          child->GetPreferredSize().width() + (margins ? margins->width() : 0);
+    }
+  }
+  native_minimum_size.set_width(width);
+  return native_minimum_size;
 }
 
 void UpdateHorizontalTabHeaderBackground(
@@ -227,8 +249,14 @@ HorizontalTabColors ResolveHorizontalTabColors(
     double hover_progress,
     bool frame_active,
     std::optional<SkColor> group_color,
-    bool split) {
+    bool split,
+    std::optional<SkColor> page_surface) {
   if (active) {
+    if (page_surface) {
+      const SkColor background = SkColorSetA(*page_surface, SK_AlphaOPAQUE);
+      return {background,
+              ResolveBrowserSurfaceHeaderColors(background).primary};
+    }
     const SkColor background = color_provider.GetColor(
         frame_active ? kColorTabBackgroundActiveFrameActive
                      : kColorTabBackgroundActiveFrameInactive);

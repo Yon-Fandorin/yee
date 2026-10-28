@@ -92,10 +92,11 @@ void ProjectRowView::SetPrimary(views::MdTextButton* button) {
   UpdateRowState();
 }
 
-void ProjectRowView::AddTrailing(views::LabelButton* button,
+void ProjectRowView::AddTrailing(std::unique_ptr<views::LabelButton> owned,
                                  bool reveal_on_hover) {
   // 실제 조작만 숨기고 슬롯은 남겨 hover 진입 때 제목이 움직이지 않게 한다.
-  auto owned = RemoveChildViewT(button);
+  // native 버튼을 중간에 분리하면 InkDrop의 부모 bounds 관찰이 끊어진다.
+  // 처음부터 슬롯 안에 추가해 상태 면과 아이콘이 같은 좌표를 유지한다.
   auto* slot = AddChildView(std::make_unique<views::View>());
   slot->SetPreferredSize(gfx::Size(kSidebarMetrics.tab_row_height,
                                    kSidebarMetrics.tab_row_height));
@@ -104,7 +105,7 @@ void ProjectRowView::AddTrailing(views::LabelButton* button,
   layout->set_main_axis_alignment(views::BoxLayout::MainAxisAlignment::kCenter);
   layout->set_cross_axis_alignment(
       views::BoxLayout::CrossAxisAlignment::kCenter);
-  slot->AddChildView(std::move(owned));
+  auto* button = slot->AddChildView(std::move(owned));
   button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
   trailing_actions_.push_back(
       {button, reveal_on_hover,

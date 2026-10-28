@@ -4,8 +4,12 @@
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 
 #include <algorithm>
+#include <limits>
+#include <map>
+#include <set>
 #include <utility>
 
+#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/i18n/rtl.h"
@@ -28,6 +32,7 @@
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/projects/project_hub_view.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_presentation.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_view.h"
@@ -222,6 +227,29 @@ ProjectPageItem MakePageItem(const ProjectPage& page,
 
 }  // namespace
 
+namespace {
+void CollectMenuCommands(const ui::MenuModel& model, std::set<int>& commands) {
+  for (size_t index = 0; index < model.GetItemCount(); ++index) {
+    if (model.GetTypeAt(index) != ui::MenuModel::TYPE_SEPARATOR) {
+      commands.insert(model.GetCommandIdAt(index));
+    }
+    if (auto* submenu = model.GetSubmenuModelAt(index)) {
+      CollectMenuCommands(*submenu, commands);
+    }
+  }
+}
+
+int AllocateMenuCommand(std::set<int>& commands, int& next) {
+  while (commands.contains(next)) {
+    CHECK_LT(next, std::numeric_limits<int>::max());
+    ++next;
+  }
+  CHECK_LT(next, std::numeric_limits<int>::max());
+  commands.insert(next);
+  return next++;
+}
+}  // namespace
+
 class ProjectPicker : public ui::SimpleMenuModel,
                       public ui::SimpleMenuModel::Delegate {
  public:
@@ -231,56 +259,65 @@ class ProjectPicker : public ui::SimpleMenuModel,
                 bool writable,
                 base::RepeatingCallback<void(std::string)> select,
                 base::RepeatingClosure create,
-                base::RepeatingCallback<void(std::string)> open_page)
-      : SimpleMenuModel(this),
-        writable_(writable),
-        select_(std::move(select)),
-        create_(std::move(create)),
-        open_page_(std::move(open_page)) {
-    for (const auto& page : pages) {
-      const int command = 10000 + static_cast<int>(page_ids_.size());
-      page_ids_.push_back(page.id);
-      AddItem(command, page.title);
+                base::RepeatingCallback<void(std::string)> open_page,
+                const ui::MenuModel* parent,
+                int container_command)
+      : SimpleMenuModel(this), writable_(writable) {
+    if (parent) {
+      CollectMenuCommands(*parent, reserved_commands_);
     }
-    if (!page_ids_.empty())
+    reserved_commands_.insert(container_command);
+    // 사용자 제목의 &는 메뉴 접근키로 해석하지 않는다.
+    for (const auto& page : pages) {
+      AddItem(AddCommand(base::BindRepeating(open_page, page.id)), page.title);
+      SetMayHaveMnemonicsAt(GetItemCount() - 1, false);
+    }
+    if (!pages.empty()) {
       AddSeparator(ui::NORMAL_SEPARATOR);
+    }
     for (const auto& project : service.projects()) {
-      const int command = static_cast<int>(ids_.size()) + 1;
-      ids_.push_back(project.id);
+      const int command = AddCommand(base::BindRepeating(select, project.id));
       AddRadioItem(command, project.name, 1);
+      SetMayHaveMnemonicsAt(GetItemCount() - 1, false);
       if (project.id == selected) {
         selected_ = command;
       }
     }
-    if (!ids_.empty()) {
+    if (!service.projects().empty()) {
       AddSeparator(ui::NORMAL_SEPARATOR);
     }
-    AddItem(0, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_NEW));
+    create_command_ = AddCommand(std::move(create));
+    AddItem(create_command_, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_NEW));
     if (!writable) {
-      AddItem(-1, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_READ_ONLY));
+      AddItem(AllocateMenuCommand(reserved_commands_, next_command_),
+              l10n_util::GetStringUTF16(IDS_YEE_PROJECT_READ_ONLY));
     }
   }
   bool IsCommandIdChecked(int id) const override { return id == selected_; }
   bool IsCommandIdEnabled(int id) const override {
-    return id >= 0 && (id != 0 || writable_);
+    return commands_.contains(id) && (id != create_command_ || writable_);
   }
   void ExecuteCommand(int id, int event_flags) override {
-    auto action =
-        id >= 10000 ? base::BindRepeating(open_page_, page_ids_.at(id - 10000))
-        : id == 0   ? create_
-                    : base::BindRepeating(select_, ids_.at(id - 1));
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(FROM_HERE,
-                                                                action);
+    if (!IsCommandIdEnabled(id)) {
+      return;
+    }
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, commands_.at(id));
   }
 
  private:
+  int AddCommand(base::RepeatingClosure action) {
+    const int command = AllocateMenuCommand(reserved_commands_, next_command_);
+    commands_.emplace(command, std::move(action));
+    return command;
+  }
+
   const bool writable_;
   int selected_ = -1;
-  std::vector<std::string> ids_;
-  base::RepeatingCallback<void(std::string)> select_;
-  base::RepeatingClosure create_;
-  base::RepeatingCallback<void(std::string)> open_page_;
-  std::vector<std::string> page_ids_;
+  int create_command_ = -1;
+  int next_command_ = 1;
+  std::set<int> reserved_commands_;
+  std::map<int, base::RepeatingClosure> commands_;
 };
 
 DEFINE_USER_DATA(ProjectNavigationController);
@@ -376,39 +413,25 @@ std::optional<BrowserSurfacePresentation> GetProjectHubSurfacePresentation(
       ProjectNavigationController::kHubViewId, 0, 0);
 }
 
-std::unique_ptr<views::View>
-ProjectNavigationController::CreateNavigationView() {
-  if (!service_) {
+std::unique_ptr<ui::SimpleMenuModel>
+ProjectNavigationController::AppendNavigationMenu(ui::SimpleMenuModel& parent) {
+  if (!service_ || !tabs_ ||
+      GetBrowserSurfaceMode(*browser_) != BrowserSurfaceMode::kConnectedTabs) {
     return nullptr;
   }
-  auto navigation = std::make_unique<ProjectNavigationView>(
-      base::BindRepeating(
-          [](base::WeakPtr<ProjectNavigationController> controller,
-             bool pointer) {
-            if (!controller)
-              return;
-            controller->OpenSelectedHub();
-            if (pointer && controller) {
-              ClearHubPointerFocus(controller->hub_toolbar_tracker_.view(),
-                                   controller->hub_tracker_.view());
-            }
-          },
-          weak_factory_.GetWeakPtr()),
-      base::BindRepeating(&ProjectNavigationController::ShowPicker,
-                          weak_factory_.GetWeakPtr()));
-  navigation_tracker_.SetView(navigation.get());
-  navigation->SetSurfacePresentation(toolbar_presentation_);
-  ScheduleRefresh();
-  return navigation;
-}
-
-void ProjectNavigationController::SetToolbarSurfacePresentation(
-    const std::optional<BrowserSurfacePresentation>& presentation) {
-  toolbar_presentation_ = presentation;
-  if (auto* navigation =
-          static_cast<ProjectNavigationView*>(navigation_tracker_.view())) {
-    navigation->SetSurfacePresentation(presentation);
+  std::set<int> commands;
+  CollectMenuCommands(parent, commands);
+  int next = 1;
+  const int container = AllocateMenuCommand(commands, next);
+  auto menu = CreateNavigationMenu(&parent, container);
+  if (parent.GetItemCount() > 0 &&
+      parent.GetTypeAt(parent.GetItemCount() - 1) !=
+          ui::MenuModel::TYPE_SEPARATOR) {
+    parent.AddSeparator(ui::NORMAL_SEPARATOR);
   }
+  parent.AddSubMenu(container, l10n_util::GetStringUTF16(IDS_YEE_PROJECTS),
+                    menu.get());
+  return menu;
 }
 
 std::unique_ptr<views::View> ProjectNavigationController::CreateSidebarView() {
@@ -613,9 +636,6 @@ bool ProjectNavigationController::IsHubHeaderControlAt(
 void ProjectNavigationController::AfterBrowserLayout() {
   auto* view = browser_view();
   if (view) {
-    if (auto* navigation = navigation_tracker_.view()) {
-      navigation->SetVisible(!view->ShouldDrawVerticalTabStrip());
-    }
     SetSidebarExpandedPresentation(sidebar_expanded_);
   }
   auto* hub = hub_tracker_.view();
@@ -803,12 +823,6 @@ void ProjectNavigationController::Refresh() {
   }
   auto* view = browser_view();
   const auto* project = service_->FindProject(selected_project_id_);
-  if (auto* navigation =
-          static_cast<ProjectNavigationView*>(navigation_tracker_.view())) {
-    navigation->SetProject(project ? project->name : u"", project != nullptr);
-    if (view)
-      navigation->SetVisible(!view->ShouldDrawVerticalTabStrip());
-  }
   auto make_page = [this](const ProjectPage& page) {
     return MakePageItem(page, *tabs_, *browser_, showing_hub_);
   };
@@ -934,17 +948,24 @@ void ProjectNavigationController::Refresh() {
 }
 
 void ProjectNavigationController::ShowPicker() {
-  auto* navigation =
-      static_cast<ProjectNavigationView*>(navigation_tracker_.view());
-  if (!service_ || !navigation || !navigation->GetWidget()) {
+  auto* const anchor = hub_toolbar_tracker_.view();
+  if (!service_ || !tabs_ || !showing_hub_ || !anchor || !anchor->GetWidget()) {
     return;
   }
-  views::View* anchor =
-      showing_hub_ ? hub_toolbar_tracker_.view() : navigation->picker_anchor();
   if (picker_runner_ && picker_runner_->IsRunning()) {
     return;
   }
   picker_runner_.reset();
+  picker_model_ = CreateNavigationMenu();
+  picker_runner_ = std::make_unique<views::MenuRunner>(picker_model_.get(), 0);
+  picker_runner_->RunMenuAt(
+      anchor->GetWidget(), nullptr, anchor->GetBoundsInScreen(),
+      views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kMouse);
+}
+
+std::unique_ptr<ProjectPicker>
+ProjectNavigationController::CreateNavigationMenu(const ui::MenuModel* parent,
+                                                  int container_command) {
   std::vector<ProjectPageItem> pages;
   if (const auto* project = service_->FindProject(selected_project_id_)) {
     for (const auto& id : project->page_ids) {
@@ -952,18 +973,15 @@ void ProjectNavigationController::ShowPicker() {
         pages.push_back(MakePageItem(*page, *tabs_, *browser_, showing_hub_));
     }
   }
-  picker_model_ = std::make_unique<ProjectPicker>(
+  return std::make_unique<ProjectPicker>(
       *service_, pages, selected_project_id_, service_->writable(),
       base::BindRepeating(&ProjectNavigationController::ShowHub,
                           weak_factory_.GetWeakPtr()),
       base::BindRepeating(&ProjectNavigationController::CreateProject,
                           weak_factory_.GetWeakPtr()),
       base::BindRepeating(&ProjectNavigationController::OpenPage,
-                          weak_factory_.GetWeakPtr()));
-  picker_runner_ = std::make_unique<views::MenuRunner>(picker_model_.get(), 0);
-  picker_runner_->RunMenuAt(
-      anchor->GetWidget(), nullptr, anchor->GetBoundsInScreen(),
-      views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kMouse);
+                          weak_factory_.GetWeakPtr()),
+      parent, container_command);
 }
 
 void ProjectNavigationController::OpenSelectedHub() {

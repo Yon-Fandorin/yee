@@ -92,6 +92,7 @@ constexpr int kShellMenuIconSize = 16;
 constexpr float kRestingSeparatorOpacity = 0.34f;
 constexpr int kRestingOriginMaximumWidth = 180;
 constexpr float kHeaderPrimaryPreferredOpacity = 0.78f;
+constexpr float kHeaderPrimaryMinimumContrast = 7.0f;
 constexpr float kHeaderSecondaryPreferredOpacity = 0.56f;
 constexpr float kHeaderDisabledOpacity = 0.28f;
 constexpr float kHeaderFocusStrokePreferredOpacity = 0.44f;
@@ -1164,10 +1165,8 @@ ui::ColorId ResolveBrowserSurfaceFocusColorId(
 BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
     SkColor surface_color) {
   surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  // Chromium's general-purpose dark endpoint is intentionally softer than
-  // black, so it cannot reach 4.5:1 on every mid-luminance page color. Header
-  // text is small and must meet the readable-text contract for every sampled
-  // surface; choose the higher-contrast physical black/white endpoint here.
+  // 작은 주요 문자·아이콘은 가능하면 7:1까지 대비를 확보한다.
+  // 중간 밝기 면에서 부족하면 물리적 검정·흰색 끝점까지 사용한다.
   const SkColor endpoint = color_utils::PickContrastingColor(
       SK_ColorBLACK, SK_ColorWHITE, surface_color);
   const SkColor preferred_primary = color_utils::AlphaBlend(
@@ -1175,9 +1174,9 @@ BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
   const SkColor preferred_secondary = color_utils::AlphaBlend(
       endpoint, surface_color, kHeaderSecondaryPreferredOpacity);
   return {
-      .primary = color_utils::BlendForMinContrast(
-                     preferred_primary, surface_color, endpoint,
-                     color_utils::kMinimumReadableContrastRatio)
+      .primary = color_utils::BlendForMinContrast(preferred_primary,
+                                                  surface_color, endpoint,
+                                                  kHeaderPrimaryMinimumContrast)
                      .color,
       .secondary = color_utils::BlendForMinContrast(
                        preferred_secondary, surface_color, endpoint,
