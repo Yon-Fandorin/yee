@@ -166,10 +166,12 @@ Windows 수평 모드에서는 검색·새 탭 버튼·드래그 여백과 창 �
 favicon 요약과 native 펼치기 아이콘을 포함하며, 모든 자식의 실제 경계를 검사한다.
 수평 창 버튼의 색상은 페이지 Header가 아닌 shell 탭 행을 기준으로 검사하고,
 밝은·어두운·유색 페이지로 바뀐 뒤에도 최소 아이콘 대비를 유지해야 한다.
-`YeeWindowsHorizontalActiveTabPaintJoinsHeader`는 Windows의 실제 선택 탭 아래쪽과
+`YeeWindowsHorizontalTabsKeepThemePaintAboveHeader`는 Windows의 실제 선택 탭 아래쪽과
 본문 Header 위쪽을 비교한다. 일반·최대화와 밝은·어두운 창에서 탭 행과
-반대색인 Header 표면을 적용해 이음새의 합성 픽셀까지 검사한다. 탭 행 전체
-높이만 맞고 실제 탭 밑에 shell 바탕이 끼는 경우도 실패해야 한다. 같은 검사를 기본·RTL 125%·통합 탭바에서
+반대색인 Header 표면을 적용하고, 탭은 테마색·Header는 페이지색으로 실제 합성되는지
+검사한다. 소수 배율에서는 경계에 걸친 픽셀 대신 각 표면 안에 포함된 픽셀을 읽는다.
+native Toolbar overlap 행은 위에서 그리는 탭 표면에 포함하고, 그 아래 Header는 페이지색을 확인한다.
+실제 탭 밑에 다른 바탕이 끼는 경우도 실패해야 한다. 같은 검사를 기본·RTL 125%·통합 탭바에서
 실행하며, 세로 Sidebar의 기존 창 버튼 조작 축은 유지한다.
 창 버튼 배치는 두 모드를 구분한다. 수평 탭에서는 본문 외곽선의 6 DIP gutter,
 Sidebar에서는 같은 gutter에 Header 내부 여백 8 DIP를 더한 위치를 검사한다.
@@ -287,3 +289,26 @@ hover와 native hit-test를 확인한다. 사방 여백의 hit-test와 화면 �
 화면 안으로 보정하므로 논리 hit-test만 검사한다. 가로 탭의
 본문 경계 정렬은 geometry 검사도 함께 쓰며, Sidebar에서만 예약하는 버튼 왼쪽
 간격은 native frame exclusion으로 확인한다.
+
+수평 그룹은 펼침·접힘의 공통 알약을 같은 배경 소유자가 유지하고 native 슬롯의 현재
+bounds를 따라 폭을 보간한다. 접힘 순간 멤버의 제목·아이콘 조작은 숨기며 모델과 닫기
+수명은 유지한다. 첫 멤버 닫기의 축소 위치는 살아 있는 그룹 Header 뒤로 제한하고,
+연속 닫기에서는 앞선 일반 탭의 폭이 바뀌어도 진행 중인 닫기 목표를 갱신한다. Header가
+삭제되거나 다른 부모로 이동하면 추적을 중단하며 기존 닫기 delegate와 시간은 유지한다.
+마지막 멤버 닫기는 기존 native 경로를 따른다. `YeeHorizontalGroupTransitionsKeepHeaderClear`는
+선행 일반 탭 유무, 첫 두 멤버의 연속 닫기와 마지막 닫기에서 실제 파비콘의 paint 범위를
+확인한다. TabIcon의 attention ring용 빈 여백은 포함하지 않는다. 접기·펼치기는 양 끝
+사이의 실제 중간 폭과 배경 가시성을 모두 확인한다.
+
+`--yee-tabbar-capture-dir`는 닫기·접기·펼치기의 중간 장면도 선택적으로 저장한다.
+동기 캡처가 중간 장면을 건너뛰지 않도록 이 촬영 실행만 같은 곡선을 4배 느리게
+재생한다. 캡처 없는 기본 실행은 정상 속도를 유지하며 두 실행을 구분한다.
+긴 그룹 이름을 최소 창 너비에서 접고 펼칠 때 일반 탭의 실제 favicon paint 사각형이
+겹치지 않는지도 검사한다. 요약 파비콘의 의도된 겹침은 이 일반 탭 검사에서 제외한다.
+프로젝트의 `--yee-project-paint-capture-dir`는 행의 상태·키보드 초점, 프로젝트 제목의
+펼침·접힘과 허브, 두 탭 방향의 넓은·좁은 허브를 실제 창으로 저장한다.
+
+프로젝트로 모든 native 일반 행을 숨긴 뒤에는 이전 ScrollView contents 높이를
+재사용하지 않는다. `ProjectTabsAppearOnceAndReturnToNativeNavigation`은 빈 일반 영역의
+overflow·스크롤 범위·offset이 0이며 drop 영역은 viewport를 채우는지 확인한다.
+창 높이 변경 뒤에도 반복하고, 일반 행이 돌아와 실제로 넘치면 스크롤이 다시 작동하는지 검사한다.

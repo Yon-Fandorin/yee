@@ -12,6 +12,11 @@ macOS 호스트는 좌표와 수명을 관리하고, 색상 callback은 마지�
 구조를 유지한다. Split 진입 직후의 임시 그리기 억제는 다음 레이아웃의
 resolved 결과로 확정한다.
 
+수평 탭의 배경·제목·아이콘·포커스는 브라우저 테마색을 사용한다. 페이지 표면색 변경은
+주소줄과 Pane Header에만 적용하며 탭 색을 다시 결정하지 않는다. 세로 Sidebar도 기존
+테마색을 유지한다. `HorizontalTabsFollowThemeAndKeepReadableStates`와 실제 페이지색
+전환을 포함한 수평 native 사례가 이 경계를 검사한다.
+
 수평 분할 탭은 한 쌍의 캡슐로 표시하고 독립된 Pane Header 위에 시각적인
 간격을 남긴다. 기본 native hit target은 탭 행 아래까지 유지한다. 기존 수평
 통합 사례가 좁은 폭·전체화면·포커스 pane 전환에서도 이 계약을 확인한다.
@@ -143,6 +148,8 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
 | WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 실제 팝업의 renderer에 media emulation을 적용하고 실제 media query와 선택 행의 계산된 표시를 검사. Windows 대비 설정 전파 검증과는 별도 |
+| 선행 일반 탭 유무와 관계없이 수평 그룹의 첫 두 멤버를 연속으로 닫아도 실제 파비콘이 이름을 침범하지 않음. 접기·펼치기 모두 알약 배경을 유지하며 양 끝 사이의 중간 폭을 거치고 마지막 멤버도 정상적으로 닫힘 | `YeeHorizontalGroupTransitionsKeepHeaderClear` |
+| 맞춤설정 패널이 세로·수평 모두 창 Header 아래 행에 도킹해 닫기 버튼을 분리 | `YeeCustomizationPanelStaysBelowWindowHeader` |
 | macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
 | macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
 
@@ -178,7 +185,7 @@ WebUI balanced-insets 검사는 DOM 결과뿐 아니라 native WebView의 자동
 기본·RTL 125%·통합 탭바를 포함한다. 별도로 통과한 단위 106개와 도구 검사
 16개는 이 실제 창 검사 수에 합산하지 않는다.
 
-제품 실행 파일과 `chrome.dll`은 `95f3e45` 검수본과 동일하며 검사 코드만 보완했다.
+당시 제품 실행 파일과 `chrome.dll`은 `95f3e45` 검수본과 동일하며 검사 코드만 보완했다.
 WebUI 대비 행렬은 Blink의 색상 캐시도 갱신하는 정식 media emulation을 사용하고,
 실제 선택 행의 Down·Up 결과를 확인한다. 맞춤설정은 로컬 페이지의 탐색을 완료한
 뒤 실제 WebView와 활성 select를 제한 시간 안에서 확인하며 기존 6회의 native
@@ -199,6 +206,13 @@ software rendering 경로이며 macOS·Linux 실기 결과를 의미하지 않�
 hidden 취소를 다루며, `YeeRenderedBoundaryTracksDelayedCssWithoutMetadata`는
 실제 페이지의 지연 CSS 변경과 클릭을 두 split 방향에서 검증한다.
 선택/hover 및 보안색 대비는 `BrowserSurfacePresentationResolverTest.*`에 포함한다.
+
+2026-10-28 프로젝트 구현 후 Windows 후속 검수는 별도 checkpoint다. 새 앱 빌드에서
+정상 속도의 기본 interactive gate 71개, RTL 125% 수평·창 버튼·그룹 드래그 25개,
+통합 수평·창 버튼 13개를 각각 실행했다. 최종 실행은 통과했으며, RTL 첫 실행의
+COM 참조 종료 검사 1회 간헐 실패는 동일 빌드 전체 재실행 통과와 함께 기록했다.
+원인은 미확정이고 해당 종료 assertion은 유지한다. 단위·프로젝트·실제 실행 파일
+재시작과 플랫폼 한계는 [현재 인계](../project-navigation-handoff.md#2026-10-28-windows-후속-검증)를 따른다.
 
 아래는 geometry 한 프레임만으로 체감 품질을 판단할 수 없어 실제 Yee 앱 검수를
 유지한다.

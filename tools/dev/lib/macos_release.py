@@ -47,11 +47,12 @@ def read_plist(path):
         return plistlib.load(stream)
 
 
-def validate_bundle(app, name, version, identity):
+def validate_bundle(app, brand, version, identity):
     """다른 앱·오래된 버전·번들 밖 의존성을 배포본에 넣지 않는다."""
+    name = brand.name
     app = Path(app).resolve(strict=True)
     info = read_plist(app / "Contents/Info.plist")
-    if (app.name != name + ".app" or info.get("CFBundleName") != name
+    if (app.name != name + ".app" or info.get("CFBundleName") != brand.short_name
             or info.get("CFBundleExecutable") != name
             or info.get("CFBundleShortVersionString") != version
             or info.get("CFBundleIdentifier") not in
@@ -132,15 +133,15 @@ def dmg_settings(app, background, icon):
     }
 
 
-def verify_image(image, mount, name, version, identity):
+def verify_image(image, mount, brand, version, identity):
     """Finder 메타데이터 적용 후에도 배포 이미지의 앱 서명이 유효한지 확인한다."""
     subprocess.run(["/usr/bin/hdiutil", "verify", str(image)], check=True)
     mount.mkdir()
     try:
         subprocess.run(["/usr/bin/hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen",
                         "-mountpoint", str(mount), str(image)], check=True)
-        app = mount / (name + ".app")
-        validate_bundle(app, name, version, identity)
+        app = mount / (brand.name + ".app")
+        validate_bundle(app, brand, version, identity)
         subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     finally:
         if mount.is_mount():
@@ -154,7 +155,7 @@ def package_app(app, chromium_src, release_root):
     brand, identity = load_brand(), load_identity()
     version, engine = version_inputs(chromium_src)
     version = version_string(version)
-    info, resources = validate_bundle(app, brand.name, version, identity)
+    info, resources = validate_bundle(app, brand, version, identity)
     args = (app.parent / "args.gn").read_text()
     if not re.search(r"(?m)^\s*is_component_build\s*=\s*false\b", args):
         raise ValueError("The macOS test package requires a static build")
@@ -180,7 +181,7 @@ def package_app(app, chromium_src, release_root):
         staging = Path(temporary)
         copied_app = staging / app.name
         subprocess.run(["/usr/bin/ditto", str(app), str(copied_app)], check=True)
-        validate_bundle(copied_app, brand.name, version, identity)
+        validate_bundle(copied_app, brand, version, identity)
         prepare_installed_bundle(copied_app, identity)
         sign_bundle(copied_app)
         background = staging / "install-background.tiff"
@@ -192,7 +193,7 @@ def package_app(app, chromium_src, release_root):
         image = staging / filename
         dmgbuild.build_dmg(str(image), brand.name,
                            settings=dmg_settings(copied_app, background, icon))
-        verify_image(image, staging / "verify-volume", brand.name, version, identity)
+        verify_image(image, staging / "verify-volume", brand, version, identity)
         metadata = {
             "schema_version": 1, "product_id": identity.product_id, "platform": "macos",
             "architecture": architecture, "channel": "test", "version": version,

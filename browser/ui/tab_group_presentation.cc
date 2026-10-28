@@ -37,10 +37,23 @@
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
+struct HorizontalTabGroupClosingHeader {
+  explicit HorizontalTabGroupClosingHeader(views::View& view) : header(&view) {}
+  views::ViewTracker header;
+};
+}  // namespace yee
+
+DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
+DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
+
+namespace yee {
 namespace {
+DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupClosingHeader,
+                                   kHorizontalTabGroupClosingHeaderKey)
 constexpr int kMaxIcons = 3;
 constexpr int kIconSize = 16;
 constexpr int kIconBox = 20;
@@ -87,11 +100,11 @@ END_METADATA
 
 class HorizontalGroupBackground : public views::Background {
  public:
-  HorizontalGroupBackground(SkColor color, bool collapsed, bool hovered)
-      : color_(color), collapsed_(collapsed), hovered_(hovered) {}
+  HorizontalGroupBackground(SkColor color, bool hovered)
+      : color_(color), hovered_(hovered) {}
 
   void Paint(gfx::Canvas* canvas, views::View* view) const override {
-    if (UsesHorizontalTabGroupCapsule(*view) && !collapsed_ && !hovered_) {
+    if (UsesHorizontalTabGroupCapsule(*view) && !hovered_) {
       return;
     }
     gfx::Rect chip = view->GetLocalBounds();
@@ -108,7 +121,6 @@ class HorizontalGroupBackground : public views::Background {
 
  private:
   const SkColor color_;
-  const bool collapsed_;
   const bool hovered_;
 };
 
@@ -163,6 +175,31 @@ int ResolveHorizontalTabGroupSeparatorOffset(
   // 선택 멤버의 여백은 보존하고 그룹 바깥 구분선만 공통 배경에서 떨어뜨린다.
   const int gap = 2 * kSidebarMetrics.horizontal_group_capsule_padding;
   return group.has_value() ? -gap : gap;
+}
+
+gfx::Rect ResolveHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
+                                                 int header_end,
+                                                 int overlap) {
+  closing_bounds.set_x(header_end - overlap);
+  return closing_bounds;
+}
+
+void TrackHorizontalTabGroupClosingHeader(views::View& tab,
+                                          views::View& header) {
+  tab.SetProperty(kHorizontalTabGroupClosingHeaderKey,
+                  std::make_unique<HorizontalTabGroupClosingHeader>(header));
+}
+
+views::View* GetHorizontalTabGroupClosingHeader(const views::View& tab) {
+  auto* tracked = tab.GetProperty(kHorizontalTabGroupClosingHeaderKey);
+  return tracked ? tracked->header.view() : nullptr;
+}
+
+void InvalidateHorizontalTabGroupMemberLayout(views::View& member) {
+  member.InvalidateLayout();
+  for (views::View* child : member.children()) {
+    InvalidateHorizontalTabGroupMemberLayout(*child);
+  }
 }
 
 gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds) {
@@ -407,9 +444,8 @@ std::optional<HorizontalTabColors> ResolveHorizontalTabGroupColors(
 
 std::unique_ptr<views::Background> CreateHorizontalTabGroupBackground(
     SkColor color,
-    bool collapsed,
     bool hovered) {
-  return std::make_unique<HorizontalGroupBackground>(color, collapsed, hovered);
+  return std::make_unique<HorizontalGroupBackground>(color, hovered);
 }
 
 void UpdateTabGroupPreview(views::View& header,
@@ -474,8 +510,7 @@ void UpdateHorizontalTabGroupChip(views::View& header,
   const auto colors =
       ResolveHorizontalTabGroupColors(header, group_color, false);
   if (colors) {
-    chip.SetBackground(
-        CreateHorizontalTabGroupBackground(colors->background, collapsed));
+    chip.SetBackground(CreateHorizontalTabGroupBackground(colors->background));
   }
   if (auto* ring = views::FocusRing::Get(&header)) {
     ring->SetColorId(colors

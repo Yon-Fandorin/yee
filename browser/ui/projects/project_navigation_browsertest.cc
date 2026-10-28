@@ -44,6 +44,7 @@
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
+#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
@@ -110,6 +111,7 @@
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/submenu_view.h"
 #include "ui/views/controls/scroll_view.h"
+#include "ui/views/controls/scrollbar/scroll_bar.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/layout_manager_base.h"
 #include "ui/views/paint_info.h"
@@ -211,6 +213,33 @@ class ProjectNavigationBrowserTest : public InProcessBrowserTest {
   ProjectTabCoordinator* coordinator() {
     return ProjectTabCoordinator::GetForProfile(browser()->GetProfile());
   }
+  // 요청한 실행에서만 실제 창을 저장해 상태별 시각 검수를 지원한다.
+  void CaptureFrame(std::string_view name) {
+    const auto directory =
+        base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+            "yee-project-paint-capture-dir");
+    if (directory.empty())
+      return;
+    ASSERT_TRUE(base::CreateDirectory(directory));
+    auto* widget =
+        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+    widget->LayoutRootViewIfNecessary();
+    auto* compositor = widget->GetCompositor();
+    compositor->ScheduleFullRedraw();
+    ASSERT_TRUE(
+        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+    base::test::TestFuture<gfx::Image> snapshot;
+    ui::GrabWindowSnapshot(widget->GetNativeWindow(),
+                           gfx::Rect(widget->GetWindowBoundsInScreen().size()),
+                           snapshot.GetCallback());
+    auto image = snapshot.Take();
+    ASSERT_FALSE(image.IsEmpty());
+    auto png = image.As1xPNGBytes();
+    ASSERT_TRUE(png && png->size());
+    ASSERT_TRUE(
+        base::WriteFile(directory.AppendASCII(std::string(name) + ".png"),
+                        static_cast<base::span<const uint8_t>>(*png)));
+  }
 };
 
 // 프로젝트 일반 행을 생략해도 실제 탭은 남고, 접힌 Sidebar·수평·참조 해제에서
@@ -246,6 +275,28 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   EXPECT_EQ(contents, model->GetActiveWebContents());
   EXPECT_EQ(native, FindNativeTab(view, tab));
   EXPECT_EQ(1, model->count());
+  auto expect_empty_native_region = [&] {
+    auto* strip = views::AsViewClass<TabStripView>(
+        view->tab_strip_view()->GetTabStripView());
+    ASSERT_TRUE(strip);
+    auto* scroll = strip->unpinned_tabs_scroll_view();
+    ASSERT_TRUE(scroll && scroll->contents());
+    EXPECT_FALSE(scroll->IsVerticalContentOverflowing());
+    EXPECT_FALSE(scroll->vertical_scroll_bar()->GetVisible());
+    EXPECT_EQ(0, scroll->vertical_scroll_bar()->GetMaxPosition());
+    EXPECT_EQ(0, scroll->CurrentOffset().y());
+    EXPECT_EQ(scroll->GetVisibleRect().height(), scroll->contents()->height());
+    EXPECT_GT(scroll->contents()->height(), 0);
+  };
+  expect_empty_native_region();
+  const auto original_bounds = browser()->GetWindow()->GetBounds();
+  for (int height : {500, 800, original_bounds.height()}) {
+    browser()->GetWindow()->SetBounds(gfx::Rect(
+        original_bounds.origin(), gfx::Size(original_bounds.width(), height)));
+    layout();
+    expect_empty_native_region();
+  }
+  CaptureFrame("project-empty-native-region");
   auto* sidebar = FindProjectSidebar(view);
   ASSERT_TRUE(sidebar);
   auto* page = FindButton(sidebar, u"프로젝트 페이지");
@@ -289,12 +340,33 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   layout();
   EXPECT_TRUE(FindNativeTab(view, tab)->IsDrawn());
   EXPECT_EQ(contents, model->GetActiveWebContents());
+  // 일반 탭이 돌아오고 실제로 넘치면 native 스크롤도 다시 동작한다.
+  browser()->GetWindow()->SetBounds(gfx::Rect(
+      original_bounds.origin(), gfx::Size(original_bounds.width(), 500)));
+  for (int i = 0; i < 20; ++i) {
+    chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  }
+  auto* strip = views::AsViewClass<TabStripView>(
+      view->tab_strip_view()->GetTabStripView());
+  ASSERT_TRUE(strip);
+  auto* scroll = strip->unpinned_tabs_scroll_view();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    layout();
+    return scroll->vertical_scroll_bar()->GetVisible();
+  }));
+  EXPECT_GT(scroll->contents()->height(), scroll->GetVisibleRect().height());
+  CaptureFrame("project-returned-native-overflow");
 }
 
 // 일반 그룹의 실제 소유권은 유지하며 숨긴 멤버의 빈 행과 빈 그룹을 남기지
 // 않는다.
 IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                        ProjectPresentationKeepsNativeGroupMembership) {
+  // 이 사례는 최종 배치의 drop 대상을 검사한다. 전환 모션은 별도 사례가 맡는다.
+  auto rich = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
   auto project = service()->CreateProject(u"그룹 참조");
   ASSERT_TRUE(project);
   auto* model = browser()->tab_strip_model();
@@ -302,6 +374,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                    -1, true);
   auto* first = model->GetTabAtIndex(0);
   auto* second = model->GetTabAtIndex(1);
+  ASSERT_TRUE(content::WaitForLoadStop(second->GetContents()));
   const auto group = model->AddToNewGroup({0, 1});
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   tabs::VerticalTabStripStateController::From(browser())
@@ -527,8 +600,13 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                                      140);
   ASSERT_TRUE(hub_scroll());
   hub_scroll()->ScrollToPosition(hub_scroll()->vertical_scroll_bar(), 260);
-  ASSERT_EQ(140, sidebar_scroll()->CurrentOffset().y());
-  ASSERT_EQ(260, hub_scroll()->CurrentOffset().y());
+  // 플랫폼별 행 높이 때문에 요청한 위치가 스크롤 끝에 제한될 수 있다.
+  const int sidebar_offset = sidebar_scroll()->CurrentOffset().y();
+  const int hub_offset = hub_scroll()->CurrentOffset().y();
+  ASSERT_GT(sidebar_offset, 0);
+  ASSERT_GT(hub_offset, 0);
+  ASSERT_LE(sidebar_offset, 140);
+  ASSERT_LE(hub_offset, 260);
   const auto url = service()->FindPage(pages.front())->url;
   for (const auto& title : {u"갱신 1", u"갱신 2"}) {
     ASSERT_TRUE(service()->UpdatePage(pages.front(), url, title));
@@ -537,8 +615,8 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     controller->ShowHub(*project);
     layout();
     EXPECT_TRUE(FindButton(hub(), title));
-    EXPECT_EQ(140, sidebar_scroll()->CurrentOffset().y());
-    EXPECT_EQ(260, hub_scroll()->CurrentOffset().y());
+    EXPECT_EQ(sidebar_offset, sidebar_scroll()->CurrentOffset().y());
+    EXPECT_EQ(hub_offset, hub_scroll()->CurrentOffset().y());
   }
   controller->ShowHub(*other);
   layout();
@@ -600,21 +678,26 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                    ->GetBgColorOverrideDeprecated());
     EXPECT_FALSE(page->background());
     EXPECT_FALSE(close->background());
+    CaptureFrame("project-page-state-" + std::to_string(state));
   }
   page->SetEnabled(false);
   EXPECT_EQ(SK_ColorTRANSPARENT, row->background()->color().ResolveToSkColor(
                                      row->GetColorProvider()));
   page->SetEnabled(true);
+  // native 탭 닫기는 접근성 키보드 탐색에서만 초점을 받는다.
+  view->GetFocusManager()->SetKeyboardAccessible(true);
   page->RequestFocus();
   EXPECT_TRUE(close->GetVisible());
   ASSERT_TRUE(views::FocusRing::Get(row));
   EXPECT_TRUE(views::FocusRing::Get(row)->GetVisible());
+  CaptureFrame("project-page-keyboard-focus");
   close->RequestFocus();
   EXPECT_EQ(close, view->GetFocusManager()->GetFocusedView());
   EXPECT_TRUE(close->GetVisible());
   EXPECT_FALSE(views::FocusRing::Get(row)->GetVisible());
   ASSERT_TRUE(views::FocusRing::Get(close));
   EXPECT_TRUE(views::FocusRing::Get(close)->GetVisible());
+  CaptureFrame("project-close-keyboard-focus");
   view->GetFocusManager()->ClearFocus();
   EXPECT_FALSE(views::FocusRing::Get(row)->GetVisible());
   EXPECT_FALSE(views::FocusRing::Get(close)->GetVisible());
@@ -661,6 +744,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   const auto normal_icon =
       gfx::Image(toggle->GetImage(views::Button::STATE_NORMAL));
   const auto title_bounds = name->bounds();
+  CaptureFrame("project-heading-resting");
   ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::Point(), gfx::Point(),
                        base::TimeTicks::Now(), 0, 0);
   static_cast<views::View*>(row)->OnMouseEntered(enter);
@@ -669,6 +753,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   EXPECT_EQ(title_bounds, name->bounds());
   EXPECT_NE(resting_fill, row->background()->color().ResolveToSkColor(
                               row->GetColorProvider()));
+  CaptureFrame("project-heading-hover");
   static_cast<views::View*>(row)->OnMouseExited(exit);
   EXPECT_EQ(resting_fill, row->background()->color().ResolveToSkColor(
                               row->GetColorProvider()));
@@ -684,6 +769,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   views::test::ButtonTestApi(toggle).NotifyDefaultMouseClick();
   EXPECT_FALSE(controller->showing_hub());
   EXPECT_FALSE(FindButton(sidebar, u"분리 페이지")->IsDrawn());
+  CaptureFrame("project-heading-collapsed");
   views::test::ButtonTestApi(name).NotifyDefaultMouseClick();
   EXPECT_FALSE(controller->showing_hub());
   EXPECT_TRUE(FindButton(sidebar, u"분리 페이지")->IsDrawn());
@@ -696,6 +782,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   views::test::ButtonTestApi(hub_button).NotifyDefaultMouseClick();
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(controller->showing_hub());
+  CaptureFrame("project-hub-sidebar");
   EXPECT_EQ(nullptr, view->GetFocusManager()->GetFocusedView());
   EXPECT_EQ(nullptr, view->GetFocusManager()->GetStoredFocusView());
   EXPECT_FALSE(view->GetFocusManager()->RestoreFocusedView());
@@ -1590,6 +1677,9 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       // 상위 Flex의 남는 폭이 이름과 화살표 사이의 큰 간격이 되지 않는다.
       EXPECT_LE(name->parent()->width(),
                 name->parent()->GetPreferredSize({}).width());
+      CaptureFrame(std::string("project-hub-") +
+                   (vertical ? "sidebar-" : "horizontal-") +
+                   std::to_string(width));
     }
     controller->ExitHub();
   }
@@ -1961,6 +2051,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       sidebar, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_CLOSE_PAGE) +
                    u": 제거 초점 페이지");
   ASSERT_TRUE(close && close->IsDrawn());
+  view->GetFocusManager()->SetKeyboardAccessible(true);
   close->RequestFocus();
   ASSERT_EQ(close, view->GetFocusManager()->GetFocusedView());
   ASSERT_TRUE(content::ExecJs(contents, "document.title='닫기 초점 페이지';"));

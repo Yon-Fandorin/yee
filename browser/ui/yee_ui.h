@@ -192,6 +192,7 @@ struct SidebarMetrics {
   int bookmarks_image_label_spacing = 6;
 
   int group_header_corner_radius = 8;
+  int horizontal_tab_minimum_icon_gap = 4;
   int horizontal_group_chip_height = 20;
   int horizontal_group_capsule_top_inset = 4;
   int horizontal_group_capsule_height = 32;
@@ -422,7 +423,8 @@ void ApplySidePanelSurfaceDecoration(
 // Chromium continues to own split layout, resizing, and semantic highlights.
 gfx::RoundedCornersF ResolveSplitPaneRoundedCorners();
 std::unique_ptr<views::View> CreateSplitPaneEmphasisView();
-void UpdateSplitPaneEmphasisView(views::View &view, bool visible,
+void UpdateSplitPaneEmphasisView(views::View& view,
+                                 bool visible,
                                  bool emphasized);
 
 // Non-interactive resting presentation layered over Chromium's real Omnibox.
@@ -492,14 +494,14 @@ std::unique_ptr<views::View> CreateSidebarHeaderActionsView(
     bool projects_enabled = true);
 // 최소 폭은 움직이지 않는 창 버튼 영역을 기준으로 하여 hover 중에도 유지한다.
 int GetSidebarHeaderMinimumWidth(int leading_exclusion);
-void SetSidebarHeaderActionsLeadingExclusion(views::View &view,
+void SetSidebarHeaderActionsLeadingExclusion(views::View& view,
                                              int leading_exclusion,
                                              int leading_offset = 0,
                                              int top_inset = 0);
-void SetSidebarHeaderActionsControlsVisible(views::View &view, bool visible);
-bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View &view,
-                                                   const gfx::Point &point);
+void SetSidebarHeaderActionsControlsVisible(views::View& view, bool visible);
+bool IsSidebarHeaderActionsPositionInWindowCaption(const views::View& view,
+                                                   const gfx::Point& point);
 
-} // namespace yee
+}  // namespace yee
 
-#endif // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_
+#endif  // CHROME_BROWSER_UI_VIEWS_YEE_YEE_UI_H_

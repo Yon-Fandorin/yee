@@ -244,6 +244,13 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 - macOS 26 미만, Windows, Linux와 macOS의 ‘투명도 줄이기’ 환경에서는 현재 theme
   frame 색을 불투명하게 그린다. 지원되는 macOS의 활성 창만 native material을
   사용하며 비활성 창은 같은 색의 불투명 표면으로 전환한다.
+- 수평 탭 행의 활성·비활성 탭과 세로 Sidebar는 페이지색을 동기화하지 않고 브라우저
+  테마의 상태색을 사용한다. 주소줄과 Pane Header는 기존 페이지 표면색을 유지한다.
+  수평 그룹의 접힘·펼침은 공통 알약 배경을 한 소유자가 계속 그리며 native bounds 전환을
+  따라간다. 첫 멤버 닫기는 그룹 이름 뒤에서 수축하고, 접히는 멤버 내용은 이름 위를
+  가로지르지 않는다. 최소 너비에서도 일반 탭의 파비콘 사이에 4 DIP 간격을 남긴다.
+  맞춤설정 패널은 탭 방향과 관계없이 창 Header 아래에서 시작하며, Header·본문·패널의
+  배경과 구분선을 연결한다. 세로 맞춤설정을 닫거나 다른 패널로 바꾸면 기존 카드 장식으로 돌아간다.
 - Tab, Group Header와 Favorite은 `chrome_bg`의 최대 대비 endpoint에서 공통 역할색을
   계산한다. Resting은 secondary foreground, Hover는 낮은 contrast layer, Active와
   drag는 같은 계열의 primary foreground와 순차적으로 강해지는 fill·outline을

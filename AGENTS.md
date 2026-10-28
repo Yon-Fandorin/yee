@@ -85,9 +85,12 @@ Ask before guessing, especially for:
   changed, otherwise `build.sh`).
 - Confirm in the real Yee app with real tabs. A design mockup page is
   not proof. `file://` fixtures as actual tabs are fine.
-- Before each real-app validation, request a graceful shutdown of every
-  running Yee browser process, wait until it has exited, and then launch the
-  newly built app. Do not validate a new build through an existing process.
+- Before each real-app validation, identify processes by the exact executable
+  path and validation profile. Only processes using the build under test or its
+  validation profile must exit gracefully before a fresh launch. Keep an installed
+  release Yee running when its executable and profile are separate. Do not request
+  a shutdown of unrelated release windows or validate through an existing process.
+  Native test launchers must preserve unrelated desktop windows.
 ## Git
 
 Do not commit, push, or open a PR unless asked.

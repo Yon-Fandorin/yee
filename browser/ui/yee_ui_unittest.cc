@@ -11,6 +11,7 @@
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
+#include "chrome/browser/ui/views/yee/tab_group_presentation.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/theme_resources.h"
 #include "chrome/test/base/test_theme_provider.h"
@@ -394,6 +395,12 @@ class YeeRestingTextViewTest : public ChromeViewsTestBase {
   std::unique_ptr<views::Widget> widget_;
 };
 
+TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
+  auto* view = widget_->SetContentsView(std::make_unique<views::View>());
+  EXPECT_EQ(38, ResolveHorizontalTabMinimumInactiveWidth(*view, 32, 18));
+  EXPECT_EQ(64, ResolveHorizontalTabMinimumInactiveWidth(*view, 64, 18));
+}
+
 TEST_F(YeeRestingTextViewTest,
        WidgetAttachedLabelsUseExactSurfaceAndPhysicalForeground) {
   std::unique_ptr<views::View> resting = CreateOmniboxRestingTextView();
@@ -421,14 +428,16 @@ TEST_F(YeeRestingTextViewTest,
 TEST_F(YeeRestingTextViewTest, RestingTextSharesHoveredControlSurface) {
   auto* resting = widget_->SetContentsView(CreateOmniboxRestingTextView());
   for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorRED}) {
-    const auto presentation = ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+    const auto presentation =
+        ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
     for (SkColor background : {surface, presentation.location_hover, surface}) {
       UpdateOmniboxRestingTextView(*resting, u"Title", u"example.test",
                                    presentation, true, background);
       EXPECT_EQ(background, resting->background()->color().ResolveToSkColor(
                                 resting->GetColorProvider()));
       for (size_t index : {0u, 2u}) {
-        auto* label = views::AsViewClass<views::Label>(resting->children()[index]);
+        auto* label =
+            views::AsViewClass<views::Label>(resting->children()[index]);
         ASSERT_TRUE(label);
         EXPECT_EQ(background, label->GetBackgroundColor());
       }
@@ -442,12 +451,14 @@ TEST_F(YeeRestingTextViewTest, ControlDividerTracksSurfaceAndNativeReset) {
             divider->GetPreferredSize());
   const auto native_color = divider->background()->color();
   for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorRED}) {
-    const auto presentation = ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+    const auto presentation =
+        ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
     UpdateShellControlDivider(*divider, presentation);
     EXPECT_EQ(presentation.resting_divider,
               divider->background()->color().ResolveToSkColor(
                   divider->GetColorProvider()));
-    UpdateShellControlDivider(*divider, UseNativeBrowserSurfaceColors(presentation));
+    UpdateShellControlDivider(*divider,
+                              UseNativeBrowserSurfaceColors(presentation));
     EXPECT_EQ(native_color, divider->background()->color());
   }
   UpdateShellControlDivider(*divider, std::nullopt);
@@ -528,6 +539,36 @@ TEST(YeeSurfaceGeometryTest, BrowserClassRoutingIsPerWindow) {
 #endif
 }
 
+TEST(YeeSurfaceGeometryTest,
+     ClosingGroupMemberFollowsTheHeaderInBothDirections) {
+  EXPECT_EQ(gfx::Rect(112, 3, 16, 32), ResolveHorizontalTabGroupClosingBounds(
+                                           gfx::Rect(0, 3, 16, 32), 128, 16));
+  EXPECT_EQ(gfx::Rect(112, 3, 16, 32), ResolveHorizontalTabGroupClosingBounds(
+                                           gfx::Rect(240, 3, 16, 32), 128, 16));
+}
+
+TEST(YeeSurfaceGeometryTest, ClosingHeaderTrackingEndsWithTheHeaderLifetime) {
+  views::View tab;
+  EXPECT_FALSE(GetHorizontalTabGroupClosingHeader(tab));
+  {
+    views::View header;
+    TrackHorizontalTabGroupClosingHeader(tab, header);
+    EXPECT_EQ(&header, GetHorizontalTabGroupClosingHeader(tab));
+  }
+  EXPECT_FALSE(GetHorizontalTabGroupClosingHeader(tab));
+}
+
+TEST(YeeSurfaceGeometryTest, CustomizationPanelKeepsBothHeadersAboveItsClose) {
+  EXPECT_TRUE(
+      UsesFullWidthBrowserSurfaceHeader(BrowserSurfaceMode::kCard, true));
+  EXPECT_TRUE(UsesFullWidthBrowserSurfaceHeader(
+      BrowserSurfaceMode::kConnectedTabs, true));
+  EXPECT_TRUE(UsesFullWidthBrowserSurfaceHeader(
+      BrowserSurfaceMode::kConnectedTabs, false));
+  EXPECT_FALSE(
+      UsesFullWidthBrowserSurfaceHeader(BrowserSurfaceMode::kCard, false));
+}
+
 TEST(YeeSurfaceGeometryTest, HorizontalTabsReserveOneRowBeforeTheSurface) {
   const gfx::Rect client(11, 17, 1200, 900);
   for (int advance : {0, 40, 52}) {
@@ -546,45 +587,48 @@ TEST(YeeSurfaceGeometryTest, HorizontalTabsReserveOneRowBeforeTheSurface) {
   EXPECT_TRUE(ResolveBrowserSurfaceContentColumn(client, 5000, 5000).IsEmpty());
 }
 
-TEST(YeeSurfaceColorTest, HorizontalTabsKeepPageAndFrameContrastSeparate) {
-  ui::ColorProvider colors;
-  SetSidebarPaletteForTesting(colors, false);
-  for (SkColor surface :
-       {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x13, 0x4E, 0x4A)}) {
-    const auto presentation =
-        ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
-    const auto active =
-        ResolveHorizontalTabColors(colors, presentation, true, true, 1.0, true);
-    EXPECT_EQ(surface, active.background);
-    EXPECT_EQ(presentation.primary, active.foreground);
-    const auto active_split = ResolveHorizontalTabColors(
-        colors, presentation, true, true, 1.0, true, std::nullopt, true);
-    EXPECT_EQ(active.background, active_split.background);
-    EXPECT_EQ(active.foreground, active_split.foreground);
-    EXPECT_EQ(surface, ResolveHorizontalTabColors(colors, presentation, true,
-                                                  true, 1.0, true, SK_ColorBLUE)
-                           .background);
-    EXPECT_GE(
-        color_utils::GetContrastRatio(active.foreground, active.background),
-        color_utils::kMinimumReadableContrastRatio);
+TEST(YeeSurfaceColorTest, HorizontalTabsFollowThemeAndKeepReadableStates) {
+  for (bool dark : {false, true}) {
+    ui::ColorProvider colors;
+    SetSidebarPaletteForTesting(colors, dark);
+    const SkColor surface = dark ? SK_ColorBLACK : SK_ColorWHITE;
+    const SkColor foreground = dark ? SK_ColorWHITE : SK_ColorBLACK;
+    for (auto id : {kColorTabBackgroundActiveFrameActive,
+                    kColorTabBackgroundActiveFrameInactive})
+      colors.SetColorForTesting(id, surface);
+    for (auto id : {kColorTabForegroundActiveFrameActive,
+                    kColorTabForegroundActiveFrameInactive})
+      colors.SetColorForTesting(id, foreground);
     for (bool frame_active : {false, true}) {
+      const auto active =
+          ResolveHorizontalTabColors(colors, true, true, 1.0, frame_active);
+      EXPECT_EQ(surface, active.background);
+      EXPECT_EQ(foreground, active.foreground);
+      const auto active_split = ResolveHorizontalTabColors(
+          colors, true, true, 1.0, frame_active, std::nullopt, true);
+      EXPECT_EQ(active.background, active_split.background);
+      EXPECT_EQ(active.foreground, active_split.foreground);
+      EXPECT_EQ(surface, ResolveHorizontalTabColors(colors, true, true, 1.0,
+                                                    frame_active, SK_ColorBLUE)
+                             .background);
+      EXPECT_GE(
+          color_utils::GetContrastRatio(active.foreground, active.background),
+          color_utils::kMinimumReadableContrastRatio);
       for (bool selected : {false, true}) {
         for (double hover : {0.0, 0.5, 1.0}) {
-          const auto tab = ResolveHorizontalTabColors(
-              colors, presentation, false, selected, hover, frame_active);
+          const auto tab = ResolveHorizontalTabColors(colors, false, selected,
+                                                      hover, frame_active);
           EXPECT_GE(
               color_utils::GetContrastRatio(tab.foreground, tab.background),
               color_utils::kMinimumReadableContrastRatio);
-          const auto grouped =
-              ResolveHorizontalTabColors(colors, presentation, false, selected,
-                                         hover, frame_active, SK_ColorBLUE);
+          const auto grouped = ResolveHorizontalTabColors(
+              colors, false, selected, hover, frame_active, SK_ColorBLUE);
           EXPECT_NE(tab.background, grouped.background);
           EXPECT_GE(color_utils::GetContrastRatio(grouped.foreground,
                                                   grouped.background),
                     color_utils::kMinimumReadableContrastRatio);
           const auto split = ResolveHorizontalTabColors(
-              colors, presentation, false, selected, hover, frame_active,
-              std::nullopt, true);
+              colors, false, selected, hover, frame_active, std::nullopt, true);
           EXPECT_NE(tab.background, split.background);
           EXPECT_GE(
               color_utils::GetContrastRatio(split.foreground, split.background),
@@ -839,6 +883,37 @@ TEST(YeeSurfaceGeometryTest,
       EXPECT_EQ(0.0f, frame.decoration.infobar_top_corner_radius);
     }
   }
+}
+
+TEST(YeeSurfaceGeometryTest, SidebarCustomizationSharesOneHeaderDecoration) {
+  BrowserSurfaceFrameInput input;
+  input.seed = ResolveBrowserSurfaceSeed(BrowserSurfaceSeedInput{
+      gfx::Rect(244, 0, 956, 800), gfx::Insets(6), false, true, 42});
+  input.native_notice_flow_allocation = gfx::Rect(250, 48, 568, 746);
+  input.native_body_allocation = input.native_notice_flow_allocation;
+  input.side_panel_surface_visible = true;
+  input.connected_side_panel_resize_gutter = gfx::Rect(818, 48, 8, 746);
+  auto frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_EQ(BrowserSurfaceMode::kCard, frame.decoration.mode);
+  EXPECT_TRUE(frame.decoration.side_panel_joins_header);
+  EXPECT_FALSE(frame.decoration.draw_outer_outline);
+  EXPECT_FALSE(frame.decoration.show_shadow);
+  EXPECT_EQ(frame.header_bounds.width(),
+            frame.decoration.combined_outline_bounds.width());
+  EXPECT_TRUE(frame.decoration.side_panel_divider_x);
+
+  // 다른 세로 패널로 전환하면 원래 카드의 윤곽과 폭으로 복귀한다.
+  input.connected_side_panel_resize_gutter.reset();
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_FALSE(frame.decoration.side_panel_joins_header);
+  EXPECT_TRUE(frame.decoration.draw_outer_outline);
+  EXPECT_EQ(frame.main_surface_bounds,
+            frame.decoration.combined_outline_bounds);
+  input.seed.split = true;
+  input.connected_side_panel_resize_gutter = gfx::Rect(818, 48, 8, 746);
+  frame = ResolveBrowserSurfaceFrame(input);
+  EXPECT_FALSE(frame.decoration.side_panel_joins_header);
+  EXPECT_FALSE(frame.decoration.combined_outline_visible);
 }
 
 TEST(YeeSurfaceGeometryTest, SplitInsetsResolveBeforeMultiContentsApplication) {

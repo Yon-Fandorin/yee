@@ -34,6 +34,10 @@ bool ShouldUseNativeHorizontalTabTheme(const ui::NativeTheme& native_theme,
                                        const ui::ThemeProvider* theme);
 
 gfx::Insets ResolveHorizontalTabToolbarInsets(gfx::Insets insets);
+// native의 겹침 폭을 제외해도 인접 favicon 사이에 최소 간격을 남긴다.
+int ResolveHorizontalTabMinimumInactiveWidth(const views::View& tab,
+                                             int native_minimum_width,
+                                             int native_overlap);
 
 // 그리기 전에 구조를 Header에 적용한다. 전체화면에서 다른 Widget으로
 // 이동한 뒤에도 View가 이 상태를 유지한다.
@@ -53,10 +57,9 @@ struct HorizontalTabColors {
   SkColor foreground;
 };
 
-// 선택 탭은 주소줄 snapshot을, 나머지 탭은 기존 Shell 대비 역할을 따른다.
+// 수평 탭은 페이지색과 분리된 native 테마와 기존 Shell 대비 역할을 따른다.
 HorizontalTabColors ResolveHorizontalTabColors(
     const ui::ColorProvider& color_provider,
-    const BrowserSurfacePresentation& presentation,
     bool active,
     bool selected,
     double hover_progress,

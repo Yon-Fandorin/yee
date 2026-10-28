@@ -58,9 +58,12 @@ Report actionable findings or explicitly state none, including review limits.
 After review, validate runtime changes such as UI, ad blocking, or installation
 in the newly built app.
 
-- Request graceful shutdown of running Yee browsers and wait for all Yee
-  processes to exit before launching. Report processes that remain; force-stop
-  only with explicit user authorization.
+- Identify the build executable and isolated validation profile before launching.
+  Request graceful shutdown only for processes using that executable or profile,
+  then wait for those processes to exit. Keep an installed release Yee running
+  when its executable and profile are separate. Report conflicting processes that
+  remain; force-stop only with explicit user authorization. Preserve unrelated
+  desktop windows when invoking native test launchers.
 - Verify the reviewed source, running build, and installer under test represent
   the same changes. Existing processes or older installations are not evidence
   for a new build.

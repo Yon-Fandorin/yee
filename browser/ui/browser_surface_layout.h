@@ -29,6 +29,10 @@ enum class BrowserSurfaceMode {
 
 BrowserSurfaceMode GetBrowserSurfaceMode(const BrowserWindowInterface& browser);
 
+// 맞춤설정은 탭 방향과 관계없이 창 Header 아래에 도킹한다.
+bool UsesFullWidthBrowserSurfaceHeader(BrowserSurfaceMode mode,
+                                       bool customization_panel);
+
 // 수평 탭 행의 실제 높이를 먼저 배분하고 같은 Surface 여백을 한 번만 적용한다.
 gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
                                              int content_leading_inset,
@@ -94,8 +98,8 @@ struct BrowserSurfaceFrameInput {
   // be wider than the notice slot underneath an occluding Side Panel.
   gfx::Rect native_body_allocation;
 
-  // 수평 공용 Header는 페이지와 Side Panel을 함께 덮는다. native resize 영역은
-  // 유지하되 두 영역이 공유하는 Surface 안에 표시한다.
+  // 공용 Header가 페이지와 Side Panel을 함께 덮을 때만 전달한다. 수평 탭과
+  // 세로 맞춤설정이 사용하며 native resize 영역은 공유 Surface 안에 유지한다.
   std::optional<gfx::Rect> connected_side_panel_resize_gutter = std::nullopt;
   BrowserSurfaceMode mode = BrowserSurfaceMode::kCard;
   bool side_panel_surface_visible = false;

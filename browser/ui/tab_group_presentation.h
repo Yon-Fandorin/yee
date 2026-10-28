@@ -36,17 +36,27 @@ int ResolveHorizontalTabGroupSeparatorOffset(
 
 // native 호스트가 실제 행 안의 inset 멤버 범위를 전달한다.
 gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds);
+
+// 닫히는 첫 멤버가 그룹 이름을 가로지르지 않게 Header 뒤에서 수축한다.
+gfx::Rect ResolveHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
+                                                 int header_end,
+                                                 int overlap);
+// 연속 닫기 중에도 살아 있는 Header의 새 위치를 따라간다.
+void TrackHorizontalTabGroupClosingHeader(views::View& tab,
+                                          views::View& header);
+views::View* GetHorizontalTabGroupClosingHeader(const views::View& tab);
+// 폭이 그대로인 첫 전환 프레임에도 멤버의 제목·아이콘 가시성을 갱신한다.
+void InvalidateHorizontalTabGroupMemberLayout(views::View& member);
 void PaintHorizontalTabGroupCapsule(gfx::Canvas& canvas,
                                     const views::View& decoration,
                                     SkColor group_color);
 std::unique_ptr<views::Background> CreateHorizontalTabGroupCapsuleBackground(
     SkColor group_color);
 
-// 두 native 가로 호스트는 전체 hit 영역 안에 같은 작은 chip을 그린다.
+// 그룹의 공통 알약은 접힘·펼침을 계속 소유하며 Header에는 hover만 더한다.
 // 세로 Sidebar는 별도 행 표현을 유지한다.
 std::unique_ptr<views::Background> CreateHorizontalTabGroupBackground(
     SkColor color,
-    bool collapsed,
     bool hovered = false);
 
 std::optional<HorizontalTabColors> ResolveHorizontalTabGroupColors(

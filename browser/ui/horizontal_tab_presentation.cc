@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -24,6 +25,7 @@
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/favicon_size.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/views/background.h"
 #include "ui/views/view.h"
@@ -37,8 +39,6 @@ struct HorizontalTabColorRefreshCallback {
 
 DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabColorRefreshCallback*)
 DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabColorRefreshCallback*)
-DECLARE_UI_CLASS_PROPERTY_TYPE(yee::BrowserSurfaceMode)
-DEFINE_UI_CLASS_PROPERTY_TYPE(yee::BrowserSurfaceMode)
 
 namespace yee {
 namespace {
@@ -47,9 +47,7 @@ DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabColorRefreshCallback,
 DEFINE_UI_CLASS_PROPERTY_KEY(int, kHorizontalTabIconForegroundKey, 0)
 DEFINE_UI_CLASS_PROPERTY_KEY(int, kHorizontalTabHeaderSurfaceKey, 0)
 DEFINE_UI_CLASS_PROPERTY_KEY(bool, kOwnsHorizontalTabHeaderClipKey, false)
-DEFINE_UI_CLASS_PROPERTY_KEY(BrowserSurfaceMode,
-                             kAppliedHeaderSurfaceModeKey,
-                             BrowserSurfaceMode::kCard)
+DEFINE_UI_CLASS_PROPERTY_KEY(bool, kPaintsConnectedHeaderKey, false)
 
 SkColor ResolveHorizontalTabHeaderSurface(const views::View& header) {
   const int color = header.GetProperty(kHorizontalTabHeaderSurfaceKey);
@@ -104,13 +102,24 @@ gfx::Insets ResolveHorizontalTabToolbarInsets(gfx::Insets insets) {
   return insets;
 }
 
+int ResolveHorizontalTabMinimumInactiveWidth(const views::View& tab,
+                                             int native_minimum_width,
+                                             int native_overlap) {
+  if (!IsShellEnabled() || ShouldUseNativeHorizontalTabTheme(
+                               *tab.GetNativeTheme(), tab.GetThemeProvider())) {
+    return native_minimum_width;
+  }
+  return std::max(native_minimum_width,
+                  native_overlap + gfx::kFaviconSize +
+                      kSidebarMetrics.horizontal_tab_minimum_icon_gap);
+}
+
 void UpdateHorizontalTabHeaderBackground(
     views::View& header,
     const std::optional<BrowserSurfacePresentation>& presentation) {
   auto* const background = header.background()->AsA<CustomCornersBackground>();
   CHECK(background);
-  const bool connected = header.GetProperty(kAppliedHeaderSurfaceModeKey) ==
-                         BrowserSurfaceMode::kConnectedTabs;
+  const bool connected = header.GetProperty(kPaintsConnectedHeaderKey);
   if (!connected) {
     return;
   }
@@ -134,8 +143,10 @@ void ApplyBrowserSurfaceHeaderDecoration(
     const ResolvedBrowserSurfaceDecoration& decoration,
     const gfx::Rect& paint_bounds,
     const std::optional<BrowserSurfacePresentation>& presentation) {
-  header.SetProperty(kAppliedHeaderSurfaceModeKey, decoration.mode);
-  const bool connected = decoration.mode == BrowserSurfaceMode::kConnectedTabs;
+  const bool connected =
+      decoration.mode == BrowserSurfaceMode::kConnectedTabs ||
+      decoration.side_panel_joins_header;
+  header.SetProperty(kPaintsConnectedHeaderKey, connected);
   auto* const background = header.background()->AsA<CustomCornersBackground>();
   CHECK(background);
   background->SetVisible(connected);
@@ -211,7 +222,6 @@ std::optional<SkColor> GetHorizontalTabIconForeground(const views::View& icon) {
 
 HorizontalTabColors ResolveHorizontalTabColors(
     const ui::ColorProvider& color_provider,
-    const BrowserSurfacePresentation& presentation,
     bool active,
     bool selected,
     double hover_progress,
@@ -219,7 +229,16 @@ HorizontalTabColors ResolveHorizontalTabColors(
     std::optional<SkColor> group_color,
     bool split) {
   if (active) {
-    return {presentation.surface, presentation.primary};
+    const SkColor background = color_provider.GetColor(
+        frame_active ? kColorTabBackgroundActiveFrameActive
+                     : kColorTabBackgroundActiveFrameInactive);
+    const SkColor foreground = color_provider.GetColor(
+        frame_active ? kColorTabForegroundActiveFrameActive
+                     : kColorTabForegroundActiveFrameInactive);
+    return {background, color_utils::BlendForMinContrast(
+                            foreground, background, std::nullopt,
+                            color_utils::kMinimumReadableContrastRatio)
+                            .color};
   }
   const SidebarItemColors colors = ResolveSidebarItemColors(
       color_provider,

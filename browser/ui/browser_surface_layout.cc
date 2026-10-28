@@ -28,6 +28,11 @@ BrowserSurfaceMode GetBrowserSurfaceMode(
              : BrowserSurfaceMode::kCard;
 }
 
+bool UsesFullWidthBrowserSurfaceHeader(BrowserSurfaceMode mode,
+                                       bool customization_panel) {
+  return mode == BrowserSurfaceMode::kConnectedTabs || customization_panel;
+}
+
 gfx::Rect ResolveBrowserSurfaceContentColumn(const gfx::Rect& client_bounds,
                                              int content_leading_inset,
                                              int horizontal_tab_strip_advance) {
@@ -146,14 +151,15 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
   result.decoration.mode = input.mode;
   result.decoration.combined_outline_visible =
       !result.split && !result.main_surface_bounds.IsEmpty();
+  const bool connected_header =
+      input.mode == BrowserSurfaceMode::kConnectedTabs ||
+      input.connected_side_panel_resize_gutter.has_value();
   result.decoration.draw_outer_outline =
-      result.decoration.combined_outline_visible &&
-      input.mode == BrowserSurfaceMode::kCard;
+      result.decoration.combined_outline_visible && !connected_header;
   result.decoration.show_shadow =
       result.decoration.draw_outer_outline && !input.side_panel_surface_visible;
   result.decoration.side_panel_joins_header =
-      input.mode == BrowserSurfaceMode::kConnectedTabs &&
-      result.decoration.combined_outline_visible &&
+      connected_header && result.decoration.combined_outline_visible &&
       !result.header_bounds.IsEmpty();
   if (result.decoration.side_panel_joins_header &&
       input.connected_side_panel_resize_gutter) {

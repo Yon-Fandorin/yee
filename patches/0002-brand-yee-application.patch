@@ -182,7 +182,7 @@ index 90b46df50f..941bfda779 100644
        grdfile_folder = grd_file_info[0]
        grdfile_name = grd_file_info[1]
 diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
-index b42bb73601..5c3e90a3f6 100644
+index b42bb73601..e48a58bd43 100644
 --- a/chrome/installer/util/BUILD.gn
 +++ b/chrome/installer/util/BUILD.gn
 @@ -3,6 +3,7 @@
@@ -193,7 +193,15 @@ index b42bb73601..5c3e90a3f6 100644
  import("//build/config/chrome_build.gni")
  
  import("//testing/test.gni")
-@@ -234,6 +235,10 @@ generate_embedded_i18n("generate_strings") {
+@@ -170,6 +171,7 @@ static_library("with_no_strings") {
+       "system_tracing_util.h",
+       "taskbar_util.cc",
+       "taskbar_util.h",
++      "taskbar_util_internal.h",
+     ]
+ 
+     public_deps += [
+@@ -234,6 +236,10 @@ generate_embedded_i18n("generate_strings") {
    grdfile_folder = "//chrome/app/"
    grdfile_name = "${branding_path_product}_strings"
    xtb_relative_path = "resources"
@@ -204,7 +212,7 @@ index b42bb73601..5c3e90a3f6 100644
    grd_files_info = [ [
          grdfile_folder,
          grdfile_name,
-@@ -244,6 +249,9 @@ generate_embedded_i18n("generate_strings") {
+@@ -244,6 +250,9 @@ generate_embedded_i18n("generate_strings") {
    output_file_name_base = "installer_util_strings"
  
    branding = branding_path_product
