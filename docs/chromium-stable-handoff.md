@@ -10,10 +10,13 @@ Yee 저장소에서 기존 작업을 보존한 뒤 브랜치를 받는다.
 
 ```sh
 git status --short
+git remote set-branches --add origin codex/chromium-stable-157
 git fetch origin
 git switch --track origin/codex/chromium-stable-157
 ```
 
+기존 저장소가 일부 브랜치만 받도록 설정돼 있어도 새 브랜치를 가져올 수 있도록
+`set-branches --add`로 이 브랜치를 추가한다. 기존 fetch 범위는 보존한다.
 같은 로컬 브랜치가 이미 있다면 마지막 명령 대신 `git switch codex/chromium-stable-157`,
 `git pull --ff-only`를 사용한다. 미커밋 변경 때문에 전환이 거부되면 먼저 기존 작업을
 보존한다. 강제 초기화하거나 기존 Chromium 소스를 새 버전으로 덮어쓰지 않는다.
