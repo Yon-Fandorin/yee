@@ -11822,10 +11822,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..3b742525fe 100644
+index 49b4f6dd0d..262462f09f 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,335 @@
+@@ -4,84 +4,344 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -11869,6 +11869,7 @@ index 49b4f6dd0d..3b742525fe 100644
  #include "chrome/browser/ui/browser_element_identifiers.h"
  #include "chrome/browser/ui/browser_tabstrip.h"
 +#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 +#include "chrome/browser/ui/color/chrome_color_id.h"
 +#include "chrome/browser/ui/find_bar/find_bar_controller.h"
  #include "chrome/browser/ui/immersive/immersive_mode_controller.h"
@@ -11913,9 +11914,11 @@ index 49b4f6dd0d..3b742525fe 100644
 +#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 +#include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
  #include "chrome/browser/ui/views/side_panel/side_panel.h"
++#include "chrome/browser/ui/views/side_panel/side_panel_animation_content_view.h"
 +#include "chrome/browser/ui/views/status_bubble_views.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_group_line_view.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_view.h"
@@ -11951,6 +11954,7 @@ index 49b4f6dd0d..3b742525fe 100644
  #include "components/prefs/pref_service.h"
  #include "components/search/ntp_features.h"
 +#include "components/tabs/public/tab_group.h"
++#include "components/tabs/public/tab_interface.h"
  #include "components/user_prefs/user_prefs.h"
 +#include "components/viz/common/frame_sinks/copy_output_request.h"
 +#include "components/viz/common/frame_sinks/copy_output_result.h"
@@ -12032,6 +12036,11 @@ index 49b4f6dd0d..3b742525fe 100644
 +#endif
 +
 +namespace {
++
++views::View* GetTabAnchorForModelIndex(BrowserView* view, int index) {
++  return view->tab_strip_view()->GetTabAnchorView(
++      view->browser()->GetTabStripModel()->GetTabAtIndex(index)->GetHandle());
++}
 +
 +void ExpectWebViewNativeClip(views::WebView* web_view,
 +                             const gfx::Rect& expected_clip) {
@@ -12164,7 +12173,7 @@ index 49b4f6dd0d..3b742525fe 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +344,25 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +353,25 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
@@ -12193,7 +12202,7 @@ index 49b4f6dd0d..3b742525fe 100644
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +377,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +386,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12208,7 +12217,7 @@ index 49b4f6dd0d..3b742525fe 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +632,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +641,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12235,7 +12244,7 @@ index 49b4f6dd0d..3b742525fe 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -389,11 +669,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -389,11 +678,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -12407,7 +12416,7 @@ index 49b4f6dd0d..3b742525fe 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1041,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1050,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12437,7 +12446,7 @@ index 49b4f6dd0d..3b742525fe 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,195 +1091,4877 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,193 +1100,4871 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12632,8 +12641,6 @@ index 49b4f6dd0d..3b742525fe 100644
 -                    ,
 -                    TopContainerBackgroundTestMode::kImmersive
 -#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
--
--                    ));
 +    CaptionPresentation,
 +    YeeWindowsCaptionInputUiTest,
 +    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
@@ -12643,6 +12650,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +             (dark ? "Dark" : "Light") + (maximized ? "Maximized" : "Restored");
 +    }));
  
+-                    ));
+-
 -// Regression test for limiting the amount of WebContents resizing when the
 -// "flyover" animation flag is enabled.
 -class BrowserViewTabbedLayoutImplContentLayoutUiTest
@@ -12887,13 +12896,11 @@ index 49b4f6dd0d..3b742525fe 100644
 +      // 모드 전환 뒤 새 collection의 실제 탭이 표시될 때까지 기다린다.
 +      ASSERT_TRUE(base::test::RunUntil([&]() {
 +        RunScheduledLayouts();
-+        auto* active =
-+            view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++        auto* active = GetTabAnchorForModelIndex(view, model->active_index());
 +        return active && active->IsDrawn() &&
 +               !active->GetVisibleBounds().IsEmpty();
 +      }));
-+      auto* const tab =
-+          view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++      auto* const tab = GetTabAnchorForModelIndex(view, model->active_index());
 +      ASSERT_TRUE(tab);
 +      ASSERT_TRUE(tab->IsDrawn());
 +      ASSERT_TRUE(layout->last_native_layout_for_testing());
@@ -13085,10 +13092,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +  state->SetVerticalTabsEnabled(false);
    RunScheduledLayouts();
 -  RunTestSequence(OpenSidePanel(), ClearResizeCounts(), CloseSidePanel(),
--                  CheckResizeCounts(1U, 0U));
--}
-+  ASSERT_TRUE(yee::UsesHorizontalTabGroupCapsule(
-+      *view->tab_strip_view()->GetTabAnchorViewAt(1)));
++  ASSERT_TRUE(
++      yee::UsesHorizontalTabGroupCapsule(*GetTabAnchorForModelIndex(view, 1)));
 +
 +  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
 +      view->GetBrowserViewLayoutForTesting());
@@ -13126,7 +13131,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +        const auto bounds = marker->GetBoundsInScreen();
 +        EXPECT_TRUE(tabs.Contains(bounds));
 +        const gfx::Rect native_row =
-+            view->tab_strip_view()->GetTabAnchorViewAt(1)->GetBoundsInScreen();
++            GetTabAnchorForModelIndex(view, 1)->GetBoundsInScreen();
 +        ASSERT_TRUE(yee::UsesHorizontalTabGroupCapsule(*marker));
 +        EXPECT_EQ(native_row.y() +
 +                      yee::kSidebarMetrics.horizontal_group_capsule_top_inset,
@@ -13236,7 +13241,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +    }
 +  };
 +  const auto expect_boundary_gap = [&](int index, bool preceding) {
-+    auto* const tab = view->tab_strip_view()->GetTabAnchorViewAt(index);
++    auto* const tab = GetTabAnchorForModelIndex(view, index);
 +    const auto* styling = tab_styling(tab);
 +    ASSERT_TRUE(styling);
 +    ASSERT_TRUE(group_marker());
@@ -13363,8 +13368,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +              order, [&](const auto& item) { return item.view() == target; });
 +        };
 +        const auto backing = position(group_marker());
-+        const auto tab =
-+            position(view->tab_strip_view()->GetTabAnchorViewAt(1));
++        const auto tab = position(GetTabAnchorForModelIndex(view, 1));
 +        ASSERT_NE(order.end(), backing);
 +        ASSERT_NE(order.end(), tab);
 +        EXPECT_EQ(capsule, backing < tab);
@@ -13856,9 +13860,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +              expect_glyphs(expect_glyphs, visible_preview);
 +            } else {
 +              for (int index : tab_group->ListTabs().ToIntVector()) {
-+                expect_glyphs(
-+                    expect_glyphs,
-+                    view->tab_strip_view()->GetTabAnchorViewAt(index));
++                expect_glyphs(expect_glyphs,
++                              GetTabAnchorForModelIndex(view, index));
 +              }
 +            }
 +          }
@@ -13882,9 +13885,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +            RunScheduledLayouts();
 +            if (auto* unified = views::AsViewClass<TabStripView>(
 +                    view->tab_strip_view()->GetTabStripView())) {
-+              unified->ScrollToFitViews(
-+                  view->tab_strip_view()->GetTabAnchorViewAt(1),
-+                  view->tab_strip_view()->GetTabAnchorViewAt(2));
++              unified->ScrollToFitViews(GetTabAnchorForModelIndex(view, 1),
++                                        GetTabAnchorForModelIndex(view, 2));
 +              unified->GetUnpinnedTabsScrollViewForTesting()
 +                  ->InvalidateLayout();
 +              // 스크롤 요청은 여러 post-layout callback에 걸쳐 완료된다.
@@ -13900,8 +13902,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +              EXPECT_FALSE(model->IsTabPinned(index));
 +              EXPECT_FALSE(model->GetTabGroupForTab(index));
 +              EXPECT_NE(model->active_index(), index);
-+              EXPECT_TRUE(
-+                  view->tab_strip_view()->GetTabAnchorViewAt(index)->IsDrawn());
++              EXPECT_TRUE(GetTabAnchorForModelIndex(view, index)->IsDrawn());
 +            }
 +            std::vector<std::pair<int, gfx::Rect>> favicons;
 +            for (int index = 0; index < model->count(); ++index) {
@@ -13950,7 +13951,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +                }
 +              };
 +              inspect_icon(inspect_icon,
-+                           view->tab_strip_view()->GetTabAnchorViewAt(index));
++                           GetTabAnchorForModelIndex(view, index));
 +              if (index == 1 || index == 2) {
 +                EXPECT_EQ(icons_before + 1, favicons.size());
 +              }
@@ -14006,7 +14007,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  const auto expect_colors = [&]() {
 +    ASSERT_EQ(group, model->GetTabGroupForTab(model->active_index()));
 +    views::View* const tab =
-+        view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++        GetTabAnchorForModelIndex(view, model->active_index());
 +    ASSERT_TRUE(tab);
 +    const auto expect_title = [&](SkColor foreground) {
 +      bool matching_title = false;
@@ -14052,7 +14053,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +    ASSERT_TRUE(model->IsTabPinned(0));
 +    ASSERT_NE(0, model->active_index());
 +    const auto* pinned_styling =
-+        tab_styling(view->tab_strip_view()->GetTabAnchorViewAt(0));
++        tab_styling(GetTabAnchorForModelIndex(view, 0));
 +    ASSERT_TRUE(pinned_styling);
 +    // 통합 호스트의 비활성 고정 탭도 같은 hover 곡률을 사용한다.
 +    for (const auto* shape_style : {styling, pinned_styling}) {
@@ -14069,7 +14070,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +    }
 +    // 계산된 tint만 검사하면 native 기본 paint가 비활성 멤버를 생략해도 모른다.
 +    // hover 없이 실제 배경 paint를 검사한다.
-+    auto* const member = view->tab_strip_view()->GetTabAnchorViewAt(1);
++    auto* const member = GetTabAnchorForModelIndex(view, 1);
 +    ASSERT_TRUE(member);
 +    const auto* member_styling = tab_styling(member);
 +    ASSERT_TRUE(member_styling);
@@ -14219,7 +14220,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  // 실제 탭 포커스를 유지한 채 hierarchy를 정리한다. 늦은 blur가 정리된
 +  // collection node에 hover card 갱신을 요청하면 안 된다.
 +  auto* const focused_tab =
-+      view->tab_strip_view()->GetTabAnchorViewAt(model->active_index());
++      GetTabAnchorForModelIndex(view, model->active_index());
 +  ASSERT_TRUE(view->tab_strip_view()->SetPaneFocus(focused_tab));
 +  EXPECT_TRUE(focused_tab->HasFocus());
 +  RunTestSequence(PressButton(kVerticalTabStripCollapseButtonElementId));
@@ -14231,7 +14232,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  EXPECT_FALSE(view->top_container()
 +                   ->background()
 +                   ->AsA<CustomCornersBackground>()
-+                   ->visible_for_testing());
++                   ->is_visible());
 +  EXPECT_EQ(count, model->count());
 +  const gfx::Rect original_window =
 +      view->GetWidget()->GetWindowBoundsInScreen();
@@ -14294,7 +14295,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  auto* const immersive_background =
 +      immersive_header->background()->AsA<CustomCornersBackground>();
 +  ASSERT_TRUE(immersive_background);
-+  EXPECT_TRUE(immersive_background->visible_for_testing());
++  EXPECT_TRUE(immersive_background->is_visible());
 +  EXPECT_FALSE(immersive_header->clip_path().contains(0.5f, 0.5f));
 +  EXPECT_FALSE(immersive_header->clip_path().contains(
 +      immersive_header->width() - 0.5f, 0.5f));
@@ -14309,7 +14310,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  yee::UpdateHorizontalTabHeaderBackground(*immersive_header, recolored_header);
 +  EXPECT_EQ(header_clip, immersive_header->clip_path());
 +  EXPECT_EQ(header_background_path, immersive_background->GetBackgroundPath());
-+  EXPECT_TRUE(immersive_background->visible_for_testing());
++  EXPECT_TRUE(immersive_background->is_visible());
 +  gfx::Canvas header_canvas(immersive_header->size(), 1.f, false);
 +  immersive_background->Paint(&header_canvas, immersive_header);
 +  const SkBitmap header_pixels = header_canvas.GetBitmap();
@@ -14396,7 +14397,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  EXPECT_TRUE(view->top_container()
 +                  ->background()
 +                  ->AsA<CustomCornersBackground>()
-+                  ->visible_for_testing());
++                  ->is_visible());
 +  RunTestSequence(CloseSidePanel());
 +  expect_rows(false);
 +#endif
@@ -14415,7 +14416,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  const auto expect_split_capsules = [&]() {
 +    for (int index : split_indices) {
 +      SCOPED_TRACE(index);
-+      auto* const tab = view->tab_strip_view()->GetTabAnchorViewAt(index);
++      auto* const tab = GetTabAnchorForModelIndex(view, index);
 +      ASSERT_TRUE(tab);
 +      const auto* styling = tab_styling(tab);
 +      ASSERT_TRUE(styling);
@@ -14549,7 +14550,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +        model->ActivateTabAt(0);
 +        RunScheduledLayouts();
 +        auto* const tab =
-+            view->tab_strip_view()->GetTabAnchorViewAt(split_indices.front());
++            GetTabAnchorForModelIndex(view, split_indices.front());
 +        ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +        const auto window = tab->GetWidget()->GetNativeWindow();
 +        ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
@@ -14654,7 +14655,11 @@ index 49b4f6dd0d..3b742525fe 100644
 +          // 실제 배율의 raster로 경계 간격과 모든 멤버의 포함 범위를 확인한다.
 +          expect_boundary_gap(0, true);
 +          for (int index : tab_group->ListTabs().ToIntVector()) {
-+            auto* const member = strip->GetTabAnchorViewAt(index);
++            auto* const member =
++                strip->GetTabAnchorView(view->browser()
++                                            ->GetTabStripModel()
++                                            ->GetTabAtIndex(index)
++                                            ->GetHandle());
 +            const auto* styling = tab_styling(member);
 +            ASSERT_TRUE(styling);
 +            const SkRect paint =
@@ -15976,8 +15981,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +          },
 +          base::Unretained(browser_view->GetProfile())),
 +      /*default_content_width_callback=*/base::NullCallback())));
-+  browser()->GetFeatures().side_panel_ui()->Show(
-+      SidePanelEntry::Id::kReadingList);
++  SidePanelUI::From(browser())->Show(SidePanelEntry::Id::kReadingList);
 +  RunTestSequence(WaitForShow(kSidePanelTestElement));
 +  RunTestSequence(WithView(kSidePanelTestElement, [](views::WebView* view) {
 +    ASSERT_TRUE(content::WaitForLoadStop(view->GetWebContents()));
@@ -16461,17 +16465,16 @@ index 49b4f6dd0d..3b742525fe 100644
 +  expect_before(surface_outline, browser_view->find_bar_host_view());
 +  expect_before(surface_outline, browser_view->window_scrim_view());
 +
-+  auto animation_content = std::make_unique<views::View>();
-+  views::View* const animation_content_ptr =
-+      browser_view->AddChildView(std::move(animation_content));
-+  browser_view->SetSidePanelAnimationContent(animation_content_ptr);
++  auto* const animation_content_ptr =
++      browser_view->SetSidePanelAnimationContent(
++          std::make_unique<SidePanelAnimationContentView>());
++  views::ViewTracker animation_content_tracker(animation_content_ptr);
 +  expect_before(animation_content_ptr, surface_outline);
 +  expect_surface_controls_order();
 +
 +  browser_view->SetSidePanelAnimationContent(nullptr);
-+  std::unique_ptr<views::View> removed_animation_content =
-+      browser_view->RemoveChildViewT(animation_content_ptr);
-+  EXPECT_TRUE(removed_animation_content);
++  EXPECT_FALSE(animation_content_tracker.view());
++  EXPECT_EQ(nullptr, browser_view->GetSidePanelAnimationContent());
 +}
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
@@ -16569,7 +16572,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +      top_container->background()->AsA<CustomCornersBackground>();
 +  ASSERT_NE(nullptr, background);
 +  if (browser_view->UsesYeeBrowserSurfaceGeometry()) {
-+    EXPECT_FALSE(background->visible_for_testing());
++    EXPECT_FALSE(background->is_visible());
 +    return;
 +  }
 +  CustomCornersBackground::ColorChoice expected;
@@ -17332,7 +17335,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +                                               ->background()
 +                                               ->AsA<CustomCornersBackground>();
 +    ASSERT_TRUE(top_container_background) << phase;
-+    EXPECT_FALSE(top_container_background->visible_for_testing()) << phase;
++    EXPECT_FALSE(top_container_background->is_visible()) << phase;
 +    const std::optional<gfx::RoundedCornersF> main_background_radii =
 +        main_background->GetRoundedCornerRadii();
 +    ASSERT_TRUE(main_background_radii) << phase;
@@ -17476,12 +17479,10 @@ index 49b4f6dd0d..3b742525fe 100644
 +  }
 +  RunScheduledLayouts();
 +  RunTestSequence(OpenSidePanel(), ClearResizeCounts(), CloseSidePanel(),
-+                  CheckResizeCounts(1U, 0U));
-+}
+                   CheckResizeCounts(1U, 0U));
+ }
  
- IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
-                        VerticalTabsSinglePaneOpenSidePanel) {
-@@ -874,10 +5995,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6000,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -17500,11 +17501,9 @@ index 49b4f6dd0d..3b742525fe 100644
 + public:
 +  void SetUp() override {
 +    if (GetParam()) {
-+      features_.InitWithFeatures(
-+          {tabs::kVerticalTabs, features::kSidePanelFlyoverAnimation}, {});
++      features_.InitAndEnableFeature(features::kSidePanelFlyoverAnimation);
 +    } else {
-+      features_.InitWithFeatures({tabs::kVerticalTabs},
-+                                 {features::kSidePanelFlyoverAnimation});
++      features_.InitAndDisableFeature(features::kSidePanelFlyoverAnimation);
 +    }
 +    set_open_about_blank_on_browser_launch(true);
 +    InteractiveBrowserTest::SetUp();
@@ -17518,6 +17517,10 @@ index 49b4f6dd0d..3b742525fe 100644
 +
 +IN_PROC_BROWSER_TEST_P(YeeRendererResizeUiTest,
 +                       YeeResizeCollapseReloadKeepsRendererLive) {
++  auto* const state = tabs::VerticalTabStripStateController::From(browser());
++  ASSERT_TRUE(state);
++  state->SetVerticalTabsEnabled(true);
++  RunScheduledLayouts();
 +  // Do not inject a surface color or force recursive layouts: the production
 +  // resize/animation pipeline must update both the renderer and its embedding.
 +  const GURL page(
@@ -17934,7 +17937,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  RunScheduledLayouts();
 +
 +  RunTestSequence(EnterSplitView(), Do([this]() {
-+                    browser()->GetFeatures().GetFindBarController()->Show();
++                    FindBarController::From(browser())->Show();
 +                    RunScheduledLayouts();
 +                  }));
 +
@@ -17945,8 +17948,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +      active_container->GetPageViewportGeometry().current_viewport_in_screen;
 +  ASSERT_FALSE(active_viewport_in_screen.IsEmpty());
 +
-+  FindBarHost* const find_bar_host = static_cast<FindBarHost*>(
-+      browser()->GetFeatures().GetFindBarController()->find_bar());
++  FindBarHost* const find_bar_host =
++      static_cast<FindBarHost*>(FindBarController::From(browser())->find_bar());
 +  ASSERT_TRUE(find_bar_host);
 +  ASSERT_TRUE(find_bar_host->IsFindBarVisible());
 +  views::Widget* const find_bar_widget = find_bar_host->GetHostWidget();
@@ -18019,7 +18022,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +  RunScheduledLayouts();
 +
 +  RunTestSequence(EnterSplitView(), Do([this]() {
-+                    browser()->GetFeatures().GetFindBarController()->Show();
++                    FindBarController::From(browser())->Show();
 +                    RunScheduledLayouts();
 +                  }));
 +
@@ -18030,8 +18033,8 @@ index 49b4f6dd0d..3b742525fe 100644
 +      active_container->GetPageViewportGeometry().current_viewport_in_screen;
 +  ASSERT_FALSE(active_viewport_in_screen.IsEmpty());
 +
-+  FindBarHost* const find_bar_host = static_cast<FindBarHost*>(
-+      browser()->GetFeatures().GetFindBarController()->find_bar());
++  FindBarHost* const find_bar_host =
++      static_cast<FindBarHost*>(FindBarController::From(browser())->find_bar());
 +  ASSERT_TRUE(find_bar_host);
 +  ASSERT_TRUE(find_bar_host->IsFindBarVisible());
 +  views::Widget* const find_bar_widget = find_bar_host->GetHostWidget();
@@ -18440,7 +18443,7 @@ index 49b4f6dd0d..3b742525fe 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +6954,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +6961,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18458,7 +18461,7 @@ index 49b4f6dd0d..3b742525fe 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7018,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7025,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18476,7 +18479,7 @@ index 49b4f6dd0d..3b742525fe 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7038,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7045,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18495,7 +18498,7 @@ index 49b4f6dd0d..3b742525fe 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7110,359 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7117,357 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -18645,10 +18648,9 @@ index 49b4f6dd0d..3b742525fe 100644
 +      };
 +      check_icon(check_icon, closing_view);
 +    };
-+    views::ViewTracker closing(
-+        view->tab_strip_view()->GetTabAnchorViewAt(first_member));
++    views::ViewTracker closing(GetTabAnchorForModelIndex(view, first_member));
 +    views::ViewTracker next_closing(
-+        view->tab_strip_view()->GetTabAnchorViewAt(first_member + 1));
++        GetTabAnchorForModelIndex(view, first_member + 1));
 +    check_icons(closing.view());
 +    check_icons(next_closing.view());
 +    capture("before-close", 0);
@@ -18693,8 +18695,7 @@ index 49b4f6dd0d..3b742525fe 100644
 +        EXPECT_LE(std::abs(marker()->height() / 2 - painted.CenterPoint().y()),
 +                  1);
 +        if (collapsed) {
-+          auto* member =
-+              view->tab_strip_view()->GetTabAnchorViewAt(first_member);
++          auto* member = GetTabAnchorForModelIndex(view, first_member);
 +          const auto check_icon = [&](auto&& self,
 +                                      views::View* current) -> void {
 +            if (auto* icon = views::AsViewClass<TabIcon>(current)) {
