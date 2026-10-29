@@ -11,7 +11,7 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/i18n/rtl.h"
+#include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
@@ -420,9 +420,8 @@ TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
 TEST_F(YeeRestingTextViewTest, HorizontalGroupHoverStaysInsideCapsule) {
   auto* view = widget_->SetContentsView(std::make_unique<views::View>());
   view->SetBounds(0, 0, 120, 40);
-  const bool original_rtl = base::i18n::IsRTL();
   for (bool rtl : {false, true}) {
-    base::i18n::SetRTLForTesting(rtl);
+    base::i18n::ScopedRTLForTesting direction(rtl);
     for (bool collapsed : {false, true}) {
       const auto background = CreateHorizontalTabGroupBackground(
           SK_ColorGREEN, true, gfx::Insets::TLBR(0, 10, 0, collapsed ? 10 : 0));
@@ -441,7 +440,6 @@ TEST_F(YeeRestingTextViewTest, HorizontalGroupHoverStaysInsideCapsule) {
       EXPECT_LT(alpha, SK_AlphaOPAQUE);
     }
   }
-  base::i18n::SetRTLForTesting(original_rtl);
 }
 
 TEST_F(YeeRestingTextViewTest,

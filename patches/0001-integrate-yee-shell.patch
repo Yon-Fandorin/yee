@@ -28867,7 +28867,7 @@ index c726fbc277..752dda078f 100644
  
  bool BrowserTabStripController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 7571027287..8e764e320a 100644
+index 7571027287..a6f66fd71c 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
 @@ -4,6 +4,7 @@
@@ -28904,7 +28904,7 @@ index 7571027287..8e764e320a 100644
  }
  
  source_set("browser_tests") {
-@@ -226,9 +232,78 @@ source_set("browser_tests") {
+@@ -226,9 +232,79 @@ source_set("browser_tests") {
    }
  }
  
@@ -28921,6 +28921,7 @@ index 7571027287..8e764e320a 100644
 +    ":common",
 +    ":impl",
 +    "//base:i18n",
++    "//base/i18n:test_support",
 +    "//base/test:test_support",
 +    "//chrome/browser/ui:ui_features",
 +    "//chrome/browser/ui/views/frame:browser_view_header",
@@ -28983,11 +28984,12 @@ index 7571027287..8e764e320a 100644
      "tab_collection_animating_layout_manager_unittest.cc",
      "tab_collection_z_order_manager_unittest.cc",
      "tab_group_header_view_unittest.cc",
-@@ -237,16 +312,19 @@ source_set("unit_tests") {
+@@ -237,16 +313,20 @@ source_set("unit_tests") {
    deps = [
      ":common",
      ":impl",
 +    ":yee_header_unit_tests",
++    "//base/i18n:test_support",
      "//base/test:test_support",
      "//chrome/browser/ui:ui_features",
      "//chrome/browser/ui/views/frame",
@@ -29003,7 +29005,7 @@ index 7571027287..8e764e320a 100644
    ]
  }
  
-@@ -268,6 +346,7 @@ source_set("interactive_ui_tests") {
+@@ -268,6 +348,7 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui:browser_commands",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui/browser_window",
@@ -29011,7 +29013,7 @@ index 7571027287..8e764e320a 100644
      "//chrome/browser/ui/tabs:tab_menu",
      "//chrome/browser/ui/views/frame:base_tab_strip_region_view",
      "//chrome/browser/ui/views/frame:browser_view_header",
-@@ -276,9 +355,12 @@ source_set("interactive_ui_tests") {
+@@ -276,9 +357,12 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui/views/tabs/hovercard",
      "//chrome/browser/ui/views/tabs/shared",
      "//chrome/browser/ui/views/tabs/tab",

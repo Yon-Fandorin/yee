@@ -399,6 +399,7 @@ test("site_controls_browsertests") {
     "history",
     "webui:strings",
     "//base",
+    "//base/i18n:test_support",
     "//base/test:test_support",
     "//chrome/browser",
     "//chrome/browser/autocomplete",

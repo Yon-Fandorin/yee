@@ -4,7 +4,7 @@
 #include "chrome/browser/ui/views/yee/disclosure_arrow.h"
 
 #include "base/functional/bind.h"
-#include "base/i18n/rtl.h"
+#include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "base/test/task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/resource/resource_scale_factor.h"
@@ -35,9 +35,8 @@ TEST_F(DisclosureArrowTest, RotatesAndReversesInBothDirections) {
       gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
   gfx::ScopedAnimationDurationScaleMode duration(
       gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
-  const bool was_rtl = base::i18n::IsRTL();
   for (bool rtl : {false, true}) {
-    base::i18n::SetRTLForTesting(rtl);
+    base::i18n::ScopedRTLForTesting direction(rtl);
     int repaints = 0;
     DisclosureArrow arrow(
         base::BindRepeating([](int* count) { ++*count; }, &repaints));
@@ -62,7 +61,6 @@ TEST_F(DisclosureArrowTest, RotatesAndReversesInBothDirections) {
     EXPECT_TRUE(gfx::test::AreBitmapsEqual(collapsed, raster()));
     EXPECT_GT(repaints, 0);
   }
-  base::i18n::SetRTLForTesting(was_rtl);
 }
 
 // 동작 줄이기에서는 타이머를 시작하지 않고 최종 방향을 바로 표시한다.

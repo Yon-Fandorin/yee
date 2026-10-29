@@ -6,7 +6,7 @@
 
 #include <memory>
 
-#include "base/i18n/rtl.h"
+#include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "base/test/scoped_command_line.h"
 #include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -172,7 +172,7 @@ class FavoritesDragGeometryTest : public views::ViewsTestBase {
   }
 
   void TearDown() override {
-    base::i18n::SetRTLForTesting(false);
+    base::i18n::ScopedRTLForTesting direction(false);
     tab_strip_ = nullptr;
     widget_.reset();
     views::ViewsTestBase::TearDown();
@@ -195,14 +195,14 @@ TEST_F(FavoritesDragGeometryTest, TabPreviewMirrorsLogicalLeadingInset) {
   const gfx::Size source_size(80, 32);
   const gfx::Vector2d source_grab_offset(20, 8);
 
-  base::i18n::SetRTLForTesting(false);
+  base::i18n::ScopedRTLForTesting ltr_direction(false);
   const gfx::Rect ltr = TabDragPreviewBoundsInTabStrip(
       tab_strip(), pointer_in_screen, kLeadingInset, source_grab_offset,
       source_size);
   EXPECT_EQ(ltr.x(), pad + kLeadingInset);
   EXPECT_EQ(ltr.width(), row_width);
 
-  base::i18n::SetRTLForTesting(true);
+  base::i18n::ScopedRTLForTesting rtl_direction(true);
   const gfx::Rect rtl = TabDragPreviewBoundsInTabStrip(
       tab_strip(), pointer_in_screen, kLeadingInset, source_grab_offset,
       source_size);
@@ -215,13 +215,13 @@ TEST_F(FavoritesDragGeometryTest, TabPreviewWithoutInsetIsSymmetric) {
   const gfx::Point pointer_in_screen =
       tab_strip().GetBoundsInScreen().origin() + gfx::Vector2d(80, 120);
 
-  base::i18n::SetRTLForTesting(false);
+  base::i18n::ScopedRTLForTesting ltr_direction(false);
   const gfx::Rect ltr = TabDragPreviewBoundsInTabStrip(
       tab_strip(), pointer_in_screen, /*tab_leading_inset=*/0,
       /*source_grab_offset=*/gfx::Vector2d(),
       /*source_tile_size=*/gfx::Size());
 
-  base::i18n::SetRTLForTesting(true);
+  base::i18n::ScopedRTLForTesting rtl_direction(true);
   const gfx::Rect rtl = TabDragPreviewBoundsInTabStrip(
       tab_strip(), pointer_in_screen, /*tab_leading_inset=*/0,
       /*source_grab_offset=*/gfx::Vector2d(),
@@ -279,7 +279,7 @@ TEST_F(FavoritesDragGeometryTest, DockMagnetExtendsSidewaysButNotBelow) {
       tab_strip(),
       gfx::Point(dock_bounds.CenterPoint().x(), dock_bounds.bottom() + 1)));
 
-  base::i18n::SetRTLForTesting(true);
+  base::i18n::ScopedRTLForTesting direction(true);
   EXPECT_TRUE(PointHitsFavoritesDropTarget(
       tab_strip(),
       gfx::Point(dock_bounds.x() - 4, dock_bounds.CenterPoint().y())));
@@ -342,7 +342,7 @@ TEST_F(FavoritesDragGeometryTest, PreviewScreenBoundsMatchRowsInLtrAndRtl) {
   auto* const row = tab_strip().AddChildView(std::make_unique<views::View>());
   const int pad = kSidebarMetrics.tab_strip_horizontal_padding;
   for (bool rtl : {false, true}) {
-    base::i18n::SetRTLForTesting(rtl);
+    base::i18n::ScopedRTLForTesting direction(rtl);
     for (int inset : {0, 10, 16}) {
       SCOPED_TRACE(::testing::Message() << "rtl=" << rtl << " inset=" << inset);
       row->SetBounds(pad + inset, 100, tab_strip().width() - 2 * pad - inset,
@@ -374,7 +374,7 @@ TEST_F(FavoritesDragGeometryTest,
       tab_strip().GetBoundsInScreen().origin() + gfx::Vector2d(100, 140);
 
   for (bool rtl : {false, true}) {
-    base::i18n::SetRTLForTesting(rtl);
+    base::i18n::ScopedRTLForTesting direction(rtl);
     ShowFavoritesDragPreview(
         tab_strip(), pointer_in_screen, /*over_favorites=*/false,
         /*tab_leading_inset=*/0, /*favorites_target_item_count=*/0,

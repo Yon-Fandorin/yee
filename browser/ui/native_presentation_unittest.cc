@@ -9,7 +9,7 @@
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
-#include "base/i18n/rtl.h"
+#include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/scoped_command_line.h"
 #include "base/test/scoped_feature_list.h"
@@ -39,6 +39,7 @@
 #include "ui/color/color_recipe.h"
 #include "ui/compositor/canvas_painter.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_test_api.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/favicon_size.h"
 #include "ui/gfx/image/image_skia_rep.h"
@@ -438,11 +439,12 @@ TEST_F(YeeNativePresentationTest,
 
   // WebUI와 별도로 그리는 native 제목·gutter도 열린 패널의 테마 변경 때 다시
   // 그린다.
+  ui::LayerTestApi layer_test_api(surface->layer());
   surface->layer()->SendDamagedRects();
-  ASSERT_TRUE(surface->layer()->damaged_region().IsEmpty());
+  ASSERT_TRUE(layer_test_api.damaged_region().IsEmpty());
   widget->ThemeChanged();
   EXPECT_EQ(surface->GetLocalBounds(),
-            surface->layer()->damaged_region().bounds());
+            layer_test_api.damaged_region().bounds());
 }
 
 TEST_F(YeeNativePresentationTest,
