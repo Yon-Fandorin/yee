@@ -11,13 +11,14 @@ Yee 저장소에서 기존 작업을 보존한 뒤 브랜치를 받는다.
 
 ```sh
 git status --short
-git remote set-branches --add origin pilot
+git remote set-branches origin pilot
 git fetch origin
 git switch --track origin/pilot
 ```
 
-기존 저장소가 일부 브랜치만 받도록 설정돼 있어도 새 브랜치를 가져올 수 있도록
-`set-branches --add`로 이 브랜치를 추가한다. 기존 fetch 범위는 보존한다.
+통합이 끝난 핸즈오프·Stable157 임시 원격 브랜치는 정리했고 `pilot`만 유지한다.
+`set-branches`로 가져올 브랜치를 `pilot`으로 맞춰, 예전 설정이 삭제된 브랜치를
+계속 찾다가 `fetch`에 실패하지 않게 한다.
 같은 로컬 브랜치가 이미 있다면 마지막 명령 대신 `git switch pilot`,
 `git pull --ff-only`를 사용한다. 미커밋 변경 때문에 전환이 거부되면 먼저 기존 작업을
 보존한다. 강제 초기화하거나 기존 Chromium 소스를 새 버전으로 덮어쓰지 않는다.
