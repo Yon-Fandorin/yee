@@ -21212,10 +21212,10 @@ index e182430481..f1e1b00b18 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index a73f5c6b4e..f44e371ec3 100644
+index a73f5c6b4e..0e99cd0301 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-@@ -4,21 +4,44 @@
+@@ -4,21 +4,43 @@
  
  #include "chrome/browser/ui/views/frame/multi_contents_view.h"
  
@@ -21244,7 +21244,7 @@ index a73f5c6b4e..f44e371ec3 100644
  #include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
  #include "chrome/browser/ui/browser_tabstrip.h"
- #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+-#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 +#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 +#include "chrome/browser/ui/color/chrome_color_id.h"
 +#include "chrome/browser/ui/omnibox/omnibox_controller.h"
@@ -21260,7 +21260,7 @@ index a73f5c6b4e..f44e371ec3 100644
  #include "chrome/browser/ui/toolbar/app_menu_model.h"
  #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -34,39 +57,116 @@
+@@ -34,39 +56,116 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
@@ -21377,7 +21377,7 @@ index a73f5c6b4e..f44e371ec3 100644
  class ViewBoundsChangedObserver : public views::ViewObserver,
                                    public ui::test::StateObserver<int> {
   public:
-@@ -301,6 +401,199 @@ class MultiContentsViewUiTest
+@@ -301,6 +400,199 @@ class MultiContentsViewUiTest
                            }),
                   WaitForState(kSidePanelViewObserver, true));
    }
@@ -21577,7 +21577,7 @@ index a73f5c6b4e..f44e371ec3 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -424,6 +717,951 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -424,6 +716,945 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -22145,21 +22145,15 @@ index a73f5c6b4e..f44e371ec3 100644
 +      Do([this]() { CloseYeeOmniboxPopup(); }), Do([this]() {
 +        ASSERT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
 +        // 새 탭 관찰 전에 알림이 끝나 이전 탭 상태만 남은 경우를 재현한다.
-+        browser()
-+            ->GetFeatures()
-+            .split_tab_highlight_controller()
++        split_tabs::SplitTabHighlightController::From(browser())
 +            ->OnOmniboxPopupVisibilityChanged(true);
-+        ASSERT_TRUE(browser()
-+                        ->GetFeatures()
-+                        .split_tab_highlight_controller()
++        ASSERT_TRUE(split_tabs::SplitTabHighlightController::From(browser())
 +                        ->ShouldHighlight());
 +        tab_strip_model()->ActivateTabAt(1);
 +      }),
 +      WaitForActiveTabChange(1), Check([this]() {
 +        return !location_bar()->GetOmniboxController()->IsPopupOpen() &&
-+               !browser()
-+                    ->GetFeatures()
-+                    .split_tab_highlight_controller()
++               !split_tabs::SplitTabHighlightController::From(browser())
 +                    ->ShouldHighlight() &&
 +               multi_contents_view()->mini_toolbar_for_testing(1)->IsDrawn() &&
 +               location_bar()->IsCompactShellSplitMode() &&
@@ -22529,7 +22523,7 @@ index a73f5c6b4e..f44e371ec3 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -569,16 +1807,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -569,16 +1800,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -22555,7 +22549,7 @@ index a73f5c6b4e..f44e371ec3 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -673,9 +1910,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -673,9 +1903,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -22569,7 +22563,7 @@ index a73f5c6b4e..f44e371ec3 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -690,8 +1928,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -690,8 +1921,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -22584,7 +22578,7 @@ index a73f5c6b4e..f44e371ec3 100644
        }));
  }
  
-@@ -713,15 +1955,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -713,15 +1948,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -22604,7 +22598,7 @@ index a73f5c6b4e..f44e371ec3 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -737,8 +1977,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -737,8 +1970,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22617,7 +22611,7 @@ index a73f5c6b4e..f44e371ec3 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -754,31 +1996,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -754,31 +1989,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -22670,7 +22664,7 @@ index a73f5c6b4e..f44e371ec3 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -798,8 +2041,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -798,8 +2034,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22683,7 +22677,7 @@ index a73f5c6b4e..f44e371ec3 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -809,23 +2054,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -809,23 +2047,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -22723,7 +22717,7 @@ index a73f5c6b4e..f44e371ec3 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -869,12 +2115,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -869,12 +2108,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -22743,7 +22737,7 @@ index a73f5c6b4e..f44e371ec3 100644
                  }));
  }
  #endif
-@@ -882,11 +2131,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -882,11 +2124,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
