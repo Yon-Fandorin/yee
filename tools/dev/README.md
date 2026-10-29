@@ -53,6 +53,11 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 컴포넌트 빌드보다 수정 후 앱을 다시 만드는 시간이 길어질 수 있다.
 설정은 [`build/args.gn`](../../build/args.gn)에 있다.
 
+공통 설정은 `proprietary_codecs = true`와 `ffmpeg_branding = "Chrome"`으로
+AAC/H.264를 포함한다. 코덱 설정을 바꾼 기존 출력 폴더는 GN 설정을 다시 생성하고
+앱 전체를 빌드해야 한다. 지원 여부는 `canPlayType`·MSE 조회와 실제 미디어 디코딩을
+함께 확인한다.
+
 ANGLE의 그래픽 코드 빌드에 필요한 Metal 도구는 `setup-metal.sh`로 준비한다.
 Xcode 26에서 `xcrun metal`이 실제 컴파일러를 찾지 못하면 빌드 도구가 올바른 경로를 찾는다.
 Xcode 파일 자체는 수정하지 않는다.
@@ -198,6 +203,15 @@ Windows 개발 실행 파일은 `out\YeePilot\chrome.exe`, 설치 프로그램�
 설치·프로필·정책·등록 식별자는 별도 `branding/identity.json`에서 생성한다.
 테스트판은 사용자별 설치만 지원하며 기존 Chromium의 데이터를 자동으로 이전하지 않는다.
 다른 브라우저의 공유 실행 파일 등록과 과거 제품 데이터도 정리 대상으로 삼지 않는다.
+
+AAC/H.264 빌드를 바꾼 뒤에는 다음 실제 앱 검사를 실행한다. Chromium의 기존
+시험 파일을 로컬 HTTP로 제공해 일반 MP4의 직접 재생과 조각 MP4의 MSE에서
+영상·음성 디코딩과 재생 종료를 확인한다. 별도 Temp 프로필을 쓰고 정상 종료 후 제거하며,
+이 검사는 외부 YouTube 라이브의 재생 검증과 구분한다.
+
+```powershell
+node tools/dev/test-media-codecs.mjs F:\yee\chromium\src\out\YeePilot\chrome.exe F:\yee\chromium\src
+```
 
 ```powershell
 .\tools\dev\package-windows.ps1
