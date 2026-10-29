@@ -73,6 +73,8 @@
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/javascript_dialogs/app_modal_dialog_controller.h"
 #include "components/javascript_dialogs/app_modal_dialog_view.h"
+#include "components/sessions/core/command_storage_read_status.h"
+#include "components/sessions/core/session_service_commands.h"
 #include "components/sessions/core/session_types.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "content/public/browser/navigation_controller.h"
@@ -2041,8 +2043,8 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       content::WebContents::CreateParams(browser()->GetProfile()));
   replacement->GetController().CopyStateFrom(&old->GetController(), false);
   auto* new_contents = replacement.get();
-  auto deleted = model->DiscardWebContentsAt(model->GetIndexOfTab(tab),
-                                             std::move(replacement));
+  auto deleted =
+      model->DiscardWebContents(tab->GetContents(), std::move(replacement));
   EXPECT_EQ(tab, coordinator()->FindLiveTab(id, browser()));
   EXPECT_EQ(new_contents, tab->GetContents());
   EXPECT_EQ(id, ProjectTabHelper::PageId(new_contents));
@@ -2114,8 +2116,8 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto replacement = content::WebContents::Create(
       content::WebContents::CreateParams(browser()->GetProfile()));
   replacement->GetController().CopyStateFrom(&contents->GetController(), false);
-  auto deleted = model->DiscardWebContentsAt(model->GetIndexOfTab(tab),
-                                             std::move(replacement));
+  auto deleted =
+      model->DiscardWebContents(tab->GetContents(), std::move(replacement));
   EXPECT_EQ(id, coordinator()->PageId(tab));
   EXPECT_EQ(tab, coordinator()->FindLiveTab(id, browser()));
 }
@@ -2298,11 +2300,13 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   helper.SaveNow();
   session->MoveCurrentSessionToLastSession();
   base::test::TestFuture<std::vector<std::unique_ptr<sessions::SessionWindow>>,
-                         SessionID, bool>
+                         SessionID, sessions::CommandStorageReadStatus,
+                         sessions::SessionReplayResult>
       result;
   session->GetLastSession(result.GetCallback());
   ASSERT_TRUE(result.Wait());
-  ASSERT_FALSE(result.Get<2>());
+  ASSERT_EQ(sessions::CommandStorageReadStatus::kSuccess, result.Get<2>());
+  ASSERT_EQ(sessions::SessionReplayResult::kSuccess, result.Get<3>());
   const auto& windows = result.Get<0>();
   ASSERT_FALSE(windows.empty());
   bool found = false;
