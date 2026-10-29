@@ -36556,7 +36556,7 @@ index da1b7607d2..2068def219 100644
    void PaintChildren(const views::PaintInfo& paint_info) override;
    gfx::Size GetMinimumSize() const override;
 diff --git a/chrome/browser/ui/views/tabs/tab_group_header.cc b/chrome/browser/ui/views/tabs/tab_group_header.cc
-index 8010ac8f74..7e21680d78 100644
+index 8010ac8f74..d3e3fa49da 100644
 --- a/chrome/browser/ui/views/tabs/tab_group_header.cc
 +++ b/chrome/browser/ui/views/tabs/tab_group_header.cc
 @@ -43,6 +43,8 @@
@@ -36610,10 +36610,10 @@ index 8010ac8f74..7e21680d78 100644
      CreateHeaderWithTitle();
    }
  
-+  if (const auto* tab_group =
++  if (const auto* current_tab_group =
 +          tab_slot_controller_->GetTabGroup(group().value())) {
-+    yee::UpdateHorizontalTabGroupChip(*this, *title_chip_, *tab_group, color_,
-+                                      is_collapsed_);
++    yee::UpdateHorizontalTabGroupChip(*this, *title_chip_, *current_tab_group,
++                                      color_, is_collapsed_);
 +  }
 +
    // Expand the clip by 1 DIP to prevent clipping the title chip's anti-aliased
