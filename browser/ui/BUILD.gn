@@ -98,7 +98,6 @@ source_set("customization") {
     "webui:strings",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/tabs",
-    "//chrome/browser/ui/tabs:features",
     "//chrome/browser/ui/webui:webui_util",
     "//chrome/common:constants",
     "//components/prefs",

@@ -2,7 +2,6 @@
 #include "chrome/browser/ui/views/yee/customization.h"
 
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
@@ -35,7 +34,7 @@ CustomizationTabLayout GetCustomizationTabLayout(
                          ->FindPreference(prefs::kVerticalTabsEnabled);
   auto* browser = webui::GetBrowserWindowInterface(&contents);
   return {pref->GetValue()->GetBool(),
-          IsShellEnabled() && tabs::IsVerticalTabsFeatureEnabled() && browser &&
+          IsShellEnabled() && browser &&
               tabs::VerticalTabStripStateController::From(browser) &&
               pref->IsUserModifiable()};
 }
