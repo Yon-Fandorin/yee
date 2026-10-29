@@ -31261,7 +31261,7 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..59b21bb8b9 100644
+index a050af7ed7..f6d59af6d7 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 @@ -4,17 +4,20 @@
@@ -31583,7 +31583,7 @@ index a050af7ed7..59b21bb8b9 100644
 +            target_index = index;
 +          }
 +          CHECK_GE(target_index, 0);
-+          return GetTabViewAt(target_index).GetBoundsInScreen().CenterPoint();
++          return GetTabViewAt(target_index)->GetBoundsInScreen().CenterPoint();
 +        })),
 +        RunScheduledLayout());
 +  }
