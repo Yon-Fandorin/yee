@@ -9233,7 +9233,7 @@ index 60cf7ccc70..84f7d1cd22 100644
    // and their values stored here, to prevent repeating them across multiple
    // calls.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 7764d4a472..b06b4cc43a 100644
+index 7764d4a472..ff0630d878 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -21,6 +21,8 @@
@@ -11145,7 +11145,7 @@ index 7764d4a472..b06b4cc43a 100644
  }
  
  void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
-@@ -1562,14 +2130,189 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
+@@ -1562,14 +2130,196 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
  void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
      const BrowserLayoutParams& params) {
    layout_data_ = std::make_unique<TransientLayoutData>(params);
@@ -11173,7 +11173,11 @@ index 7764d4a472..b06b4cc43a 100644
    layout_data_->window_state = delegate().GetBrowserWindowState();
    layout_data_->tab_strip_type = delegate().GetTabStripType();
 +  if (views().uses_yee_browser_surface_geometry) {
-+    layout_data_->surface_mode = yee::GetBrowserSurfaceMode(*browser());
++    const auto* const browser_view =
++        views::AsViewClass<BrowserView>(views().browser_view.get());
++    CHECK(browser_view);
++    layout_data_->surface_mode =
++        yee::GetBrowserSurfaceMode(*browser_view->browser());
 +    yee::BrowserSurfaceChromeState live_state;
 +    switch (layout_data_->window_state) {
 +      case WindowState::kNormal:
@@ -11219,7 +11223,10 @@ index 7764d4a472..b06b4cc43a 100644
 +    layout_data_->side_panel_visible =
 +        IsParentedToAndVisible(panel, views().browser_view);
 +    layout_data_->side_panel_type = panel->GetCurrentEntryType();
-+    const auto* side_panel_ui = SidePanelUI::From(browser());
++    const auto* const browser_view =
++        views::AsViewClass<BrowserView>(views().browser_view.get());
++    const auto* side_panel_ui =
++        browser_view ? SidePanelUI::From(browser_view->browser()) : nullptr;
 +    layout_data_->customization_panel =
 +        side_panel_ui && side_panel_ui->GetCurrentEntryId() ==
 +                             SidePanelEntryId::kCustomizeChrome;
@@ -11339,7 +11346,7 @@ index 7764d4a472..b06b4cc43a 100644
    layout_data_->side_panel_content_animation =
        CalculateSidePanelContentAnimation();
  }
-@@ -1577,7 +2320,7 @@ void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
+@@ -1577,7 +2327,7 @@ void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
  void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      const BrowserLayoutParams& params) {
    // If the window goes out of glass mode, these changes won't hurt anything.
@@ -11348,7 +11355,7 @@ index 7764d4a472..b06b4cc43a 100644
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state)) {
-@@ -1595,12 +2338,49 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1595,12 +2345,49 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      views().multi_contents_view->SetBackgroundRadii(content_corners);
    }
  
@@ -11399,7 +11406,7 @@ index 7764d4a472..b06b4cc43a 100644
  
    const double flyover_panel_opacity =
        features::kGlassExpandOnHoverEnabled.Get() ? kGlassExpandOnHoverOpacity
-@@ -1610,20 +2390,53 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1610,20 +2397,53 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    CustomCorners::ColorChoiceWithAlpha frame_color(CustomCorners::FrameTheme(),
                                                    1.0f);
    CustomCornersBackground* vertical_tabs_background = nullptr;
@@ -11456,7 +11463,7 @@ index 7764d4a472..b06b4cc43a 100644
        if (!is_fullscreen(layout_data_->window_state)) {
          frame_color.opacity = 0.0f;
        }
-@@ -1681,6 +2494,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1681,6 +2501,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
  
@@ -11482,7 +11489,7 @@ index 7764d4a472..b06b4cc43a 100644
      vertical_tabs_background->SetCorners(vertical_tabs_corners);
  
      // Apply shadow for expand-on-hover.
-@@ -1688,7 +2520,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1688,7 +2527,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          views().vertical_tab_strip_region_view->shadow_frame();
      if (vertical_tabs_bottom_corner_amount > 0.0) {
        shadow_frame->SetShadowCornerRadius(vertical_tabs_bottom_corner_size);
@@ -11493,7 +11500,7 @@ index 7764d4a472..b06b4cc43a 100644
        shadow_frame->SetShadowVisible(true);
      } else {
        shadow_frame->SetShadowVisible(false);
-@@ -1714,8 +2548,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1714,8 +2555,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_outline.top = true;
      }
      if (animation.expand_on_hover_width > 0.0) {
@@ -11509,7 +11516,7 @@ index 7764d4a472..b06b4cc43a 100644
      vertical_tabs_background->SetOutline(vertical_tabs_outline);
  
      // Cut the vertical tab strip out of the top container.
-@@ -1745,9 +2586,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1745,9 +2593,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
        // Has to be done after most other adjustments to ensure the correct
        // outline path.
@@ -11524,7 +11531,7 @@ index 7764d4a472..b06b4cc43a 100644
        vertical_tabs_background->SetUseBackgroundBlur(use_blur_background);
        if (use_blur_background) {
          // The opacity of the backdrop needs to fade over the entire animation
-@@ -1761,6 +2604,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1761,6 +2611,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
      views().vertical_tab_strip_region_view->UpdatePanelClips();
  
@@ -11536,7 +11543,7 @@ index 7764d4a472..b06b4cc43a 100644
    } else if (layout_data_->tab_strip_type == TabStripType::kHorizontal &&
               !is_fullscreen(layout_data_->window_state) && in_glass_mode()) {
      frame_color.opacity = 0.0f;
-@@ -1821,6 +2669,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1821,6 +2676,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().toolbar->background()->AsA<CustomCornersBackground>();
    CHECK(toolbar_background)
        << "Expected toolbar to have a CustomCornersBackground.";
@@ -11547,7 +11554,7 @@ index 7764d4a472..b06b4cc43a 100644
  
    // Set toolbar corners.
    CustomCornersBackground::Corners toolbar_corners;
-@@ -1868,6 +2720,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1868,6 +2727,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().top_container->background()->AsA<CustomCornersBackground>();
    CHECK(top_container_background)
        << "Expected top container to have a CustomCornersBackground.";
@@ -11560,7 +11567,7 @@ index 7764d4a472..b06b4cc43a 100644
  
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
-@@ -1921,29 +2779,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1921,29 +2786,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    // Clip the side panel so it doesn't run off the edge of the browser or into
    // the vertical tab strip.
    if (IsParentedToAndVisible(views().side_panel, views().browser_view)) {
@@ -11599,7 +11606,7 @@ index 7764d4a472..b06b4cc43a 100644
    }
  
    if (views().main_background_region &&
-@@ -1991,10 +2835,81 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1991,10 +2842,81 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            main_background->GetWindowCorner(/*upper=*/false);
      }
  
