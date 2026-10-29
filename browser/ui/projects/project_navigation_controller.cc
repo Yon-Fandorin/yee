@@ -41,6 +41,7 @@
 #include "chrome/browser/yee_projects/project_service.h"
 #include "chrome/browser/yee_projects/project_service_factory.h"
 #include "chrome/browser/yee_projects/project_tab_coordinator.h"
+#include "components/tabs/public/tab_interface.h"
 #include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -1123,15 +1124,17 @@ void ProjectNavigationController::ShowPageMenu(std::string page_id,
   auto* target = tab ? tab->GetBrowserWindowInterface() : nullptr;
   auto* target_view =
       target ? BrowserView::GetBrowserViewForBrowser(target) : nullptr;
-  if (!target_view || !target_view->tab_strip_view())
+  if (!target_view || !target_view->tab_strip_view()) {
     return;
-  const int index = target->GetTabStripModel()->GetIndexOfTab(tab);
-  auto* native = target_view->tab_strip_view()->GetTabAnchorViewAt(index);
+  }
+  auto* native =
+      target_view->tab_strip_view()->GetTabAnchorView(tab->GetHandle());
   // legacy 수평 TabStrip은 source가 실제 Tab인지 검사하므로 native view를
   // 전달한다.
-  if (native && native->context_menu_controller())
+  if (native && native->context_menu_controller()) {
     native->context_menu_controller()->ShowContextMenuForView(native, point,
                                                               type);
+  }
 }
 
 }  // namespace yee::projects
