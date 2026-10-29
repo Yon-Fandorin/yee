@@ -29011,19 +29011,23 @@ index 7571027287..8e764e320a 100644
      "//testing/gtest",
      "//ui/base",
 diff --git a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
-index 27ad413fc0..488e670fb0 100644
+index 27ad413fc0..086f02452e 100644
 --- a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
 +++ b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
-@@ -6,6 +6,8 @@
+@@ -5,9 +5,12 @@
+ #include "chrome/browser/ui/views/tabs/common/dragged_tabs_container.h"
  
  #include <algorithm>
- 
 +#include <optional>
 +#include <vector>
+ 
  #include "base/auto_reset.h"
  #include "base/callback_list.h"
++#include "base/containers/to_vector.h"
  #include "base/i18n/rtl.h"
-@@ -20,6 +22,8 @@
+ #include "base/notreached.h"
+ #include "base/time/time.h"
+@@ -20,6 +23,8 @@
  #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
  #include "chrome/browser/ui/views/tabs/dragging/drag_session_data.h"
  #include "chrome/browser/ui/views/tabs/dragging/tab_drag_target.h"
@@ -29032,7 +29036,7 @@ index 27ad413fc0..488e670fb0 100644
  #include "content/public/browser/navigation_controller.h"
  #include "ui/compositor/layer.h"
  #include "ui/gfx/geometry/point.h"
-@@ -406,10 +410,16 @@ void DraggedTabsContainer::AddViewToSquashedDragLayout(
+@@ -406,10 +411,16 @@ void DraggedTabsContainer::AddViewToSquashedDragLayout(
      const gfx::Rect& view_bounds,
      bool is_source_dragged_view) {
    if (is_source_dragged_view) {
@@ -29051,7 +29055,7 @@ index 27ad413fc0..488e670fb0 100644
                                       kDraggedViewHorizontalPadding);
    }
    dragging_views_.insert(
-@@ -488,6 +498,11 @@ gfx::Rect DraggedTabsContainer::GetDraggingViewsBounds() const {
+@@ -488,6 +499,11 @@ gfx::Rect DraggedTabsContainer::GetDraggingViewsBounds() const {
    return box_for_point;
  }
  
@@ -29063,7 +29067,7 @@ index 27ad413fc0..488e670fb0 100644
  gfx::Vector2d DraggedTabsContainer::GetDraggingViewPositionForBounds(
      const views::View* dragging_view,
      const gfx::Rect& dragging_views_bounding_box,
-@@ -546,6 +561,22 @@ DraggedTabsContainer::GetVisualDataForDraggedView(
+@@ -546,6 +562,22 @@ DraggedTabsContainer::GetVisualDataForDraggedView(
      return std::nullopt;
    }
  
@@ -29086,13 +29090,13 @@ index 27ad413fc0..488e670fb0 100644
    // Views that should be hidden are still shown while animating into position,
    // but are set to "float" so that surrounding views may also animate into
    // the end position.
-@@ -695,6 +726,54 @@ void DraggedTabsContainer::HandleTabDragInContainer(
+@@ -695,6 +727,54 @@ void DraggedTabsContainer::HandleTabDragInContainer(
  const TabCollectionNode* DraggedTabsContainer::GetTargetForTabDrag(
      const views::ProposedLayout& layout,
      const gfx::Rect& dragged_tab_bounds) const {
 +  if (collection_node_ && GetDragHandler().UseFavoritesSlotPreview()) {
 +    const std::vector<views::View*> children =
-+        collection_node_->GetDirectChildren();
++        base::ToVector(collection_node_->GetDirectChildren());
 +    const int count = static_cast<int>(children.size());
 +    views::View* const dock = base::to_address(host_view_);
 +    gfx::Size tile_size = GetDragHandler().DragSourceTileSize();
@@ -30315,16 +30319,18 @@ index 495a43a648..8c053406c4 100644
      All,
      TabCollectionAnimatingLayoutManagerTest,
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index 20c6e0b3d3..881f8bbc4c 100644
+index 20c6e0b3d3..eee81efd06 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-@@ -7,25 +7,32 @@
+@@ -7,25 +7,34 @@
  #include <algorithm>
  #include <memory>
  #include <optional>
 +#include <string>
++#include <vector>
  
  #include "base/check_deref.h"
++#include "base/containers/to_vector.h"
  #include "base/functional/bind.h"
  #include "base/notreached.h"
  #include "base/types/to_address.h"
@@ -30351,7 +30357,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  #include "components/tab_groups/tab_group_id.h"
  #include "components/tabs/public/split_tab_collection.h"
  #include "components/tabs/public/split_tab_data.h"
-@@ -40,14 +47,18 @@
+@@ -40,14 +49,18 @@
  #include "ui/base/dragdrop/drag_drop_types.h"
  #include "ui/base/dragdrop/os_exchange_data.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
@@ -30370,7 +30376,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  #include "ui/views/view_targeter.h"
  #include "ui/views/view_utils.h"
  
-@@ -55,6 +66,8 @@ DEFINE_UI_CLASS_PROPERTY_TYPE(gfx::Vector2d*)
+@@ -55,6 +68,8 @@ DEFINE_UI_CLASS_PROPERTY_TYPE(gfx::Vector2d*)
  
  namespace {
  
@@ -30379,7 +30385,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  // Stores the offset of the view's initial position to the target position
  // it should be, relative to the source dragged view's origin.
  DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(gfx::Vector2d, kOffsetAtTabDragStart)
-@@ -190,7 +203,45 @@ TabDragHandlerImpl::TabDragHandlerImpl(
+@@ -190,7 +205,45 @@ TabDragHandlerImpl::TabDragHandlerImpl(
    SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
  }
  
@@ -30426,7 +30432,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  
  bool TabDragHandlerImpl::DoesIntersectRect(const views::View* target,
                                             const gfx::Rect& rect) const {
-@@ -202,6 +253,17 @@ void TabDragHandlerImpl::InitializeDrag(
+@@ -202,6 +255,17 @@ void TabDragHandlerImpl::InitializeDrag(
      const ui::ListSelectionModel& original_selection_model,
      const ui::LocatedEvent& event) {
    ResetDragState();
@@ -30444,7 +30450,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
    drag_controller_ = std::make_unique<TabDragController>();
  
    DragInitData drag_init_data;
-@@ -354,6 +416,7 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -354,6 +418,7 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
    }
    gfx::Point screen_location(event.location());
    ConvertPointToScreen(&event_source_view, &screen_location);
@@ -30452,7 +30458,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  
    // Dragging may start a blocking loop, which may allow this to be destroyed.
    auto ref = weak_factory_.GetWeakPtr();
-@@ -365,10 +428,508 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -365,10 +430,510 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
      ResetDragState();
      return false;
    }
@@ -30759,7 +30765,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
 +          group_layout.GetLayoutFor(group->group_header());
 +      const std::vector<views::View*> group_children =
 +          group->collection_node()
-+              ? group->collection_node()->GetDirectChildren()
++              ? base::ToVector(group->collection_node()->GetDirectChildren())
 +              : std::vector<views::View*>();
 +
 +      // Reconstruct the group's compact bounds. Its target layout may already
@@ -30895,13 +30901,15 @@ index 20c6e0b3d3..881f8bbc4c 100644
 +          // 저장한다.
 +          for (const auto& child : group_node->children()) {
 +            const auto* row = layout.GetLayoutFor(child->view());
-+            if (!row || !row->visible)
++            if (!row || !row->visible) {
 +              continue;
++            }
 +            if (visible_index++ == *pending_group_gap) {
 +              const int index =
 +                  GetInsertionIndexForNode(*child, *tab_strip_model_);
-+              if (tab_strip_model_->ContainsIndex(index))
++              if (tab_strip_model_->ContainsIndex(index)) {
 +                unpin_anchor = tab_strip_model_->GetWebContentsAt(index);
++              }
 +              break;
 +            }
 +          }
@@ -30961,7 +30969,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
    // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
-@@ -383,9 +944,98 @@ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
+@@ -383,9 +948,98 @@ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
    // Let TabDragController decide whether this reason should actually end the
    // drag (e.g. capture loss while dragging a detached window) and destroy
    // itself when appropriate.
@@ -31061,7 +31069,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  }
  
  void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
-@@ -393,6 +1043,28 @@ void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
+@@ -393,6 +1047,28 @@ void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
    CHECK(drag_controller_);
    const auto& drag_session_data = drag_controller_->GetSessionData();
  
@@ -31090,7 +31098,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
    const TabDragData* source_drag_data =
        drag_session_data.source_view_drag_data();
    const content::WebContents* source_contents = source_drag_data->contents;
-@@ -783,6 +1455,9 @@ void TabDragHandlerImpl::StartedDragging(
+@@ -783,6 +1459,9 @@ void TabDragHandlerImpl::StartedDragging(
      CHECK(dragged_view);
      dragged_view->SetPaintToLayer();
      dragged_view->layer()->SetFillsBoundsOpaquely(false);
@@ -31100,7 +31108,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
      gfx::Vector2d offset = dragged_view->GetBoundsInScreen().origin() -
                             source_view_origin_in_screen;
      dragged_view->SetProperty(kOffsetAtTabDragStart, offset);
-@@ -792,11 +1467,16 @@ void TabDragHandlerImpl::StartedDragging(
+@@ -792,11 +1471,16 @@ void TabDragHandlerImpl::StartedDragging(
  }
  
  void TabDragHandlerImpl::DraggedTabsDetached() {
@@ -31117,7 +31125,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
    expand_on_hover_lock_.reset();
    scroll_synchronizers_.clear();
  
-@@ -942,8 +1622,15 @@ void TabDragHandlerImpl::OnNodeWillDestroy(TabCollectionNode& node) {
+@@ -942,8 +1626,15 @@ void TabDragHandlerImpl::OnNodeWillDestroy(TabCollectionNode& node) {
  }
  
  void TabDragHandlerImpl::ResetDragState() {
@@ -31133,7 +31141,7 @@ index 20c6e0b3d3..881f8bbc4c 100644
  }
  
  bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
-@@ -951,6 +1638,10 @@ bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
+@@ -951,6 +1642,10 @@ bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
      const TabCollectionNode* target) {
    CHECK(drag_controller_);
  
