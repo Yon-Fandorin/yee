@@ -11815,10 +11815,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..5dba250806 100644
+index 49b4f6dd0d..3b742525fe 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,334 @@
+@@ -4,84 +4,335 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -11877,6 +11877,7 @@ index 49b4f6dd0d..5dba250806 100644
 +#include "chrome/browser/ui/tabs/tab_group_model.h"
 +#include "chrome/browser/ui/tabs/tab_group_theme.h"
 +#include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
  #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
  #include "chrome/browser/ui/ui_features.h"
 +#include "chrome/browser/ui/views/animations/side_panel_animations.h"
@@ -12156,7 +12157,7 @@ index 49b4f6dd0d..5dba250806 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +343,25 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +344,25 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
@@ -12185,7 +12186,7 @@ index 49b4f6dd0d..5dba250806 100644
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +376,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +377,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12200,7 +12201,7 @@ index 49b4f6dd0d..5dba250806 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +631,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +632,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12227,7 +12228,7 @@ index 49b4f6dd0d..5dba250806 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -389,11 +668,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -389,11 +669,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
   private:
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
@@ -12399,7 +12400,7 @@ index 49b4f6dd0d..5dba250806 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1040,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1041,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12429,7 +12430,7 @@ index 49b4f6dd0d..5dba250806 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,195 +1090,4877 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,195 +1091,4877 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -14939,7 +14940,7 @@ index 49b4f6dd0d..5dba250806 100644
 +  auto* const state = tabs::VerticalTabStripStateController::From(browser());
 +  state->SetVerticalTabsEnabled(true);
 +  state->SetExpandOnHoverEnabled(true);
-+  state->SetUncollapsedWidth(VerticalTabStripRegionView::kUncollapsedMinWidth);
++  state->SetUncollapsedWidth(tabs::kVerticalTabStripUncollapsedMinWidth);
 +  state->RequestCollapse(false);
 +  RunScheduledLayouts();
 +
@@ -14962,7 +14963,7 @@ index 49b4f6dd0d..5dba250806 100644
 +  const gfx::Rect agent_bounds = agent->GetBoundsInScreen();
 +  EXPECT_GE(region->width(),
 +            region->sidebar_header_actions()->GetMinimumSize().width());
-+  EXPECT_EQ(VerticalTabStripRegionView::kUncollapsedMinWidth,
++  EXPECT_EQ(tabs::kVerticalTabStripUncollapsedMinWidth,
 +            state->GetUncollapsedWidth());
 +  views::View* toggle = nullptr;
 +  for (views::View* child : browser_view->toolbar()->children()) {
@@ -17473,7 +17474,7 @@ index 49b4f6dd0d..5dba250806 100644
  
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneOpenSidePanel) {
-@@ -874,10 +5994,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +5995,957 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18432,7 +18433,7 @@ index 49b4f6dd0d..5dba250806 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +6953,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +6954,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18450,7 +18451,7 @@ index 49b4f6dd0d..5dba250806 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7017,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7018,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18468,7 +18469,7 @@ index 49b4f6dd0d..5dba250806 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7037,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7038,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18487,7 +18488,7 @@ index 49b4f6dd0d..5dba250806 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7109,359 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7110,359 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -23691,7 +23692,7 @@ index bb6460de5b..a2019d586f 100644
      // controls) being painted underneath them. Clip rect has already been set
      // to the bounds of this view, so just paint the frame.  Use a clone without
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
-index 910a14e38e..0ee9a27d26 100644
+index 910a14e38e..9a16e3ea93 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_background_blur_backdrop.cc
 @@ -4,6 +4,8 @@
@@ -23707,7 +23708,7 @@ index 910a14e38e..0ee9a27d26 100644
    SetCanProcessEventsWithinSubtree(false);
    SetPaintToLayer();
    layer()->SetFillsBoundsOpaquely(false);
-+  collapsed_width_ = VerticalTabStripRegionView::kCollapsedWidth;
++  collapsed_width_ = tabs::kVerticalTabStripCollapsedWidth;
  }
  
  VerticalTabStripBackgroundBlurBackdrop::
@@ -23770,7 +23771,7 @@ index 32fac5ab16..aa62acf580 100644
  };
  
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index f3ab4f166b..5944ea115a 100644
+index f3ab4f166b..811cd240b7 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -10,20 +10,30 @@
@@ -24196,7 +24197,7 @@ index f3ab4f166b..5944ea115a 100644
    shadow_frame_->SetBoundsRect(GetLocalBounds());
  
    // Ensure that we update the drop arrow position so that it does not render in
-@@ -511,17 +754,61 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+@@ -511,17 +754,55 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
      return GetTabAnchorView(active_tab->GetHandle());
    }
  
@@ -24222,25 +24223,19 @@ index f3ab4f166b..5944ea115a 100644
 +int VerticalTabStripRegionView::GetMinimumUncollapsedWidth() const {
 +  int minimum =
 +      sidebar_header_actions_
-+          ? std::max(kUncollapsedMinWidth,
++          ? std::max(tabs::kVerticalTabStripUncollapsedMinWidth,
 +                     sidebar_header_actions_->GetMinimumSize().width())
-+          : kUncollapsedMinWidth;
++          : tabs::kVerticalTabStripUncollapsedMinWidth;
 +#if BUILDFLAG(IS_WIN)
-+  if (yee::IsShellEnabled() && root_node() &&
-+      tab_strip_model()->SupportsTabGroups()) {
++  if (yee::IsShellEnabled() && tab_strip_model()->SupportsTabGroups()) {
 +    // 접힌 그룹의 favicon 요약과 native 조작 아이콘은 줄일 수 없는 항목이다.
 +    // 실제 Header의 최소 폭에 목록 양쪽 inset을 더해 Sidebar가 가리지 않게
 +    // 한다.
 +    for (const auto& id : tab_strip_model()->group_model()->ListTabGroups()) {
-+      const auto* group = tab_strip_model()->group_model()->GetTabGroup(id);
-+      const auto* node =
-+          root_node()->GetNodeForHandle(group->GetCollectionHandle());
-+      const auto* group_view =
-+          node ? views::AsViewClass<TabGroupView>(node->view()) : nullptr;
-+      if (group_view) {
++      if (const auto* header = GetGroupHeaderView(id)) {
 +        minimum = std::max(
 +            minimum,
-+            group_view->group_header()->GetMinimumSize().width() +
++            header->GetMinimumSize().width() +
 +                2 * GetLayoutConstant(
 +                        LayoutConstant::kVerticalTabStripHorizontalPadding));
 +      }
@@ -24260,7 +24255,7 @@ index f3ab4f166b..5944ea115a 100644
  gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
    auto size = BaseTabStripRegionView::CalculatePreferredSize(available_size);
-@@ -530,8 +817,7 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
+@@ -530,8 +811,7 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
    const auto motion =
        controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
    const int expand_amount =
@@ -24270,7 +24265,7 @@ index f3ab4f166b..5944ea115a 100644
    const double expand_percent =
        *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
                                     TabStripAnimations::kTabStripWidth);
-@@ -741,7 +1027,7 @@ void VerticalTabStripRegionView::OnResize(int resize_amount,
+@@ -741,7 +1021,7 @@ void VerticalTabStripRegionView::OnResize(int resize_amount,
    new_state.uncollapsed_width = target_collapse_state_.uncollapsed_width;
    if (!new_state.collapsed) {
      new_state.uncollapsed_width =
@@ -24279,7 +24274,7 @@ index f3ab4f166b..5944ea115a 100644
                     tabs::kVerticalTabStripUncollapsedMaxWidth);
      if (std::abs(new_state.uncollapsed_width -
                   tabs::kVerticalTabStripDefaultUncollapsedWidth) <
-@@ -856,7 +1142,12 @@ void VerticalTabStripRegionView::AddTabStripView(
+@@ -856,7 +1136,12 @@ void VerticalTabStripRegionView::AddTabStripView(
                                 views::MaximumFlexSizeRule::kPreferred));
    view->SetProperty(
        views::kMarginsKey,
@@ -24293,7 +24288,7 @@ index f3ab4f166b..5944ea115a 100644
            GetLayoutConstant(
                LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
            0));
-@@ -887,11 +1178,32 @@ void VerticalTabStripRegionView::AddTabStripView(
+@@ -887,11 +1172,32 @@ void VerticalTabStripRegionView::AddTabStripView(
                &VerticalTabStripRegionView::OnExpandOnHoverEnabledChanged,
                base::Unretained(this)));
  
@@ -24326,7 +24321,7 @@ index f3ab4f166b..5944ea115a 100644
    on_animation_update_subscription_.reset();
    expand_on_hover_enabled_changed_subscription_.reset();
    omnibox_tab_helper_observation_.Reset();
-@@ -906,11 +1218,20 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+@@ -906,11 +1212,20 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
    // the collapsing state.
    bool collapsed = state != tabs::VerticalTabStripCollapseState::kExpanded;
  
@@ -24348,7 +24343,7 @@ index f3ab4f166b..5944ea115a 100644
  
    if (tab_strip_view()) {
      tab_strip_view()->SetCollapsedState(collapsed);
-@@ -940,6 +1261,7 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+@@ -940,6 +1255,7 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
        state == tabs::VerticalTabStripCollapseState::kCollapsed) {
      UpdateExpandOnHoverState();
    }
@@ -24356,7 +24351,7 @@ index f3ab4f166b..5944ea115a 100644
  }
  
  bool VerticalTabStripRegionView::IsCollapseButtonHovered() const {
-@@ -956,7 +1278,9 @@ gfx::Rect VerticalTabStripRegionView::GetTabStripDraggableBounds() const {
+@@ -956,7 +1272,9 @@ gfx::Rect VerticalTabStripRegionView::GetTabStripDraggableBounds() const {
    gfx::Rect tab_strip_draggable_bounds = tab_strip_view()->GetBoundsInScreen();
    tab_strip_draggable_bounds.set_height(
        GetBoundsInScreen().bottom() -
@@ -24367,7 +24362,7 @@ index f3ab4f166b..5944ea115a 100644
        GetLayoutConstant(
            LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding) -
        tab_strip_draggable_bounds.y());
-@@ -980,6 +1304,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -980,6 +1298,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
      return;
    }
  
@@ -24386,7 +24381,7 @@ index f3ab4f166b..5944ea115a 100644
    if (suppress_expand_on_hover_ && !IsCollapseButtonHovered()) {
      suppress_expand_on_hover_ = false;
    }
-@@ -1126,6 +1462,10 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
+@@ -1126,6 +1456,10 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
    is_expanded_on_hover_ = expand;
    ResetExpandOnHoverTimers();
  
@@ -24397,7 +24392,7 @@ index f3ab4f166b..5944ea115a 100644
    if (expand) {
      expand_on_hover_start_time_ = base::TimeTicks::Now();
      base::RecordAction(
-@@ -1147,6 +1487,26 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
+@@ -1147,6 +1481,26 @@ void VerticalTabStripRegionView::AnimateExpandOnHover(bool expand) {
                       : TabStripAnimations::kCollapseOnHover);
  }
  
