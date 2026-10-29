@@ -3105,7 +3105,7 @@ index bb4b18f7dc..6d1222356b 100644
        "//components/blocked_content",
        "//components/breadcrumbs/core",
 diff --git a/chrome/browser/ui/tabs/split_tab_highlight_controller.cc b/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
-index 0f1ee4f117..95e0978736 100644
+index 0f1ee4f117..afdc891f6f 100644
 --- a/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
 +++ b/chrome/browser/ui/tabs/split_tab_highlight_controller.cc
 @@ -19,6 +19,7 @@
@@ -3125,8 +3125,8 @@ index 0f1ee4f117..95e0978736 100644
 +  // Toolbar 갱신 중 새 탭으로 보낸 팝업 알림은 이 구독보다 먼저 끝날 수 있다.
 +  // 실제 팝업 상태를 읽어 이전 탭의 강조 상태를 남기지 않는다.
 +  is_omnibox_popup_showing_ =
-+      active_tab && browser_window_interface->GetFeatures()
-+                        .location_bar()
++      active_tab && BrowserWindow::FromBrowser(browser_window_interface)
++                        ->GetLocationBar()
 +                        ->GetOmniboxController()
 +                        ->IsPopupOpen();
    UpdateHighlight();
