@@ -43,6 +43,34 @@ build_regression_targets() {
   )
 }
 
+# 실행과 같은 바이너리·인수로 목록을 확인해 비어 있는 회귀 검사의 성공을 막는다.
+run_native_test_gate() {
+  local test_binary="$1"
+  shift
+  local argument test_filter='' filter_count=0
+  for argument in "$@"; do
+    if [[ "$argument" == --gtest_filter=* ]]; then
+      test_filter="${argument#--gtest_filter=}"
+      (( filter_count += 1 ))
+    fi
+  done
+  if (( filter_count != 1 )); then
+    print -u2 'Native 검사는 명시한 --gtest_filter= 인수 하나가 필요하다.'
+    return 2
+  fi
+
+  local test_listing list_result
+  if test_listing="$("$test_binary" "$@" --gtest_list_tests)"; then
+    print -r -- "$test_listing" | \
+      python3 "$COMMON_DIR/lib/native_test_discovery.py" --filter="$test_filter" || return $?
+  else
+    list_result=$?
+    print -u2 "Native 테스트 목록 조회 실패 (${list_result}): $test_binary"
+    return "$list_result"
+  fi
+  "$test_binary" "$@"
+}
+
 # Compatibility for existing focused regression gates.
 configure_regression_build_cache() {
   configure_yee_build_cache

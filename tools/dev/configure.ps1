@@ -20,10 +20,14 @@ if ($CheckOverlayOnly) {
 }
 
 $gn = Get-DepotCommand -Name 'gn'
-$gnArguments = Get-GnArguments
+# 배치 실행 시 문자열 값의 따옴표가 사라지지 않도록 GN이 파일을 직접 읽게 한다.
+New-Item -ItemType Directory -Path $script:YeeOutDir -Force | Out-Null
+$gnArguments = Get-Content -LiteralPath $script:YeeArgsFile -Raw -Encoding UTF8
+[System.IO.File]::WriteAllText((Join-Path $script:YeeOutDir 'args.gn'), $gnArguments,
+    [System.Text.UTF8Encoding]::new($false))
 Push-Location $script:ChromiumSrc
 try {
-    & $gn gen "out\$script:YeeOutName" "--args=$gnArguments"
+    & $gn gen "out\$script:YeeOutName"
     if ($LASTEXITCODE -ne 0) {
         throw 'GN generation failed.'
     }

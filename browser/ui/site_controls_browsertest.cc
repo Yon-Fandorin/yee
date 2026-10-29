@@ -17,8 +17,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
-#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
@@ -205,7 +205,7 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
                               ".display"));
   }
 
-  views::Widget* OpenControls(Browser* owner = nullptr) {
+  views::Widget* OpenControls(BrowserWindowInterface* owner = nullptr) {
     if (!owner) {
       owner = browser();
     }
@@ -225,7 +225,7 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
     return nullptr;
   }
 
-  void ToggleAndWaitForReload(Browser* owner = nullptr) {
+  void ToggleAndWaitForReload(BrowserWindowInterface* owner = nullptr) {
     if (!owner) {
       owner = browser();
     }
@@ -242,7 +242,7 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
     EXPECT_FALSE(IsSiteControlsBubbleShowing());
   }
 
-  SiteControlsButton* Button(Browser* owner = nullptr) {
+  SiteControlsButton* Button(BrowserWindowInterface* owner = nullptr) {
     return FindView<SiteControlsButton>(
         BrowserView::GetBrowserViewForBrowser(owner ? owner : browser())
             ->GetLocationBarView());
@@ -428,8 +428,8 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
     EXPECT_FALSE(FindView<views::MdTextButton>(protection->GetContentsView()));
     EXPECT_EQ(PageInfoBubbleView::BUBBLE_NONE,
               PageInfoBubbleView::GetShownBubbleType());
-    capture(protection, vertical ? "protection-sidebar.png"
-                                 : "protection-horizontal.png");
+    capture(protection,
+            vertical ? "protection-sidebar.png" : "protection-horizontal.png");
 
     auto* identity = view->GetLocationBarView()->location_icon_view();
     ASSERT_TRUE(identity);
@@ -446,13 +446,14 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
     EXPECT_FALSE(FindView<views::ToggleButton>(page_info));
     EXPECT_TRUE(page_info->GetViewByID(
         PageInfoViewFactory::VIEW_ID_PAGE_INFO_LINK_OR_BUTTON_SITE_SETTINGS));
-    capture(page_info->GetWidget(), vertical ? "page-info-sidebar.png"
-                                            : "page-info-horizontal.png");
+    capture(page_info->GetWidget(),
+            vertical ? "page-info-sidebar.png" : "page-info-horizontal.png");
     page_info->GetWidget()->CloseNow();
   }
 }
 
-IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, PageInfoOpensNativeSiteSettings) {
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       PageInfoOpensNativeSiteSettings) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
   ASSERT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())
                   ->GetLocationBarView()
@@ -495,7 +496,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, ButtonOutlivesDestroyedTab) {
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, WindowClosesWithControlsOpen) {
-  Browser* second = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* second = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(second, FixtureURL()));
   ASSERT_TRUE(OpenControls(second));
   CloseBrowserSynchronously(second);
@@ -690,7 +691,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, MultipleWindowsKeepExactSite) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
-  Browser* second = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* second = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       second, FixtureURL("other.yee-fixture.test")));
   ToggleAndWaitForReload(second);
@@ -704,7 +705,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, MultipleWindowsKeepExactSite) {
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                        SiteChangeUpdatesOtherWindowBadge) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
-  Browser* second = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* second = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(second, FixtureURL()));
   CheckPage(true, second->tab_strip_model()->GetActiveWebContents());
   ASSERT_TRUE(Button(second));
@@ -719,7 +720,8 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                        IncognitoExceptionStaysPrivate) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
-  Browser* incognito = CreateIncognitoBrowser(browser()->GetProfile());
+  BrowserWindowInterface* incognito =
+      CreateIncognitoBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(incognito, FixtureURL()));
   ToggleAndWaitForReload(incognito);
   CheckPage(false, incognito->tab_strip_model()->GetActiveWebContents());
@@ -730,7 +732,8 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                   ->GetList(content_blocking::kDisabledSitesPref)
                   .empty());
   CloseBrowserSynchronously(incognito);
-  Browser* fresh = CreateIncognitoBrowser(browser()->GetProfile());
+  BrowserWindowInterface* fresh =
+      CreateIncognitoBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(fresh, FixtureURL()));
   CheckPage(true, fresh->tab_strip_model()->GetActiveWebContents());
   CloseBrowserSynchronously(fresh);

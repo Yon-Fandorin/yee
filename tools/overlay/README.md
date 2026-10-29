@@ -16,6 +16,7 @@
 | `product_version.py` | 제품 배포 버전과 엔진 원본의 호환 범위 검증·공통 버전 입력 적용 |
 | `generate-brand-assets.py` | 설정의 SVG·배색·이름에서 desktop 로고 묶음 생성 |
 | `install-brand-assets.*` | 같은 로고 묶음의 해시·경로를 검증하고 적용 |
+| `brand_assets.py --refresh-embeds` | 동일 브랜드의 Chromium 내장 아이콘만 갱신, 기존 래스터는 해시 검증 후 유지 |
 | `audit_logo_assets.py` | GRIT·네이티브·공통 WebUI·삽화의 독립 로고 경로와 적용 상태 검사 |
 | `audit-branding.py` | 브랜딩 적용 대상과 남은 문구 점검 |
 | `regenerate-shell-patch.py` | 실제 변경 내역에서 `0001` 다시 만들기 |
@@ -53,8 +54,9 @@
 
 먼저 설정값, 패치와 소스 경로를 검사한다.
 이미 적용된 패치는 건너뛰고 내용이 달라진 제품 파일만 복사한다.
-서로 다른 패치가 같은 원본 파일을 수정하거나, 등록되지 않은 소스와 잘못된 경로가
-있으면 거부한다. 심볼릭 링크와 파일·디렉터리 충돌도 검사한다.
+서로 다른 패치가 같은 원본 파일을 수정하거나, 패치가 생성 파일·복사한 제품 소스의
+경로를 차지하면 거부한다. 등록되지 않은 소스, 잘못된 경로, 심볼릭 링크와
+파일·디렉터리 충돌도 검사한다.
 
 제품 소스 영역의 루트 README는 복사하지 않는다.
 등록된 소스 안의 원본 README와 숨김 파일은 유지하며 `.DS_Store`와 `__pycache__`는 제외한다.
@@ -71,7 +73,11 @@ macOS에서 이름·원본·배색·생성기가 달라지면 묶음을 재생�
 ## 이름·로고 설정과 점검
 
 값은 [`branding/brand.json`](../../branding/brand.json)에서 바꾼다.
-`0002`는 그 값을 제품명 리소스와 템플릿에 연결한다.
+`0002`는 그 값을 사용하는 Chromium 코드와 템플릿을 연결한다.
+`BRANDING`과 제품명 GRD·GRDP 입력은 설치 도구가 생성하며 패치에 넣지 않는다.
+선택적인 문구·번역 정책이 없어도 기본 제품명 GRD 연결은 생성한다.
+관리 표식이 없는 `BRANDING`은 Git 원본과 같은 경우에만 설치하며,
+사용자가 수정한 미관리 입력은 미리보기부터 거부한다.
 모든 문구·번역·자산·OS 식별자의 연결이 끝난 것은 아니다.
 
 ```sh
@@ -99,6 +105,8 @@ Chromium 연결 코드를 수정한 뒤 실행한다.
 
 ```sh
 python3 tools/overlay/regenerate-shell-patch.py
+# 별도 Stable 후보 원본을 사용한 경우
+python3 tools/overlay/regenerate-shell-patch.py --chromium-src /absolute/path/to/chromium/src
 ```
 
 제품 소스, 생성 자산과 다른 패치가 관리하는 파일은 제외한다.

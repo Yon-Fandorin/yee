@@ -9,7 +9,7 @@
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/policy/policy_test_utils.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -623,7 +623,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest, GuestKeepsNativeRestriction) {
-  Browser* guest = CreateGuestBrowser();
+  BrowserWindowInterface* guest = CreateGuestBrowser();
   ASSERT_TRUE(ui_test_utils::NavigateToURL(guest, branding::ExtensionsURL()));
   auto* contents = guest->tab_strip_model()->GetActiveWebContents();
   EXPECT_EQ(true, content::EvalJs(
@@ -641,7 +641,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest, GuestKeepsNativeRestriction) {
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest, PrivateAPIsKeepNativeSemantics) {
-  Browser* private_browser = CreateIncognitoBrowser(browser()->GetProfile());
+  BrowserWindowInterface* private_browser =
+      CreateIncognitoBrowser(browser()->GetProfile());
   auto* private_contents =
       private_browser->tab_strip_model()->GetActiveWebContents();
   const GURL private_url = private_contents->GetLastCommittedURL();

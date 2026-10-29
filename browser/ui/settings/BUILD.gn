@@ -11,6 +11,7 @@ source_set("settings") {
     "../webui",
     "../webui:strings",
     "//base",
+    "//chrome/browser/profiles:profile",
     "//chrome/browser/yee_content_blocking:browser",
     "//components/yee_branding",
     "//components/yee_content_blocking:core",

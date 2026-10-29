@@ -32,9 +32,17 @@ require_depot_tools() {
   export PATH="$PATH:$DEPOT_TOOLS_DIR"
 }
 
+require_yee_sync_jobs() {
+  if [[ "$YEE_SYNC_JOBS" != <-> || "$YEE_SYNC_JOBS" -lt 1 ]]; then
+    print -u2 "YEE_SYNC_JOBS는 양의 정수여야 한다: $YEE_SYNC_JOBS"
+    return 14
+  fi
+}
+
 require_chromium_src() {
   if [[ ! -f "$CHROMIUM_SRC/BUILD.gn" ]]; then
     print -u2 "Chromium source is missing. Run ./tools/dev/checkout.sh first."
     exit 6
   fi
+  python3 "$COMMON_DIR/chromium-version.py" verify "$CHROMIUM_SRC" --platform macos
 }

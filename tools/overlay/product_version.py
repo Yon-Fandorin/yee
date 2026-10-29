@@ -30,6 +30,13 @@ def version_string(parts):
     return ".".join(str(part) for part in parts)
 
 
+def validate_engine_version(version, chromium_version):
+    """제품 버전과 원본 엔진의 호환 범위를 확인한다."""
+    if version[:3] != chromium_version[:3] or version < chromium_version:
+        raise ValueError("branding/VERSION must match the Chromium major/minor/build "
+                         "and must not be older than its patch version")
+
+
 def version_inputs(chromium_src, version_path=VERSION_PATH):
     src = Path(chromium_src)
     if not src.is_absolute() or not (src / "chrome/VERSION").is_file():
@@ -40,9 +47,7 @@ def version_inputs(chromium_src, version_path=VERSION_PATH):
         ["git", "-c", f"safe.directory={src.as_posix()}", "-C", str(src),
          "show", "HEAD:chrome/VERSION"], capture_output=True, text=True, check=True)
     chromium_version = parse_version(result.stdout)
-    if version[:3] != chromium_version[:3] or version < chromium_version:
-        raise ValueError("branding/VERSION must match the Chromium major/minor/build "
-                         "and must not be older than its patch version")
+    validate_engine_version(version, chromium_version)
     return version, chromium_version
 
 

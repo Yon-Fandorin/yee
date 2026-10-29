@@ -15,9 +15,6 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-import cairosvg
-from PIL import Image, ImageDraw, ImageFont
-
 from brand_config import REPO_ROOT, load_brand
 from brand_assets import upstream_input_blobs
 
@@ -107,6 +104,9 @@ def export_svg(source, brand, palette, *, dark=False, mono=False, adaptive=False
 
 
 def render(svg, size):
+    import cairosvg
+    from PIL import Image
+
     return Image.open(BytesIO(cairosvg.svg2png(bytestring=svg.encode(),
         output_width=size, output_height=size))).convert('RGBA')
 
@@ -118,6 +118,8 @@ def png_bytes(image):
 
 
 def wordmark_font(text, size, configured=None):
+    from PIL import ImageFont
+
     if configured is not None:
         return ImageFont.truetype(str(configured), size)
     if any(ord(character) > 255 for character in text):
@@ -237,6 +239,8 @@ def embedded_logos(src, paths, upstream_blobs=None):
 
 
 def main():
+    from PIL import Image, ImageDraw
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('chromium_src', type=Path)
     parser.add_argument('--font', type=Path, help='override the automatically selected Latin/Korean wordmark font')

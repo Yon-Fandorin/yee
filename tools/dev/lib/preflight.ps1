@@ -61,6 +61,9 @@ function Assert-ChromiumSrc {
     if (-not (Test-Path -LiteralPath (Join-Path $script:ChromiumSrc 'BUILD.gn') -PathType Leaf)) {
         throw "Chromium source is missing. Run .\tools\dev\checkout.ps1 first. Expected: $script:ChromiumSrc"
     }
+    $python = Get-DepotCommand -Name 'python3'
+    & $python (Join-Path $script:WindowsDevDir 'chromium-version.py') verify $script:ChromiumSrc --platform windows
+    if ($LASTEXITCODE -ne 0) { throw 'Chromium 기준 검사에 실패했다. Stable 업그레이드 절차를 확인한다.' }
 }
 
 function Get-DepotCommand {
@@ -76,4 +79,20 @@ function Get-DepotCommand {
         throw "Cannot find depot_tools command: $Name"
     }
     return $command.Source
+}
+
+function Get-ChromiumPinnedValue {
+    param([Parameter(Mandatory = $true)][ValidateSet('version','revision','source_url')][string] $Name)
+    $python = Get-DepotCommand -Name 'python3'
+    $value = & $python (Join-Path $script:WindowsDevDir 'chromium-version.py') show --get $Name
+    if ($LASTEXITCODE -ne 0) { throw 'Chromium 공통 기준을 읽지 못했다.' }
+    return ($value -join "`n").Trim()
+}
+
+function Get-YeeSyncJobs {
+    $jobs = 0
+    if (-not [int]::TryParse($script:YeeSyncJobs, [ref]$jobs) -or $jobs -lt 1) {
+        throw "YEE_SYNC_JOBS는 양의 정수여야 한다: $script:YeeSyncJobs"
+    }
+    return $jobs
 }

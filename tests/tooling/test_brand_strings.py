@@ -5,6 +5,7 @@ from dataclasses import replace
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from unittest import mock
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / '.local-build/chromium/src'
+SRC = Path(os.environ['YEE_CHROMIUM_ROOT']) / 'src' if os.environ.get('YEE_CHROMIUM_ROOT') else ROOT / '.local-build/chromium/src'
 sys.path.insert(0, str(ROOT / 'tools/overlay'))
 import brand_strings
 from brand_config import Brand, product_parts
@@ -139,6 +140,35 @@ class BrandStringsTest(unittest.TestCase):
         self.assertEqual(self.translations()['IDS_WELCOME'], '새 이름에 오신 것을 환영합니다, $1.')
         generated = self.read('chrome/app/yee_branding_strings/inputs/chrome/app/resources/chromium_strings_ko.xtb')
         self.assertNotIn('Orbit', generated)
+
+    def test_product_parts_are_connected_without_optional_string_policy(self):
+        """정책을 끈 새 체크아웃도 제품명 연결부를 생성하고 번역 원본은 보존한다."""
+        brand = replace(self.brand, strings_policy=None)
+        before = self.snapshot()
+        self.install(brand, check=True)
+        self.assertEqual(before, self.snapshot())
+        self.install(brand)
+        ko = self.translations()
+        self.assertEqual(ko['IDS_PRODUCT_NAME'], 'Orbit')
+        self.assertEqual(ko['IDS_SHORT_PRODUCT_NAME'], 'Orb')
+        self.assertEqual(ko['IDS_APP_MENU_PRODUCT_NAME'], 'Orb')
+        self.assertEqual(ko['IDS_WELCOME'], 'Chromium에 오신 것을 환영합니다, $1.')
+        self.assertFalse((self.src / brand_strings.GENERATED).exists())
+        installed = self.snapshot()
+        self.install(brand)
+        self.assertEqual(installed, self.snapshot())
+        self.assertEqual(self.read('chrome/app/resources/chromium_strings_ko.xtb'), self.original_xtb)
+
+    def test_unmanaged_grd_is_rejected_without_optional_string_policy(self):
+        """정책 없는 생성도 GRD의 사용자 수정을 미리보기부터 거부한다."""
+        brand = replace(self.brand, strings_policy=None)
+        path = self.src / 'chrome/app/chromium_strings.grd'
+        path.write_text(path.read_text(encoding='utf-8').replace('>Chromium<', '>Manual<', 1), encoding='utf-8')
+        before = self.snapshot()
+        for check_only in (True, False):
+            with self.assertRaisesRegex(ValueError, 'Unmanaged change'):
+                self.install(brand, check=check_only)
+            self.assertEqual(before, self.snapshot())
 
     def test_utf8_policy_and_manifest_ignore_the_locale_encoding(self):
         brand = replace(self.brand, name='새 이름', short_name='새이름')

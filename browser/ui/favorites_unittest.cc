@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/i18n/rtl.h"
+#include "base/test/scoped_command_line.h"
 #include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/animation/animation.h"
@@ -21,6 +22,21 @@
 
 namespace yee {
 namespace {
+
+TEST(FavoritesPolicyTest, LayoutTimingAppliesOnlyToTheYeeVerticalDock) {
+  base::test::ScopedCommandLine command_line;
+  command_line.GetProcessCommandLine()->RemoveSwitch(
+      "disable-yee-shell-scaffold");
+  EXPECT_FALSE(GetFavoritesLayoutAnimationSettings(/*vertical=*/false));
+  const auto settings = GetFavoritesLayoutAnimationSettings(/*vertical=*/true);
+  ASSERT_TRUE(settings);
+  EXPECT_EQ(settings->duration, base::Milliseconds(420));
+  EXPECT_EQ(settings->tween, gfx::Tween::ACCEL_40_DECEL_100_3);
+  EXPECT_EQ(settings->retarget_reset_threshold, 0.0);
+  command_line.GetProcessCommandLine()->AppendSwitch(
+      "disable-yee-shell-scaffold");
+  EXPECT_FALSE(GetFavoritesLayoutAnimationSettings(/*vertical=*/true));
+}
 
 TEST(FavoritesDragIntentTest, ResolvesEveryCrossRegionState) {
   const int max_count = kSidebarMetrics.favorites_max_count;

@@ -2,7 +2,7 @@
 
 function Assert-OverlayRelativePath {
     param([Parameter(Mandatory = $true)][string] $Value)
-    if (-not $Value -or $Value -match '[\\:*?\[\]\r\n]' -or
+    if (-not $Value -or $Value -match '[\\:*?\[\]\x00\r\n]' -or
         [System.IO.Path]::IsPathRooted($Value) -or
         @($Value.Split('/') | Where-Object { $_ -eq '' -or $_ -eq '.' -or $_ -eq '..' }).Count) {
         throw "Expected a literal relative overlay path: $Value"
@@ -53,20 +53,77 @@ function Get-YeeOverlayCatalog {
 function Get-YeePatchPaths {
     param([Parameter(Mandatory = $true)][string] $PatchFile)
     $text = [System.IO.File]::ReadAllText($PatchFile)
-    $sections = [regex]::Matches($text, '(?m)^diff --git a/(\S+) b/(\S+)\r?$')
-    if (-not $sections.Count -or $sections.Count -ne [regex]::Matches($text, 'diff --git ').Count) {
+    $sections = [regex]::Split($text, '(?m)(?=^diff --git )')
+    if ($sections.Count -lt 2 -or $sections[0].Trim()) {
         throw "Expected explicit patch paths: $PatchFile"
     }
     $seen = @{}
-    foreach ($section in $sections) {
-        $path = $section.Groups[2].Value
-        Assert-OverlayRelativePath $path
-        if ($section.Groups[1].Value -cne $path -or $seen.ContainsKey($path)) {
+    $paths = @()
+    for ($i = 1; $i -lt $sections.Count; $i++) {
+        $lines = $sections[$i] -split '\r?\n'
+        $header = [regex]::Match($lines[0], '^diff --git a/(\S+) b/(\S+)$')
+        if (-not $header.Success -or $header.Groups[1].Value -cne $header.Groups[2].Value) {
             throw "Expected unique, unchanged patch paths: $PatchFile"
         }
+        $path = $header.Groups[2].Value
+        Assert-OverlayRelativePath $path
+        if ($seen.ContainsKey($path)) {
+            throw "Expected unique, unchanged patch paths: $PatchFile"
+        }
+        $fileHeaders = @()
+        $oldRemaining = $newRemaining = 0
+        $hasHunk = $hasMode = $false
+        foreach ($line in $lines | Select-Object -Skip 1) {
+            # 본문의 ---/+++는 파일 헤더가 아니라 삭제·추가한 소스일 수 있다.
+            if ($oldRemaining -or $newRemaining) {
+                if ($line -ceq '\ No newline at end of file') { continue }
+                if ($line.StartsWith(' ')) { $oldRemaining--; $newRemaining-- }
+                elseif ($line.StartsWith('-')) { $oldRemaining-- }
+                elseif ($line.StartsWith('+')) { $newRemaining-- }
+                else { throw "Malformed patch hunk: $PatchFile" }
+                if ($oldRemaining -lt 0 -or $newRemaining -lt 0) { throw "Malformed patch hunk: $PatchFile" }
+                continue
+            }
+            if ($fileHeaders.Count -eq 1 -and -not $line.StartsWith('+++ ')) {
+                throw "Expected matching patch file headers: $PatchFile"
+            }
+            if ($line.StartsWith('--- ')) {
+                $value = $line.Substring(4)
+                if ($hasHunk -or $fileHeaders.Count -or ($value -cne "a/$path" -and $value -cne '/dev/null')) {
+                    throw "Expected matching patch file headers: $PatchFile"
+                }
+                $fileHeaders += $value
+            } elseif ($line.StartsWith('+++ ')) {
+                $value = $line.Substring(4)
+                if ($hasHunk -or $fileHeaders.Count -ne 1 -or
+                    ($value -cne "b/$path" -and $value -cne '/dev/null') -or
+                    ($fileHeaders[0] -ceq '/dev/null' -and $value -ceq '/dev/null')) {
+                    throw "Expected matching patch file headers: $PatchFile"
+                }
+                $fileHeaders += $value
+            } elseif ($line.StartsWith('@@')) {
+                $hunk = [regex]::Match($line, '^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@.*$')
+                if (-not $hunk.Success -or $fileHeaders.Count -ne 2) { throw "Malformed patch hunk: $PatchFile" }
+                $oldRemaining = if ($hunk.Groups[1].Success) { [int]$hunk.Groups[1].Value } else { 1 }
+                $newRemaining = if ($hunk.Groups[2].Success) { [int]$hunk.Groups[2].Value } else { 1 }
+                $hasHunk = $true
+            } elseif ($line -cmatch '^(GIT binary patch|Binary files |rename |copy |similarity index |dissimilarity index )') {
+                throw "Unsupported binary or rename/copy patch: $PatchFile"
+            } elseif (-not $line -or ($hasHunk -and $line -ceq '\ No newline at end of file')) {
+                continue
+            } elseif (-not $hasHunk -and $line -cmatch '^(old|new|new file|deleted file) mode [0-7]{6}$') {
+                $hasMode = $true
+            } elseif (-not $hasHunk -and $line -cmatch '^index [0-9a-f]+\.\.[0-9a-f]+( [0-7]{6})?$') {
+                continue
+            } else { throw "Unsupported patch metadata: $PatchFile" }
+        }
+        if ($oldRemaining -or $newRemaining -or $fileHeaders.Count -eq 1 -or -not ($hasHunk -or $hasMode)) {
+            throw "Incomplete patch section: $PatchFile"
+        }
         $seen[$path] = $true
-        $path
+        $paths += $path
     }
+    $paths
 }
 
 function Invoke-YeeGitApply {
@@ -92,14 +149,30 @@ function Get-YeeOverlayPatchPlan {
     $catalog = Get-YeeOverlayCatalog $RepoRoot
     $selected = @($catalog.patches | Where-Object { -not $Role -or $_.role -eq $Role })
     if (-not $selected.Count) { throw "Unknown patch role: $Role" }
+    $managedRoots = @($catalog.source_roots | ForEach-Object { $_.destination }) + @($catalog.generated_roots)
     $owners = @{}
+    $patchInputs = @()
     foreach ($patch in $selected) {
         $patchFile = Join-Path $RepoRoot $patch.file
         $paths = @(Get-YeePatchPaths $patchFile)
         foreach ($path in $paths) {
+            # Windows에서 대소문자만 다른 경로도 같은 관리 파일을 가리킨다.
+            foreach ($root in $managedRoots) {
+                if ($path -eq $root -or
+                    $path.StartsWith($root + '/', [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $root.StartsWith($path + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Patch sections must not own generated or mirrored source paths: $path"
+                }
+            }
             if ($owners.ContainsKey($path)) { throw 'Patch series entries must own disjoint files.' }
             $owners[$path] = $true
         }
+        $patchInputs += [pscustomobject]@{ Patch = $patch; File = $patchFile; Paths = $paths }
+    }
+    foreach ($patchInput in $patchInputs) {
+        $patch = $patchInput.Patch
+        $patchFile = $patchInput.File
+        $paths = $patchInput.Paths
         $includes = if ($patch.strategy -eq 'sections') { $paths } else { @('') }
         foreach ($include in $includes) {
             $arguments = @()

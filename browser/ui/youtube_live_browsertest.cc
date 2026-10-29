@@ -8,7 +8,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/values.h"
-#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"

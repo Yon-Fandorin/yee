@@ -37,6 +37,74 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 | `smoke-test.*` | 기본 실행과 페이지 열기 확인 |
 | `usage.*` | 사용 중인 디스크 용량 확인 |
 
+## Stable 기준과 업그레이드
+
+[`build/chromium-version.json`](../../build/chromium-version.json)의 **공통 원본 하나**를
+Windows·macOS가 함께 사용한다. 각 OS의 Chrome Stable 패치 번호가 달라도 Yee의
+소스는 여기 기록한 버전·커밋으로 고정하며, 빌드·실제 앱 검수·출시 상태는 OS별로 나눈다.
+조회한 최신 버전을 자동 적용하거나 설치된 브라우저를 자동 교체하지 않는다.
+
+```sh
+python3 tools/dev/chromium-version.py show
+python3 tools/dev/chromium-version.py check
+```
+
+`check`는 ChromiumDash의 Windows·Mac Stable을 각각 읽고 현재 기준과의 차이를
+출력한다. 파일은 바꾸지 않는다. 두 OS의 최신 마일스톤이 다르면 후보를 구분해
+보고하며, 이를 두 개의 Yee 원본으로 자동 분기하지 않는다. Windows에서는
+`depot_tools`의 실제 `python3`가 PATH에 있는 개발 터미널에서 실행한다.
+
+업그레이드는 다음 순서로 진행한다.
+
+1. 현재 브라우저와 캐시를 보존하고 업그레이드 브랜치에서 버전·커밋을 고정한다.
+   `branding/VERSION`은 같은 major/minor/build이며 원본 patch 이상이어야 한다.
+2. 새 원본을 별도 작업 폴더에 받는다. 기존 수정이 있는 체크아웃에서 자동 stash,
+   강제 checkout, 초기화로 변경을 버리지 않는다. 직접 이식할 경우에도 먼저 원본
+   변경과 미추적 파일을 보관하고 복원 가능 여부를 확인한다.
+3. 기존 `0001`·`0002`·`0003` 패치의 충돌과 제품 소스의 API 차이를 해결한다.
+   적용된 패치를 다시 생성하고 브랜딩 문구·번역 변경을 별도로 검토한다.
+4. 새 출력 폴더와 격리 프로필로 빌드한다. 컴파일, 영향 범위의 native 회귀 검사,
+   탭·그룹·분할·설정·미디어·CLI 연결을 실제 앱에서 확인한다.
+5. 독립 검토 후 Windows와 macOS의 검수 결과를 각각 기록한다. 한 OS의 통과로
+   다른 OS를 통과 처리하지 않는다. 해당 OS의 검증이 끝난 후보만 배포 대상으로 삼는다.
+6. 이전 실행 파일·프로필을 보존한 상태로 새 빌드를 사용한다. 새 프로필에서 생긴
+   문제가 없다는 이유만으로 실사용 프로필의 이전·복구까지 검증했다고 기록하지 않는다.
+
+메이저 이식과 작은 보안 패치 갱신은 검증 범위를 구분한다. 큰 이식에는 native
+레이아웃·상호작용을 포함한 통합 검수가 필요하다. 작은 갱신도 패치 적용·앱 빌드·미디어와
+기본 탐색을 확인하며, 실제 영향을 근거로 회귀 검사를 선택한다.
+Brave의 [공개 이식 절차](https://github.com/brave/brave-core/blob/master/docs/chromium_version_upgrade.md)처럼
+버전 선택, 충돌 해결, 패치 재생성과 빌드 오류 수정을 나눠 검토한다.
+
+`checkout.*`의 처음 받기와 실패 후 재개는 같은 고정 커밋을 사용한다. `sync.*`는
+기준이 이미 일치하는 체크아웃의 의존 소스만 맞춘다. 기존 원본을 자동 승격하지 않는다.
+`sync.*`의 `src@unmanaged`는 선행 핀 검사 뒤 원본 자체를 건너뛰는 지정이며,
+Yee 패치가 적용된 tracked 변경까지 그대로 보존한다. 처음 받기의 정확한 SHA 지정과 구분한다.
+설정·빌드·동기화와 native 회귀 명령은 원본 HEAD가 기준과 다르면 제품 파일을
+수정하기 전에 중단한다. 원본 버전은 브랜딩 적용 후 작업 파일이 아니라
+`HEAD:chrome/VERSION`에서 확인한다. 낮은 수준의 `tools/overlay/apply.*`는
+충돌을 해결하는 이식 도구이므로 이 개발 명령의 고정 커밋 검사를 대신하지 않는다.
+
+다운로드는 기본 두 작업으로 제한한다. 필요하면 두 OS 모두 `YEE_SYNC_JOBS`를
+양의 정수로 지정한다. 원본 서버의 429 응답은 동시 요청을 줄이고 잠시 뒤 재개하며,
+받아 둔 소스와 고정한 버전을 초기화하지 않는다.
+
+후보 출력은 두 OS 모두 `YEE_OUT_NAME`으로 나눈다. 예를 들어 같은 소스에서
+`YeePilot`을 보존하고 `YeeStable157`에 새 앱을 만들 수 있다.
+
+```powershell
+$env:YEE_CHROMIUM_ROOT = 'F:\yee\chromium-stable157'
+$env:YEE_OUT_NAME = 'YeeStable157'
+.\tools\dev\configure.ps1
+.\tools\dev\build.ps1
+```
+
+```sh
+YEE_OUT_NAME=YeeStable157 ./tools/dev/configure.sh
+YEE_OUT_NAME=YeeStable157 ./tools/dev/build.sh
+YEE_OUT_NAME=YeeStable157 ./tools/dev/run.sh
+```
+
 ## macOS에서 처음 준비하기
 
 ```sh
@@ -48,7 +116,7 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 ./tools/dev/smoke-test.sh
 ```
 
-`checkout.sh`는 `fetch --no-history chromium`으로 전체 Git 이력 없이 소스를 받는다.
+`checkout.*`는 고정 커밋을 `gclient sync --no-history --revision src@COMMIT`으로 받는다.
 별도의 공유 Git 캐시도 만들지 않는다. 빌드는 디버그 정보를 줄여 용량을 절약하지만,
 컴포넌트 빌드보다 수정 후 앱을 다시 만드는 시간이 길어질 수 있다.
 설정은 [`build/args.gn`](../../build/args.gn)에 있다.
@@ -103,7 +171,8 @@ YEE_BUILD_JOBS=6 ./tools/dev/build.sh
 ```
 
 소스와 빌드 결과를 둘 위치는 `YEE_LOCAL_BUILD_ROOT`로 바꿀 수 있다. macOS 도구는 그 아래의
-`depot_tools/`, `chromium/src/`와 고정된 `out/YeePilot`을 사용한다.
+`depot_tools/`, `chromium/src/`와 기본 `out/YeePilot`을 사용한다. 후보 출력은
+`YEE_OUT_NAME`으로 구분한다.
 컴파일러와 도구 캐시는 같은 위치의 `cache/`에 모은다.
 
 ## macOS 앱 실행과 확인
@@ -242,6 +311,26 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `all`: 여러 변경을 마친 뒤 전체 확인
+
+이 세 게이트는 각 바이너리 실행 직전에 같은 필터·특성·창 인수에
+`--gtest_list_tests`를 추가해 목록을 조회한다. 조회 실패, 빈 목록, 또는 음수 필터와
+`DISABLED_` 스위트·사례를 제외한 뒤 활성 사례가 없는 양수 패턴이 하나라도 있으면
+중단한다. 다른 패턴이 일치해도 누락을 허용하지 않으며 기존 검사 선택 범위는 유지한다.
+JSON의 `pattern_counts`와 `missing_patterns`에서 패턴별 발견 수와 누락을 확인한다.
+레이아웃 검사의 OS 전용 필터는 공통 필터에 해당 플랫폼의 사례만 더한다. Mac에는
+Windows caption·native clip 검사를 요구하지 않으며, Windows에는 Mac glass·immersive
+검사를 요구하지 않는다. 해당 플랫폼에 있어야 할 사례의 누락은 그대로 실패다.
+
+목록 해석은 셸이나 GUI 없이 Windows에서도 사용할 수 있다. 목록 조회의 종료 코드는
+호출자가 먼저 확인하고, 같은 필터로 저장한 UTF-8 목록을 검사한다. 파일 인수를 생략하거나
+`-`로 지정하면 표준 입력을 읽으며, CLI 종료 코드 0은 발견 성공, 1은 누락, 2는 입력 오류다.
+
+```powershell
+python3 tools/dev/lib/native_test_discovery.py listing.txt '--filter=Suite.*:All/ParamTest.Case/*-Suite.Excluded'
+```
+
+발견 수는 실행 결과가 아니다. `GTEST_SKIP()` 같은 런타임 생략은 목록만으로 판단할 수
+없으므로 실제 실행의 사례 수·통과·실패·생략 결과와 해당 OS의 UI 검증도 별도로 확인한다.
 
 Windows의 native UI 픽셀 검사는 `--enable-pixel-output-in-tests`를 사용한다.
 Windows는 실제 앱 종료 때 UI 스레드가 살아 있는 동안 외부 UIA 연결을 정리한다.

@@ -10,6 +10,9 @@
 #include "ui/gfx/geometry/insets.h"
 
 class TabGroup;
+namespace tabs {
+class TabInterface;
+}
 namespace views {
 class Background;
 class View;
@@ -19,6 +22,9 @@ namespace yee {
 enum class TabGroupPreviewStyle { kHorizontal, kSidebar };
 
 bool UsesHorizontalTabGroupCapsule(const views::View& view);
+// 접힌 알약 안의 멤버는 native 탭을 유지하며 내부 조작만 숨긴다.
+bool ShouldHideHorizontalTabGroupMemberContents(const views::View& view,
+                                                const tabs::TabInterface* tab);
 int ResolveHorizontalTabGroupEdgeInset(const views::View& decoration,
                                        int native_marker_inset,
                                        int native_tab_paint_inset);

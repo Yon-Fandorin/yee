@@ -203,6 +203,22 @@ class HorizontalGroupCapsuleBackground : public views::Background {
 };
 }  // namespace
 
+bool ShouldHideHorizontalTabGroupMemberContents(const views::View& view,
+                                                const tabs::TabInterface* tab) {
+  if (!tab || !UsesHorizontalTabGroupCapsule(view)) {
+    return false;
+  }
+  const auto* browser = tab->GetBrowserWindowInterface();
+  const auto* model = browser ? browser->GetTabStripModel() : nullptr;
+  const auto group = tab->GetGroup();
+  return group && model && model->SupportsTabGroups() &&
+         model->group_model()->ContainsTabGroup(*group) &&
+         model->group_model()
+             ->GetTabGroup(*group)
+             ->visual_data()
+             ->is_collapsed();
+}
+
 bool UsesHorizontalTabGroupCapsule(const views::View& view) {
   return IsShellEnabled() &&
          !ShouldUseNativeHorizontalTabTheme(*view.GetNativeTheme(),

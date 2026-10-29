@@ -267,6 +267,73 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
         brand_assets.install([])
         self.assertEqual(target.stat().st_mtime_ns, stamp)
 
+    def prepare_embeds(self):
+        self.source.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">'
+            '<path d="M0 0L128 0L0 128Z"/></svg>', encoding='utf-8')
+        self.data['source_sha256'] = brand_assets.digest(self.source)
+        for index, relative in enumerate(brand_assets.UPSTREAM_INPUTS):
+            if index == 0:
+                text = ('<svg xmlns="http://www.w3.org/2000/svg">'
+                        '<path fill="var(--color-side-panel-customize-chrome-mini-ntp-chrome-logo)" '
+                        'd="M0 0Z"/></svg>')
+            elif index == 1:
+                text = "'chrome_product': () => getTrustedHTML`<svg><path/></svg>`"
+            else:
+                text = '<g id="chrome-product"><path/></g>' * 2
+            path = self.src / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text + '\n', encoding='utf-8')
+            packaged = self.package / 'files' / relative
+            packaged.parent.mkdir(parents=True, exist_ok=True)
+            packaged.write_text('old embedded output\n', encoding='utf-8')
+            self.data['files'].append({
+                'source': packaged.relative_to(self.package).as_posix(),
+                'destination': relative, 'sha256': brand_assets.digest(packaged),
+            })
+        self.commit_inputs()
+        self.data['upstream_inputs'] = brand_assets.upstream_input_blobs(self.src)
+        (self.repo / 'build/overlay.json').write_text(json.dumps({
+            'generated_roots': ['chrome/app/theme/chromium', *brand_assets.UPSTREAM_INPUTS],
+        }), encoding='utf-8')
+        path = self.src / brand_assets.UPSTREAM_INPUTS[1]
+        path.write_text(path.read_text(encoding='utf-8') + '// new upstream feature\n', encoding='utf-8')
+        self.commit_inputs()
+        self.manifest.write_text(json.dumps(self.data), encoding='utf-8')
+
+    def test_embedded_refresh_preserves_raster_checkout_and_new_upstream_features(self):
+        self.prepare_embeds()
+        raster = self.package / 'mark.png'
+        raster_before = (raster.read_bytes(), raster.stat().st_mtime_ns)
+        checkout = self.snapshot(self.src)
+        self.assertEqual(brand_assets.refresh_embeds(self.brand, self.src, self.repo), 5)
+        self.assertEqual(checkout, self.snapshot(self.src))
+        self.assertEqual(raster_before, (raster.read_bytes(), raster.stat().st_mtime_ns))
+        toolbar = self.package / 'files' / brand_assets.UPSTREAM_INPUTS[1]
+        self.assertIn('// new upstream feature', toolbar.read_text(encoding='utf-8'))
+        self.assertIn('M0 0L128 0L0 128Z', toolbar.read_text(encoding='utf-8'))
+        self.assertEqual(brand_assets.asset_plan(self.brand, self.src, self.repo)[1], 6)
+        package = self.snapshot(self.package)
+        self.assertEqual(brand_assets.refresh_embeds(self.brand, self.src, self.repo), 0)
+        self.assertEqual(package, self.snapshot(self.package))
+
+    def test_embedded_refresh_rejects_changed_rendering_inputs_and_corrupt_package(self):
+        self.prepare_embeds()
+        for key, value in [('product_name', 'Other'), ('generator_sha256', '0' * 64),
+                           ('source_sha256', '0' * 64), ('palette', {}), ('upstream_inputs', {})]:
+            with self.subTest(key=key):
+                self.manifest.write_text(json.dumps({**self.data, key: value}), encoding='utf-8')
+                before = self.snapshot(self.root)
+                with self.assertRaises(ValueError):
+                    brand_assets.refresh_embeds(self.brand, self.src, self.repo)
+                self.assertEqual(before, self.snapshot(self.root))
+        self.manifest.write_text(json.dumps(self.data), encoding='utf-8')
+        (self.package / 'mark.png').write_bytes(b'corrupt raster')
+        before = self.snapshot(self.root)
+        with self.assertRaisesRegex(ValueError, 'modified'):
+            brand_assets.refresh_embeds(self.brand, self.src, self.repo)
+        self.assertEqual(before, self.snapshot(self.root))
+
     def test_name_palette_and_source_changes_require_regeneration(self):
         for key, value in [('product_name', 'Nova'), ('short_name', 'N'),
                            ('product_name', 'ORBIT'), ('short_name', 'ORBIT'),
@@ -301,7 +368,7 @@ with (root / 'generator-runs').open('a', encoding='utf-8') as runs:
                 POWERSHELL, '-NoLogo', '-NoProfile', '-NonInteractive',
                 '-ExecutionPolicy', 'Bypass', '-File', str(overlay / 'install-brand-assets.ps1'),
                 '-ChromiumSrc', str(self.src), '-CheckOnly',
-            ], capture_output=True, text=True)
+            ], capture_output=True, text=True, encoding='utf-8')
 
         valid = check()
         self.assertEqual(valid.returncode, 0, valid.stderr)

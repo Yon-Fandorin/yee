@@ -24,7 +24,7 @@ class DevelopmentToolsTest(unittest.TestCase):
         self.dev.mkdir(parents=True)
         shutil.copytree(ROOT / 'tools/dev/lib', self.dev / 'lib')
         for name in ('common.zsh', 'build.sh', 'build-ui.sh',
-                     'test-header.sh', 'test-sidebar.sh',
+                     'test-header.sh', 'test-sidebar.sh', 'test-browser-surface-layout.sh',
                      'browser_bundle_executables.py', 'ui-test-display.swift'):
             shutil.copy(ROOT / 'tools/dev' / name, self.dev / name)
         self.overlay = self.repo / 'tools/overlay'
@@ -35,11 +35,25 @@ class DevelopmentToolsTest(unittest.TestCase):
         (self.repo / 'branding/brand.json').write_text(json.dumps({
             'name': 'Orbit Preview', 'internal_url_scheme': 'orbit',
             'logo_source': 'logo.png', 'logo_crop_size': 820}))
+        shutil.copy(ROOT / 'tools/dev/chromium-version.py', self.dev)
+        shutil.copy(ROOT / 'tools/overlay/product_version.py', self.overlay)
+        shutil.copy(ROOT / 'branding/VERSION', self.repo / 'branding/VERSION')
         self.local = self.repo / 'local build'
         self.src = self.local / 'chromium/src'
         self.out = self.src / 'out/YeePilot'
         self.out.mkdir(parents=True)
         (self.src / 'BUILD.gn').touch()
+        (self.src / 'chrome').mkdir(exist_ok=True)
+        manifest = json.loads((ROOT / 'build/chromium-version.json').read_text())
+        (self.src / 'chrome/VERSION').write_text(''.join(f'{key}={part}\n' for key,part in
+            zip(('MAJOR','MINOR','BUILD','PATCH'),manifest['version'].split('.'))))
+        for arguments in (('init',), ('add', 'BUILD.gn', 'chrome/VERSION'),
+                          ('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture')):
+            subprocess.run(['git', '-C', str(self.src), *arguments], check=True, capture_output=True)
+        revision = subprocess.check_output(['git', '-C', str(self.src), 'rev-parse', 'HEAD'], text=True).strip()
+        manifest['revision'] = revision
+        (self.repo / 'build').mkdir()
+        (self.repo / 'build/chromium-version.json').write_text(json.dumps(manifest))
         (self.src / 'chrome/browser/ui/views/yee').mkdir(parents=True)
         (self.src / 'chrome/browser/ui/views/yee/BUILD.gn').touch()
         self.log = self.repo / 'events.log'
@@ -48,6 +62,7 @@ class DevelopmentToolsTest(unittest.TestCase):
         self.env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1',
                     'PATH': str(self.bin) + os.pathsep + os.environ['PATH'],
                     'YEE_LOCAL_BUILD_ROOT': str(self.local), 'YEE_BUILD_JOBS': '3',
+                    'YEE_OUT_NAME': 'YeePilot',
                     'YEE_TEST_LOG': str(self.log), 'YEE_TEST_OUT': str(self.out)}
         self.write_tool(self.local / 'depot_tools/gclient', 'exit 0\n')
         self.write_tool(self.bin / 'df', 'printf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 200000000 1000000 100000000 1%% /\\n"\n')
@@ -91,6 +106,20 @@ class DevelopmentToolsTest(unittest.TestCase):
         self.assertEqual(self.events(), ['branding', 'assets', 'sources',
                          'target:-C out/YeePilot -j 3 chrome', 'cwd:' + str(self.src), 'usage'])
 
+    def test_candidate_output_is_one_directory_and_preserves_the_old_output(self):
+        """후보 출력은 기존 빌드와 분리하며 경로 이탈 이름은 변경 전에 거부한다."""
+        script = 'source "$1"; print -r -- "$YEE_OUT_DIR"'
+        result = subprocess.run(['zsh', '-c', script, 'test', str(self.dev/'common.zsh')],
+                                env={**self.env,'YEE_OUT_NAME':'YeeStable157'}, capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),str(self.src/'out/YeeStable157'))
+        self.assertTrue(self.out.is_dir())
+        for name in ('..','../elsewhere','folder/name'):
+            result = subprocess.run(['zsh','-c',script,'test',str(self.dev/'common.zsh')],
+                                    env={**self.env,'YEE_OUT_NAME':name},capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+        self.assertEqual(self.events(),[])
+
     def test_invalid_jobs_fail_before_input_or_build_mutations(self):
         for jobs in ('0', '-1', 'invalid'):
             for name in ('build.sh', 'build-ui.sh'):
@@ -126,6 +155,22 @@ class DevelopmentToolsTest(unittest.TestCase):
                         'print -r -- --window-position=1776,-1395\n')
         for binary in ('yee_layout_unittests', 'yee_header_unittests', 'interactive_ui_tests'):
             self.write_tool(self.out / binary,
+                            'listing=false\nfilter=""\n'
+                            'for argument in "$@"; do\n'
+                            '  [[ "$argument" == --gtest_list_tests ]] && listing=true\n'
+                            '  if [[ "$argument" == --gtest_filter=* ]]; then\n'
+                            '    filter="${argument#--gtest_filter=}"\n'
+                            '  fi\n'
+                            'done\n'
+                            'if [[ "$listing" == true ]]; then\n'
+                            '  for pattern in "${(@s.:.)filter}"; do\n'
+                            '    pattern="${pattern//\\*/Fixture}"\n'
+                            '    pattern="${pattern//\\?/X}"\n'
+                            '    [[ "$pattern" == *.* ]] || pattern+=".Fixture"\n'
+                            '    print -rl -- "${pattern%%.*}." "  ${pattern#*.}"\n'
+                            '  done\n'
+                            '  exit 0\n'
+                            'fi\n'
                             'printf "run:%s\\n" "${0:t}" >> "$YEE_TEST_LOG"\n'
                             'printf "arg:%s\\n" "$@" >> "$YEE_TEST_LOG"\n')
         filters = {}
@@ -170,6 +215,93 @@ class DevelopmentToolsTest(unittest.TestCase):
                              'YeeSplitCommandsUpdateChromiumModel'):
                 case = f'SplitTabLayout/MultiContentsViewUiTest.{contract}/{layout}'
                 self.assertTrue(selected('test-sidebar.sh', case), case)
+
+    def test_layout_gates_require_only_cases_compiled_for_the_host(self):
+        """다른 OS에서 빠지는 사례는 만들어 주지 않아 필수 필터의 잘못된 혼합을 잡는다."""
+        self.write_tool(self.dev / 'test-run-preflight.sh', 'exit 0\n')
+        self.write_tool(self.bin / 'uname', 'print -r -- "$YEE_TEST_PLATFORM"\n')
+        self.write_tool(self.bin / 'xcrun', 'exit 0\n')
+        self.write_tool(self.bin / 'pgrep', 'exit 1\n')
+        for binary in ('yee_layout_unittests', 'multi_contents_geometry_unittests',
+                       'interactive_ui_tests', 'browser_tests'):
+            self.write_tool(self.out / binary, '''listing=false
+filter=""
+for argument in "$@"; do
+  [[ "$argument" == --gtest_list_tests ]] && listing=true
+  [[ "$argument" == --gtest_filter=* ]] && filter="${argument#--gtest_filter=}"
+done
+if [[ "$listing" == true ]]; then
+  for pattern in "${(@s.:.)filter}"; do
+    # native 소스의 IS_WIN 및 is_mac 컴파일 경계와 같은 목록의 부재를 흉내 낸다.
+    if [[ "$YEE_TEST_PLATFORM" == Darwin &&
+          ( "$pattern" == *YeeWindows* ||
+            "$pattern" == CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost ||
+            "$pattern" == TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0 ||
+            "$pattern" == VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus ) ]]; then
+      continue
+    fi
+    if [[ "$YEE_TEST_PLATFORM" != Darwin &&
+          ( "$pattern" == ImmersiveModeControllerMac* ||
+            "$pattern" == BrowserNativeWidgetMacGlassTest.* ||
+            "$pattern" == OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState ||
+            "$pattern" == BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth ) ]]; then
+      continue
+    fi
+    pattern="${pattern//\\*/Fixture}"
+    pattern="${pattern//\\?/X}"
+    [[ "$pattern" == *.* ]] || pattern+=".Fixture"
+    print -rl -- "${pattern%%.*}." "  ${pattern#*.}"
+  done
+  exit 0
+fi
+printf 'run:%s\\n' "${0:t}" >> "$YEE_TEST_LOG"
+printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
+''')
+        for platform in ('Darwin', 'MSYS_NT-10.0'):
+            for name, mode, expected_runs in (
+                    ('test-browser-surface-layout.sh', 'horizontal', 3),
+                    ('test-browser-surface-layout.sh', 'interactive', 3),
+                    ('test-browser-surface-layout.sh', 'all', 6),
+                    ('test-sidebar.sh', 'interactive', 1),
+                    ('test-sidebar.sh', 'all', 2)):
+                with self.subTest(platform=platform, script=name, mode=mode):
+                    self.log.unlink(missing_ok=True)
+                    result = self.run_script(name, mode, '--no-build',
+                                             YEE_TEST_PLATFORM=platform)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    filters = [event.removeprefix('arg:--gtest_filter=')
+                               for event in self.events()
+                               if event.startswith('arg:--gtest_filter=')]
+                    self.assertEqual(len(filters), expected_runs)
+                    combined = ':'.join(filters)
+                    if platform == 'Darwin':
+                        self.assertNotIn('YeeWindows', combined)
+                        self.assertNotIn('YeeTabLayoutSelectPopupFollowsItsHost', combined)
+                        self.assertNotIn('YeeGroupMembershipDragSurvivesLayoutSwitch', combined)
+                        self.assertNotIn('YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus',
+                                         combined)
+                        if name == 'test-browser-surface-layout.sh' and mode != 'horizontal':
+                            self.assertIn('BrowserNativeWidgetMacGlassTest.', combined)
+                            self.assertIn('MultiWindowActivationRestartsAutocompleteWithoutStaleState',
+                                          combined)
+                            self.assertIn('YeeFindBarUsesPixelStableBoundsAtMinimumWidth', combined)
+                    else:
+                        self.assertNotIn('BrowserNativeWidgetMacGlassTest.', combined)
+                        self.assertNotIn('ImmersiveModeControllerMac', combined)
+                        self.assertNotIn('MultiWindowActivationRestartsAutocompleteWithoutStaleState',
+                                         combined)
+                        self.assertNotIn('YeeFindBarUsesPixelStableBoundsAtMinimumWidth', combined)
+                        if name == 'test-sidebar.sh':
+                            self.assertIn('YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus',
+                                          combined)
+                            continue
+                        self.assertIn('YeeWindowsHorizontalTabsConnectPageSurfaceToHeader',
+                                      combined)
+                        self.assertIn('YeeGroupMembershipDragSurvivesLayoutSwitch', combined)
+                        if mode != 'horizontal':
+                            self.assertIn('YeeWindowsNativeClipSurvivesRendererAttachment',
+                                          combined)
+                            self.assertIn('YeeTabLayoutSelectPopupFollowsItsHost', combined)
 
 
 if __name__ == '__main__':

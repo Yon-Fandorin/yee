@@ -7,7 +7,8 @@
 | --- | --- |
 | `paths.zsh`, `paths.ps1` | 저장소·Chromium·빌드 경로와 제품 이름 |
 | `preflight.zsh`, `preflight.ps1` | 필요한 소스·도구·여유 공간 확인 |
-| `build.zsh`, `build.ps1` | 소스·브랜딩 준비와 빌드 실행 |
+| `build.zsh`, `build.ps1` | 소스·브랜딩 준비와 빌드 실행; zsh의 native 회귀 목록 검사·실행 |
+| `native_test_discovery.py` | GTest 목록의 활성 사례·필터별 발견 수를 확인하는 순수 Python CLI |
 | `runtime.zsh` | macOS 앱 실행·종료와 빌드 결과의 최신 여부 확인 |
 | `metal.zsh` | macOS Metal 도구 경로 찾기 |
 | `macos_release.py` | 복사한 Mac 설치판의 식별자·코드 서명·DMG·메타데이터 생성 |

@@ -1,53 +1,7 @@
-diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
---- a/chrome/app/theme/chromium/BRANDING
-+++ b/chrome/app/theme/chromium/BRANDING
-@@ -7,3 +7,4 @@
- COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
-+OVERLAY_BRANDING_MANAGED=1
- MAC_BUNDLE_ID=org.chromium.Chromium
- MAC_CREATOR_CODE=Cr24
-diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
---- a/chrome/app/chromium_strings.grd
-+++ b/chrome/app/chromium_strings.grd
-@@ -295,8 +295,3 @@
-         <else>
--          <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
--            Chromium
--          </message>
--          <message name="IDS_SHORT_PRODUCT_NAME" desc="The Chrome application short name." translateable="false">
--            Chromium
--          </message>
-+          <part file="yee_product_names.grdp" />
-         </else>
-@@ -1184,5 +1179,3 @@
-       <if expr="is_macosx">
--        <message name="IDS_APP_MENU_PRODUCT_NAME" desc="The application's short name, used for the Mac's application menu, activity monitor, etc. This should be less than 16 characters. Example: Chrome, not Google Chrome." translateable="false">
--          Chromium
--        </message>
-+        <part file="yee_app_menu_name.grdp" />
-         <message name="IDS_HELPER_NAME" desc="The helper application's name.  Should contain the Chrome application name (IDS_PRODUCT_NAME). Example: Google Chrome Helper.">
-diff --git a/chrome/installer/mac/signing/build_props_config.py.in b/chrome/installer/mac/signing/build_props_config.py.in
-index 739dfa9d51..fdde35468c 100644
---- a/chrome/installer/mac/signing/build_props_config.py.in
-+++ b/chrome/installer/mac/signing/build_props_config.py.in
-@@ -25,11 +25,11 @@ class BuildPropsCodeSignConfig(CodeSignConfig):
- 
-     @property
-     def app_product(self):
--        return '@PRODUCT_FULLNAME@'
-+        return "@PRODUCT_FULLNAME@"
- 
-     @property
-     def product(self):
--        return '@PRODUCT_FULLNAME@'
-+        return "@PRODUCT_FULLNAME@"
- 
-     @property
-     def version(self):
-diff --git a/base/win/embedded_i18n/create_string_rc.py b/base/win/embedded_i18n/create_string_rc.py
-index bccce42ac9..56151d9ab2 100755
---- a/base/win/embedded_i18n/create_string_rc.py
-+++ b/base/win/embedded_i18n/create_string_rc.py
+diff --git a/base/i18n/win/embedded_i18n/create_string_rc.py b/base/i18n/win/embedded_i18n/create_string_rc.py
+index 6fca01533d..cf33e37663 100755
+--- a/base/i18n/win/embedded_i18n/create_string_rc.py
++++ b/base/i18n/win/embedded_i18n/create_string_rc.py
 @@ -83,7 +83,7 @@ class GrdHandler(sax.handler.ContentHandler):
      referenced_xtb_files: A list of all xtb files referenced inside the .grd
        file.
@@ -57,19 +11,18 @@ index bccce42ac9..56151d9ab2 100755
      """Constructs a handler that reads selected strings from a .grd file.
  
      The dict attribute |messages| is populated with the strings that are read.
-@@ -96,6 +96,11 @@ class GrdHandler(sax.handler.ContentHandler):
+@@ -96,6 +96,10 @@ class GrdHandler(sax.handler.ContentHandler):
      self.messages = collections.defaultdict(dict)
      self.referenced_xtb_files = []
      self.__id_set = string_id_set
-+    # Only explicitly declared action inputs are expanded. Existing callers
-+    # retain their original extraction behavior and dependency graph.
++    # 선언한 action 입력만 확장하며 기존 호출자의 추출 범위는 유지한다.
 +    self.__source_parts = {os.path.abspath(path) for path in source_parts}
 +    self.__active_parts = active_parts
 +    self.__locator = None
      self.__message_name = None
      self.__element_stack = []
      self.__text_scraps = []
-@@ -106,9 +111,24 @@ class GrdHandler(sax.handler.ContentHandler):
+@@ -106,9 +110,24 @@ class GrdHandler(sax.handler.ContentHandler):
  
      self.__characters_callback = None
  
@@ -95,7 +48,7 @@ index bccce42ac9..56151d9ab2 100755
        self.__OnOpenMessage(attrs.getValue('name'))
      elif name == 'ph':
        self.__OnOpenPlaceholder(attrs.getValue('name'))
-@@ -271,7 +291,8 @@ class XtbHandler(sax.handler.ContentHandler):
+@@ -271,7 +290,8 @@ class XtbHandler(sax.handler.ContentHandler):
  class StringRcMaker(object):
    """Makes .h and .rc files containing strings and translations."""
    def __init__(self, inputs, expected_xtb_input_files, header_file, rc_file,
@@ -105,7 +58,7 @@ index bccce42ac9..56151d9ab2 100755
      """Constructs a maker.
  
      Args:
-@@ -294,6 +315,7 @@ class StringRcMaker(object):
+@@ -294,6 +314,7 @@ class StringRcMaker(object):
          dictionary.
      """
      self.inputs = inputs
@@ -113,7 +66,7 @@ index bccce42ac9..56151d9ab2 100755
      self.expected_xtb_input_files = expected_xtb_input_files
      self.expected_xtb_input_files.sort()
      self.header_file = header_file
-@@ -386,7 +408,7 @@ Extra input files:
+@@ -386,7 +407,7 @@ Extra input files:
      sax_parser = sax.make_parser()
  
      # Read the source (en-US) string from the .grd file.
@@ -122,17 +75,16 @@ index bccce42ac9..56151d9ab2 100755
      sax_parser.setContentHandler(grd_handler)
      sax_parser.parse(grd_file)
      source_strings = grd_handler.messages
-@@ -560,6 +582,9 @@ def BuildArgumentParser():
+@@ -560,6 +581,8 @@ def BuildArgumentParser():
                        required=True,
                        help='expected xtb input files to read',
                        dest='expected_xtb_input_files')
 +  parser.add_argument('--source-part', action='append', default=[],
-+                      help='explicit GRDP action input to expand in place',
-+                      dest='source_parts')
++                      help='명시적으로 선언한 GRDP 입력을 확장한다', dest='source_parts')
    parser.add_argument('--header-file',
                        required=True,
                        help='path to generated .h file to write',
-@@ -635,7 +660,7 @@ def main():
+@@ -635,7 +658,7 @@ def main():
  
    StringRcMaker(inputs, args.expected_xtb_input_files, args.header_file,
      args.rc_file,  brand, args.first_resource_id, string_ids_to_extract,
@@ -141,23 +93,23 @@ index bccce42ac9..56151d9ab2 100755
    return 0
  
  if '__main__' == __name__:
-diff --git a/base/win/embedded_i18n/generate_embedded_i18n.gni b/base/win/embedded_i18n/generate_embedded_i18n.gni
-index 90b46df50f..941bfda779 100644
---- a/base/win/embedded_i18n/generate_embedded_i18n.gni
-+++ b/base/win/embedded_i18n/generate_embedded_i18n.gni
+diff --git a/base/i18n/win/embedded_i18n/generate_embedded_i18n.gni b/base/i18n/win/embedded_i18n/generate_embedded_i18n.gni
+index 556b766c32..d6985d282c 100644
+--- a/base/i18n/win/embedded_i18n/generate_embedded_i18n.gni
++++ b/base/i18n/win/embedded_i18n/generate_embedded_i18n.gni
 @@ -47,6 +47,9 @@ import("//build/config/python.gni")
  #       The branding used to determine specific string extractions.
  #       Will not be passed to the generation script if it is undefined.
  #
 +#   source_parts (optional)
-+#       Explicit GRDP inputs to expand during extraction.
++#       추출 중 확장할 GRDP action 입력 목록이다.
 +#
  #   deps (optional)
  #   visibility (optional)
  
 @@ -87,6 +90,9 @@ template("generate_embedded_i18n") {
    action_with_pydeps(target_name) {
-     script = "//base/win/embedded_i18n/create_string_rc.py"
+     script = "//base/i18n/win/embedded_i18n/create_string_rc.py"
      inputs = []
 +    if (defined(invoker.source_parts)) {
 +      inputs += invoker.source_parts
@@ -181,49 +133,8 @@ index 90b46df50f..941bfda779 100644
      foreach(grd_file_info, grd_files_info) {
        grdfile_folder = grd_file_info[0]
        grdfile_name = grd_file_info[1]
-diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
-index b42bb73601..e48a58bd43 100644
---- a/chrome/installer/util/BUILD.gn
-+++ b/chrome/installer/util/BUILD.gn
-@@ -3,6 +3,7 @@
- # found in the LICENSE file.
- 
- import("//base/win/embedded_i18n/generate_embedded_i18n.gni")
-+import("//chrome/app/yee_branding_strings.gni")
- import("//build/config/chrome_build.gni")
- 
- import("//testing/test.gni")
-@@ -170,6 +171,7 @@ static_library("with_no_strings") {
-       "system_tracing_util.h",
-       "taskbar_util.cc",
-       "taskbar_util.h",
-+      "taskbar_util_internal.h",
-     ]
- 
-     public_deps += [
-@@ -234,6 +236,10 @@ generate_embedded_i18n("generate_strings") {
-   grdfile_folder = "//chrome/app/"
-   grdfile_name = "${branding_path_product}_strings"
-   xtb_relative_path = "resources"
-+  if (!is_chrome_branded && !is_chrome_for_testing_branded &&
-+      yee_brand_strings_enabled) {
-+    xtb_relative_path = "yee_branding_strings/inputs/chrome/app/resources"
-+  }
-   grd_files_info = [ [
-         grdfile_folder,
-         grdfile_name,
-@@ -244,6 +250,9 @@ generate_embedded_i18n("generate_strings") {
-   output_file_name_base = "installer_util_strings"
- 
-   branding = branding_path_product
-+  if (branding_path_product == "chromium") {
-+    source_parts = [ "//chrome/app/yee_product_names.grdp" ]
-+  }
- }
- 
- # Compile the generated .rc file.
 diff --git a/build/util/version.py b/build/util/version.py
-index a5611af802..b6261da262 100755
+index a5611af802..3575b106f5 100755
 --- a/build/util/version.py
 +++ b/build/util/version.py
 @@ -25,7 +25,7 @@ def FetchValuesFromFile(values_dict, file_name):
@@ -235,7 +146,7 @@ index a5611af802..b6261da262 100755
          for line in f.readlines():
              key, val = line.rstrip('\r\n').split('=', 1)
              values_dict[key] = val
-@@ -99,21 +99,21 @@ def SubstFile(file_name, values):
+@@ -99,29 +99,39 @@ def SubstFile(file_name, values):
  
      This is like SubstTemplate, except it operates on a file.
      """
@@ -257,20 +168,34 @@ index a5611af802..b6261da262 100755
 +        with open(file_name, 'r', encoding=encoding) as f:
              old_contents = f.read()
 -    except EnvironmentError:
+-        pass
 +    except (EnvironmentError, UnicodeError):
-         pass
++        if os.name == 'nt' and os.path.isfile(file_name):
++            old_mode = stat.S_IMODE(os.stat(file_name).st_mode)
++            if not old_mode & stat.S_IWRITE:
++                os.chmod(file_name, old_mode | stat.S_IWRITE)
      else:
-         if contents == old_contents and mode == stat.S_IMODE(
-@@ -121,7 +121,7 @@ def WriteIfChanged(file_name, contents, mode):
-         ):
+-        if contents == old_contents and mode == stat.S_IMODE(
+-            os.lstat(file_name).st_mode
+-        ):
++        old_mode = stat.S_IMODE(os.lstat(file_name).st_mode)
++        # Windows chmod는 읽기 전용 속성만 표현하며 실행 권한은 보존하지 않는다.
++        mode_matches = (
++            bool(mode & stat.S_IWRITE) == bool(old_mode & stat.S_IWRITE)
++            if os.name == 'nt'
++            else mode == old_mode
++        )
++        if contents == old_contents and mode_matches:
              return
++        if os.name == 'nt' and not old_mode & stat.S_IWRITE:
++            os.chmod(file_name, old_mode | stat.S_IWRITE)
          os.unlink(file_name)
 -    with open(file_name, 'w') as f:
 +    with open(file_name, 'w', encoding=encoding) as f:
          f.write(contents)
      os.chmod(file_name, mode)
  
-@@ -148,6 +148,12 @@ def BuildParser():
+@@ -148,6 +158,12 @@ def BuildParser():
          default=None,
          help='Write substituted strings to FILE.',
      )
@@ -283,7 +208,7 @@ index a5611af802..b6261da262 100755
      parser.add_argument(
          '-t',
          '--template',
-@@ -315,7 +321,8 @@ def main(args):
+@@ -315,7 +331,8 @@ def main(args):
  
      if output['options'].output is not None:
          WriteIfChanged(
@@ -293,86 +218,159 @@ index a5611af802..b6261da262 100755
          )
      else:
          print(output['contents'])
-diff --git a/chrome/process_version_rc_template.gni b/chrome/process_version_rc_template.gni
-index 8d7edf5044..d785ab2d67 100644
---- a/chrome/process_version_rc_template.gni
-+++ b/chrome/process_version_rc_template.gni
-@@ -53,10 +53,19 @@ template("process_version_rc_template") {
-   process_version(target_name) {
-     template_file = _template_file
-     sources = _sources
-+    extra_args = []
-+    if (defined(invoker.extra_args)) {
-+      extra_args += invoker.extra_args
-+    }
-+    if (is_win) {
-+      # rc.py recognizes Unicode input through the UTF-16 BOM.
-+      extra_args += [ "--output-encoding", "utf-16" ]
-+    }
-     forward_variables_from(invoker,
-                            "*",
-                            [
-                              "sources",
-+                             "extra_args",
-                              "template_file",
-                            ])
-   }
-diff --git a/chrome/installer/setup/installer_crash_reporter_client.cc b/chrome/installer/setup/installer_crash_reporter_client.cc
-index 64c13b78f7..9af4c2ce45 100644
---- a/chrome/installer/setup/installer_crash_reporter_client.cc
-+++ b/chrome/installer/setup/installer_crash_reporter_client.cc
-@@ -38,7 +38,7 @@ void InstallerCrashReporterClient::GetProductNameAndVersion(
-     std::wstring* channel_name) {
-   // Report crashes under the same product name as the browser. This string
-   // MUST match server-side configuration.
--  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
-+  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+diff --git a/build/util/version_test.py b/build/util/version_test.py
+index 6b86417169..5b999bb185 100644
+--- a/build/util/version_test.py
++++ b/build/util/version_test.py
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
  
-   std::unique_ptr<FileVersionInfo> version_info(
-       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
-diff --git a/chrome/notification_helper/notification_helper_crash_reporter_client.cc b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
-index 86604e9427..0fa79a79c4 100644
---- a/chrome/notification_helper/notification_helper_crash_reporter_client.cc
-+++ b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
-@@ -60,7 +60,7 @@ void NotificationHelperCrashReporterClient::GetProductNameAndVersion(
-     std::wstring* channel_name) {
-   // Report crashes under the same product name as the browser. This string
-   // MUST match server-side configuration.
--  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
-+  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+ import os
++import stat
+ import tempfile
+ import time
+ import unittest
+@@ -218,10 +219,58 @@ class _VersionTest(unittest.TestCase):
+             os.chmod(file_name, 0o644)
+             mtime = os.lstat(file_name).st_mtime
+             time.sleep(0.1)
+-            version.WriteIfChanged(file_name, contents, 0o755)
++            mode = 0o444 if os.name == 'nt' else 0o755
++            version.WriteIfChanged(file_name, contents, mode)
+             with open(file_name) as f:
+                 self.assertEqual(contents, f.read())
+             self.assertNotEqual(mtime, os.lstat(file_name).st_mtime)
++            self.assertEqual(bool(mode & stat.S_IWRITE),
++                             bool(os.lstat(file_name).st_mode & stat.S_IWRITE))
++            os.chmod(file_name, 0o644)
++
++    @unittest.skipUnless(os.name == 'nt', 'Windows 읽기 전용 속성 검사')
++    def testWriteIfChangedIgnoresUnsupportedExecutableBits(self):
++        """Windows에서 실행 비트만 달라지면 동일한 출력 파일을 다시 쓰지 않는다."""
++        with tempfile.TemporaryDirectory() as tmpdir:
++            file_name = os.path.join(tmpdir, 'version.h')
++            version.WriteIfChanged(file_name, 'same contents', 0o644)
++            mtime = os.lstat(file_name).st_mtime_ns
++            time.sleep(0.1)
++            version.WriteIfChanged(file_name, 'same contents', 0o755)
++            self.assertEqual(mtime, os.lstat(file_name).st_mtime_ns)
++
++    @unittest.skipUnless(os.name == 'nt', 'Windows 읽기 전용 속성 검사')
++    def testWriteIfChangedPreservesUnchangedReadOnlyOutput(self):
++        """내용과 읽기 전용 속성이 같으면 출력과 수정 시간을 보존한다."""
++        with tempfile.TemporaryDirectory() as tmpdir:
++            file_name = os.path.join(tmpdir, 'version.h')
++            try:
++                version.WriteIfChanged(file_name, 'same contents', 0o444)
++                mtime = os.lstat(file_name).st_mtime_ns
++                time.sleep(0.1)
++                version.WriteIfChanged(file_name, 'same contents', 0o444)
++                self.assertEqual(mtime, os.lstat(file_name).st_mtime_ns)
++                self.assertFalse(os.lstat(file_name).st_mode & stat.S_IWRITE)
++            finally:
++                os.chmod(file_name, 0o644)
++
++    @unittest.skipUnless(os.name == 'nt', 'Windows 읽기 전용 속성 검사')
++    def testWriteIfChangedReplacesReadOnlyOutputAndRestoresMode(self):
++        """읽기 전용 출력의 내용·인코딩을 바꾸고 요청한 쓰기 속성을 복원한다."""
++        for encoding in ('utf-8', 'utf-16'):
++            for mode in (0o444, 0o644):
++                with self.subTest(encoding=encoding, mode=mode):
++                    with tempfile.TemporaryDirectory() as tmpdir:
++                        file_name = os.path.join(tmpdir, 'version.h')
++                        try:
++                            version.WriteIfChanged(file_name, 'old contents', 0o444)
++                            version.WriteIfChanged(file_name, 'new contents', mode, encoding)
++                            with open(file_name, encoding=encoding) as f:
++                                self.assertEqual('new contents', f.read())
++                            self.assertEqual(bool(mode & stat.S_IWRITE),
++                                             bool(os.lstat(file_name).st_mode & stat.S_IWRITE))
++                        finally:
++                            os.chmod(file_name, 0o644)
  
-   std::unique_ptr<FileVersionInfo> version_info(
-       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
-diff --git a/chrome/windows_services/service_program/crash_reporting.cc b/chrome/windows_services/service_program/crash_reporting.cc
-index 04cfd98a00..42ee02921e 100644
---- a/chrome/windows_services/service_program/crash_reporting.cc
-+++ b/chrome/windows_services/service_program/crash_reporting.cc
-@@ -116,7 +116,7 @@ void CrashClient::GetProductNameAndVersion(const std::wstring& exe_path,
-                                            std::wstring* channel_name) {
-   // Report crashes under the same product name as the browser. This string
-   // MUST match server-side configuration.
--  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
-+  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
-   *version = base::ASCIIToWide(CHROME_VERSION_STRING);
-   special_build->clear();
-   *channel_name =
-diff --git a/chrome/installer/linux/common/installer.py b/chrome/installer/linux/common/installer.py
-index 7646f80c84..a2a1de26c8 100644
---- a/chrome/installer/linux/common/installer.py
-+++ b/chrome/installer/linux/common/installer.py
-@@ -390,8 +390,8 @@ class InstallerConfig:
-             return env
+     def testWriteIfChangedNoUpdate(self):
+         """Assert it does not update mtime of file when nothing is changed."""
+diff --git a/chrome/browser/infobars/browser_infobar_manager.cc b/chrome/browser/infobars/browser_infobar_manager.cc
+index 3ca8fad2d0..2fcb2b2bee 100644
+--- a/chrome/browser/infobars/browser_infobar_manager.cc
++++ b/chrome/browser/infobars/browser_infobar_manager.cc
+@@ -31,6 +31,7 @@
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_contents_observer.h"
++#include "ui/base/models/image_model.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/gfx/vector_icon_types.h"
+ #include "ui/views/view.h"
+@@ -152,6 +153,11 @@ class RegistryInfoBarDelegate final : public ConfirmInfoBarDelegate,
  
-         def parse_simple(file_path: pathlib.Path) -> dict[str, str]:
--            return dict(
--                line.strip().split("=") for line in file_path.open("r") if line)
-+            with file_path.open("r", encoding="utf-8") as stream:
-+                return dict(line.strip().split("=", 1) for line in stream if line)
+   int GetIconId() const override { return spec_.icon_id(); }
  
-         data["info_vars"] = parse_shell(
-             output_dir / "installer/common" /
++  ui::ImageModel GetIcon() const override {
++    return spec_.icon_provider() ? spec_.icon_provider().Run(dark_mode())
++                                 : ConfirmInfoBarDelegate::GetIcon();
++  }
++
+   const gfx::VectorIcon& GetVectorIcon() const override {
+     if (dark_mode() && spec_.dark_mode_icon()) {
+       return *spec_.dark_mode_icon();
+diff --git a/chrome/browser/infobars/infobar_spec.cc b/chrome/browser/infobars/infobar_spec.cc
+index 07b476c4ec..380df39afa 100644
+--- a/chrome/browser/infobars/infobar_spec.cc
++++ b/chrome/browser/infobars/infobar_spec.cc
+@@ -96,6 +96,12 @@ InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconId(int icon_id) {
+   return *this;
+ }
+ 
++InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconProvider(
++    IconProvider provider) {
++  spec_.icon_provider_ = std::move(provider);
++  return *this;
++}
++
+ InfoBarSpec::Builder& InfoBarSpec::Builder::SetScope(InfoBarScope scope) {
+   spec_.scope_ = scope;
+   return *this;
+diff --git a/chrome/browser/infobars/infobar_spec.h b/chrome/browser/infobars/infobar_spec.h
+index fbe6f50c65..482cfca3a4 100644
+--- a/chrome/browser/infobars/infobar_spec.h
++++ b/chrome/browser/infobars/infobar_spec.h
+@@ -82,6 +82,7 @@ class InfoBarSpec {
+   // Returns true if the infobar may be shown in the given browser. Only
+   // consulted for InfoBarScope::kGlobal.
+   using BrowserFilter = base::RepeatingCallback<bool(BrowserWindowInterface*)>;
++  using IconProvider = base::RepeatingCallback<ui::ImageModel(bool dark_mode)>;
+ 
+   class Builder;
+ 
+@@ -123,6 +124,7 @@ class InfoBarSpec {
+   const gfx::VectorIcon* icon() const { return icon_; }
+   const gfx::VectorIcon* dark_mode_icon() const { return dark_mode_icon_; }
+   int icon_id() const { return icon_id_; }
++  const IconProvider& icon_provider() const { return icon_provider_; }
+   bool expire_on_navigation() const { return expire_on_navigation_; }
+   bool should_hide_in_fullscreen() const { return should_hide_in_fullscreen_; }
+   bool should_animate() const { return should_animate_; }
+@@ -174,6 +176,7 @@ class InfoBarSpec {
+   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
+   raw_ptr<const gfx::VectorIcon> dark_mode_icon_ = nullptr;
+   int icon_id_ = 0;
++  IconProvider icon_provider_;
+   bool expire_on_navigation_ = true;
+   bool should_hide_in_fullscreen_ = false;
+   bool should_animate_ = true;
+@@ -273,6 +276,9 @@ class InfoBarSpec::Builder {
+   // Shown instead of the SetIcon() icon when the infobar is in dark mode.
+   Builder& SetDarkModeIcon(const gfx::VectorIcon& icon);
+   Builder& SetIconId(int icon_id);
++  // 정적 vector·resource 아이콘보다 우선하며 배너 바탕의 명암이 바뀌면 다시
++  // 호출한다.
++  Builder& SetIconProvider(IconProvider provider);
+ 
+   Builder& SetScope(InfoBarScope scope);
+   Builder& SetPriority(InfoBarDelegate::InfobarPriority priority);
 diff --git a/chrome/browser/pdf/BUILD.gn b/chrome/browser/pdf/BUILD.gn
-index e1de032ece..0517085987 100644
+index 4d694792c0..e35ff2f318 100644
 --- a/chrome/browser/pdf/BUILD.gn
 +++ b/chrome/browser/pdf/BUILD.gn
 @@ -31,6 +31,7 @@ source_set("pdf") {
@@ -384,7 +382,7 @@ index e1de032ece..0517085987 100644
      "//chrome/browser:browser_process",
      "//chrome/browser:resources",
 diff --git a/chrome/browser/pdf/pdf_extension_util.cc b/chrome/browser/pdf/pdf_extension_util.cc
-index 0ff31abd00..6be72e2fbb 100644
+index 067d327650..d7e8e9e3e8 100644
 --- a/chrome/browser/pdf/pdf_extension_util.cc
 +++ b/chrome/browser/pdf/pdf_extension_util.cc
 @@ -10,10 +10,11 @@
@@ -400,7 +398,41 @@ index 0ff31abd00..6be72e2fbb 100644
  #include "build/build_config.h"
  #include "chrome/browser/browser_process.h"
  #include "chrome/browser/glic/public/glic_enabling.h"
-@@ -332,18 +333,17 @@ bool IsPdfSaveToDriveEnabled(content::BrowserContext* context) {
+@@ -87,9 +88,8 @@ base::DictValue GetCommonStrings() {
+   dict.Set("presetZoomFactors", zoom::GetPresetZoomFactorsAsJSON());
+   dict.Set("pdfOopifEnabled",
+            chrome_pdf::features::IsOopifPdfEnabled() ? "pdfOopifEnabled" : "");
+-  dict.Set(
+-      "webuiRoundedIconsAttribute",
+-      features::IsWebUIRoundedIconsEnabled() ? "webui-rounded-icons" : "");
++  dict.Set("webuiRoundedIconsAttribute",
++           features::IsWebUIRoundedIconsEnabled() ? "webui-rounded-icons" : "");
+   return dict;
+ }
+ 
+@@ -337,8 +337,8 @@ base::WeakPtr<extensions::StreamContainer> GetStreamContainerForEmbedder(
+     content::RenderFrameHost* embedder_host) {
+   if (chrome_pdf::features::IsOopifPdfEnabled()) {
+     auto* mime_handler_stream_manager =
+-        extensions::mime_handler::MimeHandlerStreamManager::
+-            FromRenderFrameHost(embedder_host);
++        extensions::mime_handler::MimeHandlerStreamManager::FromRenderFrameHost(
++            embedder_host);
+     return mime_handler_stream_manager
+                ? mime_handler_stream_manager->GetStreamContainer(embedder_host)
+                : nullptr;
+@@ -350,8 +350,8 @@ base::WeakPtr<extensions::StreamContainer> GetStreamContainerForEmbedder(
+       content::WebContents::FromRenderFrameHost(embedder_host);
+   for (content::WebContents* inner_contents :
+        embedder_contents->GetInnerWebContents()) {
+-    auto* guest = extensions::MimeHandlerViewGuest::FromWebContents(
+-        inner_contents);
++    auto* guest =
++        extensions::MimeHandlerViewGuest::FromWebContents(inner_contents);
+     if (guest && guest->GetEmbedderFrame() == embedder_host) {
+       return guest->GetStreamWeakPtr();
+     }
+@@ -362,18 +362,17 @@ base::WeakPtr<extensions::StreamContainer> GetStreamContainerForEmbedder(
  }  // namespace
  
  std::string GetManifest() {
@@ -410,9 +442,9 @@ index 0ff31abd00..6be72e2fbb 100644
 -  static constexpr char kExtensionName[] = "Chromium PDF Viewer";
 -#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
 +  std::string extension_name;
-+  base::EscapeJSONString(std::string(version_info::GetProductName()) +
-+                            " PDF Viewer",
-+                        false, &extension_name);
++  base::EscapeJSONString(
++      std::string(version_info::GetProductName()) + " PDF Viewer", false,
++      &extension_name);
  
    std::string manifest_contents(
        ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
@@ -425,7 +457,7 @@ index 0ff31abd00..6be72e2fbb 100644
    return manifest_contents;
  }
 diff --git a/chrome/browser/profiles/profile_shortcut_manager_win.cc b/chrome/browser/profiles/profile_shortcut_manager_win.cc
-index 127f270b08..d685bc544e 100644
+index 9d7baf5001..b9d821034b 100644
 --- a/chrome/browser/profiles/profile_shortcut_manager_win.cc
 +++ b/chrome/browser/profiles/profile_shortcut_manager_win.cc
 @@ -78,7 +78,7 @@ const int kMaxProfileShortcutFileNameLength = 64;
@@ -450,11 +482,176 @@ index 30163c22b1..e2725f670e 100644
    height: var(--illustration-height);
    margin-top: var(--illustration-margin-top);
    position: relative;
+diff --git a/chrome/browser/ui/cocoa/BUILD.gn b/chrome/browser/ui/cocoa/BUILD.gn
+index c8352aebb0..e095842dbe 100644
+--- a/chrome/browser/ui/cocoa/BUILD.gn
++++ b/chrome/browser/ui/cocoa/BUILD.gn
+@@ -206,6 +206,7 @@ source_set("cocoa") {
+     sources += [ "keystone_infobar_delegate.cc" ]
+     deps += [
+       "//chrome/browser/infobars",
++      "//chrome/browser/ui/views/yee:product_logo",
+       "//chrome/browser/updater",
+       "//components/infobars/content",
+     ]
+diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
+index 45a7606df2..dc51c5601c 100644
+--- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
++++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
+@@ -12,11 +12,13 @@
+ #include "base/time/time.h"
+ #include "chrome/browser/infobars/confirm_infobar_creator.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/browser/updater/updater.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+-#include "chrome/grit/theme_resources.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/infobars/core/infobar.h"
+ #include "components/prefs/pref_service.h"
+@@ -56,8 +58,8 @@ KeystonePromotionInfoBarDelegate::GetIdentifier() const {
+   return KEYSTONE_PROMOTION_INFOBAR_DELEGATE_MAC;
+ }
+ 
+-int KeystonePromotionInfoBarDelegate::GetIconId() const {
+-  return IDR_PRODUCT_LOGO_32;
++ui::ImageModel KeystonePromotionInfoBarDelegate::GetIcon() const {
++  return yee::branding::ProductLogoIcon(dark_mode());
+ }
+ 
+ bool KeystonePromotionInfoBarDelegate::ShouldExpire(
+diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
+index 00a16707f0..5fb97ba4ad 100644
+--- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
++++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
+@@ -37,7 +37,7 @@ class KeystonePromotionInfoBarDelegate : public ConfirmInfoBarDelegate {
+ 
+   // ConfirmInfoBarDelegate
+   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
+-  int GetIconId() const override;
++  ui::ImageModel GetIcon() const override;
+   bool ShouldExpire(const NavigationDetails& details) const override;
+   std::u16string GetMessageText() const override;
+   std::u16string GetButtonLabel(InfoBarButton button) const override;
+diff --git a/chrome/browser/ui/infobars/BUILD.gn b/chrome/browser/ui/infobars/BUILD.gn
+index f681080529..953062dddf 100644
+--- a/chrome/browser/ui/infobars/BUILD.gn
++++ b/chrome/browser/ui/infobars/BUILD.gn
+@@ -44,7 +44,10 @@ source_set("infobars") {
+   }
+ 
+   if (is_win || is_mac) {
+-    deps += [ "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar" ]
++    deps += [
++      "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar",
++      "//chrome/browser/ui/views/yee:product_logo",
++    ]
+   }
+ 
+   if (is_win || is_mac || is_linux) {
+diff --git a/chrome/browser/ui/infobars/browser_infobar_registry.cc b/chrome/browser/ui/infobars/browser_infobar_registry.cc
+index fba2bc9fb5..efa1bd13a1 100644
+--- a/chrome/browser/ui/infobars/browser_infobar_registry.cc
++++ b/chrome/browser/ui/infobars/browser_infobar_registry.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/infobars/browser_infobar_registry.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ 
+ #include <utility>
+ 
+@@ -174,7 +175,7 @@ void RegisterInfoBars() {
+   }
+ 
+   if (IsInfoBarMigrated(InfoBarDelegate::PAGE_INFO_INFOBAR_DELEGATE)) {
+-      ChromePageInfoDelegate::RegisterPageInfoInfoBar(browser_infobar_manager);
++    ChromePageInfoDelegate::RegisterPageInfoInfoBar(browser_infobar_manager);
+   }
+ 
+   if (IsInfoBarMigrated(InfoBarDelegate::OBSOLETE_SYSTEM_INFOBAR_DELEGATE)) {
+@@ -240,9 +241,8 @@ void RegisterInfoBars() {
+                     infobars::InfoBarDelegate::PIN_INFOBAR_DELEGATE)
+                     .SetMessageText(
+                         default_browser::PinInfoBarController::GetMessageText())
+-                    .SetIcon(features::IsRoundedIconsEnabled()
+-                                 ? omnibox::kChromeProductIcon
+-                                 : vector_icons::kProductRefreshIcon)
++                    .SetIconProvider(
++                        base::BindRepeating(&yee::branding::ProductLogoIcon))
+                     .SetScope(infobars::InfoBarScope::kGlobal)
+                     // Only offer to pin in normal, non-incognito,
+                     // non-guest browsers.
+@@ -341,22 +341,20 @@ void RegisterInfoBars() {
+             InfoBarDelegate::EXTENSION_DEV_TOOLS_INFOBAR_DELEGATE)
+             .SetMessageTextTemplate(
+                 l10n_util::GetStringUTF16(IDS_DEV_TOOLS_INFOBAR_LABEL))
+-            .SetSubstitutionsCallback(base::BindRepeating(
+-                [](content::WebContents*) {
++            .SetSubstitutionsCallback(
++                base::BindRepeating([](content::WebContents*) {
+                   return extensions::ExtensionDevToolsInfoBarController::
+                       GetMessageSubstitutions();
+                 }))
+             .SetScope(InfoBarScope::kGlobal)
+             .SetExpireOnNavigation(false)
+-            .AddCancelButton(
+-                l10n_util::GetStringUTF16(IDS_APP_CANCEL),
+-                base::BindRepeating([](content::WebContents*) {
+-                  extensions::ExtensionDevToolsInfoBarController::
+-                      OnInfoBarAction();
+-                }))
++            .AddCancelButton(l10n_util::GetStringUTF16(IDS_APP_CANCEL),
++                             base::BindRepeating([](content::WebContents*) {
++                               extensions::ExtensionDevToolsInfoBarController::
++                                   OnInfoBarAction();
++                             }))
+             .SetDismissAction(base::BindRepeating([](content::WebContents*) {
+-              extensions::ExtensionDevToolsInfoBarController::
+-                  OnInfoBarAction();
++              extensions::ExtensionDevToolsInfoBarController::OnInfoBarAction();
+             }))
+             .Build();
+     browser_infobar_manager->Register(std::move(spec));
+@@ -417,8 +415,8 @@ void RegisterInfoBars() {
+             .SetMessageTextTemplate(u"$1")
+             .SetSubstitutionsCallback(
+                 base::BindRepeating([](content::WebContents*) {
+-                  return session_restore_infobar::
+-                      SessionRestoreInfoBarManager::GetInstance()
++                  return session_restore_infobar::SessionRestoreInfoBarManager::
++                      GetInstance()
+                           ->GetMessageSubstitutions();
+                 }))
+             .SetLinkText(l10n_util::GetStringUTF16(IDS_SESSION_RESTORE_LINK))
+@@ -435,14 +433,14 @@ void RegisterInfoBars() {
+             .SetExpireOnNavigation(false)
+             .SetBrowserFilter(
+                 base::BindRepeating([](BrowserWindowInterface* browser) {
+-                  return session_restore_infobar::
+-                      SessionRestoreInfoBarManager::GetInstance()
++                  return session_restore_infobar::SessionRestoreInfoBarManager::
++                      GetInstance()
+                           ->ShouldTrackBrowser(browser);
+                 }))
+             .SetResultCallback(base::BindRepeating(
+                 [](content::WebContents*, InfoBarResult result) {
+-                  session_restore_infobar::
+-                      SessionRestoreInfoBarManager::GetInstance()
++                  session_restore_infobar::SessionRestoreInfoBarManager::
++                      GetInstance()
+                           ->OnInfoBarResult(result);
+                 }))
+             .Build();
 diff --git a/chrome/browser/ui/pdf/infobar/BUILD.gn b/chrome/browser/ui/pdf/infobar/BUILD.gn
-index e87fd97e3e..0711bcc58c 100644
+index 03e1a62ebe..5aa49e0715 100644
 --- a/chrome/browser/ui/pdf/infobar/BUILD.gn
 +++ b/chrome/browser/ui/pdf/infobar/BUILD.gn
-@@ -31,14 +31,13 @@ source_set("infobar") {
+@@ -30,14 +30,13 @@ source_set("infobar") {
      "//chrome/browser/ui:ui_features",
      "//chrome/browser/ui/browser_window",
      "//chrome/browser/ui/tabs:tab_strip",
@@ -470,6 +667,38 @@ index e87fd97e3e..0711bcc58c 100644
      "//ui/gfx:native_ui_types",
    ]
    if (is_win) {
+diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
+index b19f074d23..53eaa974ae 100644
+--- a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
++++ b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
+@@ -26,6 +26,7 @@
+ #include "chrome/browser/ui/pdf/infobar/pdf_infobar_prefs.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
++#include "chrome/browser/ui/views/yee/product_logo.h"
+ #include "chrome/common/buildflags.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/grit/branded_strings.h"
+@@ -35,7 +36,6 @@
+ #include "components/omnibox/browser/vector_icons.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/tabs/public/tab_interface.h"
+-#include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -172,10 +172,7 @@ void PdfInfoBarController::RegisterInfoBarSpec() {
+       infobars::InfoBarSpec::Builder(
+           infobars::InfoBarDelegate::PDF_INFOBAR_DELEGATE)
+           .SetMessageText(l10n_util::GetStringUTF16(IDS_PDF_INFOBAR_TEXT))
+-          .SetIcon(vector_icons::kProductRefreshIcon)
+-          .SetDarkModeIcon(features::IsRoundedIconsEnabled()
+-                               ? omnibox::kChromeProductIcon
+-                               : omnibox::kProductChromeRefreshOldIcon)
++          .SetIconProvider(base::BindRepeating(&yee::branding::ProductLogoIcon))
+           .SetScope(infobars::InfoBarScope::kTab)
+           .AddOkButton(l10n_util::GetStringUTF16(
+                            IDS_DEFAULT_BROWSER_INFOBAR_OK_BUTTON_LABEL),
 diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc b/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc
 index 6a2b16400f..f6ed37f8d2 100644
 --- a/chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.cc
@@ -519,11 +748,35 @@ index 74ad771f86..062c247979 100644
  
    // ConfirmInfoBarDelegate:
    std::u16string GetMessageText() const override;
+diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
+index d554afbea2..e185c7facc 100644
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -173,6 +173,7 @@ source_set("impl") {
+     "//components/tabs:public",
+     "//components/translate/core/common",
+     "//components/vector_icons",
++    "//components/yee_branding",
+     "//content/public/browser",
+     "//content/public/common",
+     "//google_apis",
+@@ -307,7 +308,10 @@ source_set("impl") {
+         "startup_launch_infobar_delegate.cc",
+         "startup_launch_infobar_manager_impl.cc",
+       ]
+-      deps += [ "//chrome/browser/startup" ]
++      deps += [
++        "//chrome/browser/startup",
++        "//chrome/browser/ui/views/yee:product_logo",
++      ]
+     }
+ 
+     if (is_win && is_chrome_branded) {
 diff --git a/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn b/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
-index df168a846a..19e3f16933 100644
+index c6c848fe9e..9df50f9793 100644
 --- a/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
 +++ b/chrome/browser/ui/startup/default_browser_prompt/BUILD.gn
-@@ -77,6 +77,7 @@ source_set("impl") {
+@@ -80,6 +80,7 @@ source_set("impl") {
      "//chrome/browser/ui/tabs:tab_strip",
      "//chrome/browser/ui/views/frame:toolbar_button_provider",
      "//chrome/browser/ui/views/toolbar",
@@ -532,7 +785,7 @@ index df168a846a..19e3f16933 100644
      "//components/infobars/content",
      "//components/infobars/core",
 diff --git a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
-index ebe5ec8442..fae17d39b3 100644
+index b1166e1f74..2f3d844d08 100644
 --- a/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
 +++ b/chrome/browser/ui/startup/default_browser_prompt/default_browser_infobar_delegate.cc
 @@ -10,14 +10,11 @@
@@ -589,310 +842,19 @@ index 2f2eece414..4a5411451c 100644
    bool ShouldExpire(const NavigationDetails& details) const override;
    void InfoBarDismissed() override;
    std::u16string GetMessageText() const override;
-diff --git a/chrome/browser/ui/webui/intro/intro_ui.cc b/chrome/browser/ui/webui/intro/intro_ui.cc
-index b4143152e4..5a79e48e2c 100644
---- a/chrome/browser/ui/webui/intro/intro_ui.cc
-+++ b/chrome/browser/ui/webui/intro/intro_ui.cc
-@@ -94,7 +94,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
-       {"backupCardTitle", IDS_FRE_BACKUP_CARD_TITLE},
-       {"acceptSignInButtonTitle", IDS_FRE_ACCEPT_SIGN_IN_BUTTON_TITLE},
-       {"createAccountDisclaimer", IDS_FRE_CREATE_ACCOUNT_DESCRIPTION},
--      {"productLogoAltText", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
-+      {"productLogoAltText", IDS_SHORT_PRODUCT_NAME},
-       // Strings for welcome subpage.
-       {"welcomeTitle", IDS_FRE_WELCOME_TITLE},
-       {"welcomeStartButtonLabel", IDS_FRE_WELCOME_START_BUTTON_LABEL},
-@@ -102,7 +102,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
-       {"defaultBrowserTitle", IDS_FRE_DEFAULT_BROWSER_TITLE_NEW},
-       {"defaultBrowserSubtitle", IDS_FRE_DEFAULT_BROWSER_SUBTITLE_NEW},
-       {"defaultBrowserIllustrationAltText",
--       IDS_FRE_DEFAULT_BROWSER_ILLUSTRATION_ALT_TEXT},
-+       IDS_SHORT_PRODUCT_NAME},
-       {"defaultBrowserSetAsDefault", IDS_FRE_DEFAULT_BROWSER_SET_AS_DEFAULT},
-       {"defaultBrowserSkip", IDS_FRE_DEFAULT_BROWSER_SKIP},
-       // Strings for refreshed default browser promo subpage.
-diff --git a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
-index 250f7472e4..891257ddc4 100644
---- a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
-+++ b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
-@@ -23,6 +23,7 @@ if (!is_android) {
-     deps = [
-       ":mojo_bindings",
-       "//base",
-+      "//chrome/app:branded_strings",
-       "//chrome/app:generated_resources",
-       "//chrome/app/theme:chrome_unscaled_resources",
-       "//chrome/browser/profiles:profile",
-diff --git a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
-index eb67b3ebb8..a8d228fd1e 100644
---- a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
-+++ b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
-@@ -16,6 +16,7 @@
- #include "chrome/browser/search_engine_choice/search_engine_choice_service_factory.h"
- #include "chrome/browser/ui/webui/search_engine_choice/search_engine_choice_handler.h"
- #include "chrome/common/webui_url_constants.h"
-+#include "chrome/grit/branded_strings.h"
- #include "chrome/grit/chrome_unscaled_resources.h"
- #include "chrome/grit/search_engine_choice_resources.h"
- #include "chrome/grit/search_engine_choice_resources_map.h"
-@@ -26,7 +27,6 @@
- #include "components/search_engines/search_engines_switches.h"
- #include "components/search_engines/template_url.h"
- #include "components/signin/public/base/signin_switches.h"
--#include "components/strings/grit/components_branded_strings.h"
- #include "components/strings/grit/components_strings.h"
- #include "content/public/browser/web_contents.h"
- #include "content/public/browser/web_ui_data_source.h"
-@@ -108,7 +108,7 @@ SearchEngineChoiceUI::SearchEngineChoiceUI(content::WebUI* web_ui)
-                              IDS_SEARCH_ENGINE_CHOICE_LIST_A11Y_LABEL);
-   source->AddLocalizedString("infoDialogButtonText", IDS_CLOSE);
-   source->AddLocalizedString("productLogoAltText",
--                             IDS_SHORT_PRODUCT_LOGO_ALT_TEXT);
-+                             IDS_SHORT_PRODUCT_NAME);
-   source->AddLocalizedString("moreButtonText",
-                              IDS_SEARCH_ENGINE_CHOICE_MORE_BUTTON);
-   source->AddLocalizedString("guestCheckboxText",
-diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-index 3ae8b2a6e4..8a6c2c0e98 100644
---- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-+++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -308,7 +308,7 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
- void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
-   // Top level About Page strings.
-   static constexpr webui::LocalizedString kLocalizedStrings[] = {
--      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
-+      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_NAME},
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-       {"aboutReportAnIssue", IDS_SETTINGS_ABOUT_PAGE_REPORT_AN_ISSUE},
-       {"aboutPrivacyPolicy", IDS_SETTINGS_ABOUT_PAGE_PRIVACY_POLICY},
-diff --git a/chrome/browser/ui/webui/version/version_ui.cc b/chrome/browser/ui/webui/version/version_ui.cc
-index 4c523d48d8..272c6889ed 100644
---- a/chrome/browser/ui/webui/version/version_ui.cc
-+++ b/chrome/browser/ui/webui/version/version_ui.cc
-@@ -79,7 +79,7 @@ void CreateAndAddVersionUIDataSource(Profile* profile) {
-   // These localized strings are used to label version details.
-   static constexpr webui::LocalizedString kStrings[] = {
-       {version_ui::kTitle, IDS_VERSION_UI_TITLE},
--      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
-+      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_NAME},
-       {version_ui::kApplicationLabel, IDS_PRODUCT_NAME},
-       {version_ui::kCompany, IDS_ABOUT_VERSION_COMPANY_NAME},
-       {version_ui::kCopyLabel, IDS_VERSION_UI_COPY_LABEL},
-diff --git a/chrome/tools/build/mac/infoplist_strings_util.cc b/chrome/tools/build/mac/infoplist_strings_util.cc
-index f52b1cf14e..7adf6ea5ea 100644
---- a/chrome/tools/build/mac/infoplist_strings_util.cc
-+++ b/chrome/tools/build/mac/infoplist_strings_util.cc
-@@ -196,6 +196,9 @@ int main(int argc, char* const argv[]) {
-         {"NSWebBrowserPublicKeyCredentialUsageDescription", permission_reason},
- 
-         {"\"Chromium Shortcut\"", chromium_shortcut_description},
-+        {"\"Chromium Extension\"",
-+         LoadStringFromDataPack(branded_data_pack.get(), lang, IDS_PRODUCT_NAME,
-+                                "IDS_PRODUCT_NAME") + " Extension"},
-     };
-     std::string strings_file_contents_string;
-     for (const auto& kv : infoplist_strings) {
-diff --git a/components/vector_icons/aggregate_vector_icons.py b/components/vector_icons/aggregate_vector_icons.py
-index 1974b6fc9e..f60718c336 100644
---- a/components/vector_icons/aggregate_vector_icons.py
-+++ b/components/vector_icons/aggregate_vector_icons.py
-@@ -4,6 +4,7 @@
- 
- import fileinput
- import glob
-+import io
- import optparse
- import os
- import re
-@@ -17,6 +18,15 @@ REFERENCE_SIZE_DIP = 48
- TEMPLATE_PLACEHOLDER = "TEMPLATE_PLACEHOLDER"
- 
- 
-+def WriteIfChanged(path, contents):
-+  if os.path.isfile(path):
-+    with open(path, "r", encoding="utf-8") as existing:
-+      if existing.read() == contents:
-+        return
-+  with open(path, "w", encoding="utf-8") as output:
-+    output.write(contents)
-+
-+
- def Error(msg):
-   print(msg, file=sys.stderr)
-   sys.exit(1)
-@@ -146,7 +156,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-             "r") as input_header_template:
-     header_template_contents = input_header_template.readlines()
- 
--  output_header = open(output_h, "w")
-+  output_header = io.StringIO()
-   for line in header_template_contents:
-     if not TEMPLATE_PLACEHOLDER in line:
-       output_header.write(line)
-@@ -157,6 +167,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-                                os.path.basename(path_map[icon]))
-       output_header.write("VECTOR_ICON_TEMPLATE_H({})\n".format(
-           GetIconName(icon_name)))
-+  WriteIfChanged(output_h, output_header.getvalue())
-   output_header.close()
- 
-   # Copy the vector icon drawing commands from the .icon files, splitting them
-@@ -167,7 +178,8 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-   cc_template_contents = input_cc_template.readlines()
-   input_cc_template.close()
- 
--  output_cc = open(output_cc, "w")
-+  output_cc_path = output_cc
-+  output_cc = io.StringIO()
-   for line in cc_template_contents:
-     if not TEMPLATE_PLACEHOLDER in line:
-       output_cc.write(line)
-@@ -194,6 +206,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-           GetRepListName(icon_name), GetIconName(icon_name),
-           ", ".join(icon_representation_strings)))
- 
-+  WriteIfChanged(output_cc_path, output_cc.getvalue())
-   output_cc.close()
- 
-   if (output_test_h):
-@@ -203,7 +216,8 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-       input_test_cc_template.close()
- 
-       # Write the vector icon unittests.
--      output_test_h = open(output_test_h, "w")
-+      output_test_h_path = output_test_h
-+      output_test_h = io.StringIO()
-       for line in cc_test_template_contents:
-         if not TEMPLATE_PLACEHOLDER in line:
-           output_test_h.write(line)
-@@ -224,6 +238,7 @@ def AggregateVectorIcons(working_directory, file_list, output_cc, output_h, outp
-           output_test_h.write("""; \\
-               CheckThatParsedElementsMatch(s, {}); \\
-               }} \\\n \\\n""".format(formatted_name))
-+      WriteIfChanged(output_test_h_path, output_test_h.getvalue())
-       output_test_h.close()
- 
- 
-diff --git a/chrome/browser/infobars/browser_infobar_manager.cc b/chrome/browser/infobars/browser_infobar_manager.cc
-index 51f2946e16..ddd188d134 100644
---- a/chrome/browser/infobars/browser_infobar_manager.cc
-+++ b/chrome/browser/infobars/browser_infobar_manager.cc
-@@ -23,6 +23,7 @@
- #include "components/infobars/core/infobar.h"
- #include "components/tabs/public/tab_interface.h"
- #include "content/public/browser/web_contents.h"
-+#include "ui/base/models/image_model.h"
- #include "ui/gfx/vector_icon_types.h"
- #include "url/gurl.h"
- 
-@@ -52,6 +53,11 @@ class RegistryInfoBarDelegate final : public ConfirmInfoBarDelegate {
- 
-   int GetIconId() const override { return spec_.icon_id(); }
- 
-+  ui::ImageModel GetIcon() const override {
-+    return spec_.icon_provider() ? spec_.icon_provider().Run(dark_mode())
-+                                 : ConfirmInfoBarDelegate::GetIcon();
-+  }
-+
-   const gfx::VectorIcon& GetVectorIcon() const override {
-     return spec_.icon() ? *spec_.icon()
-                         : ConfirmInfoBarDelegate::GetVectorIcon();
-diff --git a/chrome/browser/infobars/infobar_spec.cc b/chrome/browser/infobars/infobar_spec.cc
-index 11702640fe..3918d33811 100644
---- a/chrome/browser/infobars/infobar_spec.cc
-+++ b/chrome/browser/infobars/infobar_spec.cc
-@@ -72,6 +72,12 @@ InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconId(int icon_id) {
-   return *this;
- }
- 
-+InfoBarSpec::Builder& InfoBarSpec::Builder::SetIconProvider(
-+    IconProvider provider) {
-+  spec_.icon_provider_ = std::move(provider);
-+  return *this;
-+}
-+
- InfoBarSpec::Builder& InfoBarSpec::Builder::SetScope(InfoBarScope scope) {
-   spec_.scope_ = scope;
-   return *this;
-diff --git a/chrome/browser/infobars/infobar_spec.h b/chrome/browser/infobars/infobar_spec.h
-index dfc289fc8d..e68872e0f3 100644
---- a/chrome/browser/infobars/infobar_spec.h
-+++ b/chrome/browser/infobars/infobar_spec.h
-@@ -59,6 +59,7 @@ class InfoBarSpec {
-   // Returns true if the infobar may be shown in the given browser. Only
-   // consulted for InfoBarScope::kGlobal.
-   using BrowserFilter = base::RepeatingCallback<bool(BrowserWindowInterface*)>;
-+  using IconProvider = base::RepeatingCallback<ui::ImageModel(bool dark_mode)>;
- 
-   class Builder;
- 
-@@ -88,6 +89,7 @@ class InfoBarSpec {
-   const gfx::VectorIcon* icon() const { return icon_; }
-   const gfx::VectorIcon* dark_mode_icon() const { return dark_mode_icon_; }
-   int icon_id() const { return icon_id_; }
-+  const IconProvider& icon_provider() const { return icon_provider_; }
-   bool expire_on_navigation() const { return expire_on_navigation_; }
-   bool should_hide_in_fullscreen() const { return should_hide_in_fullscreen_; }
-   bool should_animate() const { return should_animate_; }
-@@ -125,6 +127,7 @@ class InfoBarSpec {
-   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
-   raw_ptr<const gfx::VectorIcon> dark_mode_icon_ = nullptr;
-   int icon_id_ = 0;
-+  IconProvider icon_provider_;
-   bool expire_on_navigation_ = true;
-   bool should_hide_in_fullscreen_ = false;
-   bool should_animate_ = true;
-@@ -155,6 +158,8 @@ class InfoBarSpec::Builder {
-   Builder& SetIcon(const gfx::VectorIcon& icon);
-   Builder& SetDarkModeIcon(const gfx::VectorIcon& icon);
-   Builder& SetIconId(int icon_id);
-+  // 정적 vector·resource 아이콘보다 우선하며 배너 바탕의 명암이 바뀌면 다시 호출한다.
-+  Builder& SetIconProvider(IconProvider provider);
- 
-   Builder& SetScope(InfoBarScope scope);
-   Builder& SetPriority(InfoBarDelegate::InfobarPriority priority);
-diff --git a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
-index b607106562..ce0fb68650 100644
---- a/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
-+++ b/chrome/browser/ui/pdf/infobar/pdf_infobar_controller.cc
-@@ -23,6 +23,7 @@
- #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
- #include "chrome/browser/ui/pdf/infobar/pdf_infobar_delegate.h"
- #include "chrome/browser/ui/pdf/infobar/pdf_infobar_prefs.h"
-+#include "chrome/browser/ui/views/yee/product_logo.h"
- #include "chrome/browser/ui/tabs/tab_strip_model.h"
- #include "chrome/browser/ui/ui_features.h"
- #include "chrome/common/buildflags.h"
-@@ -33,7 +34,6 @@
- #include "components/infobars/core/infobar.h"
- #include "components/prefs/pref_service.h"
- #include "components/tabs/public/tab_interface.h"
--#include "components/vector_icons/vector_icons.h"
- #include "content/public/browser/browser_thread.h"
- #include "content/public/browser/web_contents.h"
- #include "ui/base/l10n/l10n_util.h"
-@@ -166,7 +166,7 @@ void PdfInfoBarController::RegisterInfoBarSpec() {
-       infobars::InfoBarSpec::Builder(
-           infobars::InfoBarDelegate::PDF_INFOBAR_DELEGATE)
-           .SetMessageText(l10n_util::GetStringUTF16(IDS_PDF_INFOBAR_TEXT))
--          .SetIcon(vector_icons::kProductRefreshIcon)
-+          .SetIconProvider(base::BindRepeating(&yee::branding::ProductLogoIcon))
-           .SetScope(infobars::InfoBarScope::kTab)
-           .AddOkButton(
-               l10n_util::GetStringUTF16(
 diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
-index fb432004e4..1a89aea03e 100644
+index f18b1179c8..c0a2c36f5f 100644
 --- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
 +++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/BUILD.gn
-@@ -18,7 +18,6 @@ source_set("pin_infobar") {
+@@ -17,7 +17,6 @@ source_set("pin_infobar") {
+   ]
    deps = [
-     "//chrome/browser:browser_public_dependencies",
      "//components/infobars/core",
 -    "//components/vector_icons",
      "//ui/gfx:native_ui_types",
    ]
  
-@@ -42,8 +41,8 @@ source_set("impl") {
+@@ -41,8 +40,8 @@ source_set("impl") {
      "//chrome/browser/ui:ui_features",
      "//chrome/browser/ui/browser_window",
      "//chrome/browser/ui/tabs:tab_strip",
@@ -903,10 +865,10 @@ index fb432004e4..1a89aea03e 100644
      "//components/tabs:public",
      "//ui/base",
 diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
-index 35201dd0ad..54b9d7e602 100644
+index 14fa75b318..1a740b0e8a 100644
 --- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
 +++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.cc
-@@ -26,9 +26,7 @@
+@@ -28,9 +28,7 @@
  #include "chrome/common/buildflags.h"
  #include "components/infobars/content/content_infobar_manager.h"
  #include "components/infobars/core/infobar.h"
@@ -917,10 +879,10 @@ index 35201dd0ad..54b9d7e602 100644
  #include "content/public/browser/navigation_handle.h"
  #include "content/public/browser/web_contents.h"
 diff --git a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
-index 5c382d1ec4..6f2af07762 100644
+index f658f4cd4a..0f3bf94711 100644
 --- a/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
 +++ b/chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_delegate.cc
-@@ -12,13 +12,11 @@
+@@ -13,13 +13,11 @@
  #include "build/build_config.h"
  #include "chrome/browser/infobars/confirm_infobar_creator.h"
  #include "chrome/browser/ui/ui_features.h"
@@ -935,7 +897,7 @@ index 5c382d1ec4..6f2af07762 100644
  
  #if BUILDFLAG(IS_WIN)
  #include "chrome/browser/win/taskbar_manager.h"
-@@ -52,11 +50,8 @@ infobars::InfoBarDelegate::InfoBarIdentifier PinInfoBarDelegate::GetIdentifier()
+@@ -53,11 +51,8 @@ infobars::InfoBarDelegate::InfoBarIdentifier PinInfoBarDelegate::GetIdentifier()
    return PIN_INFOBAR_DELEGATE;
  }
  
@@ -962,150 +924,8 @@ index 3135fb5d3f..289fdbab3b 100644
  
    // ConfirmInfoBarDelegate:
    std::u16string GetMessageText() const override;
-diff --git a/chrome/browser/ui/infobars/BUILD.gn b/chrome/browser/ui/infobars/BUILD.gn
-index de9bbe6b7e..665f43c14e 100644
---- a/chrome/browser/ui/infobars/BUILD.gn
-+++ b/chrome/browser/ui/infobars/BUILD.gn
-@@ -17,7 +17,6 @@ source_set("infobars") {
-     "//chrome/browser/ssl",
-     "//chrome/browser/ui/page_info",
-     "//components/infobars/core",
--    "//components/omnibox/browser:vector_icons",
-     "//components/strings:components_strings",
-     "//components/vector_icons",
-     "//components/version_info",
-@@ -27,6 +26,9 @@ source_set("infobars") {
-   ]
- 
-   if (is_win || is_mac) {
--    deps += [ "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar" ]
-+    deps += [
-+      "//chrome/browser/ui/startup/default_browser_prompt/pin_infobar",
-+      "//chrome/browser/ui/views/yee:product_logo",
-+    ]
-   }
- }
-diff --git a/chrome/browser/ui/infobars/browser_infobar_registry.cc b/chrome/browser/ui/infobars/browser_infobar_registry.cc
-index cbbb7b5775..8151953b06 100644
---- a/chrome/browser/ui/infobars/browser_infobar_registry.cc
-+++ b/chrome/browser/ui/infobars/browser_infobar_registry.cc
-@@ -34,7 +34,7 @@
- 
- #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
- #include "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.h"
--#include "components/omnibox/browser/vector_icons.h"
-+#include "chrome/browser/ui/views/yee/product_logo.h"
- #endif
- 
- namespace infobars {
-@@ -128,9 +128,8 @@ void RegisterInfoBars() {
-                     infobars::InfoBarDelegate::PIN_INFOBAR_DELEGATE)
-                     .SetMessageText(
-                         default_browser::PinInfoBarController::GetMessageText())
--                    .SetIcon(features::IsRoundedIconsEnabled()
--                                 ? omnibox::kChromeProductIcon
--                                 : vector_icons::kProductRefreshIcon)
-+                    .SetIconProvider(base::BindRepeating(
-+                        &yee::branding::ProductLogoIcon))
-                     .SetScope(infobars::InfoBarScope::kGlobal)
-                     .AddOkButton(
-                         default_browser::PinInfoBarController::GetButtonLabel(),
-diff --git a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
-index 70ba390cf8..8bb3e8fd49 100644
---- a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
-+++ b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
-@@ -35,14 +35,13 @@ source_set("session_restore_infobar") {
-     "//chrome/browser/ui/tabs:tab_strip",
-     "//chrome/browser/ui/tabs:tab_strip_model_observer",
-     "//chrome/browser/ui/views/infobars",
-+    "//chrome/browser/ui/views/yee:product_logo",
-     "//chrome/common",
-     "//components/content_settings/core/browser",
-     "//components/infobars/content",
-     "//components/infobars/core",
--    "//components/omnibox/browser:vector_icons",
-     "//components/prefs",
-     "//components/tabs:public",
--    "//components/vector_icons",
-     "//content/public/browser",
-     "//ui/base",
-     "//url",
-diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
-index 04bb056354..d0cd196a19 100644
---- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
-+++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
-@@ -14,17 +14,14 @@
- #include "chrome/browser/profiles/profile.h"
- #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_manager.h"
- #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_prefs.h"
-+#include "chrome/browser/ui/views/yee/product_logo.h"
- #include "chrome/common/pref_names.h"
- #include "chrome/grit/branded_strings.h"
- #include "components/infobars/content/content_infobar_manager.h"
- #include "components/infobars/core/infobar.h"
- #include "components/infobars/core/infobar_manager.h"
--#include "components/omnibox/browser/vector_icons.h"
- #include "components/prefs/pref_service.h"
--#include "components/vector_icons/vector_icons.h"
- #include "ui/base/l10n/l10n_util.h"
--#include "ui/base/ui_base_features.h"
--#include "ui/gfx/vector_icon_types.h"
- 
- namespace session_restore_infobar {
- 
-@@ -140,11 +137,8 @@ SessionRestoreInfoBarDelegate::GetIdentifier() const {
-       SESSION_RESTORE_INFOBAR_DELEGATE;
- }
- 
--const gfx::VectorIcon& SessionRestoreInfoBarDelegate::GetVectorIcon() const {
--  return dark_mode() ? features::IsRoundedIconsEnabled()
--                           ? omnibox::kChromeProductIcon
--                           : omnibox::kProductChromeRefreshOldIcon
--                     : vector_icons::kProductRefreshIcon;
-+ui::ImageModel SessionRestoreInfoBarDelegate::GetIcon() const {
-+  return yee::branding::ProductLogoIcon(dark_mode());
- }
- 
- bool SessionRestoreInfoBarDelegate::ShouldExpire(
-diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
-index b4cef54f99..7c73008360 100644
---- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
-+++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
-@@ -70,7 +70,7 @@ class SessionRestoreInfoBarDelegate : public ConfirmInfoBarDelegate {
- 
-   // ConfirmInfoBarDelegate:
-   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
--  const gfx::VectorIcon& GetVectorIcon() const override;
-+  ui::ImageModel GetIcon() const override;
-   bool ShouldExpire(const NavigationDetails& details) const override;
-   std::u16string GetMessageText() const override;
-   std::u16string GetLinkText() const override;
-diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
-index b257bd38c8..c28e384909 100644
---- a/chrome/browser/ui/startup/BUILD.gn
-+++ b/chrome/browser/ui/startup/BUILD.gn
-@@ -172,6 +172,7 @@ source_set("impl") {
-     "//components/startup_metric_utils",
-     "//components/translate/core/common",
-     "//components/vector_icons",
-+    "//components/yee_branding",
-     "//content/public/browser",
-     "//content/public/common",
-     "//google_apis",
-@@ -305,7 +306,10 @@ source_set("impl") {
-         "startup_launch_infobar_delegate.cc",
-         "startup_launch_infobar_manager_impl.cc",
-       ]
--      deps += [ "//chrome/browser/startup" ]
-+      deps += [
-+        "//chrome/browser/startup",
-+        "//chrome/browser/ui/views/yee:product_logo",
-+      ]
-     }
- 
-     if (is_win && is_chrome_branded) {
 diff --git a/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc b/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
-index 76f2f624f9..aeea0f3ce1 100644
+index ee26aa9839..c4cf8fed71 100644
 --- a/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
 +++ b/chrome/browser/ui/startup/startup_launch_infobar_delegate.cc
 @@ -11,17 +11,15 @@
@@ -1142,7 +962,7 @@ index 76f2f624f9..aeea0f3ce1 100644
  
  bool StartupLaunchInfoBarDelegate::ShouldExpire(
 diff --git a/chrome/browser/ui/startup/startup_launch_infobar_delegate.h b/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
-index 4c3e07af3b..a321861eb1 100644
+index e58aabd500..6916393c04 100644
 --- a/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
 +++ b/chrome/browser/ui/startup/startup_launch_infobar_delegate.h
 @@ -37,7 +37,7 @@ class StartupLaunchInfoBarDelegate : public ConfirmInfoBarDelegate {
@@ -1154,62 +974,492 @@ index 4c3e07af3b..a321861eb1 100644
    bool ShouldExpire(const NavigationDetails& details) const override;
    std::u16string GetMessageText() const override;
    int GetButtons() const override;
-diff --git a/chrome/browser/ui/cocoa/BUILD.gn b/chrome/browser/ui/cocoa/BUILD.gn
-index 4ce5c7aef0..38009bd3b0 100644
---- a/chrome/browser/ui/cocoa/BUILD.gn
-+++ b/chrome/browser/ui/cocoa/BUILD.gn
-@@ -196,6 +196,7 @@ source_set("cocoa") {
-     sources += [ "keystone_infobar_delegate.cc" ]
-     deps += [
-       "//chrome/browser/infobars",
-+      "//chrome/browser/ui/views/yee:product_logo",
-       "//chrome/browser/updater",
-       "//components/infobars/content",
-     ]
-diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
-index 86d85f1594..480357e2ae 100644
---- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
-+++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.cc
-@@ -14,12 +14,12 @@
- #include "chrome/browser/ui/browser.h"
- #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
- #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+diff --git a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
+index 70ba390cf8..8bb3e8fd49 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
++++ b/chrome/browser/ui/views/session_restore_infobar/BUILD.gn
+@@ -35,14 +35,13 @@ source_set("session_restore_infobar") {
+     "//chrome/browser/ui/tabs:tab_strip",
+     "//chrome/browser/ui/tabs:tab_strip_model_observer",
+     "//chrome/browser/ui/views/infobars",
++    "//chrome/browser/ui/views/yee:product_logo",
+     "//chrome/common",
+     "//components/content_settings/core/browser",
+     "//components/infobars/content",
+     "//components/infobars/core",
+-    "//components/omnibox/browser:vector_icons",
+     "//components/prefs",
+     "//components/tabs:public",
+-    "//components/vector_icons",
+     "//content/public/browser",
+     "//ui/base",
+     "//url",
+diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
+index 75ffc71422..7250e5b70c 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
++++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.cc
+@@ -14,14 +14,13 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_manager.h"
+ #include "chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_prefs.h"
 +#include "chrome/browser/ui/views/yee/product_logo.h"
- #include "chrome/browser/updater/updater.h"
- #include "chrome/common/chrome_switches.h"
  #include "chrome/common/pref_names.h"
  #include "chrome/grit/branded_strings.h"
- #include "chrome/grit/generated_resources.h"
--#include "chrome/grit/theme_resources.h"
  #include "components/infobars/content/content_infobar_manager.h"
  #include "components/infobars/core/infobar.h"
+ #include "components/infobars/core/infobar_manager.h"
+-#include "components/omnibox/browser/vector_icons.h"
  #include "components/prefs/pref_service.h"
-@@ -84,8 +84,8 @@ KeystonePromotionInfoBarDelegate::GetIdentifier() const {
-   return KEYSTONE_PROMOTION_INFOBAR_DELEGATE_MAC;
+-#include "components/vector_icons/vector_icons.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/ui_base_features.h"
+ #include "ui/base/window_open_disposition.h"
+@@ -97,11 +96,8 @@ SessionRestoreInfoBarDelegate::GetIdentifier() const {
+       SESSION_RESTORE_INFOBAR_DELEGATE;
  }
  
--int KeystonePromotionInfoBarDelegate::GetIconId() const {
--  return IDR_PRODUCT_LOGO_32;
-+ui::ImageModel KeystonePromotionInfoBarDelegate::GetIcon() const {
+-const gfx::VectorIcon& SessionRestoreInfoBarDelegate::GetVectorIcon() const {
+-  return dark_mode() ? features::IsRoundedIconsEnabled()
+-                           ? omnibox::kChromeProductIcon
+-                           : omnibox::kProductChromeRefreshOldIcon
+-                     : vector_icons::kProductRefreshIcon;
++ui::ImageModel SessionRestoreInfoBarDelegate::GetIcon() const {
 +  return yee::branding::ProductLogoIcon(dark_mode());
  }
  
- bool KeystonePromotionInfoBarDelegate::ShouldExpire(
-diff --git a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
-index 4d176cc36f..a18f9143d4 100644
---- a/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
-+++ b/chrome/browser/ui/cocoa/keystone_infobar_delegate.h
-@@ -37,7 +37,7 @@ class KeystonePromotionInfoBarDelegate : public ConfirmInfoBarDelegate {
+ bool SessionRestoreInfoBarDelegate::ShouldExpire(
+diff --git a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
+index 7fb5a1d236..bfea45e392 100644
+--- a/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
++++ b/chrome/browser/ui/views/session_restore_infobar/session_restore_infobar_delegate.h
+@@ -44,7 +44,7 @@ class SessionRestoreInfoBarDelegate : public ConfirmInfoBarDelegate {
  
-   // ConfirmInfoBarDelegate
+   // ConfirmInfoBarDelegate:
    infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
--  int GetIconId() const override;
+-  const gfx::VectorIcon& GetVectorIcon() const override;
 +  ui::ImageModel GetIcon() const override;
    bool ShouldExpire(const NavigationDetails& details) const override;
    std::u16string GetMessageText() const override;
-   std::u16string GetButtonLabel(InfoBarButton button) const override;
+   std::u16string GetLinkText() const override;
+diff --git a/chrome/browser/ui/webui/intro/intro_ui.cc b/chrome/browser/ui/webui/intro/intro_ui.cc
+index b6d356d184..0209ca93ae 100644
+--- a/chrome/browser/ui/webui/intro/intro_ui.cc
++++ b/chrome/browser/ui/webui/intro/intro_ui.cc
+@@ -120,7 +120,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
+       {"securityCardDescription", IDS_FRE_SECURITY_CARD_DESCRIPTION},
+       {"backupCardTitle", IDS_FRE_BACKUP_CARD_TITLE},
+       {"acceptSignInButtonTitle", IDS_FRE_ACCEPT_SIGN_IN_BUTTON_TITLE},
+-      {"productLogoAltText", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"productLogoAltText", IDS_SHORT_PRODUCT_NAME},
+       // Strings for welcome subpage.
+       {"welcomeTitle", IDS_FRE_WELCOME_TITLE},
+       {"welcomeStartButtonLabel", IDS_FRE_WELCOME_START_BUTTON_LABEL},
+@@ -128,8 +128,7 @@ IntroUI::IntroUI(content::WebUI* web_ui)
+       // Strings for default browser promo subpage.
+       {"defaultBrowserTitle", IDS_FRE_DEFAULT_BROWSER_TITLE_NEW},
+       {"defaultBrowserSubtitle", IDS_FRE_DEFAULT_BROWSER_SUBTITLE_NEW},
+-      {"defaultBrowserIllustrationAltText",
+-       IDS_FRE_DEFAULT_BROWSER_ILLUSTRATION_ALT_TEXT},
++      {"defaultBrowserIllustrationAltText", IDS_SHORT_PRODUCT_NAME},
+       {"defaultBrowserSetAsDefault", IDS_FRE_DEFAULT_BROWSER_SET_AS_DEFAULT},
+       {"defaultBrowserSkip", IDS_FRE_DEFAULT_BROWSER_SKIP},
+       // Strings for refreshed default browser promo subpage.
+@@ -229,9 +228,8 @@ IntroUI::IntroUI(content::WebUI* web_ui)
+   }
+ 
+   if (switches::IsPreFirstRunDesktopRefreshEnabled()) {
+-    source->AddResourcePath(
+-        chrome::kChromeUIIntroWelcomeSubPage,
+-        IDR_INTRO_WELCOME_WELCOME_HTML);
++    source->AddResourcePath(chrome::kChromeUIIntroWelcomeSubPage,
++                            IDR_INTRO_WELCOME_WELCOME_HTML);
+   }
+ 
+   // Setup chrome://intro/default-browser UI.
+diff --git a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
+index bafbd63c7d..c7bf803bb1 100644
+--- a/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
++++ b/chrome/browser/ui/webui/search_engine_choice/BUILD.gn
+@@ -22,6 +22,7 @@ if (!is_android) {
+     deps = [
+       ":mojo_bindings",
+       "//base",
++      "//chrome/app:branded_strings",
+       "//chrome/app:generated_resources",
+       "//chrome/app/theme:chrome_unscaled_resources",
+       "//chrome/browser/profiles:profile",
+diff --git a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
+index c0dfd634cb..4a0ead0a0f 100644
+--- a/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
++++ b/chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.cc
+@@ -16,6 +16,7 @@
+ #include "chrome/browser/search_engine_choice/search_engine_choice_service_factory.h"
+ #include "chrome/browser/ui/webui/search_engine_choice/search_engine_choice_handler.h"
+ #include "chrome/common/webui_url_constants.h"
++#include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/chrome_unscaled_resources.h"
+ #include "chrome/grit/search_engine_choice_resources.h"
+ #include "chrome/grit/search_engine_choice_resources_map.h"
+@@ -26,7 +27,6 @@
+ #include "components/search_engines/search_engines_switches.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/signin/public/base/signin_switches.h"
+-#include "components/strings/grit/components_branded_strings.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_ui_data_source.h"
+@@ -103,7 +103,7 @@ SearchEngineChoiceUI::SearchEngineChoiceUI(content::WebUI* web_ui)
+        IDS_SEARCH_ENGINE_CHOICE_INFO_DIALOG_BODY_THIRD_PARAGRAPH},
+       {"choiceListA11yLabel", IDS_SEARCH_ENGINE_CHOICE_LIST_A11Y_LABEL},
+       {"infoDialogButtonText", IDS_CLOSE},
+-      {"productLogoAltText", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"productLogoAltText", IDS_SHORT_PRODUCT_NAME},
+       {"moreButtonText", IDS_SEARCH_ENGINE_CHOICE_MORE_BUTTON},
+       {"guestCheckboxText", IDS_SEARCH_ENGINE_CHOICE_GUEST_SESSION_CHECKBOX},
+   };
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+index 2513850319..26f4d16653 100644
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -312,7 +312,7 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
+ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
+   // Top level About Page strings.
+   static constexpr webui::LocalizedString kLocalizedStrings[] = {
+-      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {"aboutProductLogoAlt", IDS_SHORT_PRODUCT_NAME},
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+       {"aboutReportAnIssue", IDS_SETTINGS_ABOUT_PAGE_REPORT_AN_ISSUE},
+       {"aboutPrivacyPolicy", IDS_SETTINGS_ABOUT_PAGE_PRIVACY_POLICY},
+diff --git a/chrome/browser/ui/webui/version/version_ui.cc b/chrome/browser/ui/webui/version/version_ui.cc
+index 7a9234630b..d9cc21e53b 100644
+--- a/chrome/browser/ui/webui/version/version_ui.cc
++++ b/chrome/browser/ui/webui/version/version_ui.cc
+@@ -79,7 +79,7 @@ void CreateAndAddVersionUIDataSource(Profile* profile) {
+   // These localized strings are used to label version details.
+   static constexpr webui::LocalizedString kStrings[] = {
+       {version_ui::kTitle, IDS_VERSION_UI_TITLE},
+-      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_LOGO_ALT_TEXT},
++      {version_ui::kLogoAltText, IDS_SHORT_PRODUCT_NAME},
+       {version_ui::kApplicationLabel, IDS_PRODUCT_NAME},
+       {version_ui::kCompany, IDS_ABOUT_VERSION_COMPANY_NAME},
+       {version_ui::kCopyLabel, IDS_VERSION_UI_COPY_LABEL},
+diff --git a/chrome/install_static/BUILD.gn b/chrome/install_static/BUILD.gn
+index d23e787c71..7645869247 100644
+--- a/chrome/install_static/BUILD.gn
++++ b/chrome/install_static/BUILD.gn
+@@ -55,7 +55,11 @@ if (is_win) {
+     } else if (is_chrome_for_testing_branded) {
+       sources += [ "google_chrome_for_testing_install_modes.h" ]
+     } else {
+-      sources += [ "chromium_install_modes.h" ]
++      sources += [
++        "//chrome/app/yee_product_identity.h",
++        "//chrome/app/yee_windows_registration.h",
++        "chromium_install_modes.h",
++      ]
+     }
+ 
+     libs = [ "kernel32.lib" ]
+diff --git a/chrome/install_static/chromium_install_modes.h b/chrome/install_static/chromium_install_modes.h
+index a6d969df56..33199b2eb0 100644
+--- a/chrome/install_static/chromium_install_modes.h
++++ b/chrome/install_static/chromium_install_modes.h
+@@ -10,6 +10,7 @@
+ #include <array>
+ 
+ #include "chrome/app/chrome_dll_resource.h"
++#include "chrome/app/yee_product_identity.h"
+ #include "chrome/common/chrome_icon_resources_win.h"
+ #include "chrome/install_static/install_constants.h"
+ 
+@@ -21,7 +22,7 @@ inline constexpr wchar_t kCompanyPathName[] = L"";
+ 
+ // The brand-specific product name to be included as a component of the install
+ // and user data directory paths.
+-inline constexpr wchar_t kProductPathName[] = L"Chromium";
++inline constexpr auto& kProductPathName = yee::identity::kProfileDirectory;
+ 
+ // The brand-specific safe browsing client name.
+ inline constexpr char kSafeBrowsingName[] = "chromium";
+@@ -54,28 +55,21 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+         .logo_suffix = L"",  // No logo suffix for the primary install mode.
+         .app_guid =
+             L"",  // Empty app_guid since no integration with Google Update.
+-        .base_app_name = L"Chromium",              // A distinct base_app_name.
+-        .base_app_id = L"Chromium",                // A distinct base_app_id.
+-        .browser_prog_id_prefix = L"ChromiumHTM",  // Browser ProgID prefix.
++        .base_app_name =
++            yee::identity::kApplicationName,   // A distinct base_app_name.
++        .base_app_id = yee::identity::kAppId,  // A distinct base_app_id.
++        .browser_prog_id_prefix =
++            yee::identity::kBrowserProgIdPrefix,  // Browser ProgID prefix.
+         .browser_prog_id_description =
+-            L"Chromium HTML Document",  // Browser ProgID description.
+-        .direct_launch_url_scheme = "chromium",
+-        .pdf_prog_id_prefix = L"ChromiumPDF",  // PDF ProgID prefix.
++            L"Yee HTML Document",  // Browser ProgID description.
++        .direct_launch_url_scheme = yee::identity::kDirectLaunchScheme,
++        .pdf_prog_id_prefix =
++            yee::identity::kPdfProgIdPrefix,  // PDF ProgID prefix.
+         .pdf_prog_id_description =
+-            L"Chromium PDF Document",  // PDF ProgID description.
+-        .active_setup_guid =
+-            L"{7D2B3E1D-D096-4594-9D8F-A6667F12E0AC}",  // Active Setup
+-                                                        // GUID.
+-        .toast_activator_clsid = {0x635EFA6F,
+-                                  0x08D6,
+-                                  0x4EC9,
+-                                  {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51,
+-                                   0x59}},  // Toast Activator CLSID.
+-        .elevator_clsid = {0xD133B120,
+-                           0x6DB4,
+-                           0x4D6B,
+-                           {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1,
+-                            0xB0}},  // Elevator CLSID.
++            L"Yee PDF Document",  // PDF ProgID description.
++        .active_setup_guid = yee::identity::kActiveSetupGuid,
++        .toast_activator_clsid = yee::identity::kToastActivatorClsid,
++        .elevator_clsid = yee::identity::kElevatorClsid,
+         .elevator_iid = {0xbb19a0e5,
+                          0xc6,
+                          0x4966,
+@@ -83,11 +77,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+                           0x3a}},  // IElevator IID and TypeLib
+         // {BB19A0E5-00C6-4966-94B2-5AFEC6FED93A}.
+         .old_elevator_iids = {},
+-        .tracing_service_clsid = {0x83f69367,
+-                                  0x442d,
+-                                  0x447f,
+-                                  {0x8b, 0xcc, 0x0e, 0x3f, 0x97, 0xbe, 0x9c,
+-                                   0xf2}},  // SystemTraceSession CLSID.
++        .tracing_service_clsid = yee::identity::kTracingServiceClsid,
+         .tracing_service_iid = {0xe0b03e2d,
+                                 0x7682,
+                                 0x4d83,
+@@ -98,7 +88,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+         .default_channel_name =
+             L"",  // Empty default channel name since no update integration.
+         .channel_strategy = ChannelStrategy::UNSUPPORTED,
+-        .supports_system_level = true,  // Supports system-level installs.
++        .supports_system_level = false,  // 테스트판은 사용자별 설치만 지원한다.
+         .supports_set_as_default_browser =
+             true,  // Supports in-product set as default browser UX.
+         .app_icon_resource_index =
+@@ -108,10 +98,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+             icon_resources::kHtmlDocIndex,  // HTML doc icon resource index.
+         .pdf_doc_icon_resource_index =
+             icon_resources::kPDFDocIndex,  // PDF doc icon resource index.
+-        .sandbox_sid_prefix =
+-            L"S-1-15-2-3251537155-1984446955-2931258699-841473695-"
+-            L"1938553385-"
+-            L"924012148-",  // App container sid prefix for sandbox.
++        .sandbox_sid_prefix = yee::identity::kSandboxSidPrefix,
+     },
+ });
+ 
+diff --git a/chrome/install_static/install_util_unittest.cc b/chrome/install_static/install_util_unittest.cc
+index 73d053efd3..047a40ddc2 100644
+--- a/chrome/install_static/install_util_unittest.cc
++++ b/chrome/install_static/install_util_unittest.cc
+@@ -361,8 +361,10 @@ class InstallStaticUtilTest
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+     static constexpr wchar_t kPolicyKey[] =
+         L"Software\\Policies\\Google\\Chrome";
+-#else
++#elif BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+     static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Chromium";
++#else
++    static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Yee";
+ #endif
+ 
+     ASSERT_EQ(ERROR_SUCCESS,
+@@ -417,7 +419,7 @@ TEST_P(InstallStaticUtilTest, GetChromeInstallSubDirectory) {
+   // The directory strings for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr auto kInstallDirs = std::to_array<const wchar_t*>({
+-      L"Chromium",
++      L"Yee",
+   });
+ #endif
+   static_assert(std::size(kInstallDirs) == NUM_INSTALL_MODES,
+@@ -446,7 +448,7 @@ TEST_P(InstallStaticUtilTest, GetRegistryPath) {
+   // The registry path strings for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr auto kRegistryPaths = std::to_array<const wchar_t*>({
+-      L"Software\\Chromium",
++      L"Software\\Yee",
+   });
+ #endif
+   static_assert(std::size(kRegistryPaths) == NUM_INSTALL_MODES,
+@@ -484,7 +486,7 @@ TEST_P(InstallStaticUtilTest, GetUninstallRegistryPath) {
+   // kInstallModes.
+   static constexpr auto kUninstallRegistryPaths =
+       std::to_array<const wchar_t*>({
+-          L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chromium",
++          L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Yee",
+       });
+ #endif
+   static_assert(std::size(kUninstallRegistryPaths) == NUM_INSTALL_MODES,
+@@ -531,7 +533,7 @@ TEST_P(InstallStaticUtilTest, GetBaseAppId) {
+ #else
+   // The base app ids for the brand's install modes; parallel to kInstallModes.
+   static constexpr auto kBaseAppIds = std::to_array<const wchar_t*>({
+-      L"Chromium",
++      L"Yee",
+   });
+ #endif
+   static_assert(std::size(kBaseAppIds) == NUM_INSTALL_MODES,
+@@ -594,16 +596,16 @@ TEST_P(InstallStaticUtilTest, GetToastActivatorClsid) {
+   // The toast activator CLSIDs for the brand's install modes; parallel to
+   // kInstallModes.
+   static constexpr auto kToastActivatorClsids = std::to_array<CLSID>({
+-      {0x635EFA6F,
+-       0x08D6,
+-       0x4EC9,
+-       {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51, 0x59}}  // Chromium.
++      {0xC9EB99B2,
++       0x59A9,
++       0x45FB,
++       {0xA3, 0x09, 0xF0, 0x4C, 0xBD, 0xBA, 0x38, 0x48}}  // Chromium.
+   });
+ 
+   // The string representation of the CLSIDs above.
+   static constexpr auto kToastActivatorClsidsString =
+       std::to_array<const wchar_t*>({
+-          L"{635EFA6F-08D6-4EC9-BD14-8A0FDE975159}"  // Chromium.
++          L"{C9EB99B2-59A9-45FB-A309-F04CBDBA3848}"  // Chromium.
+       });
+ #endif
+   static_assert(std::size(kToastActivatorClsids) == NUM_INSTALL_MODES,
+@@ -664,15 +666,15 @@ TEST_P(InstallStaticUtilTest, GetElevatorClsid) {
+ #else
+   // The Elevator CLSIDs, one for each of the kInstallModes.
+   static constexpr auto kElevatorClsids = std::to_array<CLSID>({
+-      {0xD133B120,
+-       0x6DB4,
+-       0x4D6B,
+-       {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1, 0xB0}},  // Chromium.
++      {0xE45ED4A4,
++       0x3272,
++       0x4DDD,
++       {0x91, 0x32, 0x12, 0x1F, 0xDF, 0x08, 0x3A, 0xB7}},  // Chromium.
+   });
+ 
+   // The string representation of the CLSIDs above.
+   static constexpr auto kElevatorClsidsString = std::to_array<const wchar_t*>({
+-      L"{D133B120-6DB4-4D6B-8BFE-83BF8CA1B1B0}",  // Chromium.
++      L"{E45ED4A4-3272-4DDD-9132-121FDF083AB7}",  // Chromium.
+   });
+ #endif
+   static_assert(std::size(kElevatorClsids) == NUM_INSTALL_MODES,
+@@ -861,8 +863,8 @@ TEST_P(InstallStaticUtilTest, GetSandboxSidPrefix) {
+   });
+ #else
+   static constexpr auto kSandBoxSids = std::to_array<const wchar_t*>({
+-      L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+-      L"924012148-",  // Chromium.
++      L"S-1-15-2-2726106554-2681646199-3803488136-3045051458-339147570-"
++      L"929043407-",  // Chromium.
+   });
+ #endif
+   static_assert(std::size(kSandBoxSids) == NUM_INSTALL_MODES,
+@@ -899,11 +901,14 @@ INSTANTIATE_TEST_SUITE_P(
+     testing::Combine(testing::Values(GOOGLE_CHROME_FOR_TESTING_INDEX),
+                      testing::Values("user")));
+ #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+-// Chromium supports user and system levels.
++// Yee 테스트판은 사용자별 설치만 지원한다.
+ INSTANTIATE_TEST_SUITE_P(Chromium,
+                          InstallStaticUtilTest,
+                          testing::Combine(testing::Values(CHROMIUM_INDEX),
+-                                          testing::Values("user", "system")));
++                                          testing::Values("user")));
++TEST(InstallModeIdentityTest, YeeTestBuildHasNoSystemInstall) {
++  EXPECT_FALSE(kInstallModes[CHROMIUM_INDEX].supports_system_level);
++}
+ #endif  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ 
+ }  // namespace install_static
+diff --git a/chrome/install_static/product_install_details_unittest.cc b/chrome/install_static/product_install_details_unittest.cc
+index 2e5b799d34..e9216cd0ca 100644
+--- a/chrome/install_static/product_install_details_unittest.cc
++++ b/chrome/install_static/product_install_details_unittest.cc
+@@ -2,7 +2,6 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
+-
+ #include "chrome/install_static/product_install_details.h"
+ 
+ #include <string_view>
+@@ -207,13 +206,13 @@ constexpr TestData kTestData[] = {
+ #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ constexpr TestData kTestData[] = {
+     {
+-        L"C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe",
++        L"C:\\Program Files (x86)\\Yee\\Application\\chrome.exe",
+         CHROMIUM_INDEX,
+-        true,
++        false,
+         L"",
+     },
+     {
+-        L"C:\\Users\\user\\AppData\\Local\\Chromium\\Application\\chrome.exe",
++        L"C:\\Users\\user\\AppData\\Local\\Yee\\Application\\chrome.exe",
+         CHROMIUM_INDEX,
+         false,
+         L"",
+diff --git a/chrome/install_static/user_data_dir_win_unittest.cc b/chrome/install_static/user_data_dir_win_unittest.cc
+index efa4cbb99e..0ad33cf57f 100644
+--- a/chrome/install_static/user_data_dir_win_unittest.cc
++++ b/chrome/install_static/user_data_dir_win_unittest.cc
+@@ -30,8 +30,8 @@ const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
+ const wchar_t kUserDataDirNameSuffix[] =
+     L"\\Google\\Chrome for Testing\\User Data";
+ #else
+-const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
+-const wchar_t kUserDataDirNameSuffix[] = L"\\Chromium\\User Data";
++const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Yee";
++const wchar_t kUserDataDirNameSuffix[] = L"\\Yee\\User Data";
+ #endif
+ 
+ const wchar_t kUserDataDirRegistryKey[] = L"UserDataDir";
+diff --git a/chrome/installer/linux/common/installer.py b/chrome/installer/linux/common/installer.py
+index b2b6f8c06d..ebb03cb993 100644
+--- a/chrome/installer/linux/common/installer.py
++++ b/chrome/installer/linux/common/installer.py
+@@ -488,9 +488,8 @@ class InstallerConfig:
+             return env
+ 
+         def parse_simple(file_path: pathlib.Path) -> dict[str, str]:
+-            return dict(
+-                line.strip().split("=") for line in file_path.open("r") if line
+-            )
++            with file_path.open("r", encoding="utf-8") as stream:
++                return dict(line.strip().split("=", 1) for line in stream if line)
+ 
+         data["info_vars"] = parse_shell(
+             output_dir
+diff --git a/chrome/installer/mac/signing/build_props_config.py.in b/chrome/installer/mac/signing/build_props_config.py.in
+index 739dfa9d51..fdde35468c 100644
+--- a/chrome/installer/mac/signing/build_props_config.py.in
++++ b/chrome/installer/mac/signing/build_props_config.py.in
+@@ -25,11 +25,11 @@ class BuildPropsCodeSignConfig(CodeSignConfig):
+ 
+     @property
+     def app_product(self):
+-        return '@PRODUCT_FULLNAME@'
++        return "@PRODUCT_FULLNAME@"
+ 
+     @property
+     def product(self):
+-        return '@PRODUCT_FULLNAME@'
++        return "@PRODUCT_FULLNAME@"
+ 
+     @property
+     def version(self):
 diff --git a/chrome/installer/mini_installer/BUILD.gn b/chrome/installer/mini_installer/BUILD.gn
-index ce1f5a5711..fcf6cd3104 100644
+index df9408bb16..15047d761f 100644
 --- a/chrome/installer/mini_installer/BUILD.gn
 +++ b/chrome/installer/mini_installer/BUILD.gn
 @@ -41,6 +41,7 @@ config("mini_installer_compiler_flags") {
@@ -1247,7 +1497,7 @@ index ce1f5a5711..fcf6cd3104 100644
    ]
  
 diff --git a/chrome/installer/mini_installer/chrome.release b/chrome/installer/mini_installer/chrome.release
-index b0008cc7bb..0526c83779 100644
+index 33e8546206..d7e743f54c 100644
 --- a/chrome/installer/mini_installer/chrome.release
 +++ b/chrome/installer/mini_installer/chrome.release
 @@ -3,6 +3,15 @@
@@ -1267,7 +1517,7 @@ index b0008cc7bb..0526c83779 100644
  # Chrome Application dir entries, sorted alphabetically.
  #
 diff --git a/chrome/installer/mini_installer/mini_installer_constants.cc b/chrome/installer/mini_installer/mini_installer_constants.cc
-index c2a03ccbb6..754f466d1f 100644
+index ed578609ad..c6f9da3593 100644
 --- a/chrome/installer/mini_installer/mini_installer_constants.cc
 +++ b/chrome/installer/mini_installer/mini_installer_constants.cc
 @@ -5,6 +5,7 @@
@@ -1278,7 +1528,7 @@ index c2a03ccbb6..754f466d1f 100644
  
  namespace mini_installer {
  
-@@ -67,12 +68,12 @@ const wchar_t kCleanupRegistryKey[] = L"Software\\Chrome for Testing";
+@@ -68,12 +69,12 @@ const wchar_t kCleanupRegistryKey[] = L"Software\\Chrome for Testing";
  #else
  // The path to the key containing each app's Clients registry key.
  // No trailing slash on this one because the app's GUID is not appended.
@@ -1295,10 +1545,10 @@ index c2a03ccbb6..754f466d1f 100644
  
  }  // namespace mini_installer
 diff --git a/chrome/installer/setup/BUILD.gn b/chrome/installer/setup/BUILD.gn
-index 9635a435d6..624cc3c386 100644
+index e7e695f652..13ee0b3b52 100644
 --- a/chrome/installer/setup/BUILD.gn
 +++ b/chrome/installer/setup/BUILD.gn
-@@ -162,6 +162,7 @@ if (is_win) {
+@@ -176,6 +176,7 @@ if (is_win) {
        "setup_util_unittest.cc",
        "setup_util_unittest.h",
        "taskbar_util_unittest.cc",
@@ -1306,27 +1556,31 @@ index 9635a435d6..624cc3c386 100644
        "unpack_archive_unittest.cc",
        "update_active_setup_version_work_item_unittest.cc",
        "user_hive_visitor_unittest.cc",
-@@ -175,6 +176,7 @@ if (is_win) {
+@@ -189,6 +190,7 @@ if (is_win) {
        "//base/allocator:buildflags",
        "//base/test:test_support",
        "//build:branding_buildflags",
 +      "//chrome/chrome_elf:constants",
        "//chrome/common:constants",
        "//chrome/common:version_header",
-       "//chrome/install_static:buildflags",
-@@ -183,7 +185,10 @@ if (is_win) {
+       "//chrome/common/child_module",
+@@ -198,11 +200,14 @@ if (is_win) {
        "//chrome/installer/mini_installer:unit_tests",
        "//chrome/installer/util:serial_unittests",
        "//chrome/installer/util:test_support",
 +      "//chrome/windows_services/elevated_tracing_service:integration",
        "//components/crash/core/app:test_support",
+       "//components/crx_file",
+       "//components/crx_file:crx_creator",
 +      "//content/public/common:static_switches",
+       "//crypto",
+       "//crypto:test_support",
 +      "//rlz:rlz_lib_no_network",
        "//testing/gmock",
        "//testing/gtest",
-     ]
+       "//third_party/zlib/google:zip",
 diff --git a/chrome/installer/setup/install_worker_unittest.cc b/chrome/installer/setup/install_worker_unittest.cc
-index e626893700..737014bf3a 100644
+index 1aa9cfa502..cb219bc495 100644
 --- a/chrome/installer/setup/install_worker_unittest.cc
 +++ b/chrome/installer/setup/install_worker_unittest.cc
 @@ -20,6 +20,7 @@
@@ -1337,7 +1591,7 @@ index e626893700..737014bf3a 100644
  #include "chrome/install_static/install_util.h"
  #include "chrome/install_static/test/scoped_install_details.h"
  #include "chrome/installer/setup/install_params.h"
-@@ -276,6 +277,9 @@ class InstallWorkerTest : public testing::Test {
+@@ -277,6 +278,9 @@ class InstallWorkerTest : public testing::Test {
  // Chrome for Testing does not support system-level installations.
  #if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
  TEST_F(InstallWorkerTest, TestInstallChromeSystem) {
@@ -1345,13 +1599,26 @@ index e626893700..737014bf3a 100644
 +    GTEST_SKIP() << "이 설치 모드는 시스템 전체 설치를 지원하지 않는다.";
 +  }
    const bool system_level = true;
-   NiceMock<MockWorkItemList> work_item_list;
  
+   const HKEY kRegRoot = system_level ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER;
+diff --git a/chrome/installer/setup/installer_crash_reporter_client.cc b/chrome/installer/setup/installer_crash_reporter_client.cc
+index c42333099b..29fb5aa6c1 100644
+--- a/chrome/installer/setup/installer_crash_reporter_client.cc
++++ b/chrome/installer/setup/installer_crash_reporter_client.cc
+@@ -38,7 +38,7 @@ void InstallerCrashReporterClient::GetProductNameAndVersion(
+     std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+ 
+   std::unique_ptr<FileVersionInfo> version_info(
+       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
 diff --git a/chrome/installer/setup/setup_util.cc b/chrome/installer/setup/setup_util.cc
-index 623618d3b7..4a9fbf7ead 100644
+index c1d710de17..29ac17522a 100644
 --- a/chrome/installer/setup/setup_util.cc
 +++ b/chrome/installer/setup/setup_util.cc
-@@ -70,17 +70,12 @@ constexpr wchar_t kEventLogProvidersRegPath[] =
+@@ -69,17 +69,12 @@ constexpr wchar_t kEventLogProvidersRegPath[] =
  // for this mode of install was dropped from ToT in December 2016. Remove any
  // stray bits in the registry leftover from such installs.
  void RemoveBinariesVersionKey(const InstallerState& installer_state) {
@@ -1371,10 +1638,10 @@ index 623618d3b7..4a9fbf7ead 100644
  
  void RemoveAppLauncherVersionKey(const InstallerState& installer_state) {
 diff --git a/chrome/installer/setup/setup_util_unittest.cc b/chrome/installer/setup/setup_util_unittest.cc
-index cedb4cecd0..025b3f9451 100644
+index efb593dbe7..63c55e7f7e 100644
 --- a/chrome/installer/setup/setup_util_unittest.cc
 +++ b/chrome/installer/setup/setup_util_unittest.cc
-@@ -42,6 +42,7 @@
+@@ -43,6 +43,7 @@
  #include "chrome/installer/setup/installer_state.h"
  #include "chrome/installer/setup/setup_constants.h"
  #include "chrome/installer/setup/setup_util.h"
@@ -1382,10 +1649,10 @@ index cedb4cecd0..025b3f9451 100644
  #include "chrome/installer/util/google_update_constants.h"
  #include "chrome/installer/util/install_util.h"
  #include "chrome/installer/util/installation_state.h"
-@@ -825,13 +826,73 @@ TEST_F(LegacyCleanupsTest, NoOpOnFailedUpdate) {
- 
+@@ -835,13 +836,73 @@ TEST_F(LegacyCleanupsTest, NoOpOnFailedUpdate) {
  TEST_F(LegacyCleanupsTest, Do) {
    DoLegacyCleanups(installer_state(), NEW_VERSION_UPDATED);
+   EXPECT_FALSE(HasObsoleteRenameChromeCommand());
 -#if !BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
 -  EXPECT_FALSE(HasBinariesVersionKey());
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -1461,7 +1728,7 @@ index cedb4cecd0..025b3f9451 100644
 +
  }  // namespace installer
 diff --git a/chrome/installer/setup/uninstall.cc b/chrome/installer/setup/uninstall.cc
-index c0bd24ff9b..c78bc8ba67 100644
+index 823e20d1eb..b453bc83a2 100644
 --- a/chrome/installer/setup/uninstall.cc
 +++ b/chrome/installer/setup/uninstall.cc
 @@ -36,6 +36,7 @@
@@ -1488,7 +1755,7 @@ index c0bd24ff9b..c78bc8ba67 100644
  
  // Removes all files from the installer directory. Returns false in case of an
  // error.
-@@ -710,17 +713,27 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+@@ -721,17 +724,27 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
  
    // Delete the App Paths and Applications keys that let Explorer find Chrome:
    // http://msdn.microsoft.com/en-us/library/windows/desktop/ee872121
@@ -1520,7 +1787,7 @@ index c0bd24ff9b..c78bc8ba67 100644
  
    // Cleanup OpenWithList and OpenWithProgids:
    // http://msdn.microsoft.com/en-us/library/bb166549
-@@ -734,7 +747,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+@@ -745,7 +758,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
  
      open_with_list_key.clear();
      base::StrAppend(&open_with_list_key,
@@ -1529,7 +1796,7 @@ index c0bd24ff9b..c78bc8ba67 100644
      DeleteRegistryKey(root, open_with_list_key, WorkItem::kWow64Default);
  
      open_with_progids_key.clear();
-@@ -784,6 +797,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+@@ -793,6 +806,7 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
  }
  
  void RemoveChromeLegacyRegistryKeys(const base::FilePath& chrome_exe) {
@@ -1537,15 +1804,15 @@ index c0bd24ff9b..c78bc8ba67 100644
    // We used to register Chrome to handle crx files, but this turned out
    // to be not worth the hassle. Remove these old registry entries if
    // they exist. See: http://codereview.chromium.org/210007
-@@ -816,6 +830,7 @@ void RemoveChromeLegacyRegistryKeys(const base::FilePath& chrome_exe) {
-     DeleteRegistryKey(UNSAFE_TODO(roots[i]), ext_association,
-                       WorkItem::kWow64Default);
+@@ -823,6 +837,7 @@ void RemoveChromeLegacyRegistryKeys(const base::FilePath& chrome_exe) {
+     ext_association.append(L".crx");
+     DeleteRegistryKey(root, ext_association, WorkItem::kWow64Default);
    }
 +#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
  }
  
  void UninstallFirewallRules(const base::FilePath& chrome_exe) {
-@@ -927,7 +942,9 @@ InstallStatus UninstallProduct(const ModifyParams& modify_params,
+@@ -936,7 +951,9 @@ InstallStatus UninstallProduct(const ModifyParams& modify_params,
    // Chrome is not in use so lets uninstall Chrome by deleting various files
    // and registry entries. Here we will just make best effort and keep going
    // in case of errors.
@@ -1555,8 +1822,49 @@ index c0bd24ff9b..c78bc8ba67 100644
  
    auto_launch_util::DisableStartAtLogin();
  
+diff --git a/chrome/installer/util/BUILD.gn b/chrome/installer/util/BUILD.gn
+index d0dc85a334..1ed6672d9f 100644
+--- a/chrome/installer/util/BUILD.gn
++++ b/chrome/installer/util/BUILD.gn
+@@ -4,6 +4,7 @@
+ 
+ import("//base/i18n/win/embedded_i18n/generate_embedded_i18n.gni")
+ import("//build/config/chrome_build.gni")
++import("//chrome/app/yee_branding_strings.gni")
+ 
+ import("//testing/test.gni")
+ 
+@@ -166,6 +167,7 @@ static_library("with_no_strings") {
+       "system_tracing_util.h",
+       "taskbar_util.cc",
+       "taskbar_util.h",
++      "taskbar_util_internal.h",
+     ]
+ 
+     public_deps += [
+@@ -230,6 +232,10 @@ generate_embedded_i18n("generate_strings") {
+   grdfile_folder = "//chrome/app/"
+   grdfile_name = "${branding_path_product}_strings"
+   xtb_relative_path = "resources"
++  if (!is_chrome_branded && !is_chrome_for_testing_branded &&
++      yee_brand_strings_enabled) {
++    xtb_relative_path = "yee_branding_strings/inputs/chrome/app/resources"
++  }
+   grd_files_info = [ [
+         grdfile_folder,
+         grdfile_name,
+@@ -240,6 +246,9 @@ generate_embedded_i18n("generate_strings") {
+   output_file_name_base = "installer_util_strings"
+ 
+   branding = branding_path_product
++  if (branding_path_product == "chromium") {
++    source_parts = [ "//chrome/app/yee_product_names.grdp" ]
++  }
+ }
+ 
+ # Compile the generated .rc file.
 diff --git a/chrome/installer/util/shell_util.cc b/chrome/installer/util/shell_util.cc
-index fabd1fbc1e..58fd8eeda5 100644
+index 3710cb78f5..eb60bb2e5a 100644
 --- a/chrome/installer/util/shell_util.cc
 +++ b/chrome/installer/util/shell_util.cc
 @@ -48,6 +48,7 @@
@@ -1567,7 +1875,26 @@ index fabd1fbc1e..58fd8eeda5 100644
  #include "chrome/common/chrome_constants.h"
  #include "chrome/common/chrome_switches.h"
  #include "chrome/install_static/install_constants.h"
-@@ -447,9 +448,15 @@ void GetChromeAppRegistrationEntries(
+@@ -306,7 +307,7 @@ void GetChromeProgIdEntries(
+   // Get ProgId entries for PDF documents.
+   app_info.prog_id = GetPDFProgId(suffix);
+   app_info.file_type_name = install_static::GetPDFProgIdDescription();
+-  app_info.file_type_icon_index = install_static ::GetPDFIconResourceIndex();
++  app_info.file_type_icon_index = install_static::GetPDFIconResourceIndex();
+   app_info.application_icon_index = chrome_icon_index;
+   GetProgIdEntries(app_info, entries);
+ }
+@@ -407,8 +408,7 @@ void GetShellIntegrationEntries(
+   }
+ 
+   // Add the direct launch URL scheme if one is defined for this mode.
+-  const char* direct_launch_scheme =
+-      install_static::GetDirectLaunchUrlScheme();
++  const char* direct_launch_scheme = install_static::GetDirectLaunchUrlScheme();
+   if (direct_launch_scheme && *direct_launch_scheme) {
+     entries->push_back(std::make_unique<RegistryEntry>(
+         capabilities + L"\\URLAssociations",
+@@ -444,9 +444,15 @@ void GetChromeAppRegistrationEntries(
      const base::FilePath& chrome_exe,
      const std::wstring& suffix,
      std::vector<std::unique_ptr<RegistryEntry>>* entries) {
@@ -1586,288 +1913,165 @@ index fabd1fbc1e..58fd8eeda5 100644
    entries->push_back(
        std::make_unique<RegistryEntry>(app_path_key, chrome_exe.value()));
    entries->push_back(std::make_unique<RegistryEntry>(
-diff --git a/chrome/install_static/BUILD.gn b/chrome/install_static/BUILD.gn
-index dc056db749..0bdfcada1e 100644
---- a/chrome/install_static/BUILD.gn
-+++ b/chrome/install_static/BUILD.gn
-@@ -57,7 +57,11 @@ if (is_win) {
-     } else if (is_chrome_for_testing_branded) {
-       sources += [ "google_chrome_for_testing_install_modes.h" ]
-     } else {
--      sources += [ "chromium_install_modes.h" ]
-+      sources += [
-+        "//chrome/app/yee_product_identity.h",
-+        "//chrome/app/yee_windows_registration.h",
-+        "chromium_install_modes.h",
+@@ -1539,12 +1545,12 @@ bool ShellUtil::QuickIsChromeRegisteredInHKLM(const base::FilePath& chrome_exe,
+ 
+ bool ShellUtil::ShortcutLocationIsSupported(ShortcutLocation location) {
+   switch (location) {
+-    case SHORTCUT_LOCATION_DESKTOP:                           // Falls through.
+-    case SHORTCUT_LOCATION_QUICK_LAUNCH:                      // Falls through.
+-    case SHORTCUT_LOCATION_START_MENU_ROOT:                   // Falls through.
+-    case SHORTCUT_LOCATION_START_MENU_CHROME_APPS_DIR:        // Falls through.
+-    case SHORTCUT_LOCATION_STARTUP:                           // Falls through.
+-    case SHORTCUT_LOCATION_TASKBAR_PINS:                      // Falls through.
++    case SHORTCUT_LOCATION_DESKTOP:                     // Falls through.
++    case SHORTCUT_LOCATION_QUICK_LAUNCH:                // Falls through.
++    case SHORTCUT_LOCATION_START_MENU_ROOT:             // Falls through.
++    case SHORTCUT_LOCATION_START_MENU_CHROME_APPS_DIR:  // Falls through.
++    case SHORTCUT_LOCATION_STARTUP:                     // Falls through.
++    case SHORTCUT_LOCATION_TASKBAR_PINS:                // Falls through.
+     case SHORTCUT_LOCATION_APP_SHORTCUTS:
+       return true;
+     default:
+diff --git a/chrome/notification_helper/notification_helper_crash_reporter_client.cc b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
+index 86604e9427..0fa79a79c4 100644
+--- a/chrome/notification_helper/notification_helper_crash_reporter_client.cc
++++ b/chrome/notification_helper/notification_helper_crash_reporter_client.cc
+@@ -60,7 +60,7 @@ void NotificationHelperCrashReporterClient::GetProductNameAndVersion(
+     std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+ 
+   std::unique_ptr<FileVersionInfo> version_info(
+       FileVersionInfo::CreateFileVersionInfo(base::FilePath(exe_path)));
+diff --git a/chrome/process_version_rc_template.gni b/chrome/process_version_rc_template.gni
+index 8d7edf5044..5df0ae1bd1 100644
+--- a/chrome/process_version_rc_template.gni
++++ b/chrome/process_version_rc_template.gni
+@@ -53,10 +53,22 @@ template("process_version_rc_template") {
+   process_version(target_name) {
+     template_file = _template_file
+     sources = _sources
++    extra_args = []
++    if (defined(invoker.extra_args)) {
++      extra_args += invoker.extra_args
++    }
++    if (is_win) {
++      # rc.py recognizes Unicode input through the UTF-16 BOM.
++      extra_args += [
++        "--output-encoding",
++        "utf-16",
 +      ]
-     }
++    }
+     forward_variables_from(invoker,
+                            "*",
+                            [
+                              "sources",
++                             "extra_args",
+                              "template_file",
+                            ])
+   }
+diff --git a/chrome/tools/build/mac/infoplist_strings_util.cc b/chrome/tools/build/mac/infoplist_strings_util.cc
+index f52b1cf14e..cff1d164a2 100644
+--- a/chrome/tools/build/mac/infoplist_strings_util.cc
++++ b/chrome/tools/build/mac/infoplist_strings_util.cc
+@@ -196,6 +196,10 @@ int main(int argc, char* const argv[]) {
+         {"NSWebBrowserPublicKeyCredentialUsageDescription", permission_reason},
  
-     libs = [ "kernel32.lib" ]
-diff --git a/chrome/install_static/chromium_install_modes.h b/chrome/install_static/chromium_install_modes.h
-index f29a8228fe..f8cfd725c8 100644
---- a/chrome/install_static/chromium_install_modes.h
-+++ b/chrome/install_static/chromium_install_modes.h
-@@ -10,6 +10,7 @@
- #include <array>
+         {"\"Chromium Shortcut\"", chromium_shortcut_description},
++        {"\"Chromium Extension\"",
++         LoadStringFromDataPack(branded_data_pack.get(), lang, IDS_PRODUCT_NAME,
++                                "IDS_PRODUCT_NAME") +
++             " Extension"},
+     };
+     std::string strings_file_contents_string;
+     for (const auto& kv : infoplist_strings) {
+diff --git a/chrome/windows_services/service_program/crash_reporting.cc b/chrome/windows_services/service_program/crash_reporting.cc
+index 04cfd98a00..42ee02921e 100644
+--- a/chrome/windows_services/service_program/crash_reporting.cc
++++ b/chrome/windows_services/service_program/crash_reporting.cc
+@@ -116,7 +116,7 @@ void CrashClient::GetProductNameAndVersion(const std::wstring& exe_path,
+                                            std::wstring* channel_name) {
+   // Report crashes under the same product name as the browser. This string
+   // MUST match server-side configuration.
+-  *product_name = base::ASCIIToWide(PRODUCT_SHORTNAME_STRING);
++  *product_name = base::UTF8ToWide(PRODUCT_SHORTNAME_STRING);
+   *version = base::ASCIIToWide(CHROME_VERSION_STRING);
+   special_build->clear();
+   *channel_name =
+diff --git a/components/os_crypt/common/BUILD.gn b/components/os_crypt/common/BUILD.gn
+index 10db068710..509688d5cb 100644
+--- a/components/os_crypt/common/BUILD.gn
++++ b/components/os_crypt/common/BUILD.gn
+@@ -27,6 +27,9 @@ if (is_apple) {
+       "//build:branding_buildflags",
+       "//crypto",
+     ]
++    if (is_mac) {
++      deps += [ "//components/yee_branding:mac_identity" ]
++    }
+   }
+ }
  
- #include "chrome/app/chrome_dll_resource.h"
-+#include "chrome/app/yee_product_identity.h"
- #include "chrome/common/chrome_icon_resources_win.h"
- #include "chrome/install_static/install_constants.h"
+diff --git a/components/os_crypt/common/keychain_password_mac.mm b/components/os_crypt/common/keychain_password_mac.mm
+index 212b930952..498940c7f7 100644
+--- a/components/os_crypt/common/keychain_password_mac.mm
++++ b/components/os_crypt/common/keychain_password_mac.mm
+@@ -15,9 +15,15 @@
+ #include "base/rand_util.h"
+ #include "base/strings/string_view_util.h"
+ #include "build/branding_buildflags.h"
++#include "build/build_config.h"
+ #include "crypto/apple/keychain_v2.h"
+ #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
  
-@@ -21,7 +22,7 @@ inline constexpr wchar_t kCompanyPathName[] = L"";
++#if BUILDFLAG(IS_MAC)
++#include "base/apple/foundation_util.h"
++#include "components/yee_branding/mac_identity.h"
++#endif
++
+ using crypto::apple::KeychainV2;
  
- // The brand-specific product name to be included as a component of the install
- // and user data directory paths.
--inline constexpr wchar_t kProductPathName[] = L"Chromium";
-+inline constexpr auto& kProductPathName = yee::identity::kProfileDirectory;
+ #if defined(ALLOW_RUNTIME_CONFIGURABLE_KEY_STORAGE)
+@@ -73,13 +79,25 @@ std::string AddRandomPasswordToKeychain(KeychainV2& keychain,
  
- // The brand-specific safe browsing client name.
- inline constexpr char kSafeBrowsingName[] = "chromium";
-@@ -45,39 +46,28 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
-         .logo_suffix = L"",  // No logo suffix for the primary install mode.
-         .app_guid =
-             L"",  // Empty app_guid since no integration with Google Update.
--        .base_app_name = L"Chromium",              // A distinct base_app_name.
--        .base_app_id = L"Chromium",                // A distinct base_app_id.
--        .browser_prog_id_prefix = L"ChromiumHTM",  // Browser ProgID prefix.
-+        .base_app_name =
-+            yee::identity::kApplicationName,   // A distinct base_app_name.
-+        .base_app_id = yee::identity::kAppId,  // A distinct base_app_id.
-+        .browser_prog_id_prefix =
-+            yee::identity::kBrowserProgIdPrefix,  // Browser ProgID prefix.
-         .browser_prog_id_description =
--            L"Chromium HTML Document",  // Browser ProgID description.
--        .direct_launch_url_scheme = "chromium",
--        .pdf_prog_id_prefix = L"ChromiumPDF",  // PDF ProgID prefix.
-+            L"Yee HTML Document",  // Browser ProgID description.
-+        .direct_launch_url_scheme = yee::identity::kDirectLaunchScheme,
-+        .pdf_prog_id_prefix =
-+            yee::identity::kPdfProgIdPrefix,  // PDF ProgID prefix.
-         .pdf_prog_id_description =
--            L"Chromium PDF Document",  // PDF ProgID description.
--        .active_setup_guid =
--            L"{7D2B3E1D-D096-4594-9D8F-A6667F12E0AC}",  // Active Setup
--                                                        // GUID.
--        .toast_activator_clsid = {0x635EFA6F,
--                                  0x08D6,
--                                  0x4EC9,
--                                  {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51,
--                                   0x59}},  // Toast Activator CLSID.
--        .elevator_clsid = {0xD133B120,
--                           0x6DB4,
--                           0x4D6B,
--                           {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1,
--                            0xB0}},  // Elevator CLSID.
-+            L"Yee PDF Document",  // PDF ProgID description.
-+        .active_setup_guid = yee::identity::kActiveSetupGuid,
-+        .toast_activator_clsid = yee::identity::kToastActivatorClsid,
-+        .elevator_clsid = yee::identity::kElevatorClsid,
-         .elevator_iid = {0xbb19a0e5,
-                          0xc6,
-                          0x4966,
-                          {0x94, 0xb2, 0x5a, 0xfe, 0xc6, 0xfe, 0xd9,
-                           0x3a}},  // IElevator IID and TypeLib
-         // {BB19A0E5-00C6-4966-94B2-5AFEC6FED93A}.
--        .tracing_service_clsid = {0x83f69367,
--                                  0x442d,
--                                  0x447f,
--                                  {0x8b, 0xcc, 0x0e, 0x3f, 0x97, 0xbe, 0x9c,
--                                   0xf2}},  // SystemTraceSession CLSID.
-+        .tracing_service_clsid = yee::identity::kTracingServiceClsid,
-         .tracing_service_iid = {0xa3fd580a,
-                                 0xffd4,
-                                 0x4075,
-@@ -87,7 +77,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
-         .default_channel_name =
-             L"",  // Empty default channel name since no update integration.
-         .channel_strategy = ChannelStrategy::UNSUPPORTED,
--        .supports_system_level = true,  // Supports system-level installs.
-+        .supports_system_level = false,  // 테스트판은 사용자별 설치만 지원한다.
-         .supports_set_as_default_browser =
-             true,  // Supports in-product set as default browser UX.
-         .app_icon_resource_index =
-@@ -97,10 +87,7 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
-             icon_resources::kHtmlDocIndex,  // HTML doc icon resource index.
-         .pdf_doc_icon_resource_index =
-             icon_resources::kPDFDocIndex,  // PDF doc icon resource index.
--        .sandbox_sid_prefix =
--            L"S-1-15-2-3251537155-1984446955-2931258699-841473695-"
--            L"1938553385-"
--            L"924012148-",  // App container sid prefix for sandbox.
-+        .sandbox_sid_prefix = yee::identity::kSandboxSidPrefix,
-     },
- });
- 
-diff --git a/chrome/install_static/install_util_unittest.cc b/chrome/install_static/install_util_unittest.cc
-index 90483d7745..ae1c8e9ea9 100644
---- a/chrome/install_static/install_util_unittest.cc
-+++ b/chrome/install_static/install_util_unittest.cc
-@@ -356,8 +356,10 @@ class InstallStaticUtilTest
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-     static constexpr wchar_t kPolicyKey[] =
-         L"Software\\Policies\\Google\\Chrome";
--#else
-+#elif BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
-     static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Chromium";
+ // static
+ KeychainPassword::KeychainNameType& KeychainPassword::GetServiceName() {
++#if BUILDFLAG(IS_MAC) && !BUILDFLAG(GOOGLE_CHROME_BRANDING)
++  static KeychainNameContainerType service_name(
++      yee::identity::KeychainServiceName(base::apple::BaseBundleID(),
++                                         kDefaultServiceName));
 +#else
-+    static constexpr wchar_t kPolicyKey[] = L"Software\\Policies\\Yee";
- #endif
+   static KeychainNameContainerType service_name(kDefaultServiceName);
++#endif
+   return *service_name;
+ }
  
-     ASSERT_EQ(ERROR_SUCCESS,
-@@ -412,7 +414,7 @@ TEST_P(InstallStaticUtilTest, GetChromeInstallSubDirectory) {
-   // The directory strings for the brand's install modes; parallel to
-   // kInstallModes.
-   static constexpr const wchar_t* kInstallDirs[] = {
--      L"Chromium",
-+      L"Yee",
-   };
- #endif
-   static_assert(std::size(kInstallDirs) == NUM_INSTALL_MODES,
-@@ -441,7 +443,7 @@ TEST_P(InstallStaticUtilTest, GetRegistryPath) {
-   // The registry path strings for the brand's install modes; parallel to
-   // kInstallModes.
-   static constexpr const wchar_t* kRegistryPaths[] = {
--      L"Software\\Chromium",
-+      L"Software\\Yee",
-   };
- #endif
-   static_assert(std::size(kRegistryPaths) == NUM_INSTALL_MODES,
-@@ -474,7 +476,7 @@ TEST_P(InstallStaticUtilTest, GetUninstallRegistryPath) {
-   // The registry path strings for the brand's install modes; parallel to
-   // kInstallModes.
-   static constexpr const wchar_t* kUninstallRegistryPaths[] = {
--      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Chromium",
-+      L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Yee",
-   };
- #endif
-   static_assert(std::size(kUninstallRegistryPaths) == NUM_INSTALL_MODES,
-@@ -523,7 +525,7 @@ TEST_P(InstallStaticUtilTest, GetBaseAppId) {
- #else
-   // The base app ids for the brand's install modes; parallel to kInstallModes.
-   static constexpr const wchar_t* kBaseAppIds[] = {
--      L"Chromium",
-+      L"Yee",
-   };
- #endif
-   static_assert(std::size(kBaseAppIds) == NUM_INSTALL_MODES,
-@@ -583,15 +585,15 @@ TEST_P(InstallStaticUtilTest, GetToastActivatorClsid) {
-   // The toast activator CLSIDs for the brand's install modes; parallel to
-   // kInstallModes.
-   static constexpr CLSID kToastActivatorClsids[] = {
--      {0x635EFA6F,
--       0x08D6,
--       0x4EC9,
--       {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51, 0x59}}  // Chromium.
-+      {0xC9EB99B2,
-+       0x59A9,
-+       0x45FB,
-+       {0xA3, 0x09, 0xF0, 0x4C, 0xBD, 0xBA, 0x38, 0x48}}  // Chromium.
-   };
+ // static
+ KeychainPassword::KeychainNameType& KeychainPassword::GetAccountName() {
++#if BUILDFLAG(IS_MAC) && !BUILDFLAG(GOOGLE_CHROME_BRANDING)
++  static KeychainNameContainerType account_name(
++      yee::identity::KeychainAccountName(base::apple::BaseBundleID(),
++                                         kDefaultAccountName));
++#else
+   static KeychainNameContainerType account_name(kDefaultAccountName);
++#endif
+   return *account_name;
+ }
  
-   // The string representation of the CLSIDs above.
-   static constexpr const wchar_t* kToastActivatorClsidsString[] = {
--      L"{635EFA6F-08D6-4EC9-BD14-8A0FDE975159}"  // Chromium.
-+      L"{C9EB99B2-59A9-45FB-A309-F04CBDBA3848}"  // Chromium.
-   };
- #endif
-   static_assert(std::size(kToastActivatorClsids) == NUM_INSTALL_MODES,
-@@ -653,15 +655,15 @@ TEST_P(InstallStaticUtilTest, GetElevatorClsid) {
- #else
-   // The Elevator CLSIDs, one for each of the kInstallModes.
-   static constexpr CLSID kElevatorClsids[] = {
--      {0xD133B120,
--       0x6DB4,
--       0x4D6B,
--       {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1, 0xB0}},  // Chromium.
-+      {0xE45ED4A4,
-+       0x3272,
-+       0x4DDD,
-+       {0x91, 0x32, 0x12, 0x1F, 0xDF, 0x08, 0x3A, 0xB7}},  // Chromium.
-   };
- 
-   // The string representation of the CLSIDs above.
-   static constexpr const wchar_t* kElevatorClsidsString[] = {
--      L"{D133B120-6DB4-4D6B-8BFE-83BF8CA1B1B0}",  // Chromium.
-+      L"{E45ED4A4-3272-4DDD-9132-121FDF083AB7}",  // Chromium.
-   };
- #endif
-   static_assert(std::size(kElevatorClsids) == NUM_INSTALL_MODES,
-@@ -843,8 +845,8 @@ TEST_P(InstallStaticUtilTest, GetSandboxSidPrefix) {
-   };
- #else
-   static constexpr const wchar_t* kSandBoxSids[] = {
--      L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
--      L"924012148-",  // Chromium.
-+      L"S-1-15-2-2726106554-2681646199-3803488136-3045051458-339147570-"
-+      L"929043407-",  // Chromium.
-   };
- #endif
-   EXPECT_STREQ(GetSandboxSidPrefix(),
-@@ -880,11 +882,14 @@ INSTANTIATE_TEST_SUITE_P(
-     testing::Combine(testing::Values(GOOGLE_CHROME_FOR_TESTING_INDEX),
-                      testing::Values("user")));
- #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
--// Chromium supports user and system levels.
-+// Yee 테스트판은 사용자별 설치만 지원한다.
- INSTANTIATE_TEST_SUITE_P(Chromium,
-                          InstallStaticUtilTest,
-                          testing::Combine(testing::Values(CHROMIUM_INDEX),
--                                          testing::Values("user", "system")));
-+                                          testing::Values("user")));
-+TEST(InstallModeIdentityTest, YeeTestBuildHasNoSystemInstall) {
-+  EXPECT_FALSE(kInstallModes[CHROMIUM_INDEX].supports_system_level);
-+}
- #endif  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
- 
- }  // namespace install_static
-diff --git a/chrome/install_static/product_install_details_unittest.cc b/chrome/install_static/product_install_details_unittest.cc
-index 2e5b799d34..7cd1dff10e 100644
---- a/chrome/install_static/product_install_details_unittest.cc
-+++ b/chrome/install_static/product_install_details_unittest.cc
-@@ -207,13 +207,13 @@ constexpr TestData kTestData[] = {
- #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING)
- constexpr TestData kTestData[] = {
-     {
--        L"C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe",
-+        L"C:\\Program Files (x86)\\Yee\\Application\\chrome.exe",
-         CHROMIUM_INDEX,
--        true,
-+        false,
-         L"",
-     },
-     {
--        L"C:\\Users\\user\\AppData\\Local\\Chromium\\Application\\chrome.exe",
-+        L"C:\\Users\\user\\AppData\\Local\\Yee\\Application\\chrome.exe",
-         CHROMIUM_INDEX,
-         false,
-         L"",
-diff --git a/chrome/install_static/user_data_dir_win_unittest.cc b/chrome/install_static/user_data_dir_win_unittest.cc
-index efa4cbb99e..0ad33cf57f 100644
---- a/chrome/install_static/user_data_dir_win_unittest.cc
-+++ b/chrome/install_static/user_data_dir_win_unittest.cc
-@@ -30,8 +30,8 @@ const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
- const wchar_t kUserDataDirNameSuffix[] =
-     L"\\Google\\Chrome for Testing\\User Data";
- #else
--const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Chromium";
--const wchar_t kUserDataDirNameSuffix[] = L"\\Chromium\\User Data";
-+const wchar_t kPolicyRegistryKey[] = L"SOFTWARE\\Policies\\Yee";
-+const wchar_t kUserDataDirNameSuffix[] = L"\\Yee\\User Data";
- #endif
- 
- const wchar_t kUserDataDirRegistryKey[] = L"UserDataDir";
 diff --git a/components/policy/BUILD.gn b/components/policy/BUILD.gn
-index 5f345583e6..dfc42ef2e5 100644
+index f724bf914a..baefcc3e04 100644
 --- a/components/policy/BUILD.gn
 +++ b/components/policy/BUILD.gn
-@@ -86,8 +86,14 @@ policy_templates_deps_file = "$policy_templates_base_dir/policy_templates.d"
+@@ -86,8 +86,15 @@ policy_templates_deps_file = "$policy_templates_base_dir/policy_templates.d"
  policy_templates_generated_json_path =
      "$policy_templates_base_dir/policy_templates.json"
  
 +if (is_win && !is_chrome_branded && !is_chrome_for_testing_branded) {
 +  import("//chrome/app/yee_product_identity.gni")
 +}
++
  generate_policy_source("policy_code_generate") {
    chunking = true
 +  if (is_win && !is_chrome_branded && !is_chrome_for_testing_branded) {
@@ -1891,21 +2095,21 @@ index 9bfa540933..e45e49ef42 100644
        args += [ "--no-chunking" ]
      }
 diff --git a/components/policy/tools/generate_policy_source.py b/components/policy/tools/generate_policy_source.py
-index 040c3e2a6d..14f164cb13 100755
+index 0f77424e42..bfeae07571 100755
 --- a/components/policy/tools/generate_policy_source.py
 +++ b/components/policy/tools/generate_policy_source.py
-@@ -300,6 +300,8 @@ def main():
-       dest='chunking',  # A variable called `no_chunking` would be confusing.
-       default=True,
-       help='do not split policies into subProto1, subProto2, etc.')
+@@ -347,6 +347,8 @@ def main():
+     default=True,
+     help='do not split policies into subProto1, subProto2, etc.',
+   )
 +  parser.add_argument('--chromium-policy-key', default=r'SOFTWARE\Policies\Chromium',
 +                      help='unbranded Windows policy registry path')
    args = parser.parse_args()
  
    has_arg_error = False
-@@ -375,11 +377,13 @@ def main():
-                  sorted=True,
-                  mutable=True)
+@@ -434,12 +436,14 @@ def main():
+       mutable=True,
+     )
    if args.source_path:
 -    GenerateFile(args.source_path, _WritePolicyConstantSource, sorted=True)
 +    writer = partial(_WritePolicyConstantSource,
@@ -1913,85 +2117,108 @@ index 040c3e2a6d..14f164cb13 100755
 +    GenerateFile(args.source_path, writer, sorted=True)
      # Also write a version of the source with get_proto_mutable() functions.
      assert args.source_path.endswith('.cc')
-     GenerateFile(args.source_path.replace('.cc', '_mutable.cc'),
--                 _WritePolicyConstantSource,
-+                 writer,
-                  sorted=True,
-                  mutable=True)
-   if args.risk_header_path:
-@@ -1099,7 +1103,7 @@ def _GenerateDefaultValue(value):
- 
- def _WritePolicyConstantSource(all_policies, policy_atomic_groups,
-                                target_platform, f, risk_tags, chunking,
--                               mutable):
-+                               mutable, chromium_policy_key=CHROMIUM_POLICY_KEY):
+     GenerateFile(
+       args.source_path.replace('.cc', '_mutable.cc'),
+-      _WritePolicyConstantSource,
++      writer,
+       sorted=True,
+       mutable=True,
+     )
+@@ -1275,6 +1279,7 @@ def _WritePolicyConstantSource(
+   risk_tags,
+   chunking,
+   mutable,
++  chromium_policy_key=CHROMIUM_POLICY_KEY,
+ ):
    policies = _GetSupportedPolicies(all_policies, target_platform)
    policy_names = [policy.name for policy in policies]
-   namespace = 'policy::test' if mutable else 'policy'
-@@ -1214,7 +1218,7 @@ namespace {namespace} {{
-             'L"' + CHROME_FOR_TESTING_POLICY_KEY + '";\n'
-             '#else\n'
-             'const wchar_t kRegistryChromePolicyKey[] = '
--            'L"' + CHROMIUM_POLICY_KEY + '";\n'
-+            'L"' + chromium_policy_key + '";\n'
-             '#endif\n\n')
+@@ -1403,7 +1408,7 @@ namespace {namespace} {{
+       'L"' + CHROME_FOR_TESTING_POLICY_KEY + '";\n'
+       '#else\n'
+       'const wchar_t kRegistryChromePolicyKey[] = '
+-      'L"' + CHROMIUM_POLICY_KEY + '";\n'
++      'L"' + chromium_policy_key + '";\n'
+       '#endif\n\n'
+     )
  
-   # Setting enterprise defaults code generation.
-diff --git a/components/os_crypt/common/BUILD.gn b/components/os_crypt/common/BUILD.gn
-index 3128f3ac6d..1f67c229d7 100644
---- a/components/os_crypt/common/BUILD.gn
-+++ b/components/os_crypt/common/BUILD.gn
-@@ -17,6 +17,9 @@ if (is_apple) {
-       "//build:branding_buildflags",
-       "//crypto",
-     ]
-+    if (is_mac) {
-+      deps += [ "//components/yee_branding:mac_identity" ]
-+    }
-   }
- }
+diff --git a/components/vector_icons/aggregate_vector_icons.py b/components/vector_icons/aggregate_vector_icons.py
+index f1bcefd304..aa230d26a7 100644
+--- a/components/vector_icons/aggregate_vector_icons.py
++++ b/components/vector_icons/aggregate_vector_icons.py
+@@ -4,6 +4,7 @@
  
-diff --git a/components/os_crypt/common/keychain_password_mac.mm b/components/os_crypt/common/keychain_password_mac.mm
-index f240dc22ee..d8bd8f9227 100644
---- a/components/os_crypt/common/keychain_password_mac.mm
-+++ b/components/os_crypt/common/keychain_password_mac.mm
-@@ -18,9 +18,15 @@
- #include "base/strings/string_view_util.h"
- #include "base/types/expected.h"
- #include "build/branding_buildflags.h"
-+#include "build/build_config.h"
- #include "crypto/apple/keychain_v2.h"
- #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+ import fileinput
+ import glob
++import io
+ import optparse
+ import os
+ import re
+@@ -17,6 +18,15 @@ REFERENCE_SIZE_DIP = 48
+ TEMPLATE_PLACEHOLDER = "TEMPLATE_PLACEHOLDER"
  
-+#if BUILDFLAG(IS_MAC)
-+#include "base/apple/foundation_util.h"
-+#include "components/yee_branding/mac_identity.h"
-+#endif
+ 
++def WriteIfChanged(path, contents):
++  if os.path.isfile(path):
++    with open(path, "r", encoding="utf-8") as existing:
++      if existing.read() == contents:
++        return
++  with open(path, "w", encoding="utf-8") as output:
++    output.write(contents)
 +
- using crypto::apple::KeychainV2;
++
+ def Error(msg):
+     print(msg, file=sys.stderr)
+     sys.exit(1)
+@@ -165,7 +175,7 @@ def AggregateVectorIcons(
+     ) as input_header_template:
+         header_template_contents = input_header_template.readlines()
  
- #if defined(ALLOW_RUNTIME_CONFIGURABLE_KEY_STORAGE)
-@@ -110,13 +116,23 @@ base::expected<std::string, OSStatus> GetPasswordImpl(
+-    output_header = open(output_h, "w")
++    output_header = io.StringIO()
+     for line in header_template_contents:
+         if not TEMPLATE_PLACEHOLDER in line:
+             output_header.write(line)
+@@ -178,6 +188,7 @@ def AggregateVectorIcons(
+             output_header.write(
+                 "VECTOR_ICON_TEMPLATE_H({})\n".format(GetIconName(icon_name))
+             )
++    WriteIfChanged(output_h, output_header.getvalue())
+     output_header.close()
  
- // static
- KeychainPassword::KeychainNameType& KeychainPassword::GetServiceName() {
-+#if BUILDFLAG(IS_MAC) && !BUILDFLAG(GOOGLE_CHROME_BRANDING)
-+  static KeychainNameContainerType service_name(yee::identity::KeychainServiceName(
-+      base::apple::BaseBundleID(), kDefaultServiceName));
-+#else
-   static KeychainNameContainerType service_name(kDefaultServiceName);
-+#endif
-   return *service_name;
- }
+     # Copy the vector icon drawing commands from the .icon files, splitting them
+@@ -189,7 +200,8 @@ def AggregateVectorIcons(
+     cc_template_contents = input_cc_template.readlines()
+     input_cc_template.close()
  
- // static
- KeychainPassword::KeychainNameType& KeychainPassword::GetAccountName() {
-+#if BUILDFLAG(IS_MAC) && !BUILDFLAG(GOOGLE_CHROME_BRANDING)
-+  static KeychainNameContainerType account_name(yee::identity::KeychainAccountName(
-+      base::apple::BaseBundleID(), kDefaultAccountName));
-+#else
-   static KeychainNameContainerType account_name(kDefaultAccountName);
-+#endif
-   return *account_name;
- }
+-    output_cc = open(output_cc, "w")
++    output_cc_path = output_cc
++    output_cc = io.StringIO()
+     for line in cc_template_contents:
+         if not TEMPLATE_PLACEHOLDER in line:
+             output_cc.write(line)
+@@ -229,6 +241,7 @@ def AggregateVectorIcons(
+                 )
+             )
+ 
++    WriteIfChanged(output_cc_path, output_cc.getvalue())
+     output_cc.close()
+ 
+     if output_test_h:
+@@ -239,7 +252,8 @@ def AggregateVectorIcons(
+         input_test_cc_template.close()
+ 
+         # Write the vector icon unittests.
+-        output_test_h = open(output_test_h, "w")
++        output_test_h_path = output_test_h
++        output_test_h = io.StringIO()
+         for line in cc_test_template_contents:
+             if not TEMPLATE_PLACEHOLDER in line:
+                 output_test_h.write(line)
+@@ -265,6 +279,7 @@ def AggregateVectorIcons(
+               CheckThatParsedElementsMatch(s, {}); \\
+               }} \\\n \\\n""".format(formatted_name)
+                 )
++        WriteIfChanged(output_test_h_path, output_test_h.getvalue())
+         output_test_h.close()
+ 
  
