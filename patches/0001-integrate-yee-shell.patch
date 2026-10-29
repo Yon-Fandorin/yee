@@ -33990,7 +33990,7 @@ index f2302f478a..7af50b7f50 100644
  // - When available width is at least the crossover width, all tabs (active and
  //   inactive) are the same size and shrink at the same rate.
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
-index a6ac0cc24e..11ac8477e4 100644
+index a6ac0cc24e..82847556fa 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 @@ -30,6 +30,8 @@
@@ -34014,7 +34014,7 @@ index a6ac0cc24e..11ac8477e4 100644
    pinned_tabs_scroll_view_ = AddChildView(std::make_unique<views::ScrollView>(
        views::ScrollView::ScrollWithLayers::kEnabled));
    SetScrollViewProperties(pinned_tabs_scroll_view_);
-+  if (IsVerticalOrientation(collection_node_) &&
++  if (orientation_ == TabStripOrientation::kVertical &&
 +      yee::UsesExpandedSidebarPresentation()) {
 +    pinned_tabs_scroll_view_->SetID(yee::kSidebarFavoritesDockViewId);
 +  }
@@ -34025,10 +34025,10 @@ index a6ac0cc24e..11ac8477e4 100644
      tab_scroll_button_container_->SetScrollView(unpinned_tabs_scroll_view_);
    }
  
-+  if (IsVerticalOrientation(collection_node_) &&
++  if (orientation_ == TabStripOrientation::kVertical &&
 +      yee::UsesExpandedSidebarPresentation()) {
 +    AddChildView(yee::CreateFavoritesDropZone());
-+  } else if (IsVerticalOrientation(collection_node_) &&
++  } else if (orientation_ == TabStripOrientation::kVertical &&
 +             !yee::UsesExpandedSidebarPresentation()) {
 +    auto favorites_label = std::make_unique<views::Label>(u"FAVORITES");
 +    favorites_label->SetID(yee::kSidebarFavoritesLabelViewId);
