@@ -7,7 +7,6 @@
 #include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
-#include "base/test/scoped_feature_list.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
 #include "chrome/browser/profiles/profile.h"
@@ -17,7 +16,6 @@
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
-#include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
@@ -75,12 +73,10 @@ base::ScopedClosureRunner MakeProfileOmittable(ProfileAttributesEntry &entry) {
 }
 
 class SidebarFooterBrowserTest : public InProcessBrowserTest {
-public:
-  SidebarFooterBrowserTest() {
-    features_.InitAndEnableFeature(tabs::kVerticalTabs);
-  }
+ public:
+  SidebarFooterBrowserTest() = default;
 
-protected:
+ protected:
   void PrepareCurrentProfile() {
     browser()->GetProfile()->GetPrefs()->SetString(prefs::kProfileName,
                                                    "테스트용");
@@ -124,9 +120,6 @@ protected:
     }
     return GetSidebarFooterMenuForTesting(*footer);
   }
-
-private:
-  base::test::ScopedFeatureList features_;
 };
 
 // 같은 프로필의 기존·새 창과 종료 뒤 설정 변경을 실제 native Footer에서
