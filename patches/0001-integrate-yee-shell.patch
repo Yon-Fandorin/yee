@@ -20409,7 +20409,7 @@ index 460c40a7c5..1c50365f45 100644
    raw_ptr<views::FlexLayout> flex_layout_manager_;
  };
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index a756f076ff..a5de253e3a 100644
+index a756f076ff..3c75701e59 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -8,6 +8,7 @@
@@ -20695,8 +20695,8 @@ index a756f076ff..a5de253e3a 100644
  // interior margins instead of a custom layout once this bug is resolved.
 +yee::CurrentPaneGeometryInput MultiContentsView::BuildCurrentPaneGeometryInput(
 +    const gfx::Size& size,
-+    std::vector<views::ChildLayout>* supporting_layouts) const {
-+  std::vector<views::ChildLayout> ignored_layouts;
++    views::ProposedLayout::ChildLayoutList* supporting_layouts) const {
++  views::ProposedLayout::ChildLayoutList ignored_layouts;
 +  auto& child_layouts =
 +      supporting_layouts ? *supporting_layouts : ignored_layouts;
 +
@@ -20776,7 +20776,7 @@ index a756f076ff..a5de253e3a 100644
 +
 +yee::CurrentPaneGeometry MultiContentsView::CalculateCurrentPaneGeometry(
 +    const gfx::Size& size,
-+    std::vector<views::ChildLayout>* supporting_layouts) const {
++    views::ProposedLayout::ChildLayoutList* supporting_layouts) const {
 +  return yee::ComputeCurrentPaneGeometry(
 +      BuildCurrentPaneGeometryInput(size, supporting_layouts));
 +}
@@ -20972,7 +20972,7 @@ index a756f076ff..a5de253e3a 100644
          is_in_split, is_active, is_active && active_contents_view_highlighted_);
    }
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
-index e39f000c2a..788d528f47 100644
+index e39f000c2a..35e8345662 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.h
 @@ -5,6 +5,7 @@
@@ -21088,10 +21088,10 @@ index e39f000c2a..788d528f47 100644
  
 +  yee::CurrentPaneGeometryInput BuildCurrentPaneGeometryInput(
 +      const gfx::Size& size,
-+      std::vector<views::ChildLayout>* supporting_layouts) const;
++      views::ProposedLayout::ChildLayoutList* supporting_layouts) const;
 +  yee::CurrentPaneGeometry CalculateCurrentPaneGeometry(
 +      const gfx::Size& size,
-+      std::vector<views::ChildLayout>* supporting_layouts) const;
++      views::ProposedLayout::ChildLayoutList* supporting_layouts) const;
 +  void OnContentsPaneMapChanged();
 +  void ApplyPreparedExternalInfoBarFlow();
 +
