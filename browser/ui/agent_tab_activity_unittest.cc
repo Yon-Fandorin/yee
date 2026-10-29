@@ -12,13 +12,19 @@ namespace {
 TEST(AgentTabActivityTest, KeepsAgentStateOutOfBrowserMediaSignals) {
   EXPECT_EQ(AgentTabActivity::kNone, ResolveAgentTabActivity(std::nullopt));
   EXPECT_EQ(AgentTabActivity::kNone,
+            ResolveAgentTabActivity(tabs::TabAlert::kNone));
+  EXPECT_EQ(AgentTabActivity::kNone,
             ResolveAgentTabActivity(tabs::TabAlert::kAudioPlaying));
   EXPECT_EQ(AgentTabActivity::kWorking,
             ResolveAgentTabActivity(tabs::TabAlert::kActorAccessing));
+  EXPECT_EQ(AgentTabActivity::kWorking,
+            ResolveAgentTabActivity(tabs::TabAlert::kGlicAccessing));
   EXPECT_EQ(AgentTabActivity::kNeedsInput,
             ResolveAgentTabActivity(tabs::TabAlert::kActorWaitingOnUser));
   EXPECT_EQ(AgentTabActivity::kNone,
             ResolveAgentTabActivity(tabs::TabAlert::kGlicSharing));
+  EXPECT_EQ(AgentTabActivity::kNone,
+            ResolveAgentTabActivity(tabs::TabAlert::kAiModeSharing));
   EXPECT_EQ(AgentTabActivity::kNone,
             ResolveAgentTabActivity(tabs::TabAlert::kDesktopCapturing));
 }

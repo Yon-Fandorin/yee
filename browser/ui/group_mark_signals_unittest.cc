@@ -28,11 +28,13 @@ TEST(GroupMarkSignalsTest, SeparatesBrowserMediaFromAgentState) {
            tabs::TabAlert::kActorAccessing,
            tabs::TabAlert::kGlicAccessing,
            tabs::TabAlert::kGlicSharing,
+           tabs::TabAlert::kAiModeSharing,
        }) {
     EXPECT_EQ(ClassifyTabAlert(alert), TabAlertKind::kAgentAccessing);
   }
 
   for (tabs::TabAlert alert : {
+           tabs::TabAlert::kNone,
            tabs::TabAlert::kAudioMuting,
            tabs::TabAlert::kBluetoothConnected,
            tabs::TabAlert::kBluetoothScanActive,

@@ -16,7 +16,9 @@ AgentTabActivity ResolveAgentTabActivity(std::optional<tabs::TabAlert> alert) {
     case tabs::TabAlert::kActorAccessing:
     case tabs::TabAlert::kGlicAccessing:
       return AgentTabActivity::kWorking;
+    case tabs::TabAlert::kNone:
     case tabs::TabAlert::kGlicSharing:
+    case tabs::TabAlert::kAiModeSharing:
     case tabs::TabAlert::kAudioPlaying:
     case tabs::TabAlert::kAudioMuting:
     case tabs::TabAlert::kMediaRecording:

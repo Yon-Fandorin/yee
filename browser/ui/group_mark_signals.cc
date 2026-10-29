@@ -26,7 +26,9 @@ TabAlertKind ClassifyTabAlert(tabs::TabAlert alert) {
     case tabs::TabAlert::kActorAccessing:
     case tabs::TabAlert::kGlicAccessing:
     case tabs::TabAlert::kGlicSharing:
+    case tabs::TabAlert::kAiModeSharing:
       return TabAlertKind::kAgentAccessing;
+    case tabs::TabAlert::kNone:
     case tabs::TabAlert::kAudioMuting:
     case tabs::TabAlert::kBluetoothConnected:
     case tabs::TabAlert::kBluetoothScanActive:
