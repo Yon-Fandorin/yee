@@ -40120,6 +40120,40 @@ index 3f395c2fe6..37a8c10289 100644
  }
  }  // namespace
  
+diff --git a/content/renderer/service_worker/service_worker_provider_context_unittest.cc b/content/renderer/service_worker/service_worker_provider_context_unittest.cc
+index 6cc39a02c6..c2c588667c 100644
+--- a/content/renderer/service_worker/service_worker_provider_context_unittest.cc
++++ b/content/renderer/service_worker/service_worker_provider_context_unittest.cc
+@@ -10,6 +10,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "base/check.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/notimplemented.h"
+@@ -20,6 +21,7 @@
+ #include "content/renderer/service_worker/controller_service_worker_connector.h"
+ #include "content/renderer/service_worker/web_service_worker_provider_impl.h"
+ #include "mojo/public/cpp/bindings/associated_receiver_set.h"
++#include "mojo/public/cpp/bindings/pending_remote.h"
+ #include "mojo/public/cpp/bindings/receiver.h"
+ #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
+ #include "services/network/public/cpp/shared_url_loader_factory.h"
+@@ -332,6 +334,13 @@ class FakeServiceWorkerContainerHost
+       override {
+     receivers_.Add(this, std::move(receiver));
+   }
++  void WrapSubresourceLoaderFactory(
++      mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
++      mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream)
++      override {
++    // 기존 컨트롤러와 네트워크 대체 경로까지 요청이 도달하도록 연결한다.
++    CHECK(mojo::FusePipes(std::move(receiver), std::move(downstream)));
++  }
+   void HintToUpdateServiceWorker() override { NOTIMPLEMENTED(); }
+   void EnsureFileAccess(const std::vector<base::FilePath>& files,
+                         EnsureFileAccessCallback callback) override {
 diff --git a/extensions/common/api/_api_features.json b/extensions/common/api/_api_features.json
 index bff2cbf3d5..51bb66e29a 100644
 --- a/extensions/common/api/_api_features.json
