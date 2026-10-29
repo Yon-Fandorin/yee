@@ -809,11 +809,23 @@ index f2a3fe25fe..dd58cefa24 100644
      }
    }
  
+diff --git a/chrome/browser/glic/selection/BUILD.gn b/chrome/browser/glic/selection/BUILD.gn
+index 548eefc04c..7281900f94 100644
+--- a/chrome/browser/glic/selection/BUILD.gn
++++ b/chrome/browser/glic/selection/BUILD.gn
+@@ -135,6 +135,7 @@ source_set("browser_tests") {
+     "//chrome/browser/optimization_guide",
+     "//chrome/browser/search_engines",
+     "//chrome/browser/ui:browser_element_identifiers",
++    "//chrome/browser/ui/views/frame:browser_view_header",
+     "//chrome/common:constants",
+     "//chrome/test:test_interfaces",
+     "//chrome/test:test_support",
 diff --git a/chrome/browser/glic/selection/selection_overlay_browsertest.cc b/chrome/browser/glic/selection/selection_overlay_browsertest.cc
-index ad87bc1112..609e6cda09 100644
+index ad87bc1112..cdce0b2288 100644
 --- a/chrome/browser/glic/selection/selection_overlay_browsertest.cc
 +++ b/chrome/browser/glic/selection/selection_overlay_browsertest.cc
-@@ -22,6 +22,11 @@
+@@ -22,6 +22,12 @@
  #include "chrome/browser/selection/features.h"
  #include "chrome/browser/selection/mojom/action.mojom.h"
  #include "chrome/browser/selection/suggestion_service.h"
@@ -822,10 +834,11 @@ index ad87bc1112..609e6cda09 100644
 +#include "chrome/browser/ui/tabs/tab_strip_model.h"
 +#include "chrome/browser/ui/views/frame/browser_view.h"
 +#include "chrome/browser/ui/views/frame/contents_container_view.h"
++#include "chrome/browser/ui/views/frame/contents_web_view.h"
  #include "chrome/common/chrome_features.h"
  #include "chrome/test/base/search_test_utils.h"
  #include "chrome/test/mojom/echo.test-mojom.h"
-@@ -31,6 +36,7 @@
+@@ -31,6 +37,7 @@
  #include "components/search_engines/template_url.h"
  #include "components/search_engines/template_url_data.h"
  #include "components/search_engines/template_url_service.h"
@@ -833,7 +846,7 @@ index ad87bc1112..609e6cda09 100644
  #include "components/tabs/public/tab_interface.h"
  #include "content/public/browser/web_contents.h"
  #include "content/public/test/browser_test.h"
-@@ -43,6 +49,7 @@
+@@ -43,6 +50,7 @@
  #include "mojo/public/cpp/test_support/test_utils.h"
  #include "testing/gtest/include/gtest/gtest.h"
  #include "ui/gfx/geometry/rect.h"
@@ -841,7 +854,7 @@ index ad87bc1112..609e6cda09 100644
  
  namespace glic {
  
-@@ -1349,4 +1356,75 @@ IN_PROC_BROWSER_TEST_F(ExplainSuggestionBrowserTest, AskGeminiOpensGlic) {
+@@ -1349,4 +1357,75 @@ IN_PROC_BROWSER_TEST_F(ExplainSuggestionBrowserTest, AskGeminiOpensGlic) {
              SelectionOverlayController::State::kOff);
  }
  
