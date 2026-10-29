@@ -11,7 +11,6 @@
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/download/download_item_model.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -151,9 +150,8 @@ IN_PROC_BROWSER_TEST_F(DownloadsBrowserTest, NativeListSearchRemoveAndUndo) {
   }
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL("chrome://downloads/")));
-  EXPECT_EQ(
-      u"chrome://downloads",
-      browser()->GetFeatures().location_bar_model()->GetFormattedFullURL());
+  EXPECT_EQ(u"chrome://downloads",
+            LocationBarModel::From(browser())->GetFormattedFullURL());
   EXPECT_EQ(true,
             content::EvalJs(Contents(),
                             "!!document.querySelector('downloads-manager')"));

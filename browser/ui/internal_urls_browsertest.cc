@@ -12,7 +12,6 @@
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/profiles/profile_io_data.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/startup/url_util.h"
@@ -57,7 +56,7 @@ class InternalURLsBrowserTest : public InProcessBrowserTest {
   }
 
   std::u16string Address() {
-    return browser()->GetFeatures().location_bar_model()->GetFormattedFullURL();
+    return LocationBarModel::From(browser())->GetFormattedFullURL();
   }
 };
 

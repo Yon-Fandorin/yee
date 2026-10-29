@@ -8,7 +8,6 @@
 #include "base/time/time.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -145,9 +144,8 @@ IN_PROC_BROWSER_TEST_F(HistoryBrowserTest,
                 "document.querySelector('.history-row .title').textContent"));
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL("chrome://history/")));
-  EXPECT_EQ(
-      u"chrome://history",
-      browser()->GetFeatures().location_bar_model()->GetFormattedFullURL());
+  EXPECT_EQ(u"chrome://history",
+            LocationBarModel::From(browser())->GetFormattedFullURL());
   EXPECT_EQ(true, content::EvalJs(Contents(),
                                   "!!document.querySelector('history-app')"));
   EXPECT_EQ(1, content::EvalJs(Contents(), R"JS(
