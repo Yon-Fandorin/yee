@@ -27229,10 +27229,10 @@ index 38f701cf11..fbf820a7c8 100644
        // Set the request time to now when the popup is first shown. This ensures
        // that latency is measured from the user interaction to show, even if the
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-index 2d16070cf4..12e1298338 100644
+index 2d16070cf4..f6caeaac63 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-@@ -24,7 +24,9 @@
+@@ -24,9 +24,12 @@
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/omnibox/full_webui_omnibox_frame.h"
@@ -27241,8 +27241,11 @@ index 2d16070cf4..12e1298338 100644
 +#include "chrome/browser/ui/views/omnibox/omnibox_popup_aim_presenter.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_popup_full_presenter.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_delegate.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h"
-@@ -36,6 +38,7 @@
+ #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_content.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
+@@ -36,6 +39,7 @@
  #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
  #include "chrome/browser/ui/webui/searchbox/webui_omnibox_handler.h"
  #include "chrome/test/base/in_process_browser_test.h"
@@ -27250,7 +27253,7 @@ index 2d16070cf4..12e1298338 100644
  #include "chrome/test/base/ui_test_utils.h"
  #include "chrome/test/permissions/permission_request_manager_test_api.h"
  #include "components/omnibox/browser/autocomplete_result.h"
-@@ -52,6 +55,7 @@
+@@ -52,6 +56,7 @@
  #include "content/public/test/browser_test.h"
  #include "content/public/test/browser_test_utils.h"
  #include "ui/base/interaction/expect_call_in_scope.h"
@@ -27258,7 +27261,7 @@ index 2d16070cf4..12e1298338 100644
  #include "ui/native_theme/mock_os_settings_provider.h"
  #include "ui/views/controls/webview/webview.h"
  #include "ui/views/test/widget_activation_waiter.h"
-@@ -156,8 +160,11 @@ OmniboxPopupViewWebUITest::ThemeChangeWaiter::~ThemeChangeWaiter() {
+@@ -156,8 +161,11 @@ OmniboxPopupViewWebUITest::ThemeChangeWaiter::~ThemeChangeWaiter() {
  
  void OmniboxPopupViewWebUITest::CreatePopupForTestQuery() {
    auto* autocomplete_controller = controller()->autocomplete_controller();
@@ -27272,7 +27275,7 @@ index 2d16070cf4..12e1298338 100644
  
    // Verify that the popup state manager callback is called when popup opens.
    UNCALLED_MOCK_CALLBACK(
-@@ -208,8 +215,6 @@ void OmniboxPopupViewWebUITest::SetUp() {
+@@ -208,8 +216,6 @@ void OmniboxPopupViewWebUITest::SetUp() {
    InProcessBrowserTest::SetUp();
  }
  
@@ -27281,7 +27284,7 @@ index 2d16070cf4..12e1298338 100644
  // Check that the location bar background (and the background of the textfield
  // it contains) changes when it receives focus, and matches the popup background
  // color.
-@@ -260,6 +265,166 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
+@@ -260,6 +266,168 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
    popup_view->presenter()->Hide();
  }
  
@@ -27295,7 +27298,9 @@ index 2d16070cf4..12e1298338 100644
 +#endif
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  ASSERT_TRUE(location_bar()->IsCompactShellMode());
-+  auto* const presenter = location_bar()->GetOmniboxPopupAimPresenter();
++  auto* const presenter_delegate = location_bar()->GetPresenterDelegate();
++  ASSERT_TRUE(presenter_delegate);
++  auto* const presenter = presenter_delegate->GetOmniboxPopupAimPresenter();
 +  ASSERT_TRUE(presenter);
 +  controller()->StopAutocomplete(/*clear_result=*/true);
 +  auto* const state = controller()->popup_state_manager();
@@ -27448,7 +27453,7 @@ index 2d16070cf4..12e1298338 100644
  class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
   public:
    OmniboxPopupViewWebUIFullV2Test() {
-@@ -278,6 +443,110 @@ class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
+@@ -278,6 +446,112 @@ class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
    base::test::ScopedFeatureList feature_list_full_v2_;
  };
  
@@ -27474,7 +27479,9 @@ index 2d16070cf4..12e1298338 100644
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  ASSERT_TRUE(location_bar()->IsCompactShellMode());
 +  controller()->StopAutocomplete(/*clear_result=*/true);
-+  auto* const presenter = location_bar()->GetOmniboxPopupAimPresenter();
++  auto* const presenter_delegate = location_bar()->GetPresenterDelegate();
++  ASSERT_TRUE(presenter_delegate);
++  auto* const presenter = presenter_delegate->GetOmniboxPopupAimPresenter();
 +  ASSERT_TRUE(presenter);
 +  ASSERT_EQ(GetParam(), presenter->ShouldDrawShadowInWebUI());
 +  auto* const state = controller()->popup_state_manager();
