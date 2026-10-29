@@ -12,9 +12,9 @@ Settings/Profile 구조를 복제하지 않는다.
 
 펼친 Sidebar의 맨 아래에 다음 정보를 한 행으로 표시한다.
 
-- 주 정보: 현재 Workspace
+- 주 정보: 현재 Workspace; 로컬 context에서는 현재 Chromium 프로필 이름
 - 보조 정보: `Tenant · Account`; 로컬 context는 중복되는 Tenant 없이 Account만 표시
-- 선행 mark: 현재 Workspace의 짧은 표식
+- 선행 mark: 현재 주 정보의 첫 코드 포인트 표식
 - 후행 정보: 펼침 표시
 
 행 전체가 하나의 버튼이다. 내부 펼침 표시는 별도 hit target이 아니다.
@@ -59,7 +59,9 @@ Footer row
 - 하위 화면의 Back과 `Escape`는 바로 위 화면으로 돌아간다.
 - Root에서 `Escape`는 메뉴를 닫고 trigger로 keyboard traversal focus를 복원한다.
   trigger 재클릭과 외부 클릭은 메뉴를 닫되 포인터가 선택한 새 focus를 유지한다.
-- Context를 선택하면 Footer 표시를 먼저 갱신하고 메뉴를 닫는다.
+- Context를 선택하면 메뉴를 닫고 provider에 전환을 요청한다. Footer의 현재 이름과
+  선택 표시는 provider가 전달한 모델로만 갱신한다. 다른 프로필 창을 열어도 원래
+  창의 이름이나 탭을 바꾸지 않는다.
 - Browser tools는 임의 URL이나 새 WebContents를 만들지 않고 기존 Chromium
   page/command를 제한된 action callback으로 호출한다. 공개 action enum에는 위의
   다섯 shortcut만 존재하며 범용 Settings/Profile 목적지는 추가하지 않는다.
@@ -77,17 +79,25 @@ Footer 메뉴의 `BubbleDialogDelegate`와 Widget은 Yee의 단일 lifetime owne
 제거한다. 정상 닫기와 네이티브 창 종료 모두에서 browser anchor 관찰을 먼저
 해제해, 테마 변경이 닫힌 bubble에 전달되지 않게 한다.
 
-Tenant provider가 아직 연결되지 않은 native 체크포인트는 Chromium Profile에서
-얻은 Account와 `Local / Personal` 단일 context를 안전한 fallback으로 표시한다.
-이는 샘플 조직이 아니며 전환 가능한 원격 Tenant가 있다는 뜻도 아니다. Footer
-component는 처음부터 여러 context를 받는 model 경계를 유지한다. 이 fallback에서
-실제 provider가 필요한 context 관리와 로그아웃 action은 숨기고, Workspace Memory는
-연결되지 않은 상태로 비활성 표시한다. 임시 UI 상태를 실제 account나 memory 상태인
-것처럼 저장하지 않는다. Memory를 변경할 수 있는 provider가 연결되면 View 내부
-상태에 머물지 않고 별도 callback으로 변경 결과를 product model에 전달한다.
-Chromium Profile에서 실제 표시 이름을 얻지 못해 `Local profile` placeholder를 쓰는
-경우에도 푸터 보조 문구만 사용하고 `LP` 같은 가짜 이니셜이나 별도 profile mark를
-만들지 않는다.
+Tenant provider가 아직 연결되지 않은 native 체크포인트는 Chromium `AvatarMenu`의
+실제 로컬 프로필을 작업공간 선택 목록으로 표시한다. 목록·정렬·숨김·이름과 계정
+변경·프로필 전환은 Chromium이 소유한다. 프로필 이름이 주 정보이며 계정이 없으면
+보조 문구는 `Local profile`이다. 이름이 비어 있으면 주 정보도 `Local profile`을
+사용한다. 서로 다른 user-data-dir의 프로필은 Chromium에서 별도 목록으로 관리한다.
+
+현재 창의 프로필을 체크로 표시한다. 현재 프로필이 native 목록에 없으면 실제
+현재 프로필을 별도 행으로 표시하며 다른 native 전환 대상도 유지한다.
+다른 항목을 선택하면 Chromium의 기존
+전환 명령으로 해당 프로필 창을 열거나 기존 창을 활성화한다. 원래 창의 context는
+유지한다. 이름·목록이 바뀌면 열린 메뉴를 닫고 현재 창의 제목·mark·접근성 이름을
+갱신한다. 닫히는 메뉴의 이전 index가 새 목록의 다른 프로필을 열지 않게 모델
+세대를 확인한다. 창 종료 때 native 목록 관찰을 해제한다.
+
+이는 원격 Tenant 목록이 아니다. 실제 provider가 필요한 context 관리·로그아웃
+행은 숨기고 Workspace Memory도 연결되지 않은 상태로 비활성 표시한다. 임시 UI
+상태를 실제 account나 memory 상태인 것처럼 저장하지 않는다. Memory provider가
+연결되면 변경 결과를 별도 callback으로 전달한다. `LP` 같은 placeholder mark를
+추가하지 않으며 로컬 프로필 이름은 현재 주 정보와 mark에만 반영한다.
 
 ## 시각 계약
 

@@ -41,6 +41,7 @@
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
+#include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 
@@ -57,24 +58,26 @@ gfx::Insets FooterSurfaceInsetsForTesting() {
 
 TEST(SidebarFooterPolicyTest, LocalFallbackDoesNotInventRemoteTenant) {
   const SidebarFooterModel model =
-      CreateLocalSidebarFooterModel(u"Yongjun Kim");
+      CreateLocalSidebarFooterModel(u"테스트용", u"Yongjun Kim");
 
   ASSERT_EQ(model.contexts.size(), 1u);
   EXPECT_EQ(model.selected_context_index, 0u);
   EXPECT_EQ(model.contexts[0].tenant_name,
             l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL));
   EXPECT_TRUE(model.contexts[0].is_local_context);
-  EXPECT_EQ(model.contexts[0].workspace_name,
-            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_PERSONAL));
+  EXPECT_EQ(model.contexts[0].workspace_name, u"테스트용");
   EXPECT_EQ(model.contexts[0].account_name, u"Yongjun Kim");
   EXPECT_FALSE(model.contexts[0].account_name_is_placeholder);
   EXPECT_FALSE(model.memory_available);
 
-  const SidebarFooterModel empty_account = CreateLocalSidebarFooterModel({});
+  const SidebarFooterModel empty_account =
+      CreateLocalSidebarFooterModel({}, {});
   ASSERT_EQ(empty_account.contexts.size(), 1u);
   EXPECT_EQ(empty_account.contexts[0].account_name,
             l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
   EXPECT_TRUE(empty_account.contexts[0].account_name_is_placeholder);
+  EXPECT_EQ(empty_account.contexts[0].workspace_name,
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
 }
 
 class SidebarFooterViewTest : public ChromeViewsTestBase {
@@ -84,7 +87,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     widget_ = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
     widget_->SetBounds(gfx::Rect(0, 0, 240, 50));
     footer_ = widget_->SetContentsView(CreateSidebarFooterView(
-        CreateLocalSidebarFooterModel(u"Yongjun Kim"),
+        CreateLocalSidebarFooterModel(u"테스트용", u"Yongjun Kim"),
         SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
         SidebarMemoryChangedCallback(),
         base::BindRepeating(
@@ -197,6 +200,39 @@ TEST_F(SidebarFooterViewTest, BubbleUsesContentWidthAndTracksAnchorPosition) {
     expected_anchor.Offset(0, -kSidebarMetrics.sidebar_footer_menu_gap);
     EXPECT_EQ(bubble_delegate->GetAnchorRect(), expected_anchor);
   }
+}
+
+TEST_F(SidebarFooterViewTest, LocalProfileRenameUpdatesIdentityAndMenu) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  ASSERT_TRUE(OpenBubble());
+  SetSidebarFooterModel(
+      *footer_, CreateLocalSidebarFooterModel(u"개인 & 검수", u"Yongjun Kim"));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  auto* const trigger = static_cast<HoverButton*>(footer_.get());
+  EXPECT_EQ(trigger->title()->GetText(), u"개인 & 검수");
+  auto* const mark = static_cast<views::Label*>(
+      footer_->GetViewByID(kSidebarFooterWorkspaceMarkViewId));
+  ASSERT_TRUE(mark);
+  EXPECT_EQ(mark->GetText(), u"개");
+  EXPECT_NE(
+      footer_->GetViewAccessibility().GetCachedName().find(u"개인 & 검수"),
+      std::u16string::npos);
+  EXPECT_NE(
+      footer_->GetViewAccessibility().GetCachedName().find(u"Yongjun Kim"),
+      std::u16string::npos);
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+  ASSERT_EQ(menu->children().size(), 3u);
+  EXPECT_EQ(static_cast<HoverButton*>(menu->children()[2])->title()->GetText(),
+            u"개인 & 검수");
+  SetSidebarFooterModel(*footer_,
+                        CreateLocalSidebarFooterModel({}, u"Yongjun Kim"));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(trigger->title()->GetText(),
+            l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
 }
 
 TEST_F(SidebarFooterViewTest, CompactMenuKeepsActionTitlesVisible) {
@@ -343,7 +379,8 @@ TEST_F(SidebarFooterViewTest, LongNamesKeepThePopupBoundedAndAccessible) {
   auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
       gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   footer_ = nullptr;
-  auto model = CreateLocalSidebarFooterModel(std::u16string(120, u'a'));
+  auto model =
+      CreateLocalSidebarFooterModel(u"테스트용", std::u16string(120, u'a'));
   model.contexts[0].workspace_name = std::u16string(160, u'W');
   const std::u16string workspace_name = model.contexts[0].workspace_name;
   footer_ = widget()->SetContentsView(CreateSidebarFooterView(
@@ -500,7 +537,7 @@ TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {
       {.workspace_name = u"Workspace"},
       {.workspace_name = u"Personal", .account_name = u"Account"}};
   footer_ = widget()->SetContentsView(CreateSidebarFooterView(
-      std::move(model), SidebarContextSelectedCallback(),
+      model, SidebarContextSelectedCallback(),
       SidebarFooterBrowserActionCallback(), SidebarMemoryChangedCallback()));
   auto* trigger = static_cast<HoverButton*>(footer_.get());
   views::View* const labels = trigger->title()->parent();
@@ -515,6 +552,9 @@ TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {
     Click(menu->children()[2 + index]);
     base::RunLoop().RunUntilIdle();
     EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+    // 전환이 완료됐다는 provider 모델이 현재 context를 결정한다.
+    model.selected_context_index = index;
+    SetSidebarFooterModel(*footer_, model);
     EXPECT_EQ(index == 1u, account->GetVisible());
     EXPECT_EQ(index == 1u ? u"Account" : u"", account->GetText());
 
@@ -530,6 +570,52 @@ TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {
     EXPECT_EQ(index == 1u, name.find(u"Account") != std::u16string::npos);
     footer_->SetBoundsRect(gfx::Rect(0, 0, 240, 50));
   }
+}
+
+// 다른 프로필을 열어도 원래 창은 기존 프로필을 표시한다.
+TEST_F(SidebarFooterViewTest, SelectionRequestsDoNotChangeSourceIdentity) {
+  auto disable_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  footer_ = nullptr;
+  SidebarFooterModel model;
+  model.contexts = {{.workspace_name = u"테스트용", .is_local_context = true},
+                    {.workspace_name = u"개인", .is_local_context = true}};
+  std::optional<size_t> requested;
+  footer_ = widget()->SetContentsView(CreateSidebarFooterView(
+      model,
+      base::BindRepeating(
+          [](std::optional<size_t>* result, size_t index) { *result = index; },
+          &requested),
+      SidebarFooterBrowserActionCallback(), SidebarMemoryChangedCallback()));
+  views::View* menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+  Click(menu->children()[3]);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(requested, 1u);
+  EXPECT_EQ(static_cast<HoverButton*>(footer_.get())->title()->GetText(),
+            u"테스트용");
+  menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
+  ui::AXNodeData data;
+  menu->children()[2]->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_TRUE(data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
+
+  // 목록이 바뀐 뒤 닫히는 중인 이전 메뉴의 index를 재사용하지 않는다.
+  views::ViewTracker previous_row(menu->children()[3]);
+  requested.reset();
+  model.contexts = {{.workspace_name = u"남은 프로필"},
+                    {.workspace_name = u"새 프로필"}};
+  SetSidebarFooterModel(*footer_, model);
+  if (previous_row.view()) {
+    Click(previous_row.view());
+  }
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(requested.has_value());
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_EQ(static_cast<HoverButton*>(footer_.get())->title()->GetText(),
+            u"남은 프로필");
 }
 
 TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
@@ -556,7 +642,7 @@ TEST_F(SidebarFooterViewTest,
   footer_ = nullptr;
   auto root = std::make_unique<views::View>();
   footer_ = root->AddChildView(CreateSidebarFooterView(
-      CreateLocalSidebarFooterModel(u"Yongjun Kim"),
+      CreateLocalSidebarFooterModel(u"테스트용", u"Yongjun Kim"),
       SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
       SidebarMemoryChangedCallback()));
   views::View* const focus_target =
@@ -653,7 +739,7 @@ TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
   auto root = std::make_unique<views::View>();
   views::View* const container = root.get();
   footer_ = root->AddChildView(CreateSidebarFooterView(
-      CreateLocalSidebarFooterModel(u"Account"),
+      CreateLocalSidebarFooterModel(u"테스트용", u"Account"),
       SidebarContextSelectedCallback(), SidebarFooterBrowserActionCallback(),
       SidebarMemoryChangedCallback()));
   views::View* const focus_target =
@@ -765,7 +851,7 @@ TEST_F(SidebarFooterViewTest, BrowserToolsDispatchOnlyCuratedActions) {
   CloseBubble();
   footer_ = nullptr;
   footer_ = widget()->SetContentsView(CreateSidebarFooterView(
-      CreateLocalSidebarFooterModel(u"Yongjun Kim"),
+      CreateLocalSidebarFooterModel(u"테스트용", u"Yongjun Kim"),
       SidebarContextSelectedCallback(),
       base::BindRepeating(
           [](std::vector<SidebarFooterBrowserAction>* actions,
@@ -804,7 +890,7 @@ TEST_F(SidebarFooterViewTest, MemoryChangeLeavesTheViewThroughCallback) {
   footer_ = widget()->SetContentsView(CreateSidebarFooterView(
       [] {
         SidebarFooterModel model =
-            CreateLocalSidebarFooterModel(u"Yongjun Kim");
+            CreateLocalSidebarFooterModel(u"테스트용", u"Yongjun Kim");
         model.memory_available = true;
         return model;
       }(),

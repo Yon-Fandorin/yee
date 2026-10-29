@@ -117,11 +117,17 @@ enum class MenuIconTone {
 
 SidebarFooterModel NormalizeModel(SidebarFooterModel model) {
   if (model.contexts.empty()) {
-    model = CreateLocalSidebarFooterModel({});
+    model = CreateLocalSidebarFooterModel({}, {});
   }
   model.selected_context_index =
       std::min(model.selected_context_index, model.contexts.size() - 1);
   return model;
+}
+
+std::u16string LocalProfileDisplayName(std::u16string profile_name) {
+  return profile_name.empty()
+             ? l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE)
+             : std::move(profile_name);
 }
 
 const SidebarContextItem& SelectedContext(const SidebarFooterModel& model) {
@@ -866,12 +872,13 @@ class YeeSidebarFooterMenuView : public views::View,
 
   void SelectContext(size_t context_index) {
     CHECK_LT(context_index, model_.contexts.size());
-    model_.selected_context_index = context_index;
-    if (select_context_callback_) {
-      select_context_callback_.Run(context_index);
-    }
+    auto callback = select_context_callback_;
     if (GetWidget()) {
       GetWidget()->Close();
+    }
+    // callback이 모델이나 창을 바꿀 수 있으므로 닫은 뒤 마지막에 실행한다.
+    if (callback) {
+      callback.Run(context_index);
     }
   }
 
@@ -999,6 +1006,13 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   YeeSidebarFooterView(const YeeSidebarFooterView&) = delete;
   YeeSidebarFooterView& operator=(const YeeSidebarFooterView&) = delete;
   ~YeeSidebarFooterView() override = default;
+
+  void SetModel(SidebarFooterModel model) {
+    ++model_revision_;
+    CloseBubble();
+    model_ = NormalizeModel(std::move(model));
+    UpdateIdentity();
+  }
 
   void SetFooterVisible(bool visible) {
     if (!visible) {
@@ -1157,7 +1171,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
     auto menu = std::make_unique<YeeSidebarFooterMenuView>(
         bubble_delegate.get(), model_,
         base::BindRepeating(&YeeSidebarFooterView::SelectContext,
-                            weak_factory_.GetWeakPtr()),
+                            weak_factory_.GetWeakPtr(), model_revision_),
         browser_action_callback_, memory_changed_callback_);
     auto* const menu_view = menu.get();
     bubble_tracker_.SetView(menu_view);
@@ -1252,12 +1266,15 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   }
 #endif
 
-  void SelectContext(size_t context_index) {
-    CHECK_LT(context_index, model_.contexts.size());
-    model_.selected_context_index = context_index;
-    UpdateIdentity();
-    if (context_callback_) {
-      context_callback_.Run(context_index);
+  void SelectContext(size_t revision, size_t context_index) {
+    // 닫히는 중인 메뉴가 새 목록의 같은 index를 다른 프로필로 해석하지 않는다.
+    if (revision != model_revision_ ||
+        context_index >= model_.contexts.size()) {
+      return;
+    }
+    auto callback = context_callback_;
+    if (callback) {
+      callback.Run(context_index);
     }
   }
 
@@ -1337,6 +1354,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   }
 
   SidebarFooterModel model_;
+  size_t model_revision_ = 0;
   SidebarContextSelectedCallback context_callback_;
   SidebarFooterBrowserActionCallback browser_action_callback_;
   SidebarMemoryChangedCallback memory_changed_callback_;
@@ -1360,7 +1378,8 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
 
 }  // namespace
 
-SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string account_name) {
+SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string profile_name,
+                                                 std::u16string account_name) {
   const bool account_name_is_placeholder = account_name.empty();
   if (account_name_is_placeholder) {
     account_name =
@@ -1369,8 +1388,7 @@ SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string account_name) {
   SidebarFooterModel model;
   model.contexts.push_back(
       {.tenant_name = l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL),
-       .workspace_name =
-           l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_PERSONAL),
+       .workspace_name = LocalProfileDisplayName(std::move(profile_name)),
        .account_name = std::move(account_name),
        .account_name_is_placeholder = account_name_is_placeholder,
        .is_local_context = true});
@@ -1387,6 +1405,11 @@ std::unique_ptr<views::View> CreateSidebarFooterView(
       NormalizeModel(std::move(model)), std::move(context_selected_callback),
       std::move(browser_action_callback), std::move(memory_changed_callback),
       std::move(acquire_popup_lock));
+}
+
+void SetSidebarFooterModel(views::View& view, SidebarFooterModel model) {
+  CHECK_EQ(view.GetID(), kSidebarFooterViewId);
+  static_cast<YeeSidebarFooterView&>(view).SetModel(std::move(model));
 }
 
 void SetSidebarFooterVisible(views::View& view, bool visible) {

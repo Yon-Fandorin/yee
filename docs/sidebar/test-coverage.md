@@ -64,7 +64,17 @@ Footer·Create에 키보드 focus가 있어도 종료 통지 뒤 hover로 인계
 focus와 잠금을 해제하면 페이지 폭을 바꾸지 않고 숨겨야 한다.
 실제 애니메이션과 애니메이션 생략 경로를 기존 두 검사 안에서 각각 검증한다.
 
-`SidebarFooterPolicyTest.*`는 local context의 실제 계정·빈 계정 fallback을 확인한다.
+`SidebarFooterPolicyTest.*`는 local context의 실제 프로필 이름·계정과 빈 값의
+fallback을 확인한다. `LocalProfileRenameUpdatesIdentityAndMenu`는 모델 갱신 후
+trigger·mark·접근성 이름·다시 연 메뉴가 일치하는지 확인한다.
+`SelectionRequestsDoNotChangeSourceIdentity`는 다른 프로필 선택을 요청해도 원래
+창의 정체성과 체크가 유지되고, 이전 메뉴의 index를 새 모델에 적용하지 않는지 확인한다.
+`SidebarFooterBrowserTest.ProfileNameChangesReachEveryWindow`는 프로필 설정 변경이
+같은 프로필의 모든 창에 반영되고 창 종료 뒤에도 안전한지 확인한다.
+`ProfileListTracksNativeChanges`는 실제 Chromium 목록에서 프로필 추가·이름 변경·
+숨김·재표시·삭제와 현재 프로필이 숨겨진 상태의 목록을 확인한다. `ProfileSelectionOpensAndReusesWindow`는 실제 Footer
+선택으로 대상 프로필 창을 열고 다시 선택할 때 재사용하며, 원래 창의 탭과 프로필
+표시가 유지되는지 확인한다. 기존 `site_controls_browsertests` target에서 실행한다.
 `SidebarFooterViewTest.*`는 실제 메뉴의 목적지, 키보드 이동과 Back, 선별된 Browser
 action 실행, 접근 가능한 이름, Footer와 독립적인 메뉴 폭, Memory callback을 확인한다.
 `WorkspaceMarkAppearsOnlyInFooter`는 profile mark 중복을 확인한다.

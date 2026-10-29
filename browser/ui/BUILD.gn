@@ -357,6 +357,7 @@ test("site_controls_browsertests") {
     "history/history_browsertest.cc",
     "internal_urls_browsertest.cc",
     "projects/project_navigation_browsertest.cc",
+    "sidebar_footer_browsertest.cc",
     "site_controls_browsertest.cc",
     "youtube_live_browsertest.cc",
   ]

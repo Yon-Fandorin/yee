@@ -88,10 +88,10 @@ struct SidebarFooterModel {
   bool memory_enabled = false;
 };
 
-// Creates the non-fictitious fallback used until Yee's tenant provider is
-// connected. The local Chromium profile supplies the account label; the
-// fallback never claims that a remote organization exists.
-SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string account_name);
+// 로컬 context의 주 정보는 Chromium 프로필 이름, 보조 정보는 실제 계정이다.
+// 조직 provider가 연결되기 전에도 원격 조직이나 계정을 만들어내지 않는다.
+SidebarFooterModel CreateLocalSidebarFooterModel(std::u16string profile_name,
+                                                 std::u16string account_name);
 
 using SidebarContextSelectedCallback =
     base::RepeatingCallback<void(size_t context_index)>;
@@ -109,6 +109,10 @@ std::unique_ptr<views::View> CreateSidebarFooterView(
     SidebarFooterBrowserActionCallback browser_action_callback,
     SidebarMemoryChangedCallback memory_changed_callback,
     SidebarPopupLockCallback acquire_popup_lock = {});
+
+// provider가 확인한 목록과 현재 선택을 반영하고 이전 snapshot의 메뉴를 닫는다.
+// 선택 callback은 전환 요청이며 현재 context는 이 모델로만 변경한다.
+void SetSidebarFooterModel(views::View& view, SidebarFooterModel model);
 
 void SetSidebarFooterVisible(views::View& view, bool visible);
 bool IsSidebarFooterPositionInWindowCaption(const views::View& view,
