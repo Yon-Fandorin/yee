@@ -28,7 +28,7 @@
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
-#include "ui/compositor_extra/shadow.h"
+#include "ui/decoration/shadow.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_delegate.h"
@@ -109,12 +109,15 @@ enum class SplitPaneControlAction {
 
 class SplitResizeAreaBackground : public views::Background,
                                   public gfx::AnimationDelegate {
-public:
+ public:
   DECLARE_SAFE_CAST_TARGET()
 
-  SplitResizeAreaBackground(views::View &owner, views::View &handle,
+  SplitResizeAreaBackground(views::View& owner,
+                            views::View& handle,
                             bool show_resting_marker)
-      : owner_(&owner), handle_(&handle), rest_visibility_animation_(this),
+      : owner_(&owner),
+        handle_(&handle),
+        rest_visibility_animation_(this),
         active_visibility_animation_(this),
         show_resting_marker_(show_resting_marker) {
     // View destroys its children before its Background. Track both views so
@@ -126,26 +129,28 @@ public:
     SyncVisuals();
   }
 
-  SplitResizeAreaBackground(const SplitResizeAreaBackground &) = delete;
-  SplitResizeAreaBackground &
-  operator=(const SplitResizeAreaBackground &) = delete;
+  SplitResizeAreaBackground(const SplitResizeAreaBackground&) = delete;
+  SplitResizeAreaBackground& operator=(const SplitResizeAreaBackground&) =
+      delete;
   ~SplitResizeAreaBackground() override = default;
 
-  void Update(gfx::Size marker_size, bool active, bool animate,
-              const gfx::Transform &target_transform) {
+  void Update(gfx::Size marker_size,
+              bool active,
+              bool animate,
+              const gfx::Transform& target_transform) {
     const bool size_changed = marker_size_ != marker_size;
     marker_size_ = marker_size;
     const bool rich_animation = animate &&
                                 gfx::Animation::ShouldRenderRichAnimation() &&
                                 !gfx::Animation::PrefersReducedMotion();
-    views::View *const handle = handle_.view();
+    views::View* const handle = handle_.view();
     if (!handle || !handle->layer()) {
       return;
     }
     if (!rich_animation) {
       active_ = active;
-      rest_visibility_animation_.Reset(
-          !active_ && show_resting_marker_ ? 1.0 : 0.0);
+      rest_visibility_animation_.Reset(!active_ && show_resting_marker_ ? 1.0
+                                                                        : 0.0);
       active_visibility_animation_.Reset(active_ ? 1.0 : 0.0);
       pending_transform_.reset();
       handle->layer()->GetAnimator()->StopAnimating();
@@ -174,7 +179,7 @@ public:
 
     if (active_ == active) {
       if (size_changed) {
-        if (views::View *const owner = owner_.view()) {
+        if (views::View* const owner = owner_.view()) {
           owner->SchedulePaint();
         }
       }
@@ -205,8 +210,8 @@ public:
     }
   }
 
-  void Paint(gfx::Canvas *canvas, views::View *view) const override {
-    const ui::ColorProvider *const color_provider = view->GetColorProvider();
+  void Paint(gfx::Canvas* canvas, views::View* view) const override {
+    const ui::ColorProvider* const color_provider = view->GetColorProvider();
     if (!show_resting_marker_ || !color_provider || marker_size_.IsEmpty()) {
       return;
     }
@@ -224,20 +229,20 @@ public:
     canvas->DrawRoundRect(marker, kResizeHandleCornerRadius, flags);
   }
 
-  void AnimationProgressed(const gfx::Animation *animation) override {
+  void AnimationProgressed(const gfx::Animation* animation) override {
     SyncVisuals();
   }
 
-  void AnimationEnded(const gfx::Animation *animation) override {
+  void AnimationEnded(const gfx::Animation* animation) override {
     if (animation == &active_visibility_animation_ && !active_) {
       RestoreRestingMarker();
     }
     SyncVisuals();
   }
 
-private:
+ private:
   void RestoreRestingMarker() {
-    views::View *const handle = handle_.view();
+    views::View* const handle = handle_.view();
     if (pending_transform_ && handle && handle->layer()) {
       handle->layer()->GetAnimator()->StopAnimating();
       handle->layer()->SetTransform(*pending_transform_);
@@ -255,11 +260,11 @@ private:
   void SyncVisuals() {
     const float active_value =
         static_cast<float>(active_visibility_animation_.GetCurrentValue());
-    if (views::View *const handle = handle_.view(); handle && handle->layer()) {
+    if (views::View* const handle = handle_.view(); handle && handle->layer()) {
       handle->layer()->SetOpacity(kResizeHandleEmphasizedOpacity *
                                   active_value);
     }
-    if (views::View *const owner = owner_.view()) {
+    if (views::View* const owner = owner_.view()) {
       owner->SchedulePaint();
     }
   }
@@ -276,10 +281,12 @@ private:
 
 DEFINE_SAFE_CAST_SUBCLASS(SplitResizeAreaBackground, views::Background)
 
-void UpdateResizeAreaBackground(views::View &handle, bool active, bool animate,
-                                const gfx::Transform &target_transform,
+void UpdateResizeAreaBackground(views::View& handle,
+                                bool active,
+                                bool animate,
+                                const gfx::Transform& target_transform,
                                 bool show_resting_marker) {
-  views::View *const resize_area = handle.parent();
+  views::View* const resize_area = handle.parent();
   if (!resize_area) {
     return;
   }
@@ -288,7 +295,7 @@ void UpdateResizeAreaBackground(views::View &handle, bool active, bool animate,
     marker_size = handle.size();
   }
 
-  SplitResizeAreaBackground *background = nullptr;
+  SplitResizeAreaBackground* background = nullptr;
   if (resize_area->background() &&
       resize_area->background()->IsA<SplitResizeAreaBackground>()) {
     background = resize_area->background()->AsA<SplitResizeAreaBackground>();
@@ -302,19 +309,19 @@ void UpdateResizeAreaBackground(views::View &handle, bool active, bool animate,
 }
 
 class SplitPaneControlsMouseWatcherHost : public views::MouseWatcherHost {
-public:
-  SplitPaneControlsMouseWatcherHost(const views::View *controls,
-                                    const views::ViewTracker *resize_anchor)
+ public:
+  SplitPaneControlsMouseWatcherHost(const views::View* controls,
+                                    const views::ViewTracker* resize_anchor)
       : controls_(controls), resize_anchor_(resize_anchor) {}
 
-  SplitPaneControlsMouseWatcherHost(const SplitPaneControlsMouseWatcherHost &) =
+  SplitPaneControlsMouseWatcherHost(const SplitPaneControlsMouseWatcherHost&) =
       delete;
-  SplitPaneControlsMouseWatcherHost &
-  operator=(const SplitPaneControlsMouseWatcherHost &) = delete;
+  SplitPaneControlsMouseWatcherHost& operator=(
+      const SplitPaneControlsMouseWatcherHost&) = delete;
   ~SplitPaneControlsMouseWatcherHost() override = default;
 
-  bool Contains(const gfx::Point &screen_point, EventType type) override {
-    const views::View *const resize_anchor = resize_anchor_->view();
+  bool Contains(const gfx::Point& screen_point, EventType type) override {
+    const views::View* const resize_anchor = resize_anchor_->view();
     if (type == EventType::kExit || !controls_->GetWidget() || !resize_anchor ||
         !resize_anchor->GetWidget()) {
       return false;
@@ -327,7 +334,7 @@ public:
         screen_point, controls_bounds, resize_bounds);
   }
 
-private:
+ private:
   raw_ptr<const views::View> controls_;
   raw_ptr<const views::ViewTracker> resize_anchor_;
 };
@@ -335,7 +342,7 @@ private:
 class SplitPaneControlButton : public ToolbarButton {
   METADATA_HEADER(SplitPaneControlButton, ToolbarButton)
 
-public:
+ public:
   SplitPaneControlButton(PressedCallback callback,
                          SplitPaneControlAction action)
       : ToolbarButton(std::move(callback)), action_(action) {
@@ -349,8 +356,8 @@ public:
     preview_animation_.SetTweenType(gfx::Tween::LINEAR);
   }
 
-  SplitPaneControlButton(const SplitPaneControlButton &) = delete;
-  SplitPaneControlButton &operator=(const SplitPaneControlButton &) = delete;
+  SplitPaneControlButton(const SplitPaneControlButton&) = delete;
+  SplitPaneControlButton& operator=(const SplitPaneControlButton&) = delete;
   ~SplitPaneControlButton() override { preview_animation_.Stop(); }
 
   void SetPaneState(bool side_by_side, bool active_at_start) {
@@ -382,7 +389,7 @@ public:
     UpdatePreview();
   }
 
-  void PaintButtonContents(gfx::Canvas *canvas) override {
+  void PaintButtonContents(gfx::Canvas* canvas) override {
     const SkColor foreground = GetForegroundColor(GetState());
     const gfx::PointF origin((width() - kControlIconSize) / 2.0f,
                              (height() - kControlIconSize) / 2.0f);
@@ -392,49 +399,49 @@ public:
             : 1.0f;
 
     switch (action_) {
-    case SplitPaneControlAction::kToggleLayout:
-      PaintLayoutPreview(canvas, origin, foreground, timeline);
-      break;
-    case SplitPaneControlAction::kReverseOrder:
-      PaintReversePreview(canvas, origin, foreground, timeline);
-      break;
-    case SplitPaneControlAction::kSeparateViews:
-      PaintSeparatePreview(canvas, origin, foreground, timeline);
-      break;
+      case SplitPaneControlAction::kToggleLayout:
+        PaintLayoutPreview(canvas, origin, foreground, timeline);
+        break;
+      case SplitPaneControlAction::kReverseOrder:
+        PaintReversePreview(canvas, origin, foreground, timeline);
+        break;
+      case SplitPaneControlAction::kSeparateViews:
+        PaintSeparatePreview(canvas, origin, foreground, timeline);
+        break;
     }
   }
 
   SkColor GetForegroundColor(ButtonState state) const override {
-    const ui::ColorProvider *const color_provider = GetColorProvider();
+    const ui::ColorProvider* const color_provider = GetColorProvider();
     if (!color_provider) {
       return ToolbarButton::GetForegroundColor(state);
     }
     switch (state) {
-    case STATE_HOVERED:
-    case STATE_PRESSED:
-      return color_provider->GetColor(ui::kColorSysOnSurface);
-    case STATE_DISABLED:
-      return color_provider->GetColor(ui::kColorSysStateDisabled);
-    case STATE_NORMAL:
-      return color_provider->GetColor(ui::kColorSysOnSurfaceSubtle);
-    case STATE_COUNT:
-      break;
+      case STATE_HOVERED:
+      case STATE_PRESSED:
+        return color_provider->GetColor(ui::kColorSysOnSurface);
+      case STATE_DISABLED:
+        return color_provider->GetColor(ui::kColorSysStateDisabled);
+      case STATE_NORMAL:
+        return color_provider->GetColor(ui::kColorSysOnSurfaceSubtle);
+      case STATE_COUNT:
+        break;
     }
     return color_provider->GetColor(ui::kColorSysOnSurfaceSubtle);
   }
 
-  void AnimationProgressed(const gfx::Animation *animation) override {
+  void AnimationProgressed(const gfx::Animation* animation) override {
     SchedulePaint();
   }
 
-  void AnimationEnded(const gfx::Animation *animation) override {
+  void AnimationEnded(const gfx::Animation* animation) override {
     if (animation == &preview_animation_) {
       preview_active_ = false;
     }
     SchedulePaint();
   }
 
-private:
+ private:
   struct ReplayState {
     bool rewinding = false;
     float rewind = 1.0f;
@@ -455,8 +462,11 @@ private:
                 gfx::Tween::CalculateValue(kIconPreviewTween, raw_action))};
   }
 
-  static void PaintLine(gfx::Canvas *canvas, const gfx::PointF &start,
-                        const gfx::PointF &end, SkColor color, SkAlpha alpha,
+  static void PaintLine(gfx::Canvas* canvas,
+                        const gfx::PointF& start,
+                        const gfx::PointF& end,
+                        SkColor color,
+                        SkAlpha alpha,
                         float stroke_width = kControlIconStrokeWidth) {
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
@@ -467,8 +477,11 @@ private:
     canvas->DrawLine(start, end, flags);
   }
 
-  static void PaintArrow(gfx::Canvas *canvas, const gfx::PointF &start,
-                         const gfx::PointF &end, SkColor color, SkAlpha alpha) {
+  static void PaintArrow(gfx::Canvas* canvas,
+                         const gfx::PointF& start,
+                         const gfx::PointF& end,
+                         SkColor color,
+                         SkAlpha alpha) {
     const float dx = end.x() - start.x();
     const float dy = end.y() - start.y();
     const float length = std::hypot(dx, dy);
@@ -492,8 +505,10 @@ private:
               kControlIconCueStrokeWidth);
   }
 
-  static void PaintFrame(gfx::Canvas *canvas, const gfx::PointF &origin,
-                         SkColor color, SkAlpha alpha) {
+  static void PaintFrame(gfx::Canvas* canvas,
+                         const gfx::PointF& origin,
+                         SkColor color,
+                         SkAlpha alpha) {
     const gfx::RectF frame(origin.x() + 2.25f, origin.y() + 3.25f, 15.5f,
                            13.5f);
     cc::PaintFlags flags;
@@ -504,8 +519,9 @@ private:
     canvas->DrawRoundRect(frame, kControlIconCornerRadius, flags);
   }
 
-  static std::pair<gfx::PointF, gfx::PointF>
-  DividerLine(const gfx::PointF &origin, bool side_by_side) {
+  static std::pair<gfx::PointF, gfx::PointF> DividerLine(
+      const gfx::PointF& origin,
+      bool side_by_side) {
     if (side_by_side) {
       return {gfx::PointF(origin.x() + 10.0f, origin.y() + 5.25f),
               gfx::PointF(origin.x() + 10.0f, origin.y() + 14.75f)};
@@ -514,15 +530,21 @@ private:
             gfx::PointF(origin.x() + 14.75f, origin.y() + 10.0f)};
   }
 
-  static void PaintDivider(gfx::Canvas *canvas, const gfx::PointF &origin,
-                           bool side_by_side, SkColor color, SkAlpha alpha) {
+  static void PaintDivider(gfx::Canvas* canvas,
+                           const gfx::PointF& origin,
+                           bool side_by_side,
+                           SkColor color,
+                           SkAlpha alpha) {
     const auto divider = DividerLine(origin, side_by_side);
     PaintLine(canvas, divider.first, divider.second, color, alpha);
   }
 
-  static void PaintBrokenDivider(gfx::Canvas *canvas, const gfx::PointF &origin,
-                                 bool side_by_side, SkColor color,
-                                 SkAlpha alpha, float gap) {
+  static void PaintBrokenDivider(gfx::Canvas* canvas,
+                                 const gfx::PointF& origin,
+                                 bool side_by_side,
+                                 SkColor color,
+                                 SkAlpha alpha,
+                                 float gap) {
     if (gap >= 4.75f) {
       return;
     }
@@ -541,22 +563,27 @@ private:
               color, alpha);
   }
 
-  static void PaintRemoveMark(gfx::Canvas *canvas, const gfx::PointF &origin,
-                              SkColor color, SkAlpha alpha) {
+  static void PaintRemoveMark(gfx::Canvas* canvas,
+                              const gfx::PointF& origin,
+                              SkColor color,
+                              SkAlpha alpha) {
     const gfx::PointF center(origin.x() + 10.0f, origin.y() + 10.0f);
     PaintLine(canvas, gfx::PointF(center.x() - 1.25f, center.y()),
               gfx::PointF(center.x() + 1.25f, center.y()), color, alpha,
               kControlIconCueStrokeWidth);
   }
 
-  static gfx::PointF InterpolatePoint(const gfx::PointF &from,
-                                      const gfx::PointF &to, float value) {
+  static gfx::PointF InterpolatePoint(const gfx::PointF& from,
+                                      const gfx::PointF& to,
+                                      float value) {
     return gfx::PointF(gfx::Tween::FloatValueBetween(value, from.x(), to.x()),
                        gfx::Tween::FloatValueBetween(value, from.y(), to.y()));
   }
 
-  void PaintLayoutPreview(gfx::Canvas *canvas, const gfx::PointF &origin,
-                          SkColor color, float timeline) const {
+  void PaintLayoutPreview(gfx::Canvas* canvas,
+                          const gfx::PointF& origin,
+                          SkColor color,
+                          float timeline) const {
     const ReplayState replay = ResolveReplayState(timeline);
     const bool target_side_by_side = !side_by_side_;
     const gfx::PointF center(origin.x() + 10.0f, origin.y() + 10.0f);
@@ -574,8 +601,10 @@ private:
               line_alpha);
   }
 
-  void PaintReversePreview(gfx::Canvas *canvas, const gfx::PointF &origin,
-                           SkColor color, float timeline) const {
+  void PaintReversePreview(gfx::Canvas* canvas,
+                           const gfx::PointF& origin,
+                           SkColor color,
+                           float timeline) const {
     const ReplayState replay = ResolveReplayState(timeline);
     if (preview_active_ && replay.rewinding) {
       const float alpha = 1.0f - replay.rewind;
@@ -629,8 +658,10 @@ private:
                color, 0xD0);
   }
 
-  void PaintSeparatePreview(gfx::Canvas *canvas, const gfx::PointF &origin,
-                            SkColor color, float timeline) const {
+  void PaintSeparatePreview(gfx::Canvas* canvas,
+                            const gfx::PointF& origin,
+                            SkColor color,
+                            float timeline) const {
     const ReplayState replay = ResolveReplayState(timeline);
     PaintFrame(canvas, origin, color, 0xD8);
     if (!preview_requested_) {
@@ -706,9 +737,9 @@ class SplitPaneControlsView : public views::View,
                               public views::FocusChangeListener,
                               public views::MouseWatcherListener,
                               public gfx::AnimationDelegate {
-public:
+ public:
   SplitPaneControlsView(SplitPaneControlCallbacks callbacks,
-                        views::View *resize_anchor)
+                        views::View* resize_anchor)
       : callbacks_(std::move(callbacks)), resize_anchor_(resize_anchor) {
     CHECK(callbacks_.toggle_layout);
     CHECK(callbacks_.reverse_order);
@@ -759,8 +790,8 @@ public:
     reveal_animation_.SetTweenType(kControlRevealTween);
   }
 
-  SplitPaneControlsView(const SplitPaneControlsView &) = delete;
-  SplitPaneControlsView &operator=(const SplitPaneControlsView &) = delete;
+  SplitPaneControlsView(const SplitPaneControlsView&) = delete;
+  SplitPaneControlsView& operator=(const SplitPaneControlsView&) = delete;
   ~SplitPaneControlsView() override {
     reveal_timer_.Stop();
     mouse_watcher_->Stop();
@@ -777,7 +808,7 @@ public:
     }
   }
 
-  void UpdateAnchor(const gfx::Point &anchor_in_parent) {
+  void UpdateAnchor(const gfx::Point& anchor_in_parent) {
     if (position_locked_ || anchor_in_parent_ == anchor_in_parent) {
       return;
     }
@@ -831,10 +862,10 @@ public:
     UpdateTheme();
   }
 
-  void OnDidChangeFocus(views::View *before, views::View *now) override {
+  void OnDidChangeFocus(views::View* before, views::View* now) override {
     const bool had_focus = before && Contains(before);
     const bool has_focus = now && Contains(now);
-    for (SplitPaneControlButton *button :
+    for (SplitPaneControlButton* button :
          {layout_button_.get(), reverse_button_.get(), exit_button_.get()}) {
       button->SetFocusPreview(now == button);
     }
@@ -849,11 +880,11 @@ public:
     UpdateRequestedVisibility();
   }
 
-  void AnimationProgressed(const gfx::Animation *animation) override {
+  void AnimationProgressed(const gfx::Animation* animation) override {
     UpdateReveal();
   }
 
-  void AnimationEnded(const gfx::Animation *animation) override {
+  void AnimationEnded(const gfx::Animation* animation) override {
     UpdateReveal();
     if (!target_open_ && reveal_animation_.GetCurrentValue() == 0.0) {
       SetVisible(false);
@@ -861,7 +892,7 @@ public:
     }
   }
 
-  gfx::Rect GetAnchoredBounds(const gfx::Rect &parent_bounds) const {
+  gfx::Rect GetAnchoredBounds(const gfx::Rect& parent_bounds) const {
     gfx::Rect bounds(GetPreferredSize());
     const gfx::Point anchor =
         anchor_in_parent_.value_or(parent_bounds.CenterPoint());
@@ -877,8 +908,8 @@ public:
     return bounds;
   }
 
-  void OnPaint(gfx::Canvas *canvas) override {
-    const ui::ColorProvider *const color_provider = GetColorProvider();
+  void OnPaint(gfx::Canvas* canvas) override {
+    const ui::ColorProvider* const color_provider = GetColorProvider();
     if (!color_provider) {
       return;
     }
@@ -909,22 +940,22 @@ public:
     canvas->DrawRoundRect(bounds, kControlSurfaceCornerRadius - 0.5f, outline);
   }
 
-private:
-  std::unique_ptr<SplitPaneControlButton>
-  CreateButton(SplitPaneControlAction action,
-               views::Button::PressedCallback callback) {
+ private:
+  std::unique_ptr<SplitPaneControlButton> CreateButton(
+      SplitPaneControlAction action,
+      views::Button::PressedCallback callback) {
     return std::make_unique<SplitPaneControlButton>(std::move(callback),
                                                     action);
   }
 
-  void SetButtonText(SplitPaneControlButton &button, int string_id) {
+  void SetButtonText(SplitPaneControlButton& button, int string_id) {
     const std::u16string text = l10n_util::GetStringUTF16(string_id);
     button.SetTooltipText(text);
     button.GetViewAccessibility().SetName(text);
   }
 
   void UpdateIconsAndText() {
-    for (SplitPaneControlButton *button :
+    for (SplitPaneControlButton* button :
          {layout_button_.get(), reverse_button_.get(), exit_button_.get()}) {
       button->SetPaneState(side_by_side_, active_at_start_);
     }
@@ -934,11 +965,11 @@ private:
   }
 
   void UpdateTheme() {
-    const ui::ColorProvider *const color_provider = GetColorProvider();
+    const ui::ColorProvider* const color_provider = GetColorProvider();
     if (!color_provider) {
       return;
     }
-    for (SplitPaneControlButton *button :
+    for (SplitPaneControlButton* button :
          {layout_button_.get(), reverse_button_.get(), exit_button_.get()}) {
       button->SchedulePaint();
     }
@@ -952,9 +983,11 @@ private:
     const SkColor ambient = SkColorSetA(
         SK_ColorBLACK, dark ? kControlSurfaceShadowAmbientAlphaDark
                             : kControlSurfaceShadowAmbientAlphaLight);
-    const ui::Shadow::ElevationToColorsMap shadow_colors{
+    const ui::decoration::Shadow::ElevationToColorsMap shadow_colors{
         {kControlSurfaceShadowElevation, {key, ambient}}};
-    view_shadow_->shadow()->SetElevationToColorsMap(shadow_colors);
+    view_shadow_->decoration()
+        ->GetSourceAs<ui::decoration::Shadow>()
+        ->SetColorMap(shadow_colors);
     SchedulePaint();
   }
 
@@ -1066,8 +1099,8 @@ private:
     transform.Scale(scale, scale);
     transform.Translate(-center.x(), -center.y());
     layer()->SetTransform(transform);
-    if (view_shadow_ && view_shadow_->shadow()->shadow_layer()) {
-      view_shadow_->shadow()->shadow_layer()->SetOpacity(value);
+    if (view_shadow_ && view_shadow_->decoration()->layer()) {
+      view_shadow_->decoration()->layer()->SetOpacity(value);
     }
   }
 
@@ -1079,9 +1112,9 @@ private:
     callbacks_.set_resize_handle_anchored.Run(anchored);
   }
 
-  void OnToggleLayout(const ui::Event &) { callbacks_.toggle_layout.Run(); }
-  void OnReverseOrder(const ui::Event &) { callbacks_.reverse_order.Run(); }
-  void OnExitSplit(const ui::Event &) { callbacks_.exit_split.Run(); }
+  void OnToggleLayout(const ui::Event&) { callbacks_.toggle_layout.Run(); }
+  void OnReverseOrder(const ui::Event&) { callbacks_.reverse_order.Run(); }
+  void OnExitSplit(const ui::Event&) { callbacks_.exit_split.Run(); }
 
   SplitPaneControlCallbacks callbacks_;
   raw_ptr<SplitPaneControlButton> layout_button_ = nullptr;
@@ -1103,17 +1136,17 @@ private:
   bool resize_handle_anchored_ = false;
 };
 
-SplitPaneControlsView &AsSplitPaneControls(views::View &controls) {
+SplitPaneControlsView& AsSplitPaneControls(views::View& controls) {
   CHECK_EQ(controls.GetID(), kSplitPaneControlsViewId);
-  return static_cast<SplitPaneControlsView &>(controls);
+  return static_cast<SplitPaneControlsView&>(controls);
 }
 
 // Both Sidebar boundaries share the split divider's marker presentation.
 // Chromium's ResizeArea and delegate continue to own the resize gesture.
 class SidebarResizeArea : public views::ResizeArea {
-public:
-  explicit SidebarResizeArea(views::ResizeAreaDelegate *delegate,
-                            bool show_resting_marker = true)
+ public:
+  explicit SidebarResizeArea(views::ResizeAreaDelegate* delegate,
+                             bool show_resting_marker = true)
       : views::ResizeArea(delegate), show_resting_marker_(show_resting_marker) {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
@@ -1125,29 +1158,29 @@ public:
     handle_->layer()->SetOpacity(0.f);
     views::FocusRing::Install(handle_);
     views::FocusRing::Get(handle_)->SetHasFocusPredicate(
-        base::BindRepeating([](const views::View *view) {
+        base::BindRepeating([](const views::View* view) {
           return view->parent() && view->parent()->HasFocus();
         }));
   }
 
-  void OnMouseMoved(const ui::MouseEvent &event) override {
+  void OnMouseMoved(const ui::MouseEvent& event) override {
     UpdateAnchor(event.y());
   }
-  void OnMouseEntered(const ui::MouseEvent &event) override {
+  void OnMouseEntered(const ui::MouseEvent& event) override {
     UpdateAnchor(event.y());
   }
-  void OnMouseExited(const ui::MouseEvent &event) override {
+  void OnMouseExited(const ui::MouseEvent& event) override {
     if (!is_resizing()) {
       pointer_y_.reset();
       ResetAnchor(HasFocus());
     }
   }
-  bool OnMouseDragged(const ui::MouseEvent &event) override {
+  bool OnMouseDragged(const ui::MouseEvent& event) override {
     const bool handled = ResizeArea::OnMouseDragged(event);
     UpdateAnchor(event.y());
     return handled;
   }
-  void OnMouseReleased(const ui::MouseEvent &event) override {
+  void OnMouseReleased(const ui::MouseEvent& event) override {
     ResizeArea::OnMouseReleased(event);
     pointer_y_.reset();
     ResetAnchor(HasFocus() || IsMouseHovered());
@@ -1199,7 +1232,7 @@ public:
     }
   }
 
-protected:
+ protected:
   virtual std::optional<SkColor> GetContrastSurface() const {
     return std::nullopt;
   }
@@ -1211,11 +1244,10 @@ protected:
     }
     SkColor foreground = colors->GetColor(ui::kColorSysOnSurface);
     const std::optional<SkColor> surface = GetContrastSurface();
-    if (surface &&
-        color_utils::GetContrastRatio(
-            color_utils::AlphaBlend(foreground, *surface,
-                                     kResizeHandleEmphasizedOpacity),
-            *surface) < color_utils::kMinimumVisibleContrastRatio) {
+    if (surface && color_utils::GetContrastRatio(
+                       color_utils::AlphaBlend(foreground, *surface,
+                                               kResizeHandleEmphasizedOpacity),
+                       *surface) < color_utils::kMinimumVisibleContrastRatio) {
       foreground = color_utils::GetColorWithMaxContrast(*surface);
     }
     handle_->SetBackground(views::CreateRoundedRectBackground(
@@ -1226,7 +1258,7 @@ protected:
                 : std::nullopt);
   }
 
-private:
+ private:
   void UpdateAppearance(bool emphasized) {
     if (handle_->GetVisible()) {
       UpdateSplitResizeHandleAppearance(*handle_, emphasized,
@@ -1261,12 +1293,12 @@ private:
 
 // 시각적 flyout 여백과 resize gutter만 포함해 가장자리 hover 경로를 잇는다.
 class SidebarResizeAreaTargeter : public views::ViewTargeterDelegate {
-public:
-  explicit SidebarResizeAreaTargeter(views::ResizeArea &resize_area)
+ public:
+  explicit SidebarResizeAreaTargeter(views::ResizeArea& resize_area)
       : resize_area_(&resize_area) {}
 
-  bool DoesIntersectRect(const views::View *target,
-                         const gfx::Rect &rect) const override {
+  bool DoesIntersectRect(const views::View* target,
+                         const gfx::Rect& rect) const override {
     gfx::Rect hit_bounds = target->GetLocalBounds();
     hit_bounds.Outset(
         gfx::Outsets()
@@ -1279,7 +1311,7 @@ public:
     } else if (translation < 0) {
       hit_bounds.Outset(gfx::Outsets::TLBR(0, 0, 0, -translation));
     }
-    const views::View *const resize_area = resize_area_.view();
+    const views::View* const resize_area = resize_area_.view();
     if (resize_area && resize_area->parent() == target &&
         resize_area->GetVisible()) {
       const gfx::Rect resize_bounds = views::View::ConvertRectToTarget(
@@ -1289,15 +1321,15 @@ public:
     return hit_bounds.Intersects(rect);
   }
 
-private:
+ private:
   views::ViewTracker resize_area_;
 };
 
 // A sibling of the native SidePanel, never a child of its clipped card. Native
 // callbacks retain width limits, drag direction, persistence, and metrics.
 class SidePanelResizeGutterView : public SidebarResizeArea,
-                                 public views::ResizeAreaDelegate {
-public:
+                                  public views::ResizeAreaDelegate {
+ public:
   explicit SidePanelResizeGutterView(SidePanelResizeCallbacks callbacks)
       : SidebarResizeArea(this, /*show_resting_marker=*/false),
         callbacks_(std::move(callbacks)) {
@@ -1316,7 +1348,7 @@ public:
     }
   }
 
-  bool OnKeyPressed(const ui::KeyEvent &event) override {
+  bool OnKeyPressed(const ui::KeyEvent& event) override {
     if (event.key_code() != ui::VKEY_LEFT &&
         event.key_code() != ui::VKEY_RIGHT) {
       return false;
@@ -1343,23 +1375,23 @@ public:
     RefreshMarkerColor();
   }
 
-protected:
+ protected:
   std::optional<SkColor> GetContrastSurface() const override {
     return on_page_surface_ ? page_surface_color_ : std::nullopt;
   }
 
-private:
+ private:
   SidePanelResizeCallbacks callbacks_;
   std::optional<SkColor> page_surface_color_;
   bool on_page_surface_ = false;
 };
 
-} // namespace
+}  // namespace
 
-std::unique_ptr<views::ResizeArea>
-CreateSidebarResizeArea(views::ResizeAreaDelegate *delegate) {
+std::unique_ptr<views::ResizeArea> CreateSidebarResizeArea(
+    views::ResizeAreaDelegate* delegate) {
   return std::make_unique<SidebarResizeArea>(delegate,
-                                            /*show_resting_marker=*/false);
+                                             /*show_resting_marker=*/false);
 }
 
 void UpdateSidePanelResizeGutterPresentation(
@@ -1381,8 +1413,8 @@ void SetSidePanelResizeGutterOnPageSurface(views::View& gutter, bool on_page) {
   static_cast<SidePanelResizeGutterView&>(gutter).SetOnPageSurface(on_page);
 }
 
-gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect &sidebar,
-                                    int resize_area_width) {
+gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect& sidebar,
+                                     int resize_area_width) {
   // Center the marker between the visible Tab row edge and Browser Surface,
   // including the Sidebar's own trailing row inset in the visual gap.
   const int trailing_offset =
@@ -1395,13 +1427,13 @@ gfx::Rect GetSidebarResizeAreaBounds(const gfx::Rect &sidebar,
                    sidebar.y(), resize_area_width, sidebar.height());
 }
 
-std::unique_ptr<views::ViewTargeter>
-CreateSidebarResizeAreaTargeter(views::ResizeArea &resize_area) {
+std::unique_ptr<views::ViewTargeter> CreateSidebarResizeAreaTargeter(
+    views::ResizeArea& resize_area) {
   return std::make_unique<views::ViewTargeter>(
       std::make_unique<SidebarResizeAreaTargeter>(resize_area));
 }
 
-void SetSidebarFlyoutHitTestInsets(views::View &sidebar, int top, int bottom) {
+void SetSidebarFlyoutHitTestInsets(views::View& sidebar, int top, int bottom) {
   sidebar.SetProperty(kSidebarFlyoutHitTestTopInsetKey,
                       std::clamp(top, 0, kSidebarMetrics.sidebar_flyout_inset));
   sidebar.SetProperty(kSidebarFlyoutHitTestBottomInsetKey,
@@ -1410,9 +1442,9 @@ void SetSidebarFlyoutHitTestInsets(views::View &sidebar, int top, int bottom) {
                                      kSidebarMetrics.content_gutter));
 }
 
-bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point &point,
-                                             const gfx::Rect &controls,
-                                             const gfx::Rect &divider) {
+bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point& point,
+                                             const gfx::Rect& controls,
+                                             const gfx::Rect& divider) {
   if (controls.IsEmpty() || divider.IsEmpty()) {
     return false;
   }
@@ -1432,8 +1464,7 @@ bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point &point,
       return false;
     }
     const float t = static_cast<float>(position - start) / (end - start);
-    return t >= 0 && t <= 1 &&
-           cross >= near_min + t * (far_min - near_min) &&
+    return t >= 0 && t <= 1 && cross >= near_min + t * (far_min - near_min) &&
            cross <= near_max + t * (far_max - near_max);
   };
   if (controls.right() <= divider.x() || divider.right() <= controls.x()) {
@@ -1447,12 +1478,12 @@ bool IsPointInSplitPaneControlsTransitRegion(const gfx::Point &point,
   }
   if (controls.bottom() <= divider.y() || divider.bottom() <= controls.y()) {
     const bool before = controls.bottom() <= divider.y();
-    return in_corridor(
-        point.y(), point.x(), before ? divider.y() : divider.bottom(),
-        before ? controls.bottom() : controls.y(),
-        std::max(divider.x(), zone.x() - kDiagonalReach),
-        std::min(divider.right(), zone.right() + kDiagonalReach), zone.x(),
-        zone.right());
+    return in_corridor(point.y(), point.x(),
+                       before ? divider.y() : divider.bottom(),
+                       before ? controls.bottom() : controls.y(),
+                       std::max(divider.x(), zone.x() - kDiagonalReach),
+                       std::min(divider.right(), zone.right() + kDiagonalReach),
+                       zone.x(), zone.right());
   }
   return false;
 }
@@ -1461,10 +1492,9 @@ gfx::Rect GetSidePanelResizeGutterBounds(const gfx::Rect& panel, bool leading) {
   if (panel.IsEmpty()) {
     return gfx::Rect();
   }
-  return gfx::Rect(leading ? panel.right()
-                           : panel.x() - kSidebarMetrics.resize_gutter_width,
-                   panel.y(), kSidebarMetrics.resize_gutter_width,
-                   panel.height());
+  return gfx::Rect(
+      leading ? panel.right() : panel.x() - kSidebarMetrics.resize_gutter_width,
+      panel.y(), kSidebarMetrics.resize_gutter_width, panel.height());
 }
 
 std::unique_ptr<views::View> CreateSidePanelResizeGutterView(
@@ -1473,7 +1503,8 @@ std::unique_ptr<views::View> CreateSidePanelResizeGutterView(
 }
 
 gfx::Rect ExcludeSidePanelResizeGutter(gfx::Rect bounds,
-                                      const gfx::Rect& gutter, bool leading) {
+                                       const gfx::Rect& gutter,
+                                       bool leading) {
   if (gutter.IsEmpty() || bounds.bottom() <= gutter.y() ||
       gutter.bottom() <= bounds.y()) {
     return bounds;
@@ -1488,41 +1519,43 @@ gfx::Rect ExcludeSidePanelResizeGutter(gfx::Rect bounds,
   return bounds;
 }
 
-std::unique_ptr<views::View>
-CreateSplitPaneControlsView(SplitPaneControlCallbacks callbacks,
-                            views::View *resize_anchor) {
+std::unique_ptr<views::View> CreateSplitPaneControlsView(
+    SplitPaneControlCallbacks callbacks,
+    views::View* resize_anchor) {
   return std::make_unique<SplitPaneControlsView>(std::move(callbacks),
                                                  resize_anchor);
 }
 
-void SetSplitPaneControlsEnabled(views::View &controls, bool enabled) {
+void SetSplitPaneControlsEnabled(views::View& controls, bool enabled) {
   AsSplitPaneControls(controls).SetEnabledForSplit(enabled);
 }
 
-void UpdateSplitPaneControlsAnchor(views::View &controls,
-                                   const gfx::Point &anchor_in_parent) {
+void UpdateSplitPaneControlsAnchor(views::View& controls,
+                                   const gfx::Point& anchor_in_parent) {
   AsSplitPaneControls(controls).UpdateAnchor(anchor_in_parent);
 }
 
-void SetSplitPaneControlsAnchorHovered(views::View &controls, bool hovered) {
+void SetSplitPaneControlsAnchorHovered(views::View& controls, bool hovered) {
   AsSplitPaneControls(controls).SetAnchorHovered(hovered);
 }
 
-void DismissSplitPaneControls(views::View &controls) {
+void DismissSplitPaneControls(views::View& controls) {
   AsSplitPaneControls(controls).Dismiss();
 }
 
-void UpdateSplitPaneControls(views::View &controls, bool side_by_side,
+void UpdateSplitPaneControls(views::View& controls,
+                             bool side_by_side,
                              bool active_at_start) {
   AsSplitPaneControls(controls).UpdateState(side_by_side, active_at_start);
 }
 
-gfx::Rect GetSplitPaneControlsBounds(views::View &controls,
-                                     const gfx::Rect &parent_bounds) {
+gfx::Rect GetSplitPaneControlsBounds(views::View& controls,
+                                     const gfx::Rect& parent_bounds) {
   return AsSplitPaneControls(controls).GetAnchoredBounds(parent_bounds);
 }
 
-void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized,
+void UpdateSplitResizeHandleAppearance(views::View& handle,
+                                       bool emphasized,
                                        bool show_resting_marker) {
   if (!handle.layer()) {
     return;
@@ -1530,7 +1563,7 @@ void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized,
   UpdateResizeAreaBackground(handle, emphasized, /*animate=*/true,
                              handle.layer()->GetTargetTransform(),
                              show_resting_marker);
-  const ui::ColorProvider *const color_provider = handle.GetColorProvider();
+  const ui::ColorProvider* const color_provider = handle.GetColorProvider();
   if (!color_provider) {
     return;
   }
@@ -1540,9 +1573,10 @@ void UpdateSplitResizeHandleAppearance(views::View &handle, bool emphasized,
   handle.SchedulePaint();
 }
 
-void UpdateSplitResizeHandleAnchor(views::View &handle,
-                                   const gfx::Vector2dF &offset,
-                                   bool emphasized, bool animate,
+void UpdateSplitResizeHandleAnchor(views::View& handle,
+                                   const gfx::Vector2dF& offset,
+                                   bool emphasized,
+                                   bool animate,
                                    bool show_resting_marker) {
   if (!handle.layer()) {
     return;
@@ -1553,4 +1587,4 @@ void UpdateSplitResizeHandleAnchor(views::View &handle,
                              show_resting_marker);
 }
 
-} // namespace yee
+}  // namespace yee

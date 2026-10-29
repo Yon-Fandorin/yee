@@ -15,7 +15,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/image_button.h"
 
-class Browser;
+class BrowserWindowInterface;
 
 namespace content {
 class WebContents;
@@ -29,13 +29,14 @@ class View;
 namespace yee {
 
 // Yee 사이트 보호 팝업을 여는 주소창 버튼이다.
-// LocationBarView가 선택한 활성 WebContents의 helper만 관찰하며 탭 상태는 소유하지 않는다.
+// LocationBarView가 선택한 활성 WebContents의 helper만 관찰하며 탭 상태는
+// 소유하지 않는다.
 class SiteControlsButton : public views::ImageButton,
                            public content::WebContentsObserver {
   METADATA_HEADER(SiteControlsButton, views::ImageButton)
 
  public:
-  explicit SiteControlsButton(Browser* browser);
+  explicit SiteControlsButton(BrowserWindowInterface* browser);
   SiteControlsButton(const SiteControlsButton&) = delete;
   SiteControlsButton& operator=(const SiteControlsButton&) = delete;
   ~SiteControlsButton() override;
@@ -54,7 +55,7 @@ class SiteControlsButton : public views::ImageButton,
   void OnThemeChanged() override;
   void WebContentsDestroyed() override;
 
-  const raw_ptr<Browser> browser_;
+  const raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<views::Label> badge_ = nullptr;
   base::CallbackListSubscription helper_subscription_;
   base::CallbackListSubscription service_subscription_;
@@ -65,7 +66,7 @@ class SiteControlsButton : public views::ImageButton,
 
 // Yee 보호 팝업을 연다. 사이트 정보 아이콘은 Chromium PageInfo를 사용한다.
 bool ShowSiteControlsBubble(views::View* anchor,
-                            Browser* browser,
+                            BrowserWindowInterface* browser,
                             content::WebContents* contents);
 void CloseSiteControlsBubble();
 bool IsSiteControlsBubbleShowing();

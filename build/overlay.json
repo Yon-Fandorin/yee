@@ -59,6 +59,8 @@
     "chrome/app/yee_windows_registration.h",
     "chrome/app/yee_branding_strings",
     "chrome/app/yee_branding_strings.gni",
+    "chrome/app/yee_product_names.grdp",
+    "chrome/app/yee_app_menu_name.grdp",
     "chrome/app/chromium_strings.grd",
     "chrome/app/generated_resources.grd",
     "chrome/app/generated_resources.grd.gritdeps",

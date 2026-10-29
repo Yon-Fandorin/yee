@@ -12,8 +12,8 @@
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/profiles/profile_io_data.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
-#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/startup/url_util.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -230,7 +230,8 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
                        PrivateSettingsCannotUpdateLists) {
-  Browser* private_browser = CreateIncognitoBrowser(browser()->GetProfile());
+  BrowserWindowInterface* private_browser =
+      CreateIncognitoBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(private_browser, SettingsURL()));
   auto* contents = private_browser->tab_strip_model()->GetActiveWebContents();
   EXPECT_EQ(true, content::EvalJs(contents, R"JS(
@@ -293,7 +294,8 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
       content_blocking::ContentBlockingServiceFactory::GetForProfile(
           browser()->GetProfile());
   ASSERT_TRUE(regular->SetBlockedDomain("regular.example.test", false));
-  Browser* private_browser = CreateIncognitoBrowser(browser()->GetProfile());
+  BrowserWindowInterface* private_browser =
+      CreateIncognitoBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(private_browser, SettingsURL()));
   auto* contents = private_browser->tab_strip_model()->GetActiveWebContents();
   EXPECT_EQ(true, content::EvalJs(contents, R"JS(

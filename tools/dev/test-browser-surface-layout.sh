@@ -31,17 +31,31 @@ FAST_TARGETS=(
 )
 NATIVE_FAST_FILTER='BrowserAnimationControllerTest.*:BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
 YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
-INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeeWindowsNativeClipSurvivesRendererAttachment:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState:*TopContainerBackground*'
+INTERACTIVE_FILTER='BrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:BrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:BrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:BrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:BrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:BrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:BrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:BrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:BrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:BrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:BrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:BrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:BrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:*TopContainerBackground*'
 FLYOUT_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds:BrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation'
-HORIZONTAL_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity:BrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear:BrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader:BrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader:BrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations:CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*'
-HORIZONTAL_GROUP_UX_FILTER='TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0:TabDragging/DetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0'
+HORIZONTAL_FILTER='BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity:BrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear:BrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader'
+HORIZONTAL_GROUP_UX_FILTER='TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0:TabDragging/DetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0'
 VERTICAL_GROUP_UX_FILTER='VerticalTabDragTest.YeeProjectHiddenGroupRowsKeepFavoriteDropAnchor:VerticalTabDragTest.YeeProjectHiddenSplitGroupRowsKeepFavoriteDropAnchor:VerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle:VerticalTabDragTest.DragWithinGroup:VerticalTabDragTest.DragOutOfGroup:VerticalTabDragTest.YeeSidebarGroupHeaderDragHasNoFavoriteAffordance:VerticalTabDragTest.DragGroupHeader:VerticalTabDragTest.DragCollapsedGroupStaysCollapsed:VerticalTabDragTest.DragFavoriteToExpandedGroupFirstSlot:VerticalTabDragTest.DragFavoriteToExpandedGroupLastSlot:VerticalTabDragTest.CancelFavoriteToGroupDragRestoresSource'
-POPUP_UX_FILTER='OmniboxPopupViewWebUITest.YeeAimPopupKeepsStateThroughPresentationRebuild:CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost'
+POPUP_UX_FILTER='OmniboxPopupViewWebUITest.YeeAimPopupKeepsStateThroughPresentationRebuild'
+POPUP_UX_FILTER+=':Shadow/OmniboxPopupAimShadowGeometryTest.YeeAimShadowFitsWidgetAndKeepsHostTransparent/*'
+# OS 전용 사례는 실제로 컴파일되는 플랫폼에서만 필수 필터에 포함한다.
+case "$(uname -s)" in
+  Darwin)
+    INTERACTIVE_FILTER+=':BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth'
+    INTERACTIVE_FILTER+=':OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState'
+    INTERACTIVE_FILTER+=':ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip:ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren:ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction'
+    INTERACTIVE_FILTER+=':BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy:BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque'
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    POPUP_UX_FILTER+=':CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost'
+    HORIZONTAL_GROUP_UX_FILTER+=':TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0'
+    INTERACTIVE_FILTER+=':BrowserViewTabbedLayoutImplUiTest.YeeWindowsNativeClipSurvivesRendererAttachment'
+    HORIZONTAL_FILTER+=':BrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader:BrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations:CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*'
+    ;;
+esac
 INTERACTIVE_FILTER+=":$HORIZONTAL_FILTER"
 INTERACTIVE_FILTER+=":$HORIZONTAL_GROUP_UX_FILTER:$VERTICAL_GROUP_UX_FILTER:$POPUP_UX_FILTER"
 INTERACTIVE_FILTER+=":$FLYOUT_FILTER"
-INTERACTIVE_FILTER+=':ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip:ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren:ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction'
-INTERACTIVE_FILTER+=':BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy:BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque'
 # Keep transition and compositor regressions in the ordinary checkpoint gate,
 # including the combined states that isolated open/close tests cannot cover.
 TRANSITION_TESTS=(
@@ -81,11 +95,11 @@ fi
 
 if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
   print "Running the small pure native/Yee Browser Surface layout gate."
-  "$YEE_OUT_DIR/yee_layout_unittests" \
+  run_native_test_gate "$YEE_OUT_DIR/yee_layout_unittests" \
     --gtest_filter="$NATIVE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
-  "$YEE_OUT_DIR/multi_contents_geometry_unittests" \
+  run_native_test_gate "$YEE_OUT_DIR/multi_contents_geometry_unittests" \
     --gtest_filter="$YEE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
@@ -101,7 +115,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
   print "Running applied ${MODE} UI tests; native input requires window focus."
   prepare_ui_test_display
   gracefully_quit_yee
-  "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$default_filter" \
     --test-launcher-jobs=1 \
@@ -112,7 +126,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
   print "Running ${MODE} UI regressions in RTL at 125% scale."
   prepare_ui_test_display
   gracefully_quit_yee
-  "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$rtl_filter" \
     --force-ui-direction=rtl \
@@ -125,7 +139,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
   print "Checking the same horizontal contract with Chromium's unified tab strip."
   prepare_ui_test_display
   gracefully_quit_yee
-  "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --enable-features=TabStripUnification \
     --gtest_filter="$HORIZONTAL_FILTER" \
@@ -139,7 +153,7 @@ if [[ "$MODE" == "browser" || "$MODE" == "all" ]]; then
   print "Running the explicit browser-level Side Panel and overlay lifecycle gate."
   prepare_ui_test_display
   gracefully_quit_yee
-  "$YEE_OUT_DIR/browser_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/browser_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$BROWSER_FILTER" \
     --test-launcher-jobs=1 \

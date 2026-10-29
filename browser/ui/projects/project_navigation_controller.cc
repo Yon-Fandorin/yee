@@ -405,7 +405,7 @@ std::optional<BrowserSurfacePresentation> GetProjectHubSurfacePresentation(
     const BrowserView* view) {
   if (!view ||
       !ProjectNavigationController::IsHubShowing(
-          const_cast<Browser*>(view->browser())) ||
+          const_cast<BrowserWindowInterface*>(view->browser())) ||
       !view->GetColorProvider())
     return std::nullopt;
   return ResolveBrowserSurfacePresentation(
@@ -1088,8 +1088,7 @@ void ProjectNavigationController::OpenPage(std::string page_id) {
   if (release.is_null())
     return;
   base::ScopedClosureRunner pending_open(std::move(release));
-  NavigateParams params(browser_->GetBrowserForMigrationOnly(), page->url,
-                        ui::PAGE_TRANSITION_AUTO_BOOKMARK);
+  NavigateParams params(browser_, page->url, ui::PAGE_TRANSITION_AUTO_BOOKMARK);
   params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   params.window_action = NavigateParams::WindowAction::kShowWindow;
   Navigate(&params);
@@ -1122,9 +1121,8 @@ void ProjectNavigationController::ShowPageMenu(std::string page_id,
                                                ui::mojom::MenuSourceType type) {
   auto* tab = tabs_->FindLiveTab(page_id, browser_);
   auto* target = tab ? tab->GetBrowserWindowInterface() : nullptr;
-  auto* target_view = target ? BrowserView::GetBrowserViewForBrowser(
-                                   target->GetBrowserForMigrationOnly())
-                             : nullptr;
+  auto* target_view =
+      target ? BrowserView::GetBrowserViewForBrowser(target) : nullptr;
   if (!target_view || !target_view->tab_strip_view())
     return;
   const int index = target->GetTabStripModel()->GetIndexOfTab(tab);

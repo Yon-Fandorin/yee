@@ -68,14 +68,73 @@ def load_catalog(repo_root=REPO_ROOT):
 
 
 def patch_paths(patch_file):
+    """Git 파일 헤더와 섹션 경로가 일치하는 패치의 경로를 반환한다."""
     text = Path(patch_file).read_text(encoding='utf-8')
-    paths = re.findall(r'^diff --git a/(\S+) b/(\S+)\r?$', text, re.MULTILINE)
-    if (not paths or text.count('diff --git ') != len(paths)
-            or any(old != new for old, new in paths)):
+    sections = re.split(r'(?m)(?=^diff --git )', text)
+    if len(sections) < 2 or sections[0].strip():
         raise ValueError(f'Expected explicit, unchanged patch paths in {patch_file}')
-    names = [relative_path(new) for _, new in paths]
-    if len(names) != len(set(names)):
-        raise ValueError(f'Duplicate patch sections in {patch_file}')
+    names, seen = [], set()
+    for section in sections[1:]:
+        lines = section.split('\n')
+        header = re.fullmatch(r'diff --git a/(\S+) b/(\S+)', lines[0])
+        if not header or header[1] != header[2]:
+            raise ValueError(f'Expected explicit, unchanged patch paths in {patch_file}')
+        path = relative_path(header[2])
+        if path.casefold() in seen:
+            raise ValueError(f'Duplicate patch sections in {patch_file}')
+        seen.add(path.casefold())
+        file_headers, old_remaining, new_remaining = [], 0, 0
+        has_hunk = has_mode = False
+        for line in lines[1:]:
+            # 본문의 ---/+++는 파일 헤더가 아니라 삭제·추가한 소스일 수 있다.
+            if old_remaining or new_remaining:
+                if line == r'\ No newline at end of file':
+                    continue
+                if line.startswith(' '):
+                    old_remaining -= 1
+                    new_remaining -= 1
+                elif line.startswith('-'):
+                    old_remaining -= 1
+                elif line.startswith('+'):
+                    new_remaining -= 1
+                else:
+                    raise ValueError(f'Malformed patch hunk in {patch_file}')
+                if min(old_remaining, new_remaining) < 0:
+                    raise ValueError(f'Malformed patch hunk in {patch_file}')
+                continue
+            if len(file_headers) == 1 and not line.startswith('+++ '):
+                raise ValueError(f'Expected matching patch file headers in {patch_file}')
+            if line.startswith('--- '):
+                if has_hunk or file_headers or line[4:] not in ('a/' + path, '/dev/null'):
+                    raise ValueError(f'Expected matching patch file headers in {patch_file}')
+                file_headers.append(line[4:])
+            elif line.startswith('+++ '):
+                if (has_hunk or len(file_headers) != 1
+                        or line[4:] not in ('b/' + path, '/dev/null')
+                        or file_headers[0] == line[4:] == '/dev/null'):
+                    raise ValueError(f'Expected matching patch file headers in {patch_file}')
+                file_headers.append(line[4:])
+            elif line.startswith('@@'):
+                hunk = re.fullmatch(r'@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@.*', line)
+                if not hunk or len(file_headers) != 2:
+                    raise ValueError(f'Malformed patch hunk in {patch_file}')
+                old_remaining = int(hunk[1]) if hunk[1] is not None else 1
+                new_remaining = int(hunk[2]) if hunk[2] is not None else 1
+                has_hunk = True
+            elif line.startswith(('GIT binary patch', 'Binary files ', 'rename ', 'copy ',
+                                  'similarity index ', 'dissimilarity index ')):
+                raise ValueError(f'Unsupported binary or rename/copy patch in {patch_file}')
+            elif not line or (has_hunk and line == r'\ No newline at end of file'):
+                continue
+            elif not has_hunk and re.fullmatch(r'(?:old|new|new file|deleted file) mode [0-7]{6}', line):
+                has_mode = True
+            elif not has_hunk and re.fullmatch(r'index [0-9a-f]+\.\.[0-9a-f]+(?: [0-7]{6})?', line):
+                continue
+            else:
+                raise ValueError(f'Unsupported patch metadata in {patch_file}')
+        if old_remaining or new_remaining or len(file_headers) == 1 or not (has_hunk or has_mode):
+            raise ValueError(f'Incomplete patch section in {patch_file}')
+        names.append(path)
     return names
 
 
@@ -111,13 +170,26 @@ def patch_plan(src, catalog, repo_root=REPO_ROOT, role=None):
     selected = [p for p in catalog['patches'] if role is None or p['role'] == role]
     if not selected:
         raise ValueError(f'Unknown patch role: {role}')
-    plan, owners = [], set()
+    # Windows에서 대소문자만 다른 경로도 같은 관리 파일을 가리킨다.
+    managed_roots = [root.casefold() for root in
+                     [binding['destination'] for binding in catalog['source_roots']]
+                     + catalog['generated_roots']]
+    plan, owners, patch_inputs = [], set(), []
     for patch in selected:
         patch_file = Path(repo_root) / patch['file']
         paths = patch_paths(patch_file)
-        if owners.intersection(paths):
+        for path in paths:
+            normalized_path = path.casefold()
+            if any(normalized_path == root or normalized_path.startswith(root + '/')
+                   or root.startswith(normalized_path + '/')
+                   for root in managed_roots):
+                raise ValueError('Patch sections must not own generated or mirrored source paths: ' + path)
+        normalized_paths = {path.casefold() for path in paths}
+        if owners.intersection(normalized_paths):
             raise ValueError('Patch series entries must own disjoint files')
-        owners.update(paths)
+        owners.update(normalized_paths)
+        patch_inputs.append((patch, patch_file, paths))
+    for patch, patch_file, paths in patch_inputs:
         for include in paths if patch['strategy'] == 'sections' else [None]:
             args = ([f'--include={include}'] if include else []) + [str(patch_file)]
             pending = git_apply(src, ['--reverse', '--check', *args]).returncode != 0

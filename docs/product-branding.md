@@ -69,8 +69,7 @@ macOS 적용은 오래된 입력을 먼저 재생성한다. `--check`는 재생�
 Windows 적용에는 이미지 생성 도구나 Python이 필요 없다.
 이 스크립트들은 앱을 빌드하지 않는다.
 
-Windows에서는 아래 명령이 같은 설정을 사용한다. 설정 읽기와 제품명 적용에
-별도 Python 설치가 필요하지 않다.
+Windows에서는 아래 명령이 같은 설정과 빌드용 Python을 사용한다.
 
 ```powershell
 .\tools\overlay\install-branding.ps1 -ChromiumSrc F:\chromium\src -CheckOnly
@@ -85,19 +84,21 @@ Windows에서는 아래 명령이 같은 설정을 사용한다. 설정 읽기�
 새 이름의 앱으로 간주하지 않는다. 실제 앱에 반영하려면 이후 전체 앱 링크가
 필요하다. 이름 변경만으로 새 output directory를 만들 필요는 없다.
 
-`0002-brand-yee-application.patch`는 `OVERLAY_BRANDING_MANAGED=1` 표식과 GRIT
-part 연결, 작은따옴표가 포함된 제품명의 macOS 서명 Python template 연결을
-둔다. Windows 설치 프로그램의 별도 RC 생성기도 선언된 제품명 part를 읽고,
+`0002-brand-yee-application.patch`는 작은따옴표가 포함된 제품명의 macOS 서명
+Python template 등 Chromium 코드의 연결을 둔다.
+Windows 설치 프로그램의 별도 RC 생성기도 선언된 제품명 part를 읽고,
 그 part를 GN action 입력으로 추적한다. 일반 Windows 버전 RC는 UTF-16으로,
 공통 버전 메타데이터는 UTF-8로 생성하며 crash client의 제품명 변환도 UTF-8을
 사용한다. Linux KV 파서는 값에 들어간 `=`를 보존한다. 이름 자체는 넣지 않는다.
 `BRANDING`은 Chromium의 실제 `version.py`가
 모든 줄을 `KEY=VALUE`로 읽으므로 주석을 표식으로 쓰지 않는다.
-설치 스크립트는 `BRANDING`의
-네 제품명 `PRODUCT_*` 필드, `PRODUCT_INTERNAL_URL_SCHEME`과 생성된 두 `.grdp`를
-관리하며, 같은 설정을 재적용하면
-파일의 수정 시간을 유지한다. 과거 고정 `Yee` 패치가 적용된 체크아웃에서도
-새 `0002` 연결을 적용할 수 있다. 이전 overlay의 주석 표식도 이전한다.
+설치 스크립트는 `BRANDING`의 관리 표식, 네 제품명 `PRODUCT_*` 필드,
+`PRODUCT_INTERNAL_URL_SCHEME`과 두 `.grdp`를 생성한다.
+`brand_strings.py`는 변하지 않는 Git 원본에서 GRD의 제품명 part 연결을 생성하며,
+선택적인 문구·번역 정책이 없어도 이 연결을 유지한다.
+이 생성 입력은 `0002`에 포함하지 않는다. 같은 설정을 재적용하면 수정 시간을 유지한다.
+관리 표식이 없는 `BRANDING`은 Git 원본과 같아야 하며, 미관리 사용자 수정은
+미리보기부터 거부한다. 관리 표식이 있는 이전 설치와 주석 표식은 계속 이전할 수 있다.
 `regenerate-shell-patch.py`는 `0002`의 모든 소유 경로를 `0001`에서 제외해
 새 체크아웃의 순차 적용을 유지한다.
 

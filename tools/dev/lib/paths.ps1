@@ -21,13 +21,14 @@ $script:ChromiumRoot = if ($env:YEE_CHROMIUM_ROOT) {
 }
 $script:ChromiumSrc = Join-Path $script:ChromiumRoot 'src'
 $script:YeeOutName = if ($env:YEE_OUT_NAME) { $env:YEE_OUT_NAME } else { 'YeePilot' }
-if ($script:YeeOutName -notmatch '^[A-Za-z0-9._-]+$') {
+if ($script:YeeOutName -notmatch '^[A-Za-z0-9._-]+$' -or $script:YeeOutName -in @('.', '..')) {
     throw "YEE_OUT_NAME must be one directory name without spaces or separators: $script:YeeOutName"
 }
 $script:YeeOutDir = Join-Path $script:ChromiumSrc "out\$script:YeeOutName"
 $script:YeeBrowserBin = Join-Path $script:YeeOutDir 'chrome.exe'
 $script:YeeArgsFile = Join-Path $script:YeeRoot 'build\args.gn'
 $script:YeeBuildJobs = if ($env:YEE_BUILD_JOBS) { $env:YEE_BUILD_JOBS } else { '2' }
+$script:YeeSyncJobs = if ($env:YEE_SYNC_JOBS) { $env:YEE_SYNC_JOBS } else { '2' }
 
 function Write-YeePaths {
     Write-Host "project root:   $script:YeeRoot"

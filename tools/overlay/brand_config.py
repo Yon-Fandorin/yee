@@ -7,6 +7,7 @@ from html import escape
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 
 
@@ -152,8 +153,14 @@ def branding_plan(chromium_src, brand, check_only=False):
     text = re.sub(rf"(?m)^{re.escape(LEGACY_BRANDING_MARKER)}\r?\n", "", text)
     if any("=" not in line for line in text.splitlines()):
         raise ValueError("BRANDING requires KEY=VALUE on every line for Chromium version.py")
-    if BRANDING_MARKER not in text.splitlines() and not check_only:
-        raise ValueError("apply the 0002 branding patch before installing names")
+    if BRANDING_MARKER not in text.splitlines():
+        upstream = subprocess.run(
+            ['git', '-C', str(src), 'show', 'HEAD:chrome/app/theme/chromium/BRANDING'],
+            capture_output=True)
+        if (upstream.returncode or text.replace('\r\n', '\n')
+                != upstream.stdout.decode('utf-8').replace('\r\n', '\n')):
+            raise ValueError("Unmanaged change to branding input: chrome/app/theme/chromium/BRANDING")
+        text = text.rstrip('\r\n') + '\n' + BRANDING_MARKER + '\n'
     for key, value in brand.product_values.items():
         pattern = rf"(?m)^{key}=[^\r\n]*"
         text, count = re.subn(pattern, lambda _: key + "=" + value, text)

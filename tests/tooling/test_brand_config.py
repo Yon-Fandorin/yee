@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[2]
+CHROMIUM_SRC = Path(os.environ['YEE_CHROMIUM_ROOT']) / 'src' if os.environ.get('YEE_CHROMIUM_ROOT') else ROOT / '.local-build/chromium/src'
 SPEC = importlib.util.spec_from_file_location("brand_config", ROOT / "tools/overlay/brand_config.py")
 branding = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = branding
@@ -46,6 +47,11 @@ class BrandConfigTest(unittest.TestCase):
         self.src = self.repo / "chromium/src"
         self.branding_path = self.src / "chrome/app/theme/chromium/BRANDING"
         self.branding_path.parent.mkdir(parents=True)
+        self.branding_path.write_text(UPSTREAM_BRANDING)
+        for args in (("init", "-q"), ("add", "."),
+                     ("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                      "commit", "-qm", "upstream")):
+            subprocess.run(["git", "-C", str(self.src), *args], check=True, capture_output=True)
         self.branding_path.write_text(branding.BRANDING_MARKER + "\n" + UPSTREAM_BRANDING)
 
     def brand(self, name="Orbit & Co", **extra):
@@ -132,14 +138,29 @@ class BrandConfigTest(unittest.TestCase):
         self.assertEqual(self.branding_path.read_bytes(), before)
         self.assertEqual(list(self.src.joinpath("chrome/app").glob("yee_*.grdp")), [])
 
-    def test_missing_marker_or_duplicate_key_refuses_before_writes(self):
-        for text in (UPSTREAM_BRANDING, branding.BRANDING_MARKER + "\n" + UPSTREAM_BRANDING + "PRODUCT_SHORTNAME=duplicate\n"):
+    def test_fresh_upstream_branding_installs_its_own_marker_and_preserves_identity(self):
+        """0002 없이 Git 원본에 이름을 설치하고 같은 입력은 다시 쓰지 않는다."""
+        self.branding_path.write_text(UPSTREAM_BRANDING)
+        self.install(self.brand())
+        text = self.branding_path.read_text()
+        self.assertIn(branding.BRANDING_MARKER + "\n", text)
+        self.assertIn("PRODUCT_FULLNAME=Orbit & Co\n", text)
+        self.assertIn("MAC_BUNDLE_ID=org.chromium.Chromium\n", text)
+        before = (self.branding_path.read_bytes(), self.branding_path.stat().st_mtime_ns)
+        self.install(self.brand())
+        self.assertEqual(before, (self.branding_path.read_bytes(), self.branding_path.stat().st_mtime_ns))
+
+    def test_unmanaged_edit_or_duplicate_key_refuses_before_writes(self):
+        """표시 이름을 수동 수정한 미관리 입력도 미리보기에서 덮어쓰지 않는다."""
+        for text in (UPSTREAM_BRANDING.replace("PRODUCT_SHORTNAME=Chromium", "PRODUCT_SHORTNAME=Manual"),
+                     branding.BRANDING_MARKER + "\n" + UPSTREAM_BRANDING + "PRODUCT_SHORTNAME=duplicate\n"):
             self.branding_path.write_text(text)
             before = self.branding_path.read_bytes()
-            with self.assertRaises(ValueError):
-                self.install(self.brand())
-            self.assertEqual(self.branding_path.read_bytes(), before)
-            self.assertEqual(list(self.src.joinpath("chrome/app").glob("yee_*.grdp")), [])
+            for check_only in (True, False):
+                with self.assertRaises(ValueError):
+                    self.install(self.brand(), check_only=check_only)
+                self.assertEqual(self.branding_path.read_bytes(), before)
+                self.assertEqual(list(self.src.joinpath("chrome/app").glob("yee_*.grdp")), [])
 
     def test_invalid_names_and_logo_paths_are_rejected(self):
         for name in ("", "bad/name", "bad\nname", " Name", "Name.", "Name $VALUE", "Name @PATCH@"):
@@ -205,19 +226,19 @@ class BrandConfigTest(unittest.TestCase):
             self.install(self.brand())
         self.assertEqual(self.branding_path.read_bytes(), before)
 
-    @unittest.skipUnless((ROOT / ".local-build/chromium/src/build/util/version.py").is_file(),
+    @unittest.skipUnless((CHROMIUM_SRC / "build/util/version.py").is_file(),
                          "local Chromium version utility is required")
     def test_installed_branding_is_readable_by_actual_chromium_version_generator(self):
         name = "O'Reilly & 새 이름"
         self.install(self.brand(name))
         env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         output = subprocess.check_output([
-            sys.executable, str(ROOT / ".local-build/chromium/src/build/util/version.py"),
+            sys.executable, str(CHROMIUM_SRC / "build/util/version.py"),
             "-f", str(self.branding_path), "-t", "@PRODUCT_FULLNAME@"],
             text=True, env=env)
         self.assertEqual(output.rstrip("\n"), name)
 
-    @unittest.skipUnless((ROOT / ".local-build/chromium/src/build/util/version.py").is_file(),
+    @unittest.skipUnless((CHROMIUM_SRC / "build/util/version.py").is_file(),
                          "local Chromium version utility is required")
     def test_actual_generator_updates_cpp_url_scheme_from_brand_input(self):
         for name in ("Orbit", "Nova"):
@@ -225,7 +246,7 @@ class BrandConfigTest(unittest.TestCase):
                                               "logo_crop_size": 820}))
             self.install(branding.load_brand(self.config, self.repo))
             output = subprocess.check_output([
-                sys.executable, str(ROOT / ".local-build/chromium/src/build/util/version.py"),
+                sys.executable, str(CHROMIUM_SRC / "build/util/version.py"),
                 "-f", str(self.branding_path),
                 "-i", str(ROOT / "components/branding/internal_url_scheme.h.in")],
                 text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})

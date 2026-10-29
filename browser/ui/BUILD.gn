@@ -6,18 +6,37 @@ assert(is_win || is_mac || is_linux || is_chromeos)
 
 import("//testing/test.gni")
 
+source_set("brand") {
+  public = [ "brand.h" ]
+  public_deps = [
+    "//base",
+    "//base/version_info",
+  ]
+}
+
 source_set("shell_features") {
   public = [ "shell_features.h" ]
   sources = [ "shell_features.cc" ]
   deps = [ "//base" ]
 }
 
-source_set("project_navigation") {
-  friend = [ ":site_controls_browsertests" ]
+source_set("project_navigation_headers") {
   public = [
     "projects/project_navigation_controller.h",
     "projects/project_navigation_presentation.h",
   ]
+  public_deps = [
+    ":yee_ui_headers",
+    "//base",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//ui/base/unowned_user_data",
+    "//ui/views",
+  ]
+}
+
+source_set("project_navigation") {
+  friend = [ ":site_controls_browsertests" ]
   sources = [
     "projects/project_controls.cc",
     "projects/project_controls.h",
@@ -31,14 +50,7 @@ source_set("project_navigation") {
     "projects/project_row_view.cc",
     "projects/project_row_view.h",
   ]
-  public_deps = [
-    ":yee_ui",
-    "//base",
-    "//chrome/browser/ui/browser_window",
-    "//chrome/browser/ui/tabs:tab_strip",
-    "//ui/base/unowned_user_data",
-    "//ui/views",
-  ]
+  public_deps = [ ":project_navigation_headers" ]
   deps = [
     "webui:strings",
     "//chrome/app:command_ids",
@@ -47,8 +59,11 @@ source_set("project_navigation") {
     "//chrome/browser/favicon",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
+    "//chrome/browser/ui:browser_commands",
     "//chrome/browser/ui/color:color_headers",
     "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/views/frame:browser_view_header",
+    "//chrome/browser/ui/views/frame:multi_contents_view",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/toolbar",
     "//chrome/browser/yee_projects:browser",
@@ -111,12 +126,10 @@ source_set("product_logo") {
 
 source_set("default_browser_prompt") {
   public = [ "default_browser_prompt.h" ]
-  sources = [
-    "brand.h",
-    "default_browser_prompt.cc",
-  ]
+  sources = [ "default_browser_prompt.cc" ]
   public_deps = [ "//ui/base" ]
   deps = [
+    ":brand",
     ":product_logo",
     "webui:strings",
     "//base",
@@ -193,6 +206,7 @@ source_set("agent_bridge_prompt") {
     "//ui/views",
   ]
   deps = [
+    ":brand",
     "//cc/paint",
     "//skia",
     "//ui/base",
@@ -207,7 +221,10 @@ test("agent_bridge_prompt_unittests") {
   ]
   deps = [
     ":agent_bridge_prompt",
+    ":brand",
+    "//base/test:test_support",
     "//testing/gtest",
+    "//ui/events:test_support",
     "//ui/views:test_support",
   ]
   data_deps = [ "//ui/resources:ui_test_pak_data" ]
@@ -246,13 +263,17 @@ test("multi_contents_geometry_unittests") {
   ]
 }
 
-source_set("yee_ui") {
+source_set("browser_surface_presentation") {
+  public = [ "browser_surface_presentation.h" ]
+  public_deps = [ "//skia" ]
+}
+
+source_set("yee_ui_headers") {
   public = [
     "agent_bridge.h",
     "agent_tab_activity.h",
     "browser_surface_color_controller.h",
     "browser_surface_layout.h",
-    "browser_surface_presentation.h",
     "browser_surface_presentation_binding.h",
     "disclosure_arrow.h",
     "favorites.h",
@@ -273,10 +294,27 @@ source_set("yee_ui") {
     "vertical_tab_text_view.h",
     "yee_ui.h",
   ]
+  public_deps = [
+    ":agent_bridge_prompt",
+    ":agent_browser_contract",
+    ":agent_tab_activity",
+    ":browser_surface_presentation",
+    ":browser_surface_transition",
+    ":multi_contents_geometry",
+    ":page_viewport_geometry",
+    ":page_viewport_migration",
+    ":shell_features",
+    "//chrome/browser/ui/browser_window",
+    "//content/public/browser",
+    "//ui/gfx/animation",
+    "//ui/views",
+  ]
+}
+
+source_set("yee_ui") {
   sources = [
     "agent_bridge.cc",
     "agent_bridge_script.h",
-    "brand.h",
     "browser_surface_color_controller.cc",
     "browser_surface_layout.cc",
     "browser_surface_presentation_binding.cc",
@@ -298,21 +336,10 @@ source_set("yee_ui") {
     "yee_ui.cc",
   ]
 
-  public_deps = [
-    ":agent_bridge_prompt",
-    ":agent_browser_contract",
-    ":agent_tab_activity",
-    ":browser_surface_transition",
-    ":multi_contents_geometry",
-    ":page_viewport_geometry",
-    ":page_viewport_migration",
-    ":shell_features",
-    "//content/public/browser",
-    "//ui/gfx/animation",
-    "//ui/views",
-  ]
+  public_deps = [ ":yee_ui_headers" ]
 
   deps = [
+    ":brand",
     ":theme_tint",
     "webui:strings",
     "//base",
@@ -321,9 +348,11 @@ source_set("yee_ui") {
     "//chrome/app/theme:theme_resources",
     "//chrome/app/vector_icons",
     "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui:tab_ui_helper",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/controls",
+    "//chrome/browser/ui/views/frame:custom_corners_background",
     "//chrome/browser/ui/views/location_bar",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/toolbar",
@@ -339,7 +368,7 @@ source_set("yee_ui") {
     "//ui/base",
     "//ui/color",
     "//ui/compositor",
-    "//ui/compositor_extra",
+    "//ui/decoration",
     "//ui/gfx",
     "//ui/gfx/animation",
   ]
@@ -382,6 +411,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/prefs:util",
     "//chrome/browser/profiles:profile_io_data",
     "//chrome/browser/sessions:test_support",
+    "//chrome/browser/ui:browser_tabstrip",
     "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui:ui_features",
     "//chrome/browser/ui/animation",
@@ -392,14 +422,17 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/tabs",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/animations",
+    "//chrome/browser/ui/views/frame:browser_view_header",
     "//chrome/browser/ui/views/page_info",
+    "//chrome/browser/ui/views/tabs:new_tab_button",
+    "//chrome/browser/ui/views/tabs:tab_style_views",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/yee_content_blocking:browser",
     "//chrome/browser/yee_projects:browser",
     "//chrome/renderer",
-    "//chrome/test:browser_tests_runner",
     "//chrome/test:test_support",
     "//chrome/test:test_support_ui",
+    "//chrome/test/base:browser_tests_runner",
     "//components/bookmarks/browser",
     "//components/bookmarks/common",
     "//components/bookmarks/managed",

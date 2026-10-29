@@ -1,12 +1,5 @@
 # Build helpers; loaded by common.ps1.
 
-function Get-GnArguments {
-    $arguments = Get-Content -LiteralPath $script:YeeArgsFile -Encoding UTF8 |
-        ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -and -not $_.StartsWith('#') }
-    return ($arguments -join ' ')
-}
-
 function Set-YeeCacheEnvironment {
     $cacheRoot = Join-Path $script:LocalBuildRoot 'cache'
     $env:XDG_CACHE_HOME = $cacheRoot

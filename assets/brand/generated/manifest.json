@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_name": "Yee",
   "short_name": "Yee",
-  "generator_sha256": "a785af9159388107bbd14377e459f329c9bd87a38123dd221f213b3e129334df",
+  "generator_sha256": "c26c1f409bde5c0d86691c6a41f2975401243af3efd605b0f101f173457cd831",
   "source": "assets/brand/yee-logo.svg",
   "source_sha256": "ed92449cd7e02cc59ff4a279d3ac26adac83503c66126f8564faa39418d11ef6",
   "palette": {
@@ -15,9 +15,9 @@
   },
   "upstream_inputs": {
     "chrome/browser/resources/side_panel/customize_chrome/icons/mini_new_tab_page.svg": "83221a8e6f90f48946640ef05ed159423d7fdee6",
-    "chrome/browser/resources/webui_toolbar/icons.ts": "341bd234851df4a8e0ee51d0b9fab6b34f114075",
+    "chrome/browser/resources/webui_toolbar/icons.ts": "e27a671b9e506d26a602be358557b08035f00aaf",
     "ui/webui/resources/cr_elements/icons.html.ts": "d3f4f9fb266581aaf26599a257db66aee86a75fd",
-    "chrome/browser/resources/settings/icons.html.ts": "d4f8b528ca3ce38a5e95990af483492e2486c74c",
+    "chrome/browser/resources/settings/icons.html.ts": "bd369ccfa5ab6850d3d2ba288a43f46874d06afc",
     "chrome/browser/resources/webui_browser/icons.html.ts": "06dfcf11fc081ce29cdff2660810644b35ef03fa"
   },
   "files": [
@@ -94,7 +94,7 @@
     {
       "source": "files/chrome/browser/resources/webui_toolbar/icons.ts",
       "destination": "chrome/browser/resources/webui_toolbar/icons.ts",
-      "sha256": "edef9bd686403da9e7b2b68dcd00c1d90fb2bac340ed6e6b5bb1cc86a34dc143"
+      "sha256": "487a634405fb9c66e699da099da0414ac8a668e7926c16fc131a300661b2af2e"
     },
     {
       "source": "files/ui/webui/resources/cr_elements/icons.html.ts",
@@ -104,7 +104,7 @@
     {
       "source": "files/chrome/browser/resources/settings/icons.html.ts",
       "destination": "chrome/browser/resources/settings/icons.html.ts",
-      "sha256": "354e4d06665ae1352f137578d8bdf1ae01b8283e96c2cf6cba643d71c21ac8ec"
+      "sha256": "fa350f735538ee5fb579d0faad89b8d6cf32bc35fc35855b8840e6a4b4c7ab66"
     },
     {
       "source": "files/chrome/browser/resources/webui_browser/icons.html.ts",

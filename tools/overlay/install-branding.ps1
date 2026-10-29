@@ -60,7 +60,7 @@ function Read-BrandingInput {
     return $inputText
 }
 function New-ProductMessage([string] $Id, [string] $Value) {
-    $escaped = [System.Security.SecurityElement]::Escape($Value)
+    $escaped = [System.Security.SecurityElement]::Escape($Value).Replace('&apos;', '&#x27;')
     return "  <message name=`"$Id`" desc=`"Configured product name.`" translateable=`"false`">$escaped</message>`n"
 }
 function New-ProductPart([string] $Messages) {
@@ -68,8 +68,18 @@ function New-ProductPart([string] $Messages) {
 }
 function Get-BrandingPlan([switch] $Preview) {
     $text = Read-BrandingInput
-    if (-not $Preview -and -not [regex]::IsMatch($text, '(?m)^OVERLAY_BRANDING_MANAGED=1\r?$')) {
-        throw 'Apply the 0002 branding patch before installing names.'
+    if (-not [regex]::IsMatch($text, '(?m)^OVERLAY_BRANDING_MANAGED=1\r?$')) {
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $upstream = @(& git -C $ChromiumSrc show 'HEAD:chrome/app/theme/chromium/BRANDING' 2>&1)
+            $exitCode = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $previousPreference }
+        $upstreamText = ($upstream -join "`n") + "`n"
+        if ($exitCode -ne 0 -or $text.Replace("`r`n", "`n") -cne $upstreamText) {
+            throw 'Unmanaged change to branding input: chrome/app/theme/chromium/BRANDING'
+        }
+        $text = $text.TrimEnd([char[]]"`r`n") + "`nOVERLAY_BRANDING_MANAGED=1`n"
     }
     $values = [ordered]@{
         PRODUCT_FULLNAME = $brand.Name

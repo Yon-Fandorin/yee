@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
+#include "base/time/time.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/base/models/image_model.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
@@ -32,6 +34,16 @@ class View;
 }
 
 namespace yee {
+
+struct FavoritesLayoutAnimationSettings {
+  base::TimeDelta duration;
+  gfx::Tween::Type tween;
+  double retarget_reset_threshold;
+};
+
+// Favorites의 재배치 규칙을 일반 탭바의 공유 시계와 분리한다.
+std::optional<FavoritesLayoutAnimationSettings>
+GetFavoritesLayoutAnimationSettings(bool vertical);
 
 enum class FavoritesDragIntent { kNone, kPin, kUnpin, kRejected };
 

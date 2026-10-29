@@ -128,14 +128,23 @@ DockGrid ComputeDockGrid(int item_count, int available_width) {
 gfx::Size EmptyDockSize(int available_width) {
   const DockGrid grid = ComputeDockGrid(1, available_width);
   const int horizontal_inset = DockHorizontalInset();
-  const int width =
-      available_width > 0
-          ? available_width
-          : grid.cell_width + 2 * horizontal_inset;
+  const int width = available_width > 0
+                        ? available_width
+                        : grid.cell_width + 2 * horizontal_inset;
   return gfx::Size(width, grid.cell_height);
 }
 
 }  // namespace
+
+std::optional<FavoritesLayoutAnimationSettings>
+GetFavoritesLayoutAnimationSettings(bool vertical) {
+  if (!vertical || !UsesExpandedSidebarPresentation()) {
+    return std::nullopt;
+  }
+  return FavoritesLayoutAnimationSettings{
+      base::Milliseconds(kSidebarMetrics.favorites_shift_duration_ms),
+      gfx::Tween::ACCEL_40_DECEL_100_3, 0.0};
+}
 
 FavoritesDragIntent ResolveFavoritesDragIntent(bool dragging_pinned_tabs,
                                                bool over_favorites,
@@ -148,9 +157,8 @@ FavoritesDragIntent ResolveFavoritesDragIntent(bool dragging_pinned_tabs,
   if (!over_favorites) {
     return FavoritesDragIntent::kNone;
   }
-  return CanFavoriteDrop(pinned_count, adding)
-             ? FavoritesDragIntent::kPin
-             : FavoritesDragIntent::kRejected;
+  return CanFavoriteDrop(pinned_count, adding) ? FavoritesDragIntent::kPin
+                                               : FavoritesDragIntent::kRejected;
 }
 
 gfx::Size FavoritesDockMinimumSize(int /*item_count*/) {
@@ -247,11 +255,9 @@ views::ProposedLayout CalculateFavoritesDockLayout(
 
   consume_incoming();
 
-  layouts.host_size =
-      gfx::Size(available_width > 0
-                    ? available_width
-                    : content_right + horizontal_inset,
-                content_bottom);
+  layouts.host_size = gfx::Size(
+      available_width > 0 ? available_width : content_right + horizontal_inset,
+      content_bottom);
   return layouts;
 }
 
@@ -285,8 +291,7 @@ gfx::Rect TabDragPreviewBoundsInTabStrip(
     const gfx::Size& source_tile_size) {
   const int pad = kSidebarMetrics.tab_strip_horizontal_padding;
   const gfx::Size row_size(
-      std::max(DockMinCell(),
-               tab_strip.width() - 2 * pad - tab_leading_inset),
+      std::max(DockMinCell(), tab_strip.width() - 2 * pad - tab_leading_inset),
       kSidebarMetrics.tab_row_height);
   gfx::Vector2d grab_offset = source_grab_offset;
   if (!source_tile_size.IsEmpty() && source_tile_size != row_size) {
@@ -375,8 +380,7 @@ std::optional<int> FavoritesInsertIndexForTile(const views::View& dock,
     return item_count;
   }
 
-  int col =
-      stride_x > 0 ? (center.x() - horizontal_inset) / stride_x : 0;
+  int col = stride_x > 0 ? (center.x() - horizontal_inset) / stride_x : 0;
   int row = stride_y > 0 ? center.y() / stride_y : 0;
   col = std::clamp(col, 0, grid.columns - 1);
   row = std::max(0, row);
@@ -952,8 +956,8 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
     }
     icon_->SetBoundsRect(icon_bounds);
     const int title_x = pad + icon_size + gap;
-    gfx::Rect title_bounds(
-        title_x, 0, std::max(0, width() - title_x - pad), height());
+    gfx::Rect title_bounds(title_x, 0, std::max(0, width() - title_x - pad),
+                           height());
     if (base::i18n::IsRTL()) {
       title_bounds.set_x(GetMirroredXForRect(title_bounds));
     }
@@ -962,13 +966,11 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
 
   void OnPaint(gfx::Canvas* canvas) override {
     if (over_favorites_) {
-      PaintFavoritesCellBackground(canvas, GetLocalBounds(),
-                                   SidebarItemVisualState::kDragging,
-                                   /*hover_progress=*/1.0,
-                                   GetWidget()
-                                       ? GetWidget()->ShouldPaintAsActive()
-                                       : true,
-                                   *GetColorProvider());
+      PaintFavoritesCellBackground(
+          canvas, GetLocalBounds(), SidebarItemVisualState::kDragging,
+          /*hover_progress=*/1.0,
+          GetWidget() ? GetWidget()->ShouldPaintAsActive() : true,
+          *GetColorProvider());
     } else {
       cc::PaintFlags fill;
       fill.setAntiAlias(true);

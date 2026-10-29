@@ -18,19 +18,25 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / ".local-build/chromium/src"
+sys.path.insert(0, str(ROOT / "tools/overlay"))
+from brand_config import load_brand, product_parts
+SRC = (Path(os.environ['YEE_CHROMIUM_ROOT']) / 'src'
+       if os.environ.get('YEE_CHROMIUM_ROOT') else ROOT / '.local-build/chromium/src')
 PATCH_NAME = "0002-brand-yee-application.patch"
 INPUT_PATHS = (
     "chrome/app/theme/chromium/BRANDING",
     "chrome/app/chromium_strings.grd",
     "chrome/installer/mac/signing/build_props_config.py.in",
-    "base/win/embedded_i18n/create_string_rc.py",
-    "base/win/embedded_i18n/generate_embedded_i18n.gni",
+    "base/i18n/win/embedded_i18n/create_string_rc.py",
+    "base/i18n/win/embedded_i18n/generate_embedded_i18n.gni",
     "chrome/installer/util/BUILD.gn",
     "build/util/version.py",
+    "build/util/version_test.py",
     "chrome/process_version_rc_template.gni",
     "chrome/installer/setup/installer_crash_reporter_client.cc",
     "chrome/notification_helper/notification_helper_crash_reporter_client.cc",
@@ -94,17 +100,19 @@ INPUT_PATHS = (
     "components/os_crypt/common/keychain_password_mac.mm",
 )
 ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
 
 
-def command(*args, cwd=None, check=True):
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=ENV)
+def command(*args, cwd=None, check=True, env=None):
+    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=env or ENV)
     if check and result.returncode:
         raise RuntimeError(f"{args}: {result.stderr.strip()}")
     return result
 
 
-@unittest.skipUnless((SRC / "build/util/version.py").is_file() and shutil.which("zsh"),
-                     "requires the local Chromium version utility and zsh")
+@unittest.skipUnless((SRC / "build/util/version.py").is_file()
+                     and (POWERSHELL if os.name == "nt" else shutil.which("zsh")),
+                     "Chromium 원본과 플랫폼 설치 셸 필요")
 class BrandingOverlayTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -117,10 +125,17 @@ class BrandingOverlayTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="branding-overlay-test-")
         self.addCleanup(temporary.cleanup)
         self.base = Path(temporary.name)
+        self.env = ENV
+        if os.name == "nt":
+            shim = self.base / "bin"
+            shim.mkdir()
+            (shim / "python3.cmd").write_text('@"' + sys.executable + '" %*\n')
+            self.env = {**ENV, "PATH": str(shim) + os.pathsep + ENV.get("PATH", "")}
         self.repo = self.base / "product"
         self.overlay = self.repo / "tools/overlay"
         self.overlay.mkdir(parents=True)
-        for name in ("brand_config.py", "brand_strings.py", "product_identity.py", "product_version.py", "install-branding.sh"):
+        for name in ("brand_config.py", "brand_strings.py", "product_identity.py", "product_version.py",
+                     "install-branding.sh", "install-branding.ps1", "brand-config.ps1"):
             shutil.copy(ROOT / "tools/overlay" / name, self.overlay)
         shutil.copytree(ROOT / "tools/overlay/lib", self.overlay / "lib")
         (self.repo / "build").mkdir()
@@ -153,7 +168,7 @@ class BrandingOverlayTest(unittest.TestCase):
         for path, text in self.upstream.items():
             target = src / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text)
+            target.write_bytes(text.encode('utf-8'))
         (src / "structural.cc").write_text("// Upstream structural fixture\n")
         for name in ('android_chrome_version.py', 'LASTCHANGE.dummy'):
             shutil.copy(SRC / 'build/util' / name, src / 'build/util' / name)
@@ -164,13 +179,17 @@ class BrandingOverlayTest(unittest.TestCase):
         return src
 
     def install(self, src=None, check_only=False, check=True):
-        args = ["zsh", str(self.overlay / "install-branding.sh"), str(src or self.src)]
+        args = ([POWERSHELL, "-NoProfile", "-NonInteractive", "-File",
+                 str(self.overlay / "install-branding.ps1"), "-ChromiumSrc", str(src or self.src)]
+                if os.name == "nt" else
+                ["zsh", str(self.overlay / "install-branding.sh"), str(src or self.src)])
         if check_only:
-            args.append("--check")
-        return command(*args, check=check)
+            args.append("-CheckOnly" if os.name == "nt" else "--check")
+        return command(*args, check=check, env=self.env)
 
     def prepare_public_apply(self):
         for name in ("apply.sh", "install-yee-ui-sources.sh", "install-brand-assets.sh",
+                     "apply.ps1", "install-yee-ui-sources.ps1", "install-brand-assets.ps1",
                      "brand_assets.py", "audit-branding.py"):
             shutil.copy(ROOT / "tools/overlay" / name, self.overlay)
         catalog_path = self.repo / "build/overlay.json"
@@ -225,6 +244,11 @@ class BrandingOverlayTest(unittest.TestCase):
                 cwd=self.src)
 
     def apply_overlay(self, *options, check=True):
+        if os.name == "nt":
+            switches = {"--check": "-CheckOnly", "--skip-brand-assets": "-SkipBrandAssets"}
+            return command(POWERSHELL, "-NoProfile", "-NonInteractive", "-File",
+                           str(self.overlay / "apply.ps1"), "-ChromiumSrc", str(self.src),
+                           *(switches[option] for option in options), check=check, env=self.env)
         return command("zsh", str(self.overlay / "apply.sh"), str(self.src),
                        *options, check=check)
 
@@ -324,6 +348,9 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         self.rename("O'Reilly & 새 이름", short_name="새 이름")
         self.install()
         self.version_and_signing_name("O'Reilly & 새 이름")
+        brand = load_brand(self.repo / "branding/brand.json", self.repo)
+        for filename, expected in product_parts(brand).items():
+            self.assertEqual((self.src / "chrome/app" / filename).read_bytes(), expected.encode('utf-8'))
         installed = self.snapshot()
         self.install()
         self.install(check_only=True)
@@ -335,14 +362,9 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
             with self.subTest(legacy=legacy):
                 self.src = self.prepare("legacy-" + legacy)
                 branding = self.src / INPUT_PATHS[0]
-                branding.write_text(branding.read_text().replace("=Chromium", "=Yee"))
+                branding.write_text("OVERLAY_BRANDING_MANAGED=1\n"
+                                    + branding.read_text().replace("=Chromium", "=Yee"))
                 if legacy == "comment-marker":
-                    legacy_patch = self.base / "legacy-comment.patch"
-                    text = self.patch.read_text().split("diff --git a/" + INPUT_PATHS[2])[0]
-                    first_part = text.index("diff --git a/" + INPUT_PATHS[1])
-                    text = text[first_part:]
-                    legacy_patch.write_text(text)
-                    command("git", "apply", str(legacy_patch), cwd=self.src)
                     branding.write_text(
                         "# Product names are managed by the Yee overlay brand installer.\n"
                         + branding.read_text())
@@ -358,6 +380,22 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(before, self.snapshot())
 
+    def test_unmanaged_branding_or_grd_edit_is_rejected_before_patch_mutation(self):
+        """관리 표시 없는 이름과 GRD의 사용자 수정은 모든 적용 전에 거부한다."""
+        for relative in INPUT_PATHS[:2]:
+            path = self.src / relative
+            original = path.read_bytes()
+            path.write_bytes(original.replace(b"Chromium", b"Manual", 1))
+            try:
+                before = self.snapshot()
+                for check_only in (True, False):
+                    result = self.install(check_only=check_only, check=False)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Unmanaged change to branding input", result.stderr)
+                    self.assertEqual(before, self.snapshot())
+            finally:
+                path.write_bytes(original)
+
     def test_public_apply_previews_and_installs_enabled_brand_strings(self):
         self.prepare_public_apply()
         before = self.snapshot()
@@ -365,6 +403,8 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         self.assertEqual(before, self.snapshot())
         self.apply_overlay("--skip-brand-assets")
         self.version_and_signing_name("Orbit")
+        connected = {node.get("file") for node in ET.parse(self.src / INPUT_PATHS[1]).iter("part")}
+        self.assertTrue({"yee_product_names.grdp", "yee_app_menu_name.grdp"}.issubset(connected))
         self.assertIn("yee_brand_strings_enabled = true",
                       (self.src / "chrome/app/yee_branding_strings.gni").read_text(encoding="utf-8"))
         generated = self.src / "chrome/app/yee_branding_strings"
@@ -430,7 +470,7 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
                         error = "Branding output is not a file"
                     else:
                         path.symlink_to(external)
-                        error = "Branding output traverses a symlink"
+                        error = "Branding output traverses"
                     try:
                         before = self.snapshot()
                         for options in (("--check", "--skip-brand-assets"), ("--skip-brand-assets",)):
@@ -499,6 +539,7 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         self.assertTrue(audit["blockers"]["brand_strings_not_applied"])
         self.assertEqual(before, self.snapshot())
 
+    @unittest.skipIf(os.name == "nt", "macOS 전용 에셋 준비 경로")
     def test_public_apply_prepares_stale_assets_before_any_checkout_write(self):
         self.prepare_public_apply()
         self.prepare_public_assets()
@@ -539,7 +580,7 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         part = self.src / "chrome/app/yee_product_names.grdp"
         header, rc = self.base / "strings.h", self.base / "strings.rc"
         args = [sys.executable, str(self.src / INPUT_PATHS[3]), '-i', str(grd),
-                '-r', 'resources', '-x', str(xtb), '--header-file', str(header),
+                '-r', 'resources', '-x', xtb.as_posix(), '--header-file', str(header),
                 '--rc-file', str(rc), '--first-resource-id', '1600']
         env = {**ENV, 'PYTHONPATH': os.pathsep.join([
             str(SRC / 'tools/grit'), str(SRC / 'tools/python')])}
@@ -595,7 +636,6 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
 
     def test_upstream_version_utility_regressions(self):
         self.install()
-        shutil.copy(SRC / 'build/util/version_test.py', self.src / 'build/util/version_test.py')
         # Chromium's tests use the mock package API, also provided by stdlib.
         result = command(sys.executable, '-c',
                          'import sys, unittest, unittest.mock; '
@@ -613,9 +653,13 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
             "regenerate_brand_fixture", ROOT / "tools/overlay/regenerate-shell-patch.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        module.ROOT, module.SRC = self.repo, self.src
-        module.PATCH, module.NEW_GLUE = self.repo / "0001.patch", []
-        with contextlib.redirect_stdout(io.StringIO()):
+        module.ROOT, module.PATCH = self.repo, self.repo / "0001.patch"
+        catalog_path = self.repo / "build/overlay.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        catalog["new_glue"] = []
+        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        with mock.patch.object(sys, "argv", ["regenerate-shell-patch.py", "--chromium-src", str(self.src)]), \
+                contextlib.redirect_stdout(io.StringIO()):
             module.main()
         generated = module.PATCH.read_text()
         self.assertIn("structural.cc", generated)

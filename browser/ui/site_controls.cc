@@ -11,7 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_bubble_delegate_view.h"
 #include "chrome/browser/ui/views/yee/brand.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -78,7 +78,7 @@ std::unique_ptr<views::View> CreateSection() {
 class SiteControlsBubble : public LocationBarBubbleDelegateView {
  public:
   SiteControlsBubble(views::View* anchor,
-                     Browser* browser,
+                     BrowserWindowInterface* browser,
                      content::WebContents* contents)
       : LocationBarBubbleDelegateView(anchor, contents),
         browser_(browser),
@@ -216,7 +216,7 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     LocationBarBubbleDelegateView::WebContentsDestroyed();
   }
 
-  const raw_ptr<Browser> browser_;
+  const raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<content::WebContents> contents_;
   const GURL url_;
   raw_ptr<views::Label> protection_heading_ = nullptr;
@@ -228,7 +228,7 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
 
 }  // namespace
 
-SiteControlsButton::SiteControlsButton(Browser* browser)
+SiteControlsButton::SiteControlsButton(BrowserWindowInterface* browser)
     : views::ImageButton(base::BindRepeating(&SiteControlsButton::OnPressed,
                                              base::Unretained(this))),
       browser_(browser) {
@@ -300,8 +300,7 @@ bool SiteControlsButton::OnMousePressed(const ui::MouseEvent& event) {
   // 마우스를 떼기 전에 포커스를 잃어 팝업이 닫힐 수 있다.
   // 누를 때의 의도를 유지해 손을 뗄 때 다시 열리지 않게 한다.
   bubble_was_open_on_mouse_press_ =
-      g_site_controls_bubble &&
-      g_site_controls_bubble->GetAnchorView() == this;
+      g_site_controls_bubble && g_site_controls_bubble->GetAnchorView() == this;
   return views::ImageButton::OnMousePressed(event);
 }
 
@@ -445,7 +444,7 @@ void SiteControlsButton::WebContentsDestroyed() {
 }
 
 bool ShowSiteControlsBubble(views::View* anchor,
-                            Browser* browser,
+                            BrowserWindowInterface* browser,
                             content::WebContents* contents) {
   if (!anchor || !browser || !contents) {
     return false;

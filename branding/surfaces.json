@@ -1043,11 +1043,11 @@
         },
         {
           "scope": "chromium",
-          "path": "base/win/embedded_i18n/create_string_rc.py"
+          "path": "base/i18n/win/embedded_i18n/create_string_rc.py"
         },
         {
           "scope": "chromium",
-          "path": "base/win/embedded_i18n/generate_embedded_i18n.gni"
+          "path": "base/i18n/win/embedded_i18n/generate_embedded_i18n.gni"
         },
         {
           "scope": "chromium",

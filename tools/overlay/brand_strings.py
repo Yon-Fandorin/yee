@@ -145,7 +145,7 @@ def fingerprint(node):
 
 
 def product_parts_template(data):
-    """다른 문자열을 생성하기 전에 0002가 소유한 제품명 연결부를 재현한다."""
+    """Git 원본의 제품명 메시지를 생성한 GRDP 입력에 연결한다."""
     def replace(match):
         node = xml(match.group())
         names = {'IDS_PRODUCT_NAME': 'yee_product_names.grdp',
@@ -284,6 +284,13 @@ def generate_plan(src, brand, policy):
                     rendered.append(target if target in outputs else line)
                 put(dependency_path, ('\n'.join(rendered) + '\n').encode())
 
+        product_root = 'chrome/app/chromium_strings.grd'
+        if product_root not in outputs:
+            original = source.read(product_root)
+            template = product_parts_template(original)
+            originals[product_root] = (original, template)
+            put(product_root, template)
+
         manifest = {'schema_version': 1, 'revision': source.revision,
                     'name': brand.name, 'short_name': brand.short_name,
                     'policy_sha256': digest(brand.strings_policy.read_bytes()),
@@ -328,11 +335,21 @@ def install(src, brand, check_only=False):
         status = disabled_policy_status(src)
         if not status['applied']:
             raise ValueError(status['error'])
-        return
-    policy = json.loads(brand.strings_policy.read_text(encoding='utf-8'))
-    if policy.get('schema_version') != 1:
-        raise ValueError('Unsupported brand string policy')
-    outputs, originals, manifest = generate_plan(src, brand, policy)
+        source = GitSource(src)
+        try:
+            product_root = 'chrome/app/chromium_strings.grd'
+            original = source.read(product_root)
+            template = product_parts_template(original)
+            outputs = {product_root: template}
+            originals = {product_root: (original, template)}
+            manifest = None
+        finally:
+            source.close()
+    else:
+        policy = json.loads(brand.strings_policy.read_text(encoding='utf-8'))
+        if policy.get('schema_version') != 1:
+            raise ValueError('Unsupported brand string policy')
+        outputs, originals, manifest = generate_plan(src, brand, policy)
     old_path = src / MANIFEST
     old = json.loads(old_path.read_text(encoding='utf-8')) if old_path.exists() else {'files': []}
     managed = {item['path']: item['sha256'] for item in old['files']}
@@ -357,8 +374,8 @@ def install(src, brand, check_only=False):
         if current == data:
             continue
         if relative in originals and current not in originals[relative] and digest(current or b'') != managed.get(relative):
-            # 이전 제품명 패치는 두 메시지 사이의 빈 줄도 지우므로 공백 대신
-            # XML 구조로 해당 변경을 비교한다.
+            # 이전 제품명 연결 패치는 두 메시지 사이의 빈 줄도 지우므로
+            # 공백 대신 XML 구조로 해당 변경을 비교한다.
             if relative != 'chrome/app/chromium_strings.grd' or canonical(current) != canonical(originals[relative][1]):
                 raise ValueError('Unmanaged change to branding input: ' + relative)
         if current is not None and relative.startswith(GENERATED.as_posix() + '/') and relative != MANIFEST.as_posix() and relative not in managed:
@@ -375,8 +392,9 @@ def install(src, brand, check_only=False):
                 temporary_path.replace(path)
             finally:
                 temporary_path.unlink(missing_ok=True)
-    print(f"{'Would install' if check_only else 'Installed'} {len(pending)} brand string inputs; "
-          f"{len(manifest['changed_messages'])} messages, {len(manifest['files'])} managed files")
+    detail = (f"; {len(manifest['changed_messages'])} messages, {len(manifest['files'])} managed files"
+              if manifest is not None else '')
+    print(f"{'Would install' if check_only else 'Installed'} {len(pending)} brand string inputs{detail}")
 
 
 def check_inputs(src, brand):

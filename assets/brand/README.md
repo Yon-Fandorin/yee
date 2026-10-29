@@ -38,6 +38,19 @@ macOS의 적용·빌드 스크립트도 오래된 입력을 감지해 다시 생
 Windows의 로고 자산 설치에는 이미지 렌더러가 필요 없으며 동일한 생성 묶음을 복사한다.
 Windows에서 설정을 바꿨다면 macOS에서 묶음을 다시 생성한 뒤 적용한다.
 소스나 해시가 맞지 않는 자산은 빌드에 넣지 않는다.
+
+Chromium만 올리고 브랜드·배색·렌더러가 같다면 Windows에서도 내장 SVG와
+아이콘 모음 5개의 원본을 갱신할 수 있다. 최신 Chromium의 기능 아이콘과 코드를
+보존하며, 검증된 PNG·ICO·Mac 자산은 다시 생성하지 않는다.
+
+```sh
+python3 tools/overlay/brand_assets.py /absolute/chromium/src --refresh-embeds
+```
+
+이 명령은 저장소의 생성 묶음과 원본 해시만 갱신하고 Chromium에는 설치하지 않는다.
+브랜드나 생성기가 바뀌거나 기존 묶음이 손상되면 실패하며 macOS 전체 생성이 필요하다.
+갱신 후 `install-brand-assets.*`로 검사·설치하고 두 OS에서 실제 표시를 검수한다.
+
 독립 감사는 Chromium의 GRIT 연결과 중복 벡터 파일을 다시 읽어,
 묶음에서 빠지거나 적용되지 않은 제품 표식을 실패로 보고한다.
 

@@ -14,7 +14,9 @@ import unittest
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / '.local-build/chromium/src/components/vector_icons'
+CHROMIUM_SRC = (Path(os.environ['YEE_CHROMIUM_ROOT']) / 'src'
+                if os.environ.get('YEE_CHROMIUM_ROOT') else ROOT / '.local-build/chromium/src')
+SOURCE = CHROMIUM_SRC / 'components/vector_icons'
 
 
 @unittest.skipUnless(importlib.util.find_spec('PIL'), '브랜드 렌더러 의존성이 필요하다')
@@ -53,7 +55,7 @@ class InlineProductIconGenerationTest(unittest.TestCase):
         source = generator.load_brand(validate_assets=False).logo_source
         paths = generator.paths_from(ET.parse(source).getroot())
         expected_geometry = [path.attrib['d'] for path in paths]
-        chromium = ROOT / '.local-build/chromium/src'
+        chromium = CHROMIUM_SRC
         upstream_blobs = generator.upstream_input_blobs(chromium)
         outputs = generator.embedded_logos(chromium, paths, upstream_blobs)
         manifest = ROOT / 'assets/brand/generated/manifest.json'

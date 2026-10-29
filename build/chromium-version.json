@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "channel": "Stable",
+  "source_url": "https://chromium.googlesource.com/chromium/src.git",
+  "version": "157.0.8103.27",
+  "revision": "f9d7b13a569b352a0267234ea5740fdecc83ffa2"
+}

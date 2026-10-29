@@ -215,7 +215,7 @@ TEST(YeeSurfaceColorTest, FocusFollowsTextPolarityOnChromaticPages) {
 
 TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
   ui::ColorProviderManager& manager = ui::ColorProviderManager::Get();
-  const size_t cache_size = manager.color_provider_cache_size_for_testing();
+  const size_t cache_size = manager.num_cached_providers_for_testing();
   const auto expected_custom_colors = [](const BrowserSurfacePresentation&
                                              presentation) {
     return std::array<std::pair<ui::ColorId, SkColor>, 26>{
@@ -276,7 +276,7 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     // Security warnings are semantic Chromium state, not Yee presentation.
     EXPECT_EQ(native->GetColor(kColorOmniboxSecurityChipDangerous),
               provider->GetColor(kColorOmniboxSecurityChipDangerous));
-    EXPECT_EQ(cache_size, manager.color_provider_cache_size_for_testing());
+    EXPECT_EQ(cache_size, manager.num_cached_providers_for_testing());
   }
 
   const std::array<ui::ColorId, 26> overridden_ids = {
@@ -340,7 +340,7 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     for (ui::ColorId color_id : overridden_ids) {
       EXPECT_EQ(native->GetColor(color_id), provider->GetColor(color_id));
     }
-    EXPECT_EQ(cache_size, manager.color_provider_cache_size_for_testing());
+    EXPECT_EQ(cache_size, manager.num_cached_providers_for_testing());
   }
 }
 

@@ -23,10 +23,10 @@
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/sessions/session_service_test_helper.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
-#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/tabs/features.h"
@@ -2060,7 +2060,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* tab = model->GetActiveTab();
   ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
   const std::string id = coordinator()->PageId(tab);
-  Browser* target = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* target = CreateBrowser(browser()->GetProfile());
   chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
   auto detached = model->DetachTabAtForInsertion(model->GetIndexOfTab(tab));
   target->tab_strip_model()->InsertDetachedTabAt(0, std::move(detached),
@@ -2407,7 +2407,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* tab = model->GetActiveTab();
   ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
   const std::string id = coordinator()->PageId(tab);
-  Browser* other = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   auto* other_controller = ProjectNavigationController::From(other);
   auto* other_view = BrowserView::GetBrowserViewForBrowser(other);
   other_controller->ShowHub(*project);
@@ -2444,7 +2444,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   const auto id = coordinator()->PageId(first);
   const auto first_url = first->GetContents()->GetLastCommittedURL();
   const int first_count = first_model->count();
-  Browser* other = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       other, embedded_test_server()->GetURL("/empty.html")));
   auto* other_model = other->tab_strip_model();
@@ -2521,7 +2521,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       content::ExecJs(first->GetContents(), "document.title='제목 A';"));
   ASSERT_TRUE(coordinator()->Attach(*first, *project, {}));
   const auto id = coordinator()->PageId(first);
-  Browser* other = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       other, first->GetContents()->GetLastCommittedURL()));
   auto* second = other->tab_strip_model()->GetActiveTab();
@@ -2584,7 +2584,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto page = service()->AttachPage(
       *project, embedded_test_server()->GetURL("/empty.html"), u"보관 자료");
   ASSERT_TRUE(page);
-  Browser* other = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       other, embedded_test_server()->GetURL("/empty.html")));
   auto first_release = coordinator()->BeginReopenPage(*page, browser());
@@ -2621,7 +2621,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* moved = model->GetActiveTab();
   ASSERT_TRUE(coordinator()->Attach(*moved, *project, {}));
   const auto id = coordinator()->PageId(moved);
-  Browser* other = CreateBrowser(browser()->GetProfile());
+  BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       other, embedded_test_server()->GetURL("/title1.html")));
   auto* other_model = other->tab_strip_model();
