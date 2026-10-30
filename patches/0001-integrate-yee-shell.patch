@@ -39540,7 +39540,7 @@ index 16120a47f0..582fde4e30 100644
    // Returns true if the client's sandbox flags allow access to a
    // ServiceWorkerContainer (i.e. not sandboxed without the allow-same-origin
 diff --git a/content/browser/service_worker/service_worker_container_host_unittest.cc b/content/browser/service_worker/service_worker_container_host_unittest.cc
-index 5231dd32d2..785c6079f3 100644
+index 5231dd32d2..7a13e77d3f 100644
 --- a/content/browser/service_worker/service_worker_container_host_unittest.cc
 +++ b/content/browser/service_worker/service_worker_container_host_unittest.cc
 @@ -22,6 +22,7 @@
@@ -39570,7 +39570,7 @@ index 5231dd32d2..785c6079f3 100644
  #include "third_party/blink/public/common/storage_key/storage_key.h"
  #include "third_party/blink/public/common/tokens/tokens.h"
  #include "third_party/blink/public/mojom/service_worker/service_worker_ancestor_frame_type.mojom.h"
-@@ -196,6 +204,71 @@ class ServiceWorkerContainerHostTest : public testing::Test {
+@@ -196,6 +204,72 @@ class ServiceWorkerContainerHostTest : public testing::Test {
                                  /*route_id=*/1));
    }
  
@@ -39621,9 +39621,10 @@ index 5231dd32d2..785c6079f3 100644
 +    request.request_initiator = origin;
 +    network::TestURLLoaderClient client;
 +    mojo::Remote<network::mojom::URLLoader> loader;
-+    wrapped->CreateLoaderAndStart(loader.BindNewPipeAndPassReceiver(), 7, 0,
-+                                  request, client.CreateRemote(),
-+                                  TRAFFIC_ANNOTATION_FOR_TESTS);
++    wrapped->CreateLoaderAndStart(
++        loader.BindNewPipeAndPassReceiver(), 7, 0, request,
++        client.CreateRemote(),
++        net::MutableNetworkTrafficAnnotationTag(TRAFFIC_ANNOTATION_FOR_TESTS));
 +    wrapped.FlushForTesting();
 +
 +    ASSERT_EQ(1u, terminal.total_requests());
@@ -39642,7 +39643,7 @@ index 5231dd32d2..785c6079f3 100644
    blink::mojom::ServiceWorkerErrorType Register(
        blink::mojom::ServiceWorkerContainerHost* container_host,
        GURL scope,
-@@ -1156,6 +1229,46 @@ TEST_F(ServiceWorkerContainerHostTest,
+@@ -1156,6 +1230,46 @@ TEST_F(ServiceWorkerContainerHostTest,
    EXPECT_EQ(1u, bad_messages_.size());
  }
  
