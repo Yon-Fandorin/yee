@@ -33179,7 +33179,7 @@ index a7784a0305..15a1137859 100644
  };
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
-index 4cca85eb84..0451a70949 100644
+index 4cca85eb84..153149b6c9 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 @@ -6,16 +6,24 @@
@@ -33238,7 +33238,7 @@ index 4cca85eb84..0451a70949 100644
  
    ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
  
-@@ -215,6 +233,275 @@ TEST_F(TabGroupHeaderViewTest, EditorBubbleButtonVisibilityOnHover) {
+@@ -215,6 +233,285 @@ TEST_F(TabGroupHeaderViewTest, EditorBubbleButtonVisibilityOnHover) {
    check_editor_bubble_button_visible(false);
  }
  
@@ -33301,25 +33301,35 @@ index 4cca85eb84..0451a70949 100644
 +  ON_CALL(delegate, GetTabGroup()).WillByDefault(testing::ReturnRef(group));
 +  ON_CALL(delegate, GetTabGroupData()).WillByDefault(testing::ReturnRef(data));
 +  auto widget = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
++  ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
++  // 부착 시 현재 화면 포인터로 hover를 읽으므로 먼저 창 밖으로 옮긴다.
++  generator.MoveMouseTo(widget->GetWindowBoundsInScreen().bottom_right() +
++                        gfx::Vector2d(10, 10));
 +  auto* header = widget->SetContentsView(std::make_unique<TabGroupHeaderView>(
 +      delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
 +  header->OnDataChanged(data);
 +  widget->ShowInactive();
 +  EXPECT_FALSE(widget->IsActive());
-+  ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
 +  MoveMouseTo(generator, header, false);
 +  ASSERT_FALSE(header->IsMouseHovered());
 +  const auto resting = yee::ResolveSidebarItemColors(
 +      *header->GetColorProvider(), yee::SidebarItemVisualState::kResting, 0.0,
 +      widget->ShouldPaintAsActive(), /*persistent_surface=*/false);
-+  const auto expect_sidebar_presentation = [&] {
++  const auto expect_sidebar_presentation = [&](const char* phase) {
++    SCOPED_TRACE(phase);
 +    EXPECT_FALSE(header->IsMouseHovered());
-+    EXPECT_FALSE(header->background());
++    EXPECT_FALSE(header->background())
++        << "배경색: "
++        << (header->background()
++                ? color_utils::SkColorToRgbaString(
++                      header->background()->color().ResolveToSkColor(
++                          header->GetColorProvider()))
++                : "없음");
 +    EXPECT_EQ(resting.foreground,
 +              header->title_label_for_testing()->GetEnabledColor());
 +    EXPECT_FALSE(header->collapse_icon_for_testing()->GetVisible());
 +  };
-+  expect_sidebar_presentation();
++  expect_sidebar_presentation("편집기 열기 전");
 +  views::Widget* editor = nullptr;
 +  EXPECT_CALL(delegate, ShowGroupEditorBubble(false)).WillOnce([&](bool) {
 +    auto bubble =
@@ -33334,14 +33344,14 @@ index 4cca85eb84..0451a70949 100644
 +  header->OnMouseReleased(released);
 +  ASSERT_TRUE(editor);
 +  // hover를 다시 보내기 전에 editor 콜백 자체가 Sidebar 표시를 유지해야 한다.
-+  expect_sidebar_presentation();
++  expect_sidebar_presentation("편집기 열기 직후");
 +  EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
 +  editor->CloseWithReason(views::Widget::ClosedReason::kAcceptButtonClicked);
 +  editor = nullptr;
-+  expect_sidebar_presentation();
++  expect_sidebar_presentation("편집기 닫기 직후");
 +  EXPECT_FALSE(header->editor_bubble_button()->GetVisible());
 +  RunPendingMessages();
-+  expect_sidebar_presentation();
++  expect_sidebar_presentation("닫기 알림 처리 후");
 +  EXPECT_FALSE(widget->IsActive());
 +}
 +
@@ -33514,7 +33524,7 @@ index 4cca85eb84..0451a70949 100644
  TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
    MockDelegate delegate;
    ON_CALL(delegate, IsGroupFocused()).WillByDefault(testing::Return(true));
-@@ -228,6 +515,27 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
+@@ -228,6 +525,27 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
        delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
    widget->Show();
  
@@ -33542,7 +33552,7 @@ index 4cca85eb84..0451a70949 100644
    // In focus mode, the 3-dot menu should always be visible and collapse button
    // hidden.
    EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
-@@ -238,11 +546,17 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
+@@ -238,11 +556,17 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
    // Even when hovering over the header, 3-dot button is visible and collapse
    // button is hidden.
    MoveMouseTo(generator, header, true);

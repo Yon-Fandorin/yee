@@ -34,7 +34,13 @@ Widget이 비활성인지 확인한다. Footer도 비활성으로 시작하며 p
 | 일반 행·Favorite·drag preview의 라이트/다크 및 활성/비활성 상태 팔레트 | `YeeSidebarItemColorTest.*` |
 | Resting→Hover→Active→Dragging의 fill·stroke 강도와 실제 합성 표면의 전경 대비 | `YeeSidebarItemColorTest.EveryStateSharesOneThemeAwarePalette` |
 | 세로 Group Header의 resting·hover 표면과 전경이 함께 바뀌고 창 활성 상태를 다시 반영 | `TabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether` |
+| 세로 Group 편집기를 열고 닫아도 기본 배경·전경·펼침 아이콘 상태를 유지 | `TabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed` |
 | Group mark가 브라우저 신호만 사용하고 Agent 상태를 섞지 않음 | `GroupMarkSignalsTest.*` |
+
+세로 Group 편집기 검사는 Header 부착 전에 포인터를 창 밖으로 옮겨 초기 hover가
+이전 화면 위치에 좌우되지 않게 한다. 열기 전·열기 직후·닫기 직후·닫기 알림 처리 후를
+구분해 검사하며, 열기·닫기 콜백 뒤에는 hover를 다시 보내지 않는다. 실패 시 해당
+단계와 남은 배경색을 기록한다.
 
 ## 2. 펼친 Sidebar의 실제 View 구조
 
