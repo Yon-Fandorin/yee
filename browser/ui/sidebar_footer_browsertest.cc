@@ -101,15 +101,20 @@ class SidebarFooterBrowserTest : public InProcessBrowserTest {
     return profile;
   }
 
-  views::View *OpenContexts(BrowserWindowInterface *owner) {
-    views::View *const footer = FooterFor(owner);
+  views::View* OpenContexts(BrowserWindowInterface* owner) {
+    views::View* const footer = FooterFor(owner);
     owner->GetWindow()->Activate();
+    // Windows의 비동기 활성화가 새 bubble을 다시 닫지 않게 먼저 기다린다.
+    if (!base::test::RunUntil([&] { return owner->GetWindow()->IsActive(); })) {
+      ADD_FAILURE() << "프로필 메뉴를 열 부모 창이 활성화되지 않았습니다";
+      return nullptr;
+    }
     ClickFooterControl(footer);
-    views::View *const menu = GetSidebarFooterMenuForTesting(*footer);
+    views::View* const menu = GetSidebarFooterMenuForTesting(*footer);
     if (menu) {
       ClickFooterControl(menu->GetViewByID(kSidebarFooterRootContextViewId));
       if (!base::test::RunUntil([&] {
-            views::View *const current =
+            views::View* const current =
                 GetSidebarFooterMenuForTesting(*footer);
             return !current ||
                    !current->GetViewByID(kSidebarFooterRootContextViewId);

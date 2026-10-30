@@ -81,6 +81,8 @@ trigger·mark·접근성 이름·다시 연 메뉴가 일치하는지 확인한�
 숨김·재표시·삭제와 현재 프로필이 숨겨진 상태의 목록을 확인한다. `ProfileSelectionOpensAndReusesWindow`는 실제 Footer
 선택으로 대상 프로필 창을 열고 다시 선택할 때 재사용하며, 원래 창의 탭과 프로필
 표시가 유지되는지 확인한다. 기존 `site_controls_browsertests` target에서 실행한다.
+프로필 메뉴를 열기 전 부모 창의 실제 활성화를 기다려, Windows의 지연된 활성화가
+방금 연 메뉴를 닫는 상황과 프로필 목록 갱신 결과를 구분한다.
 `SidebarFooterViewTest.*`는 실제 메뉴의 목적지, 키보드 이동과 Back, 선별된 Browser
 action 실행, 접근 가능한 이름, Footer와 독립적인 메뉴 폭, Memory callback을 확인한다.
 `WorkspaceMarkAppearsOnlyInFooter`는 profile mark 중복을 확인한다.

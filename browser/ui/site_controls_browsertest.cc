@@ -17,11 +17,13 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
@@ -358,20 +360,49 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* state = tabs::VerticalTabStripStateController::From(browser());
-  const auto native_window = view->GetWidget()->GetNativeWindow();
   for (bool vertical : {false, true}) {
     SCOPED_TRACE(vertical);
     state->SetVerticalTabsEnabled(vertical);
     base::RunLoop().RunUntilIdle();
+    bool observed_unready_layout = false;
+    // 방향 전환의 실제 배치가 끝나야 화면 좌표가 native 클릭 대상과 맞는다.
+    const bool layout_ready = base::test::RunUntil([&] {
+      auto* current = Button();
+      const bool ready =
+          !BrowserAnimationController::From(browser())->IsAnimating(
+              TabStripAnimations::kVerticalTabStrip) &&
+          current && current->IsDrawn() &&
+          !current->GetLocalBounds().IsEmpty() &&
+          current->GetVisibleBounds().Contains(
+              current->GetLocalBounds().CenterPoint());
+      observed_unready_layout |= !ready;
+      return ready;
+    });
+    RecordProperty(vertical ? "YeeVerticalProtectionObservedUnreadyLayout"
+                            : "YeeHorizontalProtectionObservedUnreadyLayout",
+                   observed_unready_layout ? 1 : 0);
+    ASSERT_TRUE(layout_ready);
+    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
     view->GetWidget()->LayoutRootViewIfNecessary();
     auto* button = Button();
     ASSERT_TRUE(button);
+    RecordProperty(vertical ? "YeeVerticalProtectionButtonBounds"
+                            : "YeeHorizontalProtectionButtonBounds",
+                   button->GetBoundsInScreen().ToString());
+    const auto native_window = view->GetWidget()->GetNativeWindow();
     int click = 0;
     for (bool expected_open : {true, false, true, false}) {
       SCOPED_TRACE(++click);
       SCOPED_TRACE(expected_open);
+      auto* root = button->GetWidget()->GetRootView();
+      auto point = button->GetBoundsInScreen().CenterPoint();
+      views::View::ConvertPointFromScreen(root, &point);
+      auto* target = root->GetEventHandlerForPoint(point);
+      ASSERT_TRUE(target && (target == button || button->Contains(target)));
       ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
           button->GetBoundsInScreen().CenterPoint(), native_window));
+      ASSERT_TRUE(button->IsMouseHovered())
+          << "실제 포인터가 Protection 버튼에 도착하지 않았습니다";
       ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
           ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
           native_window));
