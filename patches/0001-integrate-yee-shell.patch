@@ -11843,7 +11843,7 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..78d6ad76c8 100644
+index 49b4f6dd0d..405e448e39 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 @@ -4,84 +4,356 @@
@@ -18509,7 +18509,7 @@ index 49b4f6dd0d..78d6ad76c8 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7135,357 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7135,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -18691,11 +18691,29 @@ index 49b4f6dd0d..78d6ad76c8 100644
 +      SCOPED_TRACE(testing::Message() << "collapsed=" << collapsed);
 +      std::set<int> sampled_widths;
 +      std::set<int> sampled_heights;
++      std::string frame_samples;
 +      const int start_width = marker()->width();
++      const auto transition_start = base::TimeTicks::Now();
 +      model->ChangeTabGroupVisuals(
 +          group,
 +          tab_groups::TabGroupVisualData(
 +              u"Group motion", tab_groups::TabGroupColorId::kBlue, collapsed));
++      if (collapsed &&
++          views::IsViewClass<TabContainerImpl>(header()->parent())) {
++        // 자식 layout을 전파하지 않는 classic 부모의 첫 tick 전 상태도
++        // 확인한다.
++        const auto check_immediate_icon = [&](auto&& self,
++                                              views::View* current) -> void {
++          if (auto* icon = views::AsViewClass<TabIcon>(current)) {
++            EXPECT_FALSE(icon->GetVisible());
++          }
++          for (views::View* child : current->children()) {
++            self(self, child);
++          }
++        };
++        check_immediate_icon(check_immediate_icon,
++                             GetTabAnchorForModelIndex(view, first_member));
++      }
 +      for (int i = 0; i < 20; ++i) {
 +        tick();
 +        ASSERT_TRUE(marker());
@@ -18703,6 +18721,12 @@ index 49b4f6dd0d..78d6ad76c8 100644
 +        sampled_widths.insert(marker()->width());
 +        const gfx::Rect painted = painted_capsule_bounds();
 +        sampled_heights.insert(painted.height());
++        frame_samples += base::StringPrintf(
++            "frame=%d elapsed_ms=%.1f width=%d height=%d rich=%d reduced=%d\n",
++            i, (base::TimeTicks::Now() - transition_start).InMillisecondsF(),
++            marker()->width(), painted.height(),
++            gfx::Animation::ShouldRenderRichAnimation(),
++            gfx::Animation::PrefersReducedMotion());
 +        EXPECT_LE(std::abs(marker()->height() / 2 - painted.CenterPoint().y()),
 +                  1);
 +        if (collapsed) {
@@ -18728,16 +18752,25 @@ index 49b4f6dd0d..78d6ad76c8 100644
 +              ? yee::kSidebarMetrics.horizontal_group_collapsed_capsule_height
 +              : yee::kSidebarMetrics.horizontal_group_capsule_height;
 +      EXPECT_EQ(final_height, painted_capsule_bounds().height());
-+      EXPECT_TRUE(std::ranges::any_of(sampled_heights, [&](int height) {
-+        return height > yee::kSidebarMetrics
-+                            .horizontal_group_collapsed_capsule_height &&
-+               height < yee::kSidebarMetrics.horizontal_group_capsule_height;
-+      })) << "알약이 접힘·펼침 사이의 실제 중간 높이를 거치지 않음";
++      EXPECT_TRUE(std::ranges::any_of(
++          sampled_heights,
++          [&](int height) {
++            return height > yee::kSidebarMetrics
++                                .horizontal_group_collapsed_capsule_height &&
++                   height <
++                       yee::kSidebarMetrics.horizontal_group_capsule_height;
++          }))
++          << "알약이 접힘·펼침 사이의 실제 중간 높이를 거치지 않음\n"
++          << frame_samples;
 +      const int end_width = marker()->width();
-+      EXPECT_TRUE(std::ranges::any_of(sampled_widths, [&](int width) {
-+        return width > std::min(start_width, end_width) &&
-+               width < std::max(start_width, end_width);
-+      })) << "알약이 양 끝 사이의 실제 중간 폭을 거치지 않음";
++      EXPECT_TRUE(std::ranges::any_of(
++          sampled_widths,
++          [&](int width) {
++            return width > std::min(start_width, end_width) &&
++                   width < std::max(start_width, end_width);
++          }))
++          << "알약이 양 끝 사이의 실제 중간 폭을 거치지 않음\n"
++          << frame_samples;
 +      if (collapsed) {
 +        EXPECT_LT(marker()->width(), expanded_width);
 +        // 접힌 모델은 native 테마를 거쳐도 작은 장식 높이로 복귀한다.
@@ -26431,7 +26464,7 @@ index 26bcb276a9..302fcc5ef8 100644
    // label contains the complete description of the keyword, the second
    // contains a truncated version of the description, for if there is not
 diff --git a/chrome/browser/ui/views/omnibox/BUILD.gn b/chrome/browser/ui/views/omnibox/BUILD.gn
-index be19fc11a6..c4cb92bd07 100644
+index be19fc11a6..40c81a5f64 100644
 --- a/chrome/browser/ui/views/omnibox/BUILD.gn
 +++ b/chrome/browser/ui/views/omnibox/BUILD.gn
 @@ -78,6 +78,8 @@ source_set("omnibox") {
@@ -26451,6 +26484,24 @@ index be19fc11a6..c4cb92bd07 100644
      "//chrome/browser/ui/webui:webui_util",
      "//chrome/browser/ui/webui/omnibox_popup",
      "//chrome/browser/ui/webui/searchbox",
+@@ -396,7 +399,9 @@ if (!is_chromeos_device) {
+       "//chrome/test/interaction",
+       "//components/content_settings/core/browser",
+       "//components/content_settings/core/common",
++      "//components/keyed_service/content",
+       "//components/omnibox/browser",
++      "//components/omnibox/browser:test_support",
+       "//components/permissions",
+       "//components/prefs",
+       "//components/search_engines",
+@@ -404,6 +409,7 @@ if (!is_chromeos_device) {
+       "//components/send_tab_to_self:test_support",
+       "//content/public/browser",
+       "//content/test:test_support",
++      "//services/network/public/cpp",
+       "//testing/gmock",
+       "//testing/gtest",
+       "//ui/events:test_support",
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_aim_presenter.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_aim_presenter.cc
 index 598a7f465f..aeab83d925 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_aim_presenter.cc
@@ -27257,10 +27308,28 @@ index 38f701cf11..fbf820a7c8 100644
        // Set the request time to now when the popup is first shown. This ensures
        // that latency is measured from the user interaction to show, even if the
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-index 2d16070cf4..f6caeaac63 100644
+index 2d16070cf4..72b5f58b06 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-@@ -24,9 +24,12 @@
+@@ -4,11 +4,17 @@
+ 
+ #include "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui.h"
+ 
++#include <memory>
++
++#include "base/callback_list.h"
++#include "base/functional/bind.h"
+ #include "base/run_loop.h"
+ #include "base/test/run_until.h"
+ #include "base/test/scoped_feature_list.h"
+ #include "build/build_config.h"
++#include "chrome/browser/autocomplete/aim_eligibility_service_factory.h"
+ #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
++#include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/themes/test/theme_service_changed_waiter.h"
+ #include "chrome/browser/themes/theme_service.h"
+ #include "chrome/browser/themes/theme_service_factory.h"
+@@ -24,9 +30,12 @@
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/omnibox/full_webui_omnibox_frame.h"
@@ -27273,23 +27342,55 @@ index 2d16070cf4..f6caeaac63 100644
  #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_content.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
-@@ -36,6 +39,7 @@
+@@ -36,9 +45,13 @@
  #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
  #include "chrome/browser/ui/webui/searchbox/webui_omnibox_handler.h"
  #include "chrome/test/base/in_process_browser_test.h"
 +#include "chrome/test/base/interactive_test_utils.h"
  #include "chrome/test/base/ui_test_utils.h"
  #include "chrome/test/permissions/permission_request_manager_test_api.h"
++#include "components/keyed_service/content/browser_context_dependency_manager.h"
++#include "components/omnibox/browser/aim_eligibility_service.h"
  #include "components/omnibox/browser/autocomplete_result.h"
-@@ -52,6 +56,7 @@
++#include "components/omnibox/browser/mock_aim_eligibility_service.h"
+ #include "components/omnibox/browser/omnibox_popup_selection.h"
+ #include "components/omnibox/browser/omnibox_triggered_feature_service.h"
+ #include "components/permissions/embedded_permission_prompt_flow_model.h"
+@@ -51,7 +64,10 @@
+ #include "content/public/browser/web_ui.h"
  #include "content/public/test/browser_test.h"
  #include "content/public/test/browser_test_utils.h"
++#include "services/network/public/cpp/shared_url_loader_factory.h"
++#include "testing/gmock/include/gmock/gmock.h"
  #include "ui/base/interaction/expect_call_in_scope.h"
 +#include "ui/base/test/ui_controls.h"
  #include "ui/native_theme/mock_os_settings_provider.h"
  #include "ui/views/controls/webview/webview.h"
  #include "ui/views/test/widget_activation_waiter.h"
-@@ -156,8 +161,11 @@ OmniboxPopupViewWebUITest::ThemeChangeWaiter::~ThemeChangeWaiter() {
+@@ -136,14 +152,21 @@ class OmniboxPopupViewWebUITest : public InProcessBrowserTest {
+   }
+ 
+   void SetUp() override;
++  void SetUpInProcessBrowserTestFixture() override;
+ 
+  private:
++  static std::unique_ptr<KeyedService> BuildAimEligibilityService(
++      content::BrowserContext* context);
++
+   OmniboxTriggeredFeatureService triggered_feature_service_;
+   base::test::ScopedFeatureList feature_list_;
++  base::CallbackListSubscription create_services_subscription_;
+ };
+ 
+ OmniboxPopupViewWebUITest::OmniboxPopupViewWebUITest() {
+-  feature_list_.InitAndEnableFeature(omnibox::internal::kWebUIOmniboxPopup);
++  feature_list_.InitWithFeatures({omnibox::internal::kWebUIOmniboxPopup,
++                                  omnibox::internal::kWebUIOmniboxAimPopup},
++                                 {});
+ }
+ OmniboxPopupViewWebUITest::~OmniboxPopupViewWebUITest() = default;
+ 
+@@ -156,8 +179,11 @@ OmniboxPopupViewWebUITest::ThemeChangeWaiter::~ThemeChangeWaiter() {
  
  void OmniboxPopupViewWebUITest::CreatePopupForTestQuery() {
    auto* autocomplete_controller = controller()->autocomplete_controller();
@@ -27303,16 +27404,42 @@ index 2d16070cf4..f6caeaac63 100644
  
    // Verify that the popup state manager callback is called when popup opens.
    UNCALLED_MOCK_CALLBACK(
-@@ -208,8 +216,6 @@ void OmniboxPopupViewWebUITest::SetUp() {
+@@ -208,7 +234,34 @@ void OmniboxPopupViewWebUITest::SetUp() {
    InProcessBrowserTest::SetUp();
  }
  
--
--
++void OmniboxPopupViewWebUITest::SetUpInProcessBrowserTestFixture() {
++  InProcessBrowserTest::SetUpInProcessBrowserTestFixture();
++  // 157은 eligible 프로필에서만 presenter를 생성한다. UI 검사는 해당 조건을
++  // 준비한다.
++  create_services_subscription_ =
++      BrowserContextDependencyManager::GetInstance()
++          ->RegisterCreateServicesCallbackForTesting(
++              base::BindRepeating([](content::BrowserContext* context) {
++                AimEligibilityServiceFactory::GetInstance()->SetTestingFactory(
++                    context,
++                    base::BindRepeating(&OmniboxPopupViewWebUITest::
++                                            BuildAimEligibilityService));
++              }));
++}
+ 
++std::unique_ptr<KeyedService>
++OmniboxPopupViewWebUITest::BuildAimEligibilityService(
++    content::BrowserContext* context) {
++  auto service = std::make_unique<testing::NiceMock<MockAimEligibilityService>>(
++      *Profile::FromBrowserContext(context)->GetPrefs(),
++      /*template_url_service=*/nullptr,
++      /*url_loader_factory=*/nullptr, /*identity_manager=*/nullptr,
++      AimEligibilityService::Configuration{});
++  ON_CALL(*service, IsAimEligible()).WillByDefault(testing::Return(true));
++  ON_CALL(*service, IsFuseboxEligible()).WillByDefault(testing::Return(true));
++  ON_CALL(*service, GetLocaleImpl()).WillByDefault(testing::Return("en-US"));
++  return service;
++}
+ 
  // Check that the location bar background (and the background of the textfield
  // it contains) changes when it receives focus, and matches the popup background
- // color.
-@@ -260,6 +266,168 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
+@@ -260,6 +313,168 @@ IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest, PopupLoadsAndAcceptsCalls) {
    popup_view->presenter()->Hide();
  }
  
@@ -27481,7 +27608,7 @@ index 2d16070cf4..f6caeaac63 100644
  class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
   public:
    OmniboxPopupViewWebUIFullV2Test() {
-@@ -278,6 +446,112 @@ class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
+@@ -278,6 +493,112 @@ class OmniboxPopupViewWebUIFullV2Test : public OmniboxPopupViewWebUITest {
    base::test::ScopedFeatureList feature_list_full_v2_;
  };
  
@@ -36570,7 +36697,7 @@ index dca6d70923..a27037493a 100644
    }
  
 diff --git a/chrome/browser/ui/views/tabs/tab_container_impl.cc b/chrome/browser/ui/views/tabs/tab_container_impl.cc
-index b75830793c..d35ad67b00 100644
+index b75830793c..c6a7078028 100644
 --- a/chrome/browser/ui/views/tabs/tab_container_impl.cc
 +++ b/chrome/browser/ui/views/tabs/tab_container_impl.cc
 @@ -28,6 +28,7 @@
@@ -36581,7 +36708,25 @@ index b75830793c..d35ad67b00 100644
  #include "components/tab_groups/tab_group_id.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
  #include "ui/base/mojom/menu_source_type.mojom.h"
-@@ -676,6 +677,31 @@ void TabContainerImpl::AnimateToIdealBounds() {
+@@ -369,6 +370,17 @@ void TabContainerImpl::OnGroupVisualsChanged(
+     const tab_groups::TabGroupVisualData* old_visuals,
+     const tab_groups::TabGroupVisualData* new_visuals) {
+   GetGroupViews(group)->OnGroupVisualsChanged();
++  if (old_visuals &&
++      old_visuals->is_collapsed() != new_visuals->is_collapsed()) {
++    for (int i = 0; i < GetTabCount(); ++i) {
++      Tab* const tab = GetTabAtModelIndex(i);
++      if (tab->group() == group && yee::UsesHorizontalTabGroupCapsule(*tab)) {
++        // 첫 bounds 변경 전에 접힌 멤버 내용의 이전 visible 상태를 갱신한다.
++        yee::InvalidateHorizontalTabGroupMemberLayout(*tab);
++        tab->DeprecatedLayoutImmediately();
++      }
++    }
++  }
+   // The group title may have changed size, so update bounds.
+   // First exit tab closing mode, unless this change was a collapse, in which
+   // case we want to stay in tab closing mode.
+@@ -676,6 +688,31 @@ void TabContainerImpl::AnimateToIdealBounds() {
      AnimateTabSlotViewTo(header, target_bounds);
    }
  
@@ -36613,7 +36758,7 @@ index b75830793c..d35ad67b00 100644
    AnimateViewTo(&*overall_bounds_view_, gfx::Rect(GetIdealTrailingX(), 0));
  
    // Because the preferred size of the tabstrip depends on the IsAnimating()
-@@ -861,6 +887,13 @@ gfx::Rect TabContainerImpl::GetIdealBounds(tab_groups::TabGroupId group) const {
+@@ -861,6 +898,13 @@ gfx::Rect TabContainerImpl::GetIdealBounds(tab_groups::TabGroupId group) const {
    return layout_helper_->group_header_ideal_bounds().at(group);
  }
  
@@ -36627,7 +36772,7 @@ index b75830793c..d35ad67b00 100644
  void TabContainerImpl::Layout(PassKey) {
    UpdateIdealBounds();
  
-@@ -1374,6 +1407,32 @@ gfx::Rect TabContainerImpl::GetTargetBoundsForClosingTab(
+@@ -1374,6 +1418,32 @@ gfx::Rect TabContainerImpl::GetTargetBoundsForClosingTab(
  
    target_bounds.set_x(target_x);
    target_bounds.set_width(tab_overlap);
