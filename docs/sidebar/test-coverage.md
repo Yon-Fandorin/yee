@@ -140,13 +140,19 @@ theme 변경과 즉시 다시 열기에서 이전 anchor·잠금이 남지 않�
 | Tab → 기존 Favorite 좌·우 슬롯, 가득 찬 독 거절 | `DragTabBeforeExistingFavoriteCommitsPin`, `DragTabAfterExistingFavoriteCommitsPin`, `FullFavoritesRejectsWithoutNativeReorder` |
 | Favorite → Group 이동 취소 시 pin·Group·순서 복원, 취소 뒤·활성 drag 중 대상 Group 제거와 capture loss | `CancelFavoriteToGroupDragRestoresSource` |
 | Group 헤더 전체 이동·접힌 상태 유지 | `DragGroupHeader`, `DragCollapsedGroupStaysCollapsed`, `DragCollapsedGroupOverExpandedGroup` |
-| 여러 선택 일반 Tab과 unpinned split 묶음의 기존 Chromium drag 회귀 | runner의 `DragMultipleTabs*`, `DragSplitTabs`, `DragOverSplit*` 테스트 |
+| 여러 선택 일반 Tab과 unpinned split 묶음의 기존 Chromium drag 회귀, Favorites 초대에서 목록 진입 후 source 행 복원·기존 순서 유지 | runner의 `DragMultipleTabs*`, `DragSplitTabs`, `DragOverSplit*` 테스트 |
 | browser/keyboard pin 명령과 세로 Tab context menu가 최대 용량을 지키고 unpin은 허용 | `YeeSidebarFavoriteCommandHonorsCapacityAndUnpin`, `YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin` |
 
 Favorite 취소 회귀는 기존 복원 단언 뒤에 Group을 제거하고 public drag context의
 capture-loss 이벤트를 보낸다. 활성 drag의 landing Group을 지운 경우도 확인한다.
 종료 시점의 모델 조회는 실제 commit에 한정하고, native 종료·pin 변경 뒤에는 Group
 존재를 다시 확인한다. 사라진 Group에는 별도 위치 보정을 적용하지 않는다.
+
+
+`DragOverSplit`은 Favorites 초대 영역에서 탭 목록으로 먼저 진입해 source 행이
+복원되고 첫 재정렬 순서가 유지되는지 확인한 뒤, 같은 split 탭의 화면 위치를
+다시 찾는다. 기존 첫·최종 순서 단언은 유지한다. 이 fixture의 기존 애니메이션
+비활성화 설정은 그대로이므로 실제 전환 중 체감은 별도 화면 검수 대상이다.
 
 ## 4. 실제 화면에서만 확인할 것
 

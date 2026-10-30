@@ -31677,7 +31677,7 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..8a453e24ba 100644
+index a050af7ed78c088608c69f9a150cee1583d63287..648a9a511ff40f0c7e34b91e6535284b3633edab 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 @@ -2,19 +2,24 @@
@@ -32382,7 +32382,34 @@ index a050af7ed7..8a453e24ba 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -878,8 +1485,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -609,6 +1216,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
+                                     })),
+       // Dragging from index 0 to index 2 (split) should put the dragged tab to
+       // index 3.
++      // 빈 Favorites 초대가 첫 포인터를 덮을 수 있으므로 Tab 목록에 먼저
++      // 진입한다. source 행이 복원된 뒤 split의 좌표를 다시 읽는다.
++      MoveMouseTo(base::BindLambdaForTesting([this]() {
++        const gfx::Rect bounds =
++            GetTabStripView().unpinned_tabs_scroll_view()->GetBoundsInScreen();
++        return gfx::Point(bounds.CenterPoint().x(),
++                          bounds.y() + yee::kSidebarMetrics.tab_row_height / 2);
++      })),
++      RunScheduledLayout(), Check([this]() {
++        return !vertical_tab_strip_controller()
++                    ->GetDragHandler()
++                    .CollapseDraggedSourceSlot();
++      }),
++      CheckResult([&]() { return GetTabOrder(tab_strip_model).Run(); },
++                  URLs({
++                      chrome::kChromeUIBookmarksURL,
++                      url::kAboutBlankURL,
++                      chrome::kChromeUISettingsURL,
++                      chrome::kChromeUIVersionURL,
++                  })),
+       ContinueDragToTab(2),
+       WaitForState(kTabOrderPoller, URLs({
+                                         url::kAboutBlankURL,
+@@ -878,8 +1505,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32392,7 +32419,7 @@ index a050af7ed7..8a453e24ba 100644
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1493,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1513,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32403,7 +32430,7 @@ index a050af7ed7..8a453e24ba 100644
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1505,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1525,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -32920,7 +32947,7 @@ index a050af7ed7..8a453e24ba 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2194,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2214,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -32933,7 +32960,7 @@ index a050af7ed7..8a453e24ba 100644
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2215,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2235,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
