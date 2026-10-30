@@ -6,7 +6,9 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {closeOwnedBrowser, connectCDP, pause, requireShutdown, waitForShutdown} from './content_blocking_test_runtime.mjs';
+import {closeOwnedBrowser, connectCDP, pause, requireCdpPeerSocket,
+  requireShutdown, requireWindowsBrowserOwner, requireWindowsCdpOwner,
+  waitForShutdown} from './content_blocking_test_runtime.mjs';
 
 const [executableArg] = process.argv.slice(2);
 assert.ok(executableArg, 'Usage: node tools/dev/test-group-session-restore.mjs YEE_EXECUTABLE');
@@ -42,6 +44,16 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 let child, browser, worker, debuggingPort;
 let launchCount = 0;
+const endpointOwnership = [];
+
+function verifyPeer(port, pid, type, id) {
+  return peer => {
+    requireCdpPeerSocket(peer, port, type, id);
+    const owner = requireWindowsCdpOwner(executable, profile, pid, port);
+    endpointOwnership.push({launch: launchCount, type, peer, ...owner});
+    return owner;
+  };
+}
 
 async function evaluate(expression) {
   const result = await worker.call('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true});
@@ -54,6 +66,7 @@ async function launch() {
   await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
   // 복원 강제 플래그나 시작 URL 없이 제품의 실제 기본값으로 시작한다.
   child = spawn(executable, [`--user-data-dir=${profile}`, '--remote-debugging-port=0',
+    '--remote-debugging-address=127.0.0.1',
     '--no-first-run', '--no-default-browser-check', '--disable-sync',
     '--disable-background-networking', '--hide-crash-restore-bubble',
     `--load-extension=${extension}`, `--disable-extensions-except=${extension}`],
@@ -68,14 +81,17 @@ async function launch() {
     await pause(100);
   }
   assert.ok(endpoint, '검사 연결 준비 시간 초과');
-  debuggingPort = endpoint[0];
-  browser = await connectCDP(`ws://127.0.0.1:${endpoint[0]}${endpoint[1]}`);
+  debuggingPort = Number(endpoint[0]);
+  const pid = child.pid;
+  browser = await connectCDP(`ws://127.0.0.1:${endpoint[0]}${endpoint[1]}`,
+    undefined, 15000, verifyPeer(debuggingPort, pid, 'browser'));
   for (let attempt = 0; attempt < 200; ++attempt) {
     const targets = await (await fetch(`http://127.0.0.1:${endpoint[0]}/json/list`)).json();
     const target = targets.find(item => item.type === 'service_worker' &&
       item.url.startsWith('chrome-extension://') && item.url.endsWith('/worker.js'));
     if (target) {
-      worker = await connectCDP(target.webSocketDebuggerUrl);
+      worker = await connectCDP(target.webSocketDebuggerUrl, undefined, 15000,
+        verifyPeer(debuggingPort, pid, 'page', target.id));
       // target 공개는 worker 초기화보다 빠르므로 API 호출 전 본문 실행을 확인한다.
       for (let readyAttempt = 0; readyAttempt < 100; ++readyAttempt) {
         const ready = await worker.call('Runtime.evaluate', {
@@ -99,7 +115,11 @@ async function startupSetting(value) {
     for (let attempt = 0; attempt < 100; ++attempt) {
       const targets = await (await fetch(`http://127.0.0.1:${debuggingPort}/json/list`)).json();
       const target = targets.find(item => item.id === targetId);
-      if (target) {settings = await connectCDP(target.webSocketDebuggerUrl); break;}
+      if (target) {
+        settings = await connectCDP(target.webSocketDebuggerUrl, undefined, 15000,
+          verifyPeer(debuggingPort, child.pid, 'page', target.id));
+        break;
+      }
       await pause(100);
     }
     assert.ok(settings, '시작 설정 검사 연결');
@@ -136,6 +156,7 @@ async function shutdown() {
   worker?.close(); worker = undefined;
   if (child) {
     await closeOwnedBrowser(child, browser, pid => {
+      requireWindowsBrowserOwner(executable, profile, pid);
       execFileSync('powershell.exe', ['-NoProfile', '-Command',
         `$taskBrowser = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($taskBrowser) { [void]$taskBrowser.CloseMainWindow() }`],
       {windowsHide: true});
@@ -208,5 +229,9 @@ try {
   await shutdown();
   console.log(JSON.stringify({passed: true, output, groups: before.groups, explicitNewTab}, null, 2));
 } finally {
-  try {await shutdown();} finally {await new Promise(resolve => server.close(resolve));}
+  try {await shutdown();} finally {
+    await fs.writeFile(path.join(output, 'endpoint-owners.json'),
+      JSON.stringify(endpointOwnership, null, 2));
+    await new Promise(resolve => server.close(resolve));
+  }
 }

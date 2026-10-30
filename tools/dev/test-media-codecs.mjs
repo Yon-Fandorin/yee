@@ -9,7 +9,9 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {closeOwnedBrowser, connectCDP, pause, requireShutdown, waitForShutdown} from './content_blocking_test_runtime.mjs';
+import {closeOwnedBrowser, connectCDP, pause, requireCdpPeerSocket,
+  requireShutdown, requireWindowsBrowserOwner, requireWindowsCdpOwner,
+  waitForShutdown} from './content_blocking_test_runtime.mjs';
 
 const [executableArg, chromiumArg] = process.argv.slice(2);
 assert.ok(executableArg && chromiumArg,
@@ -66,7 +68,7 @@ const server = http.createServer((request, response) => {
 
 let child, browser, tab;
 const report = {executable, chromium, profile,
-  fixtures: Object.fromEntries(Object.entries(fixtures).map(([mode, fixture]) =>
+  endpointOwnership: [], fixtures: Object.fromEntries(Object.entries(fixtures).map(([mode, fixture]) =>
     [mode, {filename: fixture.filename, sha256: fixture.sha256}])), cases: [], passed: false};
 const mediaEvents = [];
 async function evaluate(expression) {
@@ -78,7 +80,7 @@ async function evaluate(expression) {
 
 async function shutdown() {
   if (child) await closeOwnedBrowser(child, browser, pid => {
-    assert.ok(Number.isInteger(pid) && pid > 0, '검사가 실행한 프로세스만 종료한다');
+    requireWindowsBrowserOwner(executable, profile, pid);
     execFileSync('powershell.exe', ['-NoProfile', '-Command',
       `$codecBrowser = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($codecBrowser) { [void]$codecBrowser.CloseMainWindow() }`],
     {windowsHide: true});
@@ -111,11 +113,19 @@ try {
   }
   assert.ok(version, '명시적 디버깅 포트의 준비 시간 초과');
   report.version = version.Browser;
-  browser = await connectCDP(version.webSocketDebuggerUrl);
+  const verifyPeer = (type, id) => peer => {
+    requireCdpPeerSocket(peer, port, type, id);
+    const owner = requireWindowsCdpOwner(executable, profile, child.pid, port);
+    report.endpointOwnership.push({type, peer, ...owner});
+    return owner;
+  };
+  browser = await connectCDP(version.webSocketDebuggerUrl, undefined, 15000,
+    verifyPeer('browser'));
   const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   const target = targets.find(item => item.type === 'page' && item.url === 'about:blank');
   assert.ok(target, '검사 프로필의 빈 탭만 선택한다');
-  tab = await connectCDP(target.webSocketDebuggerUrl, undefined, 45000);
+  tab = await connectCDP(target.webSocketDebuggerUrl, undefined, 45000,
+    verifyPeer('page', target.id));
   await tab.call('Page.enable');
   await tab.call('Media.enable');
   for (const method of ['Media.playerPropertiesChanged', 'Media.playerEventsAdded',

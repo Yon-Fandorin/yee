@@ -4275,7 +4275,7 @@ index 09c735790d..88ec836986 100644
  
    // Mirror for when caption buttons are on the "wrong" side.
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 5b7aa72031..988422bda6 100644
+index 5b7aa72031..a05c11575a 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 @@ -2,14 +2,13 @@
@@ -4595,7 +4595,7 @@ index 5b7aa72031..988422bda6 100644
    const int height =
        !GetBrowserView()->GetWebAppFrameToolbarPreferredSize().IsEmpty()
            ? (TitlebarHeight(false) - WindowTopY())
-@@ -744,6 +880,53 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+@@ -744,6 +880,55 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
                                         height);
  }
  
@@ -4606,7 +4606,8 @@ index 5b7aa72031..988422bda6 100644
 +                   : nullptr;
 +  return surface && surface->GetVisible() &&
 +         surface->GetLocalBounds().Contains(ConvertPointToTarget(
-+             this, surface, caption_button_container_->bounds().CenterPoint()));
++             caption_button_container_.get(), surface,
++             caption_button_container_->GetLocalBounds().CenterPoint()));
 +}
 +
 +void BrowserFrameViewWin::OnViewBoundsChanged(views::View* observed_view) {
@@ -4637,7 +4638,8 @@ index 5b7aa72031..988422bda6 100644
 +  }
 +  for (const auto& container : GetBrowserView()->GetContentsContainerViews()) {
 +    const gfx::Point point = ConvertPointToTarget(
-+        this, container, caption_button_container_->bounds().CenterPoint());
++        caption_button_container_.get(), container,
++        caption_button_container_->GetLocalBounds().CenterPoint());
 +    if (container->GetVisible() &&
 +        container->GetLocalBounds().Contains(point)) {
 +      return container->GetYeeBrowserSurfacePresentationBinding();
@@ -11865,10 +11867,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..759de78d7d 100644
+index 49b4f6dd0d..0820e298c2 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,356 @@
+@@ -4,84 +4,357 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -11976,6 +11978,7 @@ index 49b4f6dd0d..759de78d7d 100644
 +#include "chrome/browser/ui/views/toolbar/toolbar_button.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 +#include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
++#include "chrome/browser/ui/views/yee/browser_surface_presentation_binding.h"
 +#include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
 +#include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 +#include "chrome/browser/ui/views/yee/page_viewport_migration.h"
@@ -12228,7 +12231,7 @@ index 49b4f6dd0d..759de78d7d 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +365,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +366,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
@@ -12262,7 +12265,7 @@ index 49b4f6dd0d..759de78d7d 100644
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +403,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +404,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12277,7 +12280,7 @@ index 49b4f6dd0d..759de78d7d 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +658,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +659,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12304,7 +12307,7 @@ index 49b4f6dd0d..759de78d7d 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -387,13 +693,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -387,13 +694,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
    }
  
   private:
@@ -12479,7 +12482,7 @@ index 49b4f6dd0d..759de78d7d 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1068,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1069,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12509,7 +12512,7 @@ index 49b4f6dd0d..759de78d7d 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,177 +1118,4881 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,177 +1119,4915 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12786,6 +12789,11 @@ index 49b4f6dd0d..759de78d7d 100644
 +            dark ? ThemeService::BrowserColorScheme::kDark
 +                 : ThemeService::BrowserColorScheme::kLight);
 +        RunScheduledLayouts();
++        if (!captures.empty()) {
++          view->GetWidget()->Activate();
++          ASSERT_TRUE(base::test::RunUntil(
++              [&]() { return view->GetWidget()->IsActive(); }));
++        }
 +        const BrowserLayoutParams frame_params =
 +            view->browser_widget()->GetFrameView()->GetBrowserLayoutParams();
 +        ASSERT_FALSE(frame_params.IsEmpty());
@@ -12806,6 +12814,35 @@ index 49b4f6dd0d..759de78d7d 100644
 +        ASSERT_TRUE(caption && caption->IsDrawn());
 +        EXPECT_TRUE(controls.Contains(views::View::ConvertRectToTarget(
 +            caption, view, caption->GetLocalBounds())));
++        const SkColor caption_color =
++            frame->GetCaptionColor(BrowserFrameActiveState::kUseCurrent);
++        SkColor caption_background = yee::ResolveShellBackgroundColor(
++            *frame->GetColorProvider(),
++            view->GetWidget()->ShouldPaintAsActive());
++        if (vertical) {
++          // 논리 bounds 변환을 재사용하지 않고 실제 화면 좌표로 색상 소유자를
++          // 찾는다. RTL에서는 창 버튼 아래의 Pane Header가 달라진다.
++          const gfx::Point caption_point =
++              caption->GetBoundsInScreen().CenterPoint();
++          bool caption_header_found = false;
++          for (const auto& container : view->GetContentsContainerViews()) {
++            if (!container->mini_toolbar()->GetBoundsInScreen().Contains(
++                    caption_point)) {
++              continue;
++            }
++            EXPECT_FALSE(caption_header_found);
++            caption_header_found = true;
++            const auto* const binding =
++                container->GetYeeBrowserSurfacePresentationBinding();
++            ASSERT_TRUE(binding && binding->GetPresentation().has_value());
++            EXPECT_EQ(caption_color, binding->GetPresentation()->primary);
++            caption_background = binding->GetPresentation()->surface;
++          }
++          EXPECT_TRUE(caption_header_found);
++        }
++        EXPECT_GE(
++            color_utils::GetContrastRatio(caption_color, caption_background),
++            color_utils::kMinimumVisibleContrastRatio);
 +        for (const auto& container : view->GetContentsContainerViews()) {
 +          auto* const header = container->mini_toolbar();
 +          ASSERT_TRUE(header->IsDrawn());
@@ -17539,7 +17576,7 @@ index 49b4f6dd0d..759de78d7d 100644
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
      GTEST_SKIP();
-@@ -874,10 +6044,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6079,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18500,7 +18537,7 @@ index 49b4f6dd0d..759de78d7d 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +7005,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7040,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18518,7 +18555,7 @@ index 49b4f6dd0d..759de78d7d 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7069,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7104,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18536,7 +18573,7 @@ index 49b4f6dd0d..759de78d7d 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7089,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7124,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18555,7 +18592,7 @@ index 49b4f6dd0d..759de78d7d 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7161,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7196,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }

@@ -277,6 +277,11 @@ AAC/H.264 빌드를 바꾼 뒤에는 다음 실제 앱 검사를 실행한다. C
 시험 파일을 로컬 HTTP로 제공해 일반 MP4의 직접 재생과 조각 MP4의 MSE에서
 영상·음성 디코딩과 재생 종료를 확인한다. 별도 Temp 프로필을 쓰고 정상 종료 후 제거하며,
 이 검사는 외부 YouTube 라이브의 재생 검증과 구분한다.
+Windows CDP 연결은 새 본체의 실행 파일·전용 프로필·리스너 PID와 loopback
+WebSocket 주소를 확인한다. 종료 직전에도 소유권을 확인하며, 달라진 연결에는
+`Browser.close`를 보내지 않는다. 확인된 검수용 PID의 정상 종료 뒤 소유권 오류를
+검사 실패로 남긴다. 일반 보관 영상의 코덱 전환과 AAC 전용 방송의 실제 AAC
+디코딩 증거를 구분하고, 물리 청취나 직접 창 조작을 대신 통과 처리하지 않는다.
 
 ```powershell
 node tools/dev/test-media-codecs.mjs F:\yee\chromium\src\out\YeePilot\chrome.exe F:\yee\chromium\src
@@ -374,6 +379,7 @@ Windows에서 `node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>
 시작 URL이나 복원 강제 플래그 없이 새 격리 프로필을 사용하며, 명시적인 새 탭
 시작 설정이 기본 복원 동작보다 우선하는지도 검사한다. 검사 전 실행 중인 Yee를
 정상 종료한다. 검사 기록과 전용 프로필은 `.local-build/group-session-*`에 남는다.
+각 연결·종료의 소유권 관찰은 `endpoint-owners.json`에 함께 저장한다.
 
 ### 콘텐츠 차단 검증
 
