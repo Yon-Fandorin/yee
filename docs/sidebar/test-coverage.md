@@ -282,6 +282,11 @@ allocation은 유지한다. Header clip도 native가 계산한 현재 paint allo
 `interactive`에는 세로 그룹의 편입·내부 정렬·해제·접기·헤더 드래그와
 Favorites 경계 및 취소 사례도 포함한다.
 RTL의 방향 이동 사례는 논리적인 앞·뒤를 화면 좌표로 반전하여 실행한다.
+`DragSingleTabRightOfRightmostGroup`는 마지막 탭 중앙에서 그룹 바깥쪽으로
+1 DIP 이동하는 부호도 RTL에서 반전한다.
+`DragFavoriteToExpandedGroupLastSlot`는 고정 해제로 인덱스가 바뀐 뒤에도
+`chrome://version/` 탭을 유일한 URL로 다시 찾는다. 이동과 끝 슬롯 좌표를
+같은 탭에서 계산하며, 원래 탭 순서와 그룹 멤버십 기대값은 유지한다.
 `PreviewScreenBoundsMatchRowsInLtrAndRtl`는 Windows에서 그룹 들여쓰기별 실제
 행과 드래그 미리보기의 화면 좌표를 비교한다. 미리보기의 물리 좌표는 배치
 직전에만 Views의 논리 bounds로 바꾸며, 드롭 판정과 전환 애니메이션의 좌표

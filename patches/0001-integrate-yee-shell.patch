@@ -31555,7 +31555,7 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..7b5f9aa687 100644
+index a050af7ed7..d2d3df3be6 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 @@ -2,19 +2,23 @@
@@ -31731,7 +31731,7 @@ index a050af7ed7..7b5f9aa687 100644
    auto StartDragFromGroupToTab(int from_group_index, int to_tab_index) {
      const char kGroupToDragFrom[] = "Group to drag";
      const char kTabToDragTo[] = "Tab to drag to";
-@@ -266,6 +366,157 @@ class VerticalTabDragTest
+@@ -266,6 +366,163 @@ class VerticalTabDragTest
          RunScheduledLayout());
    }
  
@@ -31816,10 +31816,25 @@ index a050af7ed7..7b5f9aa687 100644
 +    });
 +  }
 +
-+  auto SavePointAfterTab(int tab_index) {
-+    return Do([this, tab_index]() {
++  int GetUniqueTabIndex(const GURL& target_url) {
++    TabStripModel* model = browser()->GetTabStripModel();
++    int target_index = -1;
++    for (int index = 0; index < model->count(); ++index) {
++      if (model->GetWebContentsAt(index)->GetURL() != target_url) {
++        continue;
++      }
++      CHECK_EQ(-1, target_index);
++      target_index = index;
++    }
++    CHECK_GE(target_index, 0);
++    return target_index;
++  }
++
++  auto SavePointAfterTabWithUrl(GURL target_url) {
++    return Do([this, target_url = std::move(target_url)]() {
 +      TabStripModel* model = browser()->GetTabStripModel();
-+      tabs::TabInterface* tab = model->GetTabAtIndex(tab_index);
++      tabs::TabInterface* tab =
++          model->GetTabAtIndex(GetUniqueTabIndex(target_url));
 +      RootTabCollectionNode* root_node =
 +          GetBrowserView()
 +              .vertical_tab_strip_region_view_for_testing()
@@ -31867,29 +31882,20 @@ index a050af7ed7..7b5f9aa687 100644
 +  }
 +
 +  auto ContinueDragToTabWithUrl(GURL target_url) {
-+    return Steps(
-+        Log("Continue drag to a stable destination tab"),
-+        MoveMouseTo(base::BindLambdaForTesting([this, target_url = std::move(
-+                                                          target_url)]() {
-+          TabStripModel* model = browser()->GetTabStripModel();
-+          int target_index = -1;
-+          for (int index = 0; index < model->count(); ++index) {
-+            if (model->GetWebContentsAt(index)->GetURL() != target_url) {
-+              continue;
-+            }
-+            CHECK_EQ(-1, target_index);
-+            target_index = index;
-+          }
-+          CHECK_GE(target_index, 0);
-+          return GetTabViewAt(target_index)->GetBoundsInScreen().CenterPoint();
-+        })),
-+        RunScheduledLayout());
++    return Steps(Log("Continue drag to a stable destination tab"),
++                 MoveMouseTo(base::BindLambdaForTesting(
++                     [this, target_url = std::move(target_url)]() {
++                       return GetTabViewAt(GetUniqueTabIndex(target_url))
++                           ->GetBoundsInScreen()
++                           .CenterPoint();
++                     })),
++                 RunScheduledLayout());
 +  }
 +
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +621,356 @@ class VerticalTabDragTest
+@@ -370,8 +627,356 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32246,7 +32252,7 @@ index a050af7ed7..7b5f9aa687 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -878,8 +1477,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -878,8 +1483,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32256,7 +32262,7 @@ index a050af7ed7..7b5f9aa687 100644
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1485,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1491,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32267,7 +32273,7 @@ index a050af7ed7..7b5f9aa687 100644
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1497,453 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1503,456 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -32663,8 +32669,11 @@ index a050af7ed7..7b5f9aa687 100644
 +      PollState(kDragStatePoller, GetDragActive()),
 +      PollState(kTabOrderPoller, GetTabOrder(model)),
 +      StartDragBetweenTabs(0, 1), WaitForState(kDragStatePoller, true),
-+      ContinueDragToFavoritesDropZone(), ContinueDragToTab(3),
-+      SavePointAfterTab(3), ContinueDragToSavedTabCenter(), ReleaseMouse(),
++      // Favorite 해제로 순서가 바뀌어도 마지막 그룹 탭의 정체성을 유지한다.
++      ContinueDragToFavoritesDropZone(),
++      ContinueDragToTabWithUrl(GURL(chrome::kChromeUIVersionURL)),
++      SavePointAfterTabWithUrl(GURL(chrome::kChromeUIVersionURL)),
++      ContinueDragToSavedTabCenter(), ReleaseMouse(),
 +      WaitForState(kDragStatePoller, false),
 +      WaitForState(
 +          kTabOrderPoller,
@@ -32724,7 +32733,7 @@ index a050af7ed7..7b5f9aa687 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2126,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2135,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -32737,7 +32746,7 @@ index a050af7ed7..7b5f9aa687 100644
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2147,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2156,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
@@ -35791,7 +35800,7 @@ index ae7f210dc7..47a406d82e 100644
          return StartSystemDnDSessionIfNecessary(attached_context_,
                                                  point_in_screen);
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
-index 83ab00a709..e6d01e435b 100644
+index 83ab00a709..933d68e273 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 @@ -12,19 +12,24 @@
@@ -36231,7 +36240,18 @@ index 83ab00a709..e6d01e435b 100644
  // Creates a browser with five tabs. The last two tabs are in a Tab Group.
  // Dragging the first tab past the last slot should allow it to exit the group.
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-@@ -2400,7 +2733,6 @@ void DragToSeparateWindowStep2(DetachToBrowserTabDragControllerTest* test,
+@@ -1800,7 +2133,9 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+   // Dragging the first tab past the last slot brings it to the end of the
+   // tabstrip, where it should not be in a group.
+   ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(0)));
+-  ASSERT_TRUE(DragInputToCenter(tab_strip->tab_at(4), gfx::Vector2d(1, 0)));
++  // 화면 좌표의 끝 슬롯은 RTL에서 왼쪽이므로 이동 방향도 반전한다.
++  ASSERT_TRUE(DragInputToCenter(
++      tab_strip->tab_at(4), gfx::Vector2d(base::i18n::IsRTL() ? -1 : 1, 0)));
+   ASSERT_TRUE(ReleaseInput());
+   StopAnimating(tab_strip);
+ 
+@@ -2400,7 +2735,6 @@ void DragToSeparateWindowStep2(DetachToBrowserTabDragControllerTest* test,
  // Creates two browsers, drags from first into second.
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
                         MAYBE_DragToSeparateWindow) {
@@ -36239,7 +36259,7 @@ index 83ab00a709..e6d01e435b 100644
    TabStrip* tab_strip = GetTabStripForBrowser(browser());
  
    AddTabsAndResetBrowser(browser(), 1);
-@@ -2472,7 +2804,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -2472,7 +2806,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
  // from source to target before the target browser finishes ending drags.
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
                         MAYBE_DragToSeparateWindowDuringDragEnd) {
@@ -36247,7 +36267,7 @@ index 83ab00a709..e6d01e435b 100644
    TabStrip* tab_strip = GetTabStripForBrowser(browser());
  
    AddTabsAndResetBrowser(browser(), 1);
-@@ -2523,7 +2854,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -2523,7 +2856,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    ASSERT_FALSE(TabDragController::IsActive());
  }
  
@@ -36255,7 +36275,7 @@ index 83ab00a709..e6d01e435b 100644
  // Canceling tab dragging while the detached tab is reattached should
  // not cause dangling ptr. (crbug.com/459242414)
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-@@ -4857,9 +5187,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4857,9 +5189,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the last tab to the left should cause it to swap places with the
    // collapsed group header.
    ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(3)));
@@ -36270,7 +36290,7 @@ index 83ab00a709..e6d01e435b 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -4894,12 +5226,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4894,12 +5228,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the first tab to the right should cause it to swap places with the
    // collapsed group header.
    const gfx::NativeWindow window_hint = GetWindowHint(tab_strip);
