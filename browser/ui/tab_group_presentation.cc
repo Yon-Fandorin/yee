@@ -270,10 +270,30 @@ int ResolveHorizontalTabGroupSeparatorOffset(
   return group.has_value() ? -gap : gap;
 }
 
+std::optional<bool> ResolveHorizontalTabGroupBoundarySeparator(
+    const views::View &tab, std::optional<tab_groups::TabGroupId> group,
+    std::optional<tab_groups::TabGroupId> adjacent_group) {
+  if (!UsesHorizontalTabGroupCapsule(tab) ||
+      group.has_value() == adjacent_group.has_value()) {
+    return std::nullopt;
+  }
+  return !group.has_value();
+}
+
+bool ShouldShowNativeHorizontalTabGroupLine(bool native_visible) {
+  return !IsShellEnabled() && native_visible;
+}
+
 gfx::Rect ResolveHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
                                                  int header_end,
                                                  int overlap) {
   closing_bounds.set_x(header_end - overlap);
+  return closing_bounds;
+}
+
+gfx::Rect ClampHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
+                                               int header_end, int overlap) {
+  closing_bounds.set_x(std::max(closing_bounds.x(), header_end - overlap));
   return closing_bounds;
 }
 

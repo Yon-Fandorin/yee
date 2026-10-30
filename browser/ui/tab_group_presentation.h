@@ -44,6 +44,13 @@ int ResolveHorizontalTabGroupSeparatorOffset(
     const views::View& tab,
     std::optional<tab_groups::TabGroupId> group,
     std::optional<tab_groups::TabGroupId> adjacent_group);
+// 공통 알약 경계의 구분선은 그룹 바깥 탭이 한 번만 그린다.
+// native 표현이나 그룹 내부 경계는 기존 소유 규칙을 유지한다.
+std::optional<bool> ResolveHorizontalTabGroupBoundarySeparator(
+    const views::View &tab, std::optional<tab_groups::TabGroupId> group,
+    std::optional<tab_groups::TabGroupId> adjacent_group);
+// 알약을 쓰지 않는 Yee 공통 행에도 별도의 native 밑줄을 덧그리지 않는다.
+bool ShouldShowNativeHorizontalTabGroupLine(bool native_visible);
 
 // native 호스트가 실제 행 안의 inset 멤버 범위를 전달한다.
 gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds);
@@ -56,6 +63,9 @@ void SetHorizontalTabGroupCapsuleCollapsed(views::View& decoration,
 gfx::Rect ResolveHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
                                                  int header_end,
                                                  int overlap);
+// 공통 native 닫기 목표를 보존하되 그룹 이름 앞으로 넘어가지 않게 제한한다.
+gfx::Rect ClampHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,
+                                               int header_end, int overlap);
 // 연속 닫기 중에도 살아 있는 Header의 새 위치를 따라간다.
 void TrackHorizontalTabGroupClosingHeader(views::View& tab,
                                           views::View& header);

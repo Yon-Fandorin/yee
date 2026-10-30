@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -417,6 +418,22 @@ TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
   EXPECT_EQ(64, ResolveHorizontalTabGroupMinimumWidth(*view, 64, 20, 12));
 }
 
+TEST_F(YeeRestingTextViewTest, HorizontalGroupBoundaryHasOneOutsideSeparator) {
+  auto *view = widget_->SetContentsView(std::make_unique<views::View>());
+  const auto group = tab_groups::TabGroupId::GenerateNew();
+  EXPECT_EQ(
+      std::optional<bool>(true),
+      ResolveHorizontalTabGroupBoundarySeparator(*view, std::nullopt, group));
+  EXPECT_EQ(
+      std::optional<bool>(false),
+      ResolveHorizontalTabGroupBoundarySeparator(*view, group, std::nullopt));
+  EXPECT_FALSE(ResolveHorizontalTabGroupBoundarySeparator(*view, group, group));
+  EXPECT_FALSE(ResolveHorizontalTabGroupBoundarySeparator(*view, std::nullopt,
+                                                          std::nullopt));
+  EXPECT_FALSE(ResolveHorizontalTabGroupBoundarySeparator(
+      *view, group, tab_groups::TabGroupId::GenerateNew()));
+}
+
 TEST_F(YeeRestingTextViewTest, HorizontalGroupHoverStaysInsideCapsule) {
   auto* view = widget_->SetContentsView(std::make_unique<views::View>());
   view->SetBounds(0, 0, 120, 40);
@@ -625,6 +642,16 @@ TEST(YeeSurfaceGeometryTest, ClosingHeaderTrackingEndsWithTheHeaderLifetime) {
     EXPECT_EQ(&header, GetHorizontalTabGroupClosingHeader(tab));
   }
   EXPECT_FALSE(GetHorizontalTabGroupClosingHeader(tab));
+}
+
+TEST(YeeSurfaceGeometryTest,
+     ClosingGroupMemberKeepsItsNativeTargetAfterTheHeader) {
+  EXPECT_EQ(gfx::Rect(102, 3, 0, 32), ClampHorizontalTabGroupClosingBounds(
+                                          gfx::Rect(57, 3, 0, 32), 104, 2));
+  EXPECT_EQ(gfx::Rect(240, 3, 0, 32), ClampHorizontalTabGroupClosingBounds(
+                                          gfx::Rect(240, 3, 0, 32), 104, 2));
+  EXPECT_EQ(gfx::Rect(132, 3, 0, 32), ClampHorizontalTabGroupClosingBounds(
+                                          gfx::Rect(102, 3, 0, 32), 134, 2));
 }
 
 TEST(YeeSurfaceGeometryTest, CustomizationPanelKeepsBothHeadersAboveItsClose) {
