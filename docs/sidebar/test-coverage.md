@@ -288,8 +288,8 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 `YeeAimPopupKeepsStateThroughPresentationRebuild`는 예열 창 교체와 테마 갱신 후
 AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바깥 클릭으로 닫히는지
 확인한다. `YeeTabLayoutSelectPopupFollowsItsHost`는 맞춤설정 창을 움직이기 전
-첫 번째·두 번째 열기와 창 이동 후 반복 열기에서 HTML select와 실제 popup의
-화면 좌표를 함께 확인한다. Windows Aura의
+패널 열기 애니메이션이 자연스럽게 끝난 뒤 첫 번째·두 번째 열기와 창 이동 후
+반복 열기에서 HTML select와 실제 popup의 화면 좌표를 함께 확인한다. Windows Aura의
 `UnmanagedLayerKeepsScreenOriginAfterAncestorMoves`는 Views 조상 이동 뒤 layer의
 로컬 좌표가 같아도 native 화면 좌표와 변경 알림이 갱신되는지 확인한다.
 `CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*`는
