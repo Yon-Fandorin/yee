@@ -29098,7 +29098,7 @@ index c726fbc277..752dda078f 100644
  
  bool BrowserTabStripController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 7571027287..a6f66fd71c 100644
+index 7571027287..543c4a84cf 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
 @@ -4,6 +4,7 @@
@@ -29236,15 +29236,17 @@ index 7571027287..a6f66fd71c 100644
    ]
  }
  
-@@ -268,6 +348,7 @@ source_set("interactive_ui_tests") {
+@@ -268,7 +348,9 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui:browser_commands",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui/browser_window",
 +    "//chrome/browser/ui/tabs",
      "//chrome/browser/ui/tabs:tab_menu",
++    "//chrome/browser/ui/views/animations",
      "//chrome/browser/ui/views/frame:base_tab_strip_region_view",
      "//chrome/browser/ui/views/frame:browser_view_header",
-@@ -276,9 +357,12 @@ source_set("interactive_ui_tests") {
+     "//chrome/browser/ui/views/frame:browser_widget",
+@@ -276,9 +358,12 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui/views/tabs/hovercard",
      "//chrome/browser/ui/views/tabs/shared",
      "//chrome/browser/ui/views/tabs/tab",
@@ -33982,10 +33984,21 @@ index 383e9e7810..947c25f876 100644
  
  bool TabStripCollectionController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
-index 987d4cbbfe..cb12803c55 100644
+index 987d4cbbfe..49b2f0e94f 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
-@@ -10,32 +10,48 @@
+@@ -2,40 +2,60 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++#include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
++
+ #include "base/run_loop.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/test/metrics/histogram_tester.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/ui/animation/browser_animation_controller.h"
+ #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
  #include "chrome/browser/ui/browser_tabstrip.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
@@ -33995,14 +34008,15 @@ index 987d4cbbfe..cb12803c55 100644
  #include "chrome/browser/ui/tabs/tab_group_model.h"
  #include "chrome/browser/ui/tabs/tab_menu_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 +#include "chrome/browser/ui/views/frame/base_tab_strip_region_view.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/frame/browser_widget.h"
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 +#include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
 +#include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
-+#include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 +#include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
@@ -34034,7 +34048,7 @@ index 987d4cbbfe..cb12803c55 100644
  
  namespace {
  
-@@ -44,9 +60,8 @@ const char kSecondTabName[] = "SecondTab";
+@@ -44,9 +64,10 @@ const char kSecondTabName[] = "SecondTab";
  const char kThirdTabName[] = "ThirdTab";
  const int kShift = ui::EF_LEFT_MOUSE_BUTTON | ui::EF_SHIFT_DOWN;
  
@@ -34043,10 +34057,12 @@ index 987d4cbbfe..cb12803c55 100644
 -#include "chrome/browser/ui/views/tabs/shared/tab_strip_types.h"
 +DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
 +                                    kYeeCollectionDragActive);
++DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
++                                    kYeeCollectionDragLayoutReady);
  
  class TabStripCollectionControllerInteractiveUiTest
      : public VerticalTabsInteractiveTestMixin<InteractiveBrowserTest>,
-@@ -64,7 +79,10 @@ class TabStripCollectionControllerInteractiveUiTest
+@@ -64,7 +85,10 @@ class TabStripCollectionControllerInteractiveUiTest
      VerticalTabsInteractiveTestMixin<
          InteractiveBrowserTest>::SetUpOnMainThread();
      if (is_horizontal()) {
@@ -34058,7 +34074,7 @@ index 987d4cbbfe..cb12803c55 100644
      }
    }
  
-@@ -84,6 +102,24 @@ class TabStripCollectionControllerInteractiveUiTest
+@@ -84,6 +108,24 @@ class TabStripCollectionControllerInteractiveUiTest
                         : nullptr;
    }
  
@@ -34083,7 +34099,7 @@ index 987d4cbbfe..cb12803c55 100644
    ui::ElementIdentifier tab_strip_anchor_element() const {
      return is_horizontal() ? kNewTabButtonElementId
                             : kVerticalTabStripBottomContainerElementId;
-@@ -443,6 +479,178 @@ IN_PROC_BROWSER_TEST_P(TabStripCollectionControllerInteractiveUiTest,
+@@ -443,6 +485,234 @@ IN_PROC_BROWSER_TEST_P(TabStripCollectionControllerInteractiveUiTest,
                    2));
  }
  
@@ -34094,6 +34110,34 @@ index 987d4cbbfe..cb12803c55 100644
 +  auto* model = browser()->GetTabStripModel();
 +  tabs::TabInterface* ordinary_source = nullptr;
 +  tabs::TabInterface* pinned_source = nullptr;
++  bool observed_unready_layout = false;
++  const auto drag_layout_ready = [&] {
++    bool ready = !BrowserAnimationController::From(browser())->IsAnimating(
++        TabStripAnimations::kVerticalTabStrip);
++    if (model->count() != 4) {
++      observed_unready_layout = true;
++      return false;
++    }
++    for (int index = 0; index < model->count(); ++index) {
++      auto* tab = GetTabViewAt(index);
++      ready &=
++          tab->IsDrawn() && !tab->GetLocalBounds().IsEmpty() &&
++          tab->GetVisibleBounds().Contains(tab->GetLocalBounds().CenterPoint());
++      for (auto* ancestor = tab; ancestor; ancestor = ancestor->parent()) {
++        ready &=
++            !TabCollectionAnimatingLayoutManager::IsViewAnimating(ancestor);
++      }
++    }
++    observed_unready_layout |= !ready;
++    return ready;
++  };
++  const auto center_hits_tab = [&](int index) {
++    auto* tab = GetTabViewAt(index);
++    auto* root = tab->GetWidget()->GetRootView();
++    auto point = tab->GetBoundsInScreen().CenterPoint();
++    views::View::ConvertPointFromScreen(root, &point);
++    return tab->Contains(root->GetEventHandlerForPoint(point));
++  };
 +  const auto expect_drag_presentation = [&](tabs::TabInterface* source,
 +                                            bool pinned) {
 +    auto* strip = GetTabStripView();
@@ -34136,6 +34180,20 @@ index 987d4cbbfe..cb12803c55 100644
 +               base::BindLambdaForTesting([&] { return GetTabViewAt(3); })),
 +      NameView(kSecondTabName,
 +               base::BindLambdaForTesting([&] { return GetTabViewAt(2); })),
++      // 방향 전환 때 생성된 manager는 기존 애니메이션 시간을 유지할 수 있다.
++      // 실제 배치와 입력 대상을 확인한 뒤 화면 좌표를 잡는다.
++      PollStateUntil(kYeeCollectionDragLayoutReady,
++                     base::BindLambdaForTesting(drag_layout_ready), true),
++      Do([&] {
++        views::test::RunScheduledLayout(
++            BrowserView::GetBrowserViewForBrowser(browser()));
++        RecordProperty("YeeOrdinaryDragSourceBounds",
++                       GetTabViewAt(3)->GetBoundsInScreen().ToString());
++        RecordProperty("YeeOrdinaryDragTargetBounds",
++                       GetTabViewAt(2)->GetBoundsInScreen().ToString());
++      }),
++      CheckResult([&] { return center_hits_tab(3); }, true),
++      CheckResult([&] { return center_hits_tab(2); }, true),
 +      MoveMouseTo(kFirstTabName),
 +      DragMouseTo(kSecondTabName, CenterPoint(), /*release=*/false),
 +      WaitForState(kYeeCollectionDragActive, true),
@@ -34149,6 +34207,18 @@ index 987d4cbbfe..cb12803c55 100644
 +               base::BindLambdaForTesting([&] { return GetTabViewAt(0); })),
 +      NameView("PinnedDragTarget",
 +               base::BindLambdaForTesting([&] { return GetTabViewAt(1); })),
++      PollStateUntil(kYeeCollectionDragLayoutReady,
++                     base::BindLambdaForTesting(drag_layout_ready), true),
++      Do([&] {
++        views::test::RunScheduledLayout(
++            BrowserView::GetBrowserViewForBrowser(browser()));
++        RecordProperty("YeePinnedDragSourceBounds",
++                       GetTabViewAt(0)->GetBoundsInScreen().ToString());
++        RecordProperty("YeePinnedDragTargetBounds",
++                       GetTabViewAt(1)->GetBoundsInScreen().ToString());
++      }),
++      CheckResult([&] { return center_hits_tab(0); }, true),
++      CheckResult([&] { return center_hits_tab(1); }, true),
 +      MoveMouseTo("PinnedDragSource"),
 +      DragMouseTo("PinnedDragTarget", CenterPoint(), /*release=*/false),
 +      WaitForState(kYeeCollectionDragActive, true),
@@ -34158,6 +34228,8 @@ index 987d4cbbfe..cb12803c55 100644
 +        EXPECT_TRUE(pinned_source->IsPinned());
 +        EXPECT_EQ(1, model->GetIndexOfTab(pinned_source));
 +      }));
++  RecordProperty("YeeDragObservedUnreadyLayout",
++                 observed_unready_layout ? 1 : 0);
 +}
 +
 +IN_PROC_BROWSER_TEST_P(TabStripCollectionControllerInteractiveUiTest,

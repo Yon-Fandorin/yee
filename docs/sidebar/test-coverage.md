@@ -287,6 +287,13 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 지정한다. 기본 BrowserTest의 GL drawing 비활성화 상태에서는 검정 캡처나
 보이지 않는 native dialog로 인해 화면·입력 검증이 성립하지 않을 수 있다.
 
+`YeeDragPreviewFollowsStripOrientation`는 각 실제 마우스 드래그 전에 방향 전환과
+네 native 탭의 조상 배치 애니메이션이 끝나고 탭 중앙이 보이는지 기다린다.
+일반 탭을 정렬한 뒤 고정 탭을 드래그할 때도 새 관찰을 시작한다. 화면 좌표의
+실제 이벤트 대상이 해당 TabView 안인지 확인하며 미리보기·불투명도·정렬·고정
+상태의 판정과 OS 마우스 입력은 유지한다. 대기 중 미완료 배치를 관찰했는지와
+각 드래그의 출발·도착 bounds를 실제 GTest XML에 남긴다.
+
 `YeeAimPopupKeepsStateThroughPresentationRebuild`는 예열 창 교체와 테마 갱신 후
 AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바깥 클릭으로 닫히는지
 확인한다. `YeeTabLayoutSelectPopupFollowsItsHost`는 맞춤설정 창을 움직이기 전
