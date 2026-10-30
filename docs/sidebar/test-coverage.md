@@ -138,10 +138,15 @@ theme 변경과 즉시 다시 열기에서 이전 anchor·잠금이 남지 않�
 | Favorite → 펼친 Group 처음·중간 retarget·끝, 실제 들여쓰기 정렬 | `DragFavoriteToExpandedGroupFirstSlot`, `DragFavoriteCanRetargetWithinExpandedGroup`, `DragFavoriteToExpandedGroupLastSlot` |
 | Favorite → Group 헤더 경계와 접힌 Group 뒤의 최상위 목록 | `DragFavoriteOnGroupHeaderStaysTopLevel`, `DragFavoriteAfterCollapsedGroupStaysTopLevel` |
 | Tab → 기존 Favorite 좌·우 슬롯, 가득 찬 독 거절 | `DragTabBeforeExistingFavoriteCommitsPin`, `DragTabAfterExistingFavoriteCommitsPin`, `FullFavoritesRejectsWithoutNativeReorder` |
-| Favorite → Group 이동 취소 시 pin·Group·순서 복원 | `CancelFavoriteToGroupDragRestoresSource` |
+| Favorite → Group 이동 취소 시 pin·Group·순서 복원, 취소 뒤·활성 drag 중 대상 Group 제거와 capture loss | `CancelFavoriteToGroupDragRestoresSource` |
 | Group 헤더 전체 이동·접힌 상태 유지 | `DragGroupHeader`, `DragCollapsedGroupStaysCollapsed`, `DragCollapsedGroupOverExpandedGroup` |
 | 여러 선택 일반 Tab과 unpinned split 묶음의 기존 Chromium drag 회귀 | runner의 `DragMultipleTabs*`, `DragSplitTabs`, `DragOverSplit*` 테스트 |
 | browser/keyboard pin 명령과 세로 Tab context menu가 최대 용량을 지키고 unpin은 허용 | `YeeSidebarFavoriteCommandHonorsCapacityAndUnpin`, `YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin` |
+
+Favorite 취소 회귀는 기존 복원 단언 뒤에 Group을 제거하고 public drag context의
+capture-loss 이벤트를 보낸다. 활성 drag의 landing Group을 지운 경우도 확인한다.
+종료 시점의 모델 조회는 실제 commit에 한정하고, native 종료·pin 변경 뒤에는 Group
+존재를 다시 확인한다. 사라진 Group에는 별도 위치 보정을 적용하지 않는다.
 
 ## 4. 실제 화면에서만 확인할 것
 

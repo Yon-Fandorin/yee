@@ -30728,7 +30728,7 @@ index 495a43a648..8c053406c4 100644
      All,
      TabCollectionAnimatingLayoutManagerTest,
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index 20c6e0b3d3..eee81efd06 100644
+index 20c6e0b3d3..578e8dceec 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 @@ -7,25 +7,34 @@
@@ -30867,7 +30867,7 @@ index 20c6e0b3d3..eee81efd06 100644
  
    // Dragging may start a blocking loop, which may allow this to be destroyed.
    auto ref = weak_factory_.GetWeakPtr();
-@@ -365,10 +430,510 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -365,10 +430,511 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
      ResetDragState();
      return false;
    }
@@ -31281,8 +31281,10 @@ index 20c6e0b3d3..eee81efd06 100644
 +
  void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
 +  const FavoriteDrop pending_drop = favorite_drop_;
-+  const bool commits_cross_region = pending_drop == FavoriteDrop::kPin ||
-+                                    pending_drop == FavoriteDrop::kUnpin;
++  const bool commit_cross_region = reason == EndDragReason::kComplete &&
++                                   drag_controller_ &&
++                                   (pending_drop == FavoriteDrop::kPin ||
++                                    pending_drop == FavoriteDrop::kUnpin);
 +  const std::optional<int> pending_favorites_slot = incoming_favorites_slot_;
 +  const std::optional<int> pending_unpinned_gap = incoming_unpinned_gap_before_;
 +  const std::optional<tab_groups::TabGroupId> pending_group =
@@ -31294,9 +31296,9 @@ index 20c6e0b3d3..eee81efd06 100644
 +  // commit the visual gap as the real model position after the drag ends.
 +  content::WebContents* unpin_anchor = nullptr;
 +  bool has_unpin_destination = false;
-+  if (pending_drop == FavoriteDrop::kUnpin) {
++  if (commit_cross_region && pending_drop == FavoriteDrop::kUnpin) {
 +    if (pending_group && pending_group_gap) {
-+      if (tab_strip_model_->group_model()->GetTabGroup(*pending_group)) {
++      if (tab_strip_model_->group_model()->ContainsTabGroup(*pending_group)) {
 +        const auto* group_node = GetNodeForTabGroup(*pending_group);
 +        auto* group = group_node
 +                          ? views::AsViewClass<TabGroupView>(group_node->view())
@@ -31355,8 +31357,7 @@ index 20c6e0b3d3..eee81efd06 100644
 +
 +  std::vector<raw_ptr<content::WebContents>> tabs_to_toggle;
 +  std::vector<raw_ptr<const tabs::TabInterface>> cross_region_arrival_tabs;
-+  if (reason == EndDragReason::kComplete && commits_cross_region &&
-+      drag_controller_) {
++  if (commit_cross_region) {
 +    for (const TabDragData& tab_drag_data :
 +         drag_controller_->GetSessionData().tab_drag_data_) {
 +      if (!tab_drag_data.contents) {
@@ -31378,12 +31379,11 @@ index 20c6e0b3d3..eee81efd06 100644
    // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
-@@ -383,9 +948,98 @@ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
+@@ -383,9 +949,105 @@ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
    // Let TabDragController decide whether this reason should actually end the
    // drag (e.g. capture loss while dragging a detached window) and destroy
    // itself when appropriate.
-+  preserve_favorites_drop_zone_during_commit_ =
-+      reason == EndDragReason::kComplete && commits_cross_region;
++  preserve_favorites_drop_zone_during_commit_ = commit_cross_region;
    if (drag_controller_) {
 -    drag_controller_->EndDrag(reason);
 +    // A full Favorites dock is a rejected destination, not an unpinned-list
@@ -31394,8 +31394,12 @@ index 20c6e0b3d3..eee81efd06 100644
 +                pending_drop == FavoriteDrop::kRejected
 +            ? EndDragReason::kCancel
 +            : reason;
++    auto ref = weak_factory_.GetWeakPtr();
 +    drag_controller_->EndDrag(controller_reason);
-+  }
++    if (!ref) {
++      return;
++    }
+   }
 +
 +  // Retire the visual landing slot before pinning moves the real tab into the
 +  // Favorites container. Otherwise the first pin can briefly lay out as an
@@ -31404,7 +31408,7 @@ index 20c6e0b3d3..eee81efd06 100644
 +  ClearIncomingDropSlots();
 +  InvalidateTabStripDragLayout();
 +
-+  if (reason == EndDragReason::kComplete && commits_cross_region) {
++  if (commit_cross_region) {
 +    const bool pin = pending_drop == FavoriteDrop::kPin;
 +    for (const tabs::TabInterface* const tab : cross_region_arrival_tabs) {
 +      TabCollectionAnimatingLayoutManager::PrepareYeeCrossRegionArrival(tab);
@@ -31437,6 +31441,12 @@ index 20c6e0b3d3..eee81efd06 100644
 +          continue;
 +        }
 +
++        // native 종료나 pin 변경에서 제거한 그룹에는 다시 삽입하지 않는다.
++        // 이 경우 이미 확정한 native unpin 결과를 유지한다.
++        if (pending_group && !tab_strip_model_->group_model()->ContainsTabGroup(
++                                 *pending_group)) {
++          continue;
++        }
 +        int destination = tab_strip_model_->count() - 1;
 +        bool destination_is_before_anchor = false;
 +        if (unpin_anchor) {
@@ -31446,12 +31456,10 @@ index 20c6e0b3d3..eee81efd06 100644
 +          }
 +          destination_is_before_anchor = true;
 +        } else if (pending_group) {
-+          if (const TabGroup* group =
-+                  tab_strip_model_->group_model()->GetTabGroup(
-+                      *pending_group)) {
-+            destination = static_cast<int>(group->ListTabs().end());
-+            destination_is_before_anchor = true;
-+          }
++          const TabGroup* group =
++              tab_strip_model_->group_model()->GetTabGroup(*pending_group);
++          destination = static_cast<int>(group->ListTabs().end());
++          destination_is_before_anchor = true;
 +        }
 +        if (destination_is_before_anchor && current < destination) {
 +          --destination;
@@ -31467,7 +31475,7 @@ index 20c6e0b3d3..eee81efd06 100644
 +    for (const tabs::TabInterface* const tab : cross_region_arrival_tabs) {
 +      TabCollectionAnimatingLayoutManager::AnimateYeeCrossRegionArrival(tab);
 +    }
-   }
++  }
 +
 +  // A successful cross-region drop keeps the empty invitation alive through
 +  // the model mutation. Clearing it only now avoids restoring the one-cell
@@ -31478,7 +31486,7 @@ index 20c6e0b3d3..eee81efd06 100644
  }
  
  void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
-@@ -393,6 +1047,28 @@ void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
+@@ -393,6 +1055,28 @@ void TabDragHandlerImpl::HandleDraggedTabsIntoNode(
    CHECK(drag_controller_);
    const auto& drag_session_data = drag_controller_->GetSessionData();
  
@@ -31507,7 +31515,7 @@ index 20c6e0b3d3..eee81efd06 100644
    const TabDragData* source_drag_data =
        drag_session_data.source_view_drag_data();
    const content::WebContents* source_contents = source_drag_data->contents;
-@@ -783,6 +1459,9 @@ void TabDragHandlerImpl::StartedDragging(
+@@ -783,6 +1467,9 @@ void TabDragHandlerImpl::StartedDragging(
      CHECK(dragged_view);
      dragged_view->SetPaintToLayer();
      dragged_view->layer()->SetFillsBoundsOpaquely(false);
@@ -31517,7 +31525,7 @@ index 20c6e0b3d3..eee81efd06 100644
      gfx::Vector2d offset = dragged_view->GetBoundsInScreen().origin() -
                             source_view_origin_in_screen;
      dragged_view->SetProperty(kOffsetAtTabDragStart, offset);
-@@ -792,11 +1471,16 @@ void TabDragHandlerImpl::StartedDragging(
+@@ -792,11 +1479,16 @@ void TabDragHandlerImpl::StartedDragging(
  }
  
  void TabDragHandlerImpl::DraggedTabsDetached() {
@@ -31534,7 +31542,7 @@ index 20c6e0b3d3..eee81efd06 100644
    expand_on_hover_lock_.reset();
    scroll_synchronizers_.clear();
  
-@@ -942,8 +1626,15 @@ void TabDragHandlerImpl::OnNodeWillDestroy(TabCollectionNode& node) {
+@@ -942,8 +1634,15 @@ void TabDragHandlerImpl::OnNodeWillDestroy(TabCollectionNode& node) {
  }
  
  void TabDragHandlerImpl::ResetDragState() {
@@ -31550,7 +31558,7 @@ index 20c6e0b3d3..eee81efd06 100644
  }
  
  bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
-@@ -951,6 +1642,10 @@ bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
+@@ -951,6 +1650,10 @@ bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
      const TabCollectionNode* target) {
    CHECK(drag_controller_);
  
@@ -31669,14 +31677,15 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..d2d3df3be6 100644
+index a050af7ed7..8a453e24ba 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-@@ -2,19 +2,23 @@
+@@ -2,19 +2,24 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
 +#include <algorithm>
++#include <optional>
  #include <string>
  
 +#include "base/command_line.h"
@@ -31696,7 +31705,14 @@ index a050af7ed7..d2d3df3be6 100644
  #include "chrome/browser/ui/tabs/tab_group_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -31,24 +35,35 @@
+@@ -25,30 +30,42 @@
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
+ #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
++#include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
  #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
  #include "chrome/browser/ui/views/test/vertical_tabs_interactive_test_mixin.h"
@@ -31732,7 +31748,7 @@ index a050af7ed7..d2d3df3be6 100644
  #include "ui/views/interaction/interactive_views_test.h"
  #include "ui/views/interaction/mouse/interaction_test_util_mouse.h"
  #include "ui/views/test/views_test_utils.h"
-@@ -159,6 +174,8 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
+@@ -159,6 +176,8 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
                                      kBrowserCountPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
                                      kDragStatePoller);
@@ -31741,7 +31757,7 @@ index a050af7ed7..d2d3df3be6 100644
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<URLs>,
                                      kTabOrderPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<PinnedURLs>,
-@@ -172,6 +189,28 @@ class VerticalTabDragTest
+@@ -172,6 +191,28 @@ class VerticalTabDragTest
    VerticalTabDragTest() = default;
    ~VerticalTabDragTest() override = default;
  
@@ -31770,7 +31786,7 @@ index a050af7ed7..d2d3df3be6 100644
    const std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures()
        override {
      auto enabled = VerticalTabsInteractiveTestMixin<
-@@ -207,6 +246,43 @@ class VerticalTabDragTest
+@@ -207,6 +248,43 @@ class VerticalTabDragTest
      return *browser_view;
    }
  
@@ -31814,7 +31830,7 @@ index a050af7ed7..d2d3df3be6 100644
    auto RunScheduledLayout() {
      return Do([&]() { views::test::RunScheduledLayout(&GetBrowserView()); });
    }
-@@ -244,6 +320,30 @@ class VerticalTabDragTest
+@@ -244,6 +322,30 @@ class VerticalTabDragTest
          MoveMouseTo(kTabToDragTo), RunScheduledLayout());
    }
  
@@ -31845,7 +31861,7 @@ index a050af7ed7..d2d3df3be6 100644
    auto StartDragFromGroupToTab(int from_group_index, int to_tab_index) {
      const char kGroupToDragFrom[] = "Group to drag";
      const char kTabToDragTo[] = "Tab to drag to";
-@@ -266,6 +366,163 @@ class VerticalTabDragTest
+@@ -266,6 +368,163 @@ class VerticalTabDragTest
          RunScheduledLayout());
    }
  
@@ -32009,7 +32025,7 @@ index a050af7ed7..d2d3df3be6 100644
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +627,356 @@ class VerticalTabDragTest
+@@ -370,8 +629,356 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32366,7 +32382,7 @@ index a050af7ed7..d2d3df3be6 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -878,8 +1483,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -878,8 +1485,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32376,7 +32392,7 @@ index a050af7ed7..d2d3df3be6 100644
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1491,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1493,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32387,7 +32403,7 @@ index a050af7ed7..d2d3df3be6 100644
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1503,456 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1505,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -32823,10 +32839,15 @@ index a050af7ed7..d2d3df3be6 100644
 +                       CancelFavoriteToGroupDragRestoresSource) {
 +  TabStripModel* tab_strip_model = browser()->GetTabStripModel();
 +  ASSERT_NE(nullptr, tab_strip_model);
++  std::optional<tab_groups::TabGroupId> target_group;
 +  RunTestSequence(
 +      AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUIBookmarksURL), 1),
 +      AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
-+      PinTabAt(0), AddTabsToNewGroup({1, 2}),
++      PinTabAt(0), AddTabsToNewGroup({1, 2}), Do([&]() {
++        const auto groups = tab_strip_model->group_model()->ListTabGroups();
++        ASSERT_EQ(1u, groups.size());
++        target_group = groups.front();
++      }),
 +      PollState(kDragStatePoller, GetDragActive()),
 +      PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
 +      PollState(kTabOrderPoller, GetTabOrder(tab_strip_model)),
@@ -32841,13 +32862,65 @@ index a050af7ed7..d2d3df3be6 100644
 +      WaitForState(kTabOrderPoller,
 +                   URLs({url::kAboutBlankURL,
 +                         TabGroupURLs({chrome::kChromeUIBookmarksURL,
-+                                       chrome::kChromeUISettingsURL})})));
++                                       chrome::kChromeUISettingsURL})})),
++      // Escape가 native controller만 끝낸 뒤에도 늦은 capture loss가 올 수
++      // 있다.
++      Do([&]() {
++        ASSERT_TRUE(target_group.has_value());
++        tab_strip_model->RemoveFromGroup({1, 2});
++        ASSERT_FALSE(
++            tab_strip_model->group_model()->ContainsTabGroup(*target_group));
++        GetBrowserView()
++            .tab_strip_view()
++            ->GetDragContext()
++            ->OnMouseCaptureLost();
++      }),
++      ReleaseMouse(), WaitForState(kDragStatePoller, false),
++      WaitForState(kPinnedTabOrderPoller, PinnedURLs({url::kAboutBlankURL})),
++      WaitForState(kTabOrderPoller,
++                   URLs({url::kAboutBlankURL, chrome::kChromeUIBookmarksURL,
++                         chrome::kChromeUISettingsURL})),
++      AddTabsToNewGroup({1, 2}), Do([&]() {
++        const auto groups = tab_strip_model->group_model()->ListTabGroups();
++        ASSERT_EQ(1u, groups.size());
++        target_group = groups.front();
++      }),
++      StartDragBetweenTabs(0, 1), WaitForState(kDragStatePoller, true),
++      ContinueDragToFavoritesDropZone(), SavePointBeforeTab(2),
++      ContinueDragToTab(1), ContinueDragToSavedTabCenter(),
++      // 활성 드래그의 landing 그룹이 제거되는 경로도 동일한 public 이벤트로
++      // 검증한다.
++      Do([&]() {
++        auto* context = GetBrowserView().tab_strip_view()->GetDragContext();
++        auto* handler = static_cast<TabDragHandlerImpl*>(context);
++        ASSERT_TRUE(target_group.has_value());
++        ASSERT_EQ(target_group, handler->IncomingGroupId());
++        ASSERT_TRUE(handler->GroupIncomingGapBeforeIndex().has_value());
++        ASSERT_TRUE(
++            tab_strip_model->group_model()->ContainsTabGroup(*target_group));
++        const auto range = tab_strip_model->group_model()
++                               ->GetTabGroup(*target_group)
++                               ->ListTabs();
++        std::vector<int> members;
++        for (auto index = range.start(); index < range.end(); ++index) {
++          members.push_back(static_cast<int>(index));
++        }
++        tab_strip_model->RemoveFromGroup(members);
++        ASSERT_FALSE(
++            tab_strip_model->group_model()->ContainsTabGroup(*target_group));
++        context->OnMouseCaptureLost();
++      }),
++      ReleaseMouse(), WaitForState(kDragStatePoller, false),
++      WaitForState(kPinnedTabOrderPoller, PinnedURLs({url::kAboutBlankURL})),
++      WaitForState(kTabOrderPoller,
++                   URLs({url::kAboutBlankURL, chrome::kChromeUIBookmarksURL,
++                         chrome::kChromeUISettingsURL})));
 +}
 +
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2135,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2194,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -32860,7 +32933,7 @@ index a050af7ed7..d2d3df3be6 100644
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2156,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2215,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
