@@ -23,6 +23,7 @@
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/product_logo.h"
 #include "chrome/browser/ui/views/yee/side_panel_colors.h"
+#include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "components/infobars/core/confirm_infobar_delegate.h"
@@ -49,7 +50,9 @@
 #include "ui/views/cascading_property.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/link.h"
+#include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/paint_info.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -248,6 +251,80 @@ TEST_F(YeeNativePresentationTest,
     const SkBitmap restored_border = paint(surface.outline);
     EXPECT_GT(SkColorGetA(restored_border.getColor(120, header_height)), 0u);
   }
+}
+
+TEST_F(YeeNativePresentationTest, SidebarControlsReserveLocalHeaderAndFooter) {
+  views::View sidebar;
+  auto* header = sidebar.AddChildView(std::make_unique<views::View>());
+  header->SetPreferredSize(gfx::Size(244, 48));
+  auto* footer = sidebar.AddChildView(std::make_unique<views::View>());
+  footer->SetPreferredSize(gfx::Size(244, 38));
+  footer->SetProperty(
+      views::kMarginsKey,
+      gfx::Insets::TLBR(kSidebarMetrics.sidebar_footer_top_spacing,
+                        kSidebarMetrics.section_horizontal_inset, 0,
+                        kSidebarMetrics.section_horizontal_inset));
+  views::ProposedLayout layout;
+  layout.host_size = gfx::Size(244, 480);
+  const gfx::Rect content = AllocateSidebarControls(
+      sidebar, header, footer, layout, gfx::Rect(0, 0, 244, 474), true, 8);
+  EXPECT_EQ(gfx::Size(244, 480), layout.host_size);
+  ASSERT_TRUE(layout.GetLayoutFor(header));
+  ASSERT_TRUE(layout.GetLayoutFor(footer));
+  EXPECT_EQ(gfx::Rect(0, 0, 244, 48), layout.GetLayoutFor(header)->bounds);
+  EXPECT_EQ(gfx::Rect(8, 436, 228, 38), layout.GetLayoutFor(footer)->bounds);
+  EXPECT_EQ(gfx::Rect(0, 48, 244, 388), content);
+  EXPECT_FALSE(content.Intersects(layout.GetLayoutFor(header)->bounds));
+  EXPECT_FALSE(content.Intersects(layout.GetLayoutFor(footer)->bounds));
+
+  // 높이 제약이 없는 선호 크기에는 두 행이 더해지고 본문 높이는 유지된다.
+  layout = {};
+  layout.host_size = gfx::Size(244, 200);
+  EXPECT_EQ(gfx::Size(244, 194),
+            AllocateSidebarControls(sidebar, header, footer, layout,
+                                    gfx::Rect(0, 0, 244, 194), false, 8)
+                .size());
+  EXPECT_EQ(gfx::Size(244, 286), layout.host_size);
+
+  // 본문 쪽 여백이 없을 때는 Footer가 소유한 상단 간격을 예약한다.
+  layout = {};
+  layout.host_size = gfx::Size(244, 480);
+  EXPECT_EQ(gfx::Rect(0, 48, 244, 382),
+            AllocateSidebarControls(sidebar, header, footer, layout,
+                                    gfx::Rect(0, 0, 244, 474), true, 0));
+  EXPECT_EQ(gfx::Rect(8, 436, 228, 38), layout.GetLayoutFor(footer)->bounds);
+}
+
+TEST_F(YeeNativePresentationTest,
+       SidebarControlsFollowImmersiveHostAndFooterVisibility) {
+  views::View sidebar;
+  views::View external_host;
+  auto* header = sidebar.AddChildView(std::make_unique<views::View>());
+  header->SetPreferredSize(gfx::Size(244, 48));
+  auto* footer = sidebar.AddChildView(std::make_unique<views::View>());
+  footer->SetPreferredSize(gfx::Size(244, 38));
+  footer->SetVisible(false);
+  header->SetProperty(views::kFlexBehaviorKey,
+                      views::FlexSpecification(base::BindRepeating(
+                          [](const views::View*, const views::SizeBounds&) {
+                            return gfx::Size(244, 24);
+                          })));
+  views::ProposedLayout layout;
+  layout.host_size = gfx::Size(244, 480);
+  EXPECT_EQ(gfx::Rect(0, 24, 244, 450),
+            AllocateSidebarControls(sidebar, header, footer, layout,
+                                    gfx::Rect(0, 0, 244, 474), true, 8));
+  ASSERT_TRUE(layout.GetLayoutFor(footer));
+  EXPECT_FALSE(layout.GetLayoutFor(footer)->visible);
+
+  external_host.AddChildView(sidebar.RemoveChildViewT(header));
+  layout = {};
+  layout.host_size = gfx::Size(244, 480);
+  EXPECT_EQ(gfx::Rect(0, 0, 244, 474),
+            AllocateSidebarControls(sidebar, header, footer, layout,
+                                    gfx::Rect(0, 0, 244, 474), true, 8));
+  EXPECT_FALSE(layout.GetLayoutFor(header));
+  EXPECT_EQ(gfx::Size(244, 480), layout.host_size);
 }
 
 TEST_F(YeeNativePresentationTest,

@@ -9,6 +9,8 @@
 #include "base/functional/callback_helpers.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/color/color_id.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/views/layout/proposed_layout.h"
 
 namespace views {
 class View;
@@ -72,6 +74,17 @@ SkColor ResolveSidebarSurfaceColor(const views::View& view);
 double ResolveSidebarReveal(double pinned, double hover);
 
 SidebarFlyoutPresentation ResolveSidebarFlyoutPresentation(double reveal);
+
+// native 본문 배치 전에 같은 Sidebar에 남은 Header와 Footer 높이를 예약한다.
+// 외부 immersive host의 Header와 숨긴 Footer는 본문 공간을 차지하지 않는다.
+// content_trailing_margin은 native 본문이 이미 예약한 탭 하단 여백이다.
+gfx::Rect AllocateSidebarControls(const views::View& sidebar,
+                                  views::View* header,
+                                  views::View* footer,
+                                  views::ProposedLayout& layout,
+                                  gfx::Rect available,
+                                  bool height_bounded,
+                                  int content_trailing_margin);
 
 // 숨긴 가장자리 영역은 Header 높이를 유지하며, 고정과 hover 펼침 상태는
 // 동일한 Header 조작과 Footer를 표시한다.

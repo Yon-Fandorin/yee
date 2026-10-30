@@ -13,7 +13,10 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/geometry/insets.h"
+#include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
@@ -77,6 +80,65 @@ SidebarFlyoutPresentation ResolveSidebarFlyoutPresentation(double reveal) {
       .outline_color = ui::kColorSysNeutralOutline,
       .outline_opacity = static_cast<float>(0.35 * reveal),
   };
+}
+
+gfx::Rect AllocateSidebarControls(const views::View& sidebar,
+                                  views::View* header,
+                                  views::View* footer,
+                                  views::ProposedLayout& layout,
+                                  gfx::Rect available,
+                                  bool height_bounded,
+                                  int content_trailing_margin) {
+  const auto preferred_height = [&](const views::View* view, int width) {
+    if (!view || view->parent() != &sidebar || !view->GetVisible()) {
+      return 0;
+    }
+    const views::SizeBounds bounds(width, {});
+    if (const auto* flex = view->GetProperty(views::kFlexBehaviorKey)) {
+      // immersive Header가 host를 옮기는 동안 사용하는 reveal 규칙을 유지한다.
+      return flex->rule().Run(view, bounds).height();
+    }
+    return view->GetPreferredSize(bounds).height();
+  };
+  const bool footer_visible =
+      footer && footer->parent() == &sidebar && footer->GetVisible();
+  const auto* margins =
+      footer_visible ? footer->GetProperty(views::kMarginsKey) : nullptr;
+  const gfx::Insets footer_margins = margins ? *margins : gfx::Insets();
+  const int footer_width =
+      std::max(0, available.width() - footer_margins.width());
+  const int header_height = preferred_height(header, available.width());
+  const int footer_height = preferred_height(footer, footer_width);
+  // native 본문 안의 탭 하단 여백과 Footer 상단 여백을 중복 예약하지 않는다.
+  const int footer_spacing =
+      std::max(0, footer_margins.top() - content_trailing_margin);
+  const int footer_allocation =
+      footer_height + footer_spacing + footer_margins.bottom();
+  if (!height_bounded) {
+    layout.host_size.Enlarge(0, header_height + footer_allocation);
+    available.set_height(available.height() + header_height +
+                         footer_allocation);
+  }
+  if (header && header->parent() == &sidebar) {
+    const int height = std::min(header_height, available.height());
+    layout.child_layouts.emplace_back(
+        header, header->GetVisible(),
+        gfx::Rect(available.x(), available.y(), available.width(), height));
+    available.Inset(gfx::Insets::TLBR(height, 0, 0, 0));
+  }
+  if (footer && footer->parent() == &sidebar) {
+    const int height = std::min(
+        footer_height, std::max(0, available.height() - footer_spacing -
+                                       footer_margins.bottom()));
+    layout.child_layouts.emplace_back(
+        footer, footer->GetVisible(),
+        gfx::Rect(available.x() + footer_margins.left(),
+                  available.bottom() - footer_margins.bottom() - height,
+                  footer_width, height));
+    available.Inset(gfx::Insets::TLBR(
+        0, 0, height + footer_spacing + footer_margins.bottom(), 0));
+  }
+  return available;
 }
 
 void UpdateSidebarExpandedPresentation(views::View* header,
