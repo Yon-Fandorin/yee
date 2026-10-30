@@ -11865,7 +11865,7 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..0ce79fec62 100644
+index 49b4f6dd0d..759de78d7d 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 @@ -4,84 +4,356 @@
@@ -12509,7 +12509,7 @@ index 49b4f6dd0d..0ce79fec62 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,178 +1118,4865 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,177 +1118,4881 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12734,6 +12734,9 @@ index 49b4f6dd0d..0ce79fec62 100644
 +  const auto captures =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +          "yee-split-tab-capture-dir");
++  if (!captures.empty()) {
++    ASSERT_TRUE(base::CreateDirectory(captures));
++  }
 +  gfx::Rect window_bounds = view->GetWidget()->GetWindowBoundsInScreen();
 +  window_bounds.set_size(gfx::Size(1100, 760));
 +  view->GetWidget()->SetBounds(window_bounds);
@@ -12789,11 +12792,20 @@ index 49b4f6dd0d..0ce79fec62 100644
 +        ASSERT_TRUE(frame_params.visual_client_area.Contains(view->bounds()));
 +        const auto params = frame_params.InLocalCoordinates(view->bounds());
 +        const auto exclusion = params.trailing_exclusion.ContentWithPadding();
-+        const gfx::Rect controls(params.visual_client_area.right() -
-+                                     base::ClampCeil(exclusion.width()),
-+                                 params.visual_client_area.y(),
-+                                 base::ClampCeil(exclusion.width()),
-+                                 base::ClampCeil(exclusion.height()));
++        // Native frame의 논리 exclusion을 실제 Header 자식과 같은 물리 좌표로
++        // 비교한다.
++        const gfx::Rect controls = view->GetMirroredRect(gfx::Rect(
++            params.visual_client_area.right() -
++                base::ClampCeil(exclusion.width()),
++            params.visual_client_area.y(), base::ClampCeil(exclusion.width()),
++            base::ClampCeil(exclusion.height())));
++        auto* const frame = static_cast<BrowserFrameViewWin*>(
++            view->browser_widget()->GetFrameView());
++        const auto* const caption =
++            frame->caption_button_container_for_testing();
++        ASSERT_TRUE(caption && caption->IsDrawn());
++        EXPECT_TRUE(controls.Contains(views::View::ConvertRectToTarget(
++            caption, view, caption->GetLocalBounds())));
 +        for (const auto& container : view->GetContentsContainerViews()) {
 +          auto* const header = container->mini_toolbar();
 +          ASSERT_TRUE(header->IsDrawn());
@@ -12857,6 +12869,11 @@ index 49b4f6dd0d..0ce79fec62 100644
 +        // 단색 페이지의 중앙만 검사하면 잘못 이동한 native layer도 통과한다.
 +        // 각 viewport 원점에 고정한 실제 renderer 표식을 합성 결과에서 읽는다.
 +        auto* const compositor = view->GetWidget()->GetCompositor();
++        // Renderer 크기 확인 뒤에도 이전 native 합성 프레임은 아직 표시될 수
++        // 있다.
++        compositor->ScheduleFullRedraw();
++        ASSERT_TRUE(
++            ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
 +        base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
 +        auto request = std::make_unique<viz::CopyOutputRequest>(
 +            viz::CopyOutputRequest::ResultFormat::RGBA,
@@ -13252,7 +13269,6 @@ index 49b4f6dd0d..0ce79fec62 100644
 -};
 -
 -IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
--                       HorizontalTabsSinglePaneOpenSidePanel) {
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -17520,11 +17536,10 @@ index 49b4f6dd0d..0ce79fec62 100644
 +}
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
-+                       HorizontalTabsSinglePaneOpenSidePanel) {
+                        HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
      GTEST_SKIP();
-   }
-@@ -874,10 +6027,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6044,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18485,7 +18500,7 @@ index 49b4f6dd0d..0ce79fec62 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +6988,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7005,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18503,7 +18518,7 @@ index 49b4f6dd0d..0ce79fec62 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7052,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7069,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18521,7 +18536,7 @@ index 49b4f6dd0d..0ce79fec62 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7072,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7089,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18540,7 +18555,7 @@ index 49b4f6dd0d..0ce79fec62 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7144,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7161,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -21274,7 +21289,7 @@ index e182430481..f1e1b00b18 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index a73f5c6b4e..17a1f314f8 100644
+index a73f5c6b4e..592efae704 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 @@ -4,21 +4,43 @@
@@ -21639,7 +21654,7 @@ index a73f5c6b4e..17a1f314f8 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -424,6 +716,956 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -424,6 +716,975 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -22239,6 +22254,25 @@ index a73f5c6b4e..17a1f314f8 100644
 +  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
 +  ASSERT_TRUE(ui_test_utils::NavigateToURL(
 +      browser(), embedded_test_server()->GetURL("/title1.html")));
++  // 첫 표시 신호가 오기 전 준비된 WebUI 문서에도 같은 제안 목록 여백이
++  // 필요하다.
++  auto* const initial_popup = location_bar()->GetOmniboxPopupView();
++  ASSERT_TRUE(initial_popup);
++  if (auto* presenter = initial_popup->presenter()) {
++    presenter->EnsureWebUIContentCreated();
++    auto* const webui_content = presenter->GetWebUIContent();
++    ASSERT_TRUE(webui_content);
++    auto* const contents = webui_content->GetWrappedWebContents();
++    ASSERT_TRUE(contents);
++    ASSERT_TRUE(content::WaitForLoadStop(contents));
++    ASSERT_TRUE(base::test::RunUntil([&] {
++      return content::EvalJs(contents, R"(
++        document.documentElement?.style.getPropertyValue(
++            '--omnibox-popup-results-padding-top') === '8px'
++      )")
++          .ExtractBool();
++    }));
++  }
 +  const auto capture_dir =
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +          "yee-omnibox-popup-capture-dir");
@@ -22596,7 +22630,7 @@ index a73f5c6b4e..17a1f314f8 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -569,16 +1811,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -569,16 +1830,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -22622,7 +22656,7 @@ index a73f5c6b4e..17a1f314f8 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -673,9 +1914,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -673,9 +1933,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -22636,7 +22670,7 @@ index a73f5c6b4e..17a1f314f8 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -690,8 +1932,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -690,8 +1951,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -22651,7 +22685,7 @@ index a73f5c6b4e..17a1f314f8 100644
        }));
  }
  
-@@ -713,15 +1959,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -713,15 +1978,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -22671,7 +22705,7 @@ index a73f5c6b4e..17a1f314f8 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -737,8 +1981,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -737,8 +2000,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22684,7 +22718,7 @@ index a73f5c6b4e..17a1f314f8 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -754,31 +2000,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -754,31 +2019,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -22737,7 +22771,7 @@ index a73f5c6b4e..17a1f314f8 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -798,8 +2045,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -798,8 +2064,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22750,7 +22784,7 @@ index a73f5c6b4e..17a1f314f8 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -809,23 +2058,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -809,23 +2077,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -22790,7 +22824,7 @@ index a73f5c6b4e..17a1f314f8 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -869,12 +2119,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -869,12 +2138,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -22810,7 +22844,7 @@ index a73f5c6b4e..17a1f314f8 100644
                  }));
  }
  #endif
-@@ -882,11 +2135,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -882,11 +2154,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -22829,7 +22863,7 @@ index a73f5c6b4e..17a1f314f8 100644
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index 3d3d583887..b3aa21e6d0 100644
+index 3d3d583887..7ae361bd7b 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,37 +7,61 @@
@@ -23077,7 +23111,7 @@ index 3d3d583887..b3aa21e6d0 100644
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -168,6 +332,92 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -168,6 +332,94 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -23147,7 +23181,9 @@ index 3d3d583887..b3aa21e6d0 100644
 +    const gfx::SizeF exclusion = params.trailing_exclusion.ContentWithPadding();
 +    gfx::Point origin;
 +    views::View::ConvertPointToTarget(this, browser_view_, &origin);
-+    const gfx::Rect header(origin, size());
++    // 물리 Header 좌표를 frame exclusion과 Flex가 사용하는 논리 좌표로 맞춘다.
++    const gfx::Rect header =
++        browser_view_->GetMirroredRect(gfx::Rect(origin, size()));
 +    const gfx::Rect controls(
 +        params.visual_client_area.right() - base::ClampCeil(exclusion.width()),
 +        params.visual_client_area.y(), base::ClampCeil(exclusion.width()),
@@ -23170,7 +23206,7 @@ index 3d3d583887..b3aa21e6d0 100644
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -210,6 +460,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -210,6 +462,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
@@ -23179,7 +23215,7 @@ index 3d3d583887..b3aa21e6d0 100644
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -226,7 +478,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -226,7 +480,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    web_contents_ = nullptr;
  }
  
@@ -23209,7 +23245,7 @@ index 3d3d583887..b3aa21e6d0 100644
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -244,6 +518,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -244,6 +520,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -23452,7 +23488,7 @@ index 3d3d583887..b3aa21e6d0 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -264,14 +774,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -264,14 +776,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -23500,7 +23536,7 @@ index 3d3d583887..b3aa21e6d0 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -287,7 +823,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -287,7 +825,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -27783,7 +27819,7 @@ index 2d16070cf4..72b5f58b06 100644
    // Create a new tab.
    int initial_tab_index = browser()->GetTabStripModel()->active_index();
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc
-index 8ebd435225..4082d92feb 100644
+index 8ebd435225..e800ffe270 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc
 @@ -33,6 +33,8 @@
@@ -27861,7 +27897,28 @@ index 8ebd435225..4082d92feb 100644
    DCHECK(!content_url_.is_empty());
    contents_wrapper_ = std::make_unique<WebUIContentsWrapperT<OmniboxPopupUI>>(
        content_url_, location_bar_->GetProfile(), IDS_TASK_MANAGER_OMNIBOX,
-@@ -609,8 +618,8 @@ void OmniboxPopupWebUIBaseContent::PrimaryMainFrameRenderProcessGone(
+@@ -600,6 +609,20 @@ void OmniboxPopupWebUIBaseContent::OnMenuClosed() {
+   }
+ }
+ 
++void OmniboxPopupWebUIBaseContent::DOMContentLoaded(
++    content::RenderFrameHost* render_frame_host) {
++  views::WebView::DOMContentLoaded(render_frame_host);
++  auto* const contents = GetWrappedWebContents();
++  if (contents && render_frame_host == contents->GetPrimaryMainFrame() &&
++      render_frame_host->GetLastCommittedURL().EqualsIgnoringRef(
++          content_url_) &&
++      location_bar_->IsCompactShellMode()) {
++    // 초기 표시나 renderer 복구가 문서 파싱보다 앞섰다면 준비된 문서에
++    // 적용한다.
++    yee::ApplyOmniboxPopupStyle(contents);
++  }
++}
++
+ void OmniboxPopupWebUIBaseContent::PrimaryMainFrameRenderProcessGone(
+     base::TerminationStatus status) {
+   if (browser_shutdown::HasShutdownStarted()) {
+@@ -609,8 +632,8 @@ void OmniboxPopupWebUIBaseContent::PrimaryMainFrameRenderProcessGone(
    TRACE_EVENT_INSTANT2(
        "omnibox",
        "OmniboxPopupWebUIBaseContent::PrimaryMainFrameRenderProcessGone",
@@ -27872,6 +27929,26 @@ index 8ebd435225..4082d92feb 100644
  
    base::UmaHistogramEnumeration(
        base::StrCat({GetMetricPrefix(), ".RendererProcessGoneStatus"}), status,
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h b/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h
+index 88544af4bd..c9b7fd2e7e 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h
+@@ -30,6 +30,7 @@ class OmniboxPopupTabSelectionListener;
+ class OmniboxPopupUI;
+ 
+ namespace content {
++class RenderFrameHost;
+ class WebContents;
+ }  // namespace content
+ 
+@@ -95,6 +96,7 @@ class OmniboxPopupWebUIBaseContent : public views::WebView,
+   content::WebContents* GetWrappedWebContents();
+ 
+   // content::WebContentsObserver:
++  void DOMContentLoaded(content::RenderFrameHost* render_frame_host) override;
+   void PrimaryMainFrameRenderProcessGone(
+       base::TerminationStatus status) override;
+ 
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_result_view.cc b/chrome/browser/ui/views/omnibox/omnibox_result_view.cc
 index 65eba79e0d..2392e29ce0 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_result_view.cc

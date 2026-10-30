@@ -11,7 +11,8 @@ class WebContents;
 
 namespace yee {
 // 신뢰된 WebUI 팝업 문서가 준비된 뒤, 결과를 보이기 전에 Views와 같은
-// 제안 목록 여백과 곡률을 한 번 적용한다.
+// 제안 목록 여백과 곡률을 적용한다. 아직 준비되지 않은 문서는 수정하지 않으며
+// 호출자는 DOMContentLoaded에서 준비된 문서에 다시 적용한다.
 void ApplyOmniboxPopupStyle(content::WebContents* contents);
 }  // namespace yee
 

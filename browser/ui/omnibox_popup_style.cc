@@ -14,13 +14,19 @@
 namespace yee {
 
 void ApplyOmniboxPopupStyle(content::WebContents* contents) {
-  if (!contents || !contents->GetPrimaryMainFrame()) {
+  auto* const frame = contents ? contents->GetPrimaryMainFrame() : nullptr;
+  if (!frame || !frame->IsDOMContentLoaded()) {
     return;
   }
-  contents->GetPrimaryMainFrame()->ExecuteJavaScript(
-      base::UTF8ToUTF16(base::StringPrintf(R"JS(
+  frame->ExecuteJavaScript(
+      base::UTF8ToUTF16(
+          base::StringPrintf(R"JS(
         (() => {
-          const style = document.documentElement.style;
+          const root = document.documentElement;
+          if (!root) {
+            return;
+          }
+          const style = root.style;
           const properties = {
             '--omnibox-popup-results-padding-top': '%dpx',
             '--omnibox-popup-results-padding-bottom': '%dpx',
@@ -35,12 +41,12 @@ void ApplyOmniboxPopupStyle(content::WebContents* contents) {
           }
         })();
       )JS",
-          kSidebarMetrics.omnibox_popup_results_padding,
-          kSidebarMetrics.omnibox_popup_results_padding,
-          kSidebarMetrics.omnibox_popup_separator_height,
-          kSidebarMetrics.omnibox_popup_row_inset,
-          kSidebarMetrics.omnibox_popup_row_inset,
-          kSidebarMetrics.omnibox_popup_row_corner_radius)),
+                             kSidebarMetrics.omnibox_popup_results_padding,
+                             kSidebarMetrics.omnibox_popup_results_padding,
+                             kSidebarMetrics.omnibox_popup_separator_height,
+                             kSidebarMetrics.omnibox_popup_row_inset,
+                             kSidebarMetrics.omnibox_popup_row_inset,
+                             kSidebarMetrics.omnibox_popup_row_corner_radius)),
       base::NullCallback());
 }
 
