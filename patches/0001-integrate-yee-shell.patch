@@ -3557,7 +3557,7 @@ index e20e096dfc..5995b9d238 100644
  
  void FindBarHost::SetDialogPosition(const gfx::Rect& new_pos) {
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
-index 07ff3566c1..68c6467dba 100644
+index 07ff3566c1..47ca0e57a9 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
 +++ b/chrome/browser/ui/views/frame/BUILD.gn
 @@ -474,6 +474,7 @@ source_set("base_tab_strip_region_view") {
@@ -3865,7 +3865,15 @@ index 07ff3566c1..68c6467dba 100644
      "//chrome/browser/ui/views/page_info",
      "//chrome/browser/ui/views/tabs:new_tab_button",
      "//chrome/browser/ui/views/tabs/horizontal",
-@@ -2554,7 +2630,6 @@ source_set("interactive_ui_tests") {
+@@ -2523,6 +2599,7 @@ source_set("interactive_ui_tests") {
+     "//testing/gtest",
+     "//ui/base:ozone_buildflags",
+     "//ui/base:test_support",
++    "//ui/base/unowned_user_data",
+     "//ui/events:test_support",
+     "//ui/views",
+     "//ui/views:test_support",
+@@ -2554,7 +2631,6 @@ source_set("interactive_ui_tests") {
        ":browser_native_widget_mac",
        ":immersive_mode_controller_mac",
        "//chrome/browser/ui:browser_commands_mac",
@@ -3873,7 +3881,7 @@ index 07ff3566c1..68c6467dba 100644
      ]
    }
  
-@@ -2564,12 +2639,21 @@ source_set("interactive_ui_tests") {
+@@ -2564,12 +2640,21 @@ source_set("interactive_ui_tests") {
        "browser_window_property_manager_browsertest_win.cc",
      ]
      deps += [
@@ -3895,7 +3903,7 @@ index 07ff3566c1..68c6467dba 100644
  }
  
  if (is_linux) {
-@@ -3093,6 +3177,22 @@ source_set("browser_view_popup_layout_impl") {
+@@ -3093,6 +3178,22 @@ source_set("browser_view_popup_layout_impl") {
    ]
  }
  
@@ -3918,7 +3926,7 @@ index 07ff3566c1..68c6467dba 100644
  source_set("browser_view_tabbed_layout_impl") {
    public = [ "layout/browser_view_tabbed_layout_impl.h" ]
    sources = [ "layout/browser_view_tabbed_layout_impl.cc" ]
-@@ -3107,6 +3207,7 @@ source_set("browser_view_tabbed_layout_impl") {
+@@ -3107,6 +3208,7 @@ source_set("browser_view_tabbed_layout_impl") {
      "//ui/views",
    ]
    deps = [
@@ -3926,7 +3934,7 @@ index 07ff3566c1..68c6467dba 100644
      ":custom_corners",
      ":custom_corners_background",
      ":custom_floating_corner",
-@@ -3127,12 +3228,20 @@ source_set("browser_view_tabbed_layout_impl") {
+@@ -3127,12 +3229,20 @@ source_set("browser_view_tabbed_layout_impl") {
      "//chrome/browser/ui/views/infobars",
      "//chrome/browser/ui/views/side_panel",
      "//chrome/browser/ui/views/tabs/organizer",
@@ -3947,7 +3955,7 @@ index 07ff3566c1..68c6467dba 100644
  }
  
  source_set("browser_frame_view") {
-@@ -3269,6 +3378,7 @@ source_set("contents_container_view_impl") {
+@@ -3269,6 +3379,7 @@ source_set("contents_container_view_impl") {
      "//chrome/browser/ui/ai_overlay_dialog",
      "//chrome/browser/ui/read_anything",
      "//chrome/browser/ui/views/indigo",
@@ -3955,7 +3963,7 @@ index 07ff3566c1..68c6467dba 100644
      "//chrome/browser/ui/views/new_tab_footer",
      "//chrome/common:chrome_features",
      "//components/search",
-@@ -3279,6 +3389,12 @@ source_set("contents_container_view_impl") {
+@@ -3279,6 +3390,12 @@ source_set("contents_container_view_impl") {
      "//ui/gfx/geometry",
      "//ui/views",
    ]
@@ -3968,7 +3976,7 @@ index 07ff3566c1..68c6467dba 100644
  }
  
  source_set("multi_contents_view") {
-@@ -3342,6 +3458,8 @@ source_set("multi_contents_view_impl") {
+@@ -3342,6 +3459,8 @@ source_set("multi_contents_view_impl") {
      "//ui/gfx/geometry",
      "//ui/views",
    ]
@@ -11835,10 +11843,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0d..262462f09f 100644
+index 49b4f6dd0d..78d6ad76c8 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,344 @@
+@@ -4,84 +4,356 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -11986,6 +11994,7 @@ index 49b4f6dd0d..262462f09f 100644
  #include "ui/base/interaction/interactive_test_definitions.h"
  #include "ui/base/pointer/touch_ui_controller.h"
 +#include "ui/base/test/ui_controls.h"
++#include "ui/base/unowned_user_data/user_data_factory.h"
 +#include "ui/color/color_provider.h"
 +#include "ui/color/color_provider_key.h"
 +#include "ui/compositor/canvas_painter.h"
@@ -12161,7 +12170,18 @@ index 49b4f6dd0d..262462f09f 100644
 +                : gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED)),
 +        enable_ai_overlay_dialog_(enable_ai_overlay_dialog),
 +        enable_vertical_tabs_(enable_vertical_tabs),
-+        enable_indigo_overlay_(enable_indigo_overlay) {}
++        enable_indigo_overlay_(enable_indigo_overlay) {
++    if (!enable_vertical_tabs_) {
++      // 157에서 없어진 기능 플래그 대신 controller 부재를 명시적으로 주입한다.
++      vertical_tabs_override_ =
++          BrowserWindowFeatures::GetUserDataFactoryForTesting()
++              .AddOverrideForTesting(
++                  base::BindRepeating([](BrowserWindowInterface&) {
++                    return std::unique_ptr<
++                        tabs::VerticalTabStripStateController>();
++                  }));
++    }
++  }
  
    ~BrowserViewTabbedLayoutImplUiTest() override = default;
  
@@ -12186,13 +12206,18 @@ index 49b4f6dd0d..262462f09f 100644
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +353,25 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +365,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
-+    // 탭 방향은 실험 플래그가 아니라 실제 창의 상태로 선택한다.
-+    tabs::VerticalTabStripStateController::From(browser())
-+        ->SetVerticalTabsEnabled(enable_vertical_tabs_);
++    auto* const vertical_tabs =
++        tabs::VerticalTabStripStateController::From(browser());
++    if (enable_vertical_tabs_) {
++      ASSERT_TRUE(vertical_tabs);
++      vertical_tabs->SetVerticalTabsEnabled(true);
++    } else {
++      ASSERT_FALSE(vertical_tabs);
++    }
      chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
    }
  
@@ -12215,7 +12240,7 @@ index 49b4f6dd0d..262462f09f 100644
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +386,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +403,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12230,7 +12255,7 @@ index 49b4f6dd0d..262462f09f 100644
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +641,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +658,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12257,8 +12282,11 @@ index 49b4f6dd0d..262462f09f 100644
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -389,11 +678,171 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -387,13 +693,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+   }
+ 
   private:
++  ui::UserDataFactory::ScopedOverride vertical_tabs_override_;
    base::test::ScopedFeatureList feature_list_;
    const gfx::AnimationTestApi::RenderModeResetter render_mode_resetter_;
 +  const bool enable_ai_overlay_dialog_;
@@ -12429,7 +12457,7 @@ index 49b4f6dd0d..262462f09f 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1050,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1068,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12459,7 +12487,7 @@ index 49b4f6dd0d..262462f09f 100644
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,193 +1100,4871 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,178 +1118,4856 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12654,6 +12682,8 @@ index 49b4f6dd0d..262462f09f 100644
 -                    ,
 -                    TopContainerBackgroundTestMode::kImmersive
 -#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+-
+-                    ));
 +    CaptionPresentation,
 +    YeeWindowsCaptionInputUiTest,
 +    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
@@ -12663,8 +12693,6 @@ index 49b4f6dd0d..262462f09f 100644
 +             (dark ? "Dark" : "Light") + (maximized ? "Maximized" : "Restored");
 +    }));
  
--                    ));
--
 -// Regression test for limiting the amount of WebContents resizing when the
 -// "flyover" animation flag is enabled.
 -class BrowserViewTabbedLayoutImplContentLayoutUiTest
@@ -13018,23 +13046,6 @@ index 49b4f6dd0d..262462f09f 100644
 -        }),
 -        WaitForShow(MultiContentsResizeArea::kMultiContentsResizeAreaElementId),
 -        Do([this]() { RunScheduledLayouts(); }));
--  }
--
-- private:
--  const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
--  GetContentsContainers() {
--    return BrowserView::GetBrowserViewForBrowser(browser())
--        ->multi_contents_view()
--        ->contents_container_views();
--  }
--
--  // views::ViewObserver:
--  void OnViewBoundsChanged(views::View* observed_view) override {
--    if (auto* webview = views::AsViewClass<views::WebView>(observed_view)) {
--      auto& data = resize_data_[webview];
--      if (data.last_size != observed_view->size()) {
--        data.last_size = observed_view->size();
--        ++data.count;
 +      EXPECT_EQ(0U, different_pixels)
 +          << "탭의 테마색과 Header의 페이지색 사이에 틈이나 잘림이 있음; tab="
 +          << tab_bounds.ToString() << ", header=" << header_bounds.ToString();
@@ -13043,37 +13054,21 @@ index 49b4f6dd0d..262462f09f 100644
 +                              captures.AppendASCII(base::StringPrintf(
 +                                  "seam-%s-%s.png", dark ? "dark" : "light",
 +                                  maximized ? "maximized" : "restored")));
-       }
-     }
++      }
++    }
    }
--
--  struct ResizeData {
--    gfx::Size last_size;
--    size_t count = 0U;
--  };
--
--  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
--  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
--      observation_{this};
--};
--
--IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
--                       HorizontalTabsSinglePaneOpenSidePanel) {
--  if (!features::UseSidePanelFlyoverAnimation()) {
--    GTEST_SKIP();
--  }
 +  widget->Restore();
 +  theme->SetBrowserColorScheme(original_scheme);
-   RunScheduledLayouts();
--  RunTestSequence(ClearResizeCounts(), OpenSidePanel(),
--                  CheckResizeCounts(1U, 0U));
- }
++  RunScheduledLayouts();
++}
 +#endif
  
--IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
--                       HorizontalTabsSinglePaneCloseSidePanel) {
--  if (!features::UseSidePanelFlyoverAnimation()) {
--    GTEST_SKIP();
+- private:
+-  const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
+-  GetContentsContainers() {
+-    return BrowserView::GetBrowserViewForBrowser(browser())
+-        ->multi_contents_view()
+-        ->contents_container_views();
 -  }
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeHorizontalTabsPreserveRowsColorsAndTabIdentity) {
@@ -13103,11 +13098,17 @@ index 49b4f6dd0d..262462f09f 100644
 +  const auto active_handle = model->GetActiveTab()->GetHandle();
 +  const int count = model->count();
 +  state->SetVerticalTabsEnabled(false);
-   RunScheduledLayouts();
--  RunTestSequence(OpenSidePanel(), ClearResizeCounts(), CloseSidePanel(),
++  RunScheduledLayouts();
 +  ASSERT_TRUE(
 +      yee::UsesHorizontalTabGroupCapsule(*GetTabAnchorForModelIndex(view, 1)));
-+
+ 
+-  // views::ViewObserver:
+-  void OnViewBoundsChanged(views::View* observed_view) override {
+-    if (auto* webview = views::AsViewClass<views::WebView>(observed_view)) {
+-      auto& data = resize_data_[webview];
+-      if (data.last_size != observed_view->size()) {
+-        data.last_size = observed_view->size();
+-        ++data.count;
 +  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
 +      view->GetBrowserViewLayoutForTesting());
 +  ASSERT_TRUE(layout);
@@ -13213,11 +13214,23 @@ index 49b4f6dd0d..262462f09f 100644
 +        EXPECT_EQ(view->GetYeeHeaderPresentation()->surface,
 +                  bitmap.getColor(x, top->height() / 2));
 +        EXPECT_EQ(SK_AlphaTRANSPARENT, SkColorGetA(bitmap.getColor(x, 0)));
-+      }
-+    }
-+  };
+       }
+     }
+-  }
+-
+-  struct ResizeData {
+-    gfx::Size last_size;
+-    size_t count = 0U;
+   };
 +  expect_rows(false);
-+
+ 
+-  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
+-  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
+-      observation_{this};
+-};
+-
+-IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+-                       HorizontalTabsSinglePaneOpenSidePanel) {
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -17477,25 +17490,10 @@ index 49b4f6dd0d..262462f09f 100644
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
 +                       HorizontalTabsSinglePaneOpenSidePanel) {
-+  if (!features::UseSidePanelFlyoverAnimation()) {
-+    GTEST_SKIP();
-+  }
-+  RunScheduledLayouts();
-+  RunTestSequence(ClearResizeCounts(), OpenSidePanel(),
-+                  CheckResizeCounts(1U, 0U));
-+}
-+
-+IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
-+                       HorizontalTabsSinglePaneCloseSidePanel) {
-+  if (!features::UseSidePanelFlyoverAnimation()) {
-+    GTEST_SKIP();
-+  }
-+  RunScheduledLayouts();
-+  RunTestSequence(OpenSidePanel(), ClearResizeCounts(), CloseSidePanel(),
-                   CheckResizeCounts(1U, 0U));
- }
- 
-@@ -874,10 +6000,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+   if (!features::UseSidePanelFlyoverAnimation()) {
+     GTEST_SKIP();
+   }
+@@ -874,10 +6018,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18456,7 +18454,7 @@ index 49b4f6dd0d..262462f09f 100644
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +6961,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +6979,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18474,7 +18472,7 @@ index 49b4f6dd0d..262462f09f 100644
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7025,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7043,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18492,7 +18490,7 @@ index 49b4f6dd0d..262462f09f 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7045,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7063,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18511,7 +18509,7 @@ index 49b4f6dd0d..262462f09f 100644
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7117,357 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7135,357 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -28801,7 +28799,7 @@ index 5168c91126..a97443300f 100644
  
    // Manages the expansion of a status bubble to fit a long URL.
 diff --git a/chrome/browser/ui/views/tabs/BUILD.gn b/chrome/browser/ui/views/tabs/BUILD.gn
-index c8a34df68a..6cc00f9581 100644
+index c8a34df68a..950132b91b 100644
 --- a/chrome/browser/ui/views/tabs/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/BUILD.gn
 @@ -127,6 +127,11 @@ source_set("tab_group_impl") {
@@ -28850,6 +28848,14 @@ index c8a34df68a..6cc00f9581 100644
  }
  
  source_set("new_tab_button") {
+@@ -525,6 +543,7 @@ source_set("new_tab_button") {
+     "//chrome/browser/ui:ui_features",
+     "//chrome/browser/ui/browser_window",
+     "//chrome/browser/ui/views/tabs/shared",
++    "//chrome/browser/ui/views/yee:yee_ui_headers",
+     "//ui/base:features",
+     "//ui/views",
+   ]
 diff --git a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
 index c726fbc277..752dda078f 100644
 --- a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
@@ -35944,6 +35950,56 @@ index dc571ae36e..444dacf481 100644
  };
  
  BEGIN_METADATA(TabHoverCardBubbleView, TabCardView)
+diff --git a/chrome/browser/ui/views/tabs/new_tab_button.cc b/chrome/browser/ui/views/tabs/new_tab_button.cc
+index 6be7d11319..d3299be992 100644
+--- a/chrome/browser/ui/views/tabs/new_tab_button.cc
++++ b/chrome/browser/ui/views/tabs/new_tab_button.cc
+@@ -12,6 +12,8 @@
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/tabs/shared/new_tab_button_menu_model.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
++#include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
++#include "chrome/browser/ui/views/yee/yee_ui.h"
+ #include "ui/views/controls/menu/menu_runner.h"
+ #include "ui/views/view_class_properties.h"
+ 
+@@ -27,12 +29,23 @@ NewTabButton::NewTabButton(PressedCallback callback,
+                             animated_flat_edge),
+       browser_(browser) {
+   set_context_menu_controller(this);
++  if (yee::IsShellEnabled()) {
++    SetPreferredSize(gfx::Size(yee::kSidebarMetrics.shell_control_size,
++                               yee::kSidebarMetrics.shell_control_size));
++  }
+   SetProperty(views::kElementIdentifierKey, kNewTabButtonElementId);
+   set_paint_transparent_for_glass(true);
+ }
+ 
+ NewTabButton::~NewTabButton() = default;
+ 
++int NewTabButton::GetCornerRadius() const {
++  return yee::IsShellEnabled() && !yee::ShouldUseNativeHorizontalTabTheme(
++                                      *GetNativeTheme(), GetThemeProvider())
++             ? yee::kSidebarMetrics.shell_control_corner_radius
++             : TabStripControlButton::GetCornerRadius();
++}
++
+ void NewTabButton::ShowContextMenuForViewImpl(
+     View* source,
+     const gfx::Point& point,
+diff --git a/chrome/browser/ui/views/tabs/new_tab_button.h b/chrome/browser/ui/views/tabs/new_tab_button.h
+index 2881e58f49..19924569ca 100644
+--- a/chrome/browser/ui/views/tabs/new_tab_button.h
++++ b/chrome/browser/ui/views/tabs/new_tab_button.h
+@@ -35,6 +35,8 @@ class NewTabButton : public TabStripControlButton,
+   NewTabButton& operator=(const NewTabButton&) = delete;
+   ~NewTabButton() override;
+ 
++  int GetCornerRadius() const override;
++
+   // views::ContextMenuController
+   void ShowContextMenuForViewImpl(
+       View* source,
 diff --git a/chrome/browser/ui/views/tabs/shared/BUILD.gn b/chrome/browser/ui/views/tabs/shared/BUILD.gn
 index 846ec37ee4..ea2ca91f90 100644
 --- a/chrome/browser/ui/views/tabs/shared/BUILD.gn
