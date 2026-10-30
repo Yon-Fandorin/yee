@@ -14,6 +14,7 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -450,9 +451,37 @@ class AgentWidgetLifetime final : public WidgetObserver {
 
   WidgetDelegate* delegate() const { return delegate_.get(); }
 
-  void Attach(Widget* widget) { widget->AddObserver(this); }
+  void Attach(Widget* widget, Widget* visibility_owner = nullptr) {
+    widget_ = widget;
+    widget->AddObserver(this);
+    if (visibility_owner) {
+      owner_observation_.Observe(visibility_owner);
+    }
+  }
+
+  void OnWidgetVisibilityChanged(Widget* widget, bool visible) override {
+    if (!owner_observation_.IsObservingSource(widget) || !widget_ ||
+        widget_->IsClosed()) {
+      return;
+    }
+    // native 부모 창의 숨김이 자식의 표시 요청까지 지우는 플랫폼도 있다.
+    if (visible) {
+      widget_->ShowInactive();
+    } else {
+      widget_->Hide();
+    }
+  }
 
   void OnWidgetDestroyed(Widget* widget) override {
+    if (owner_observation_.IsObservingSource(widget)) {
+      owner_observation_.Reset();
+      if (widget_) {
+        widget_->Close();
+      }
+      return;
+    }
+    owner_observation_.Reset();
+    widget_ = nullptr;
     widget->RemoveObserver(this);
     base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
                                                                   this);
@@ -460,6 +489,8 @@ class AgentWidgetLifetime final : public WidgetObserver {
 
  private:
   std::unique_ptr<WidgetDelegate> delegate_;
+  raw_ptr<Widget> widget_ = nullptr;
+  base::ScopedObservation<Widget, WidgetObserver> owner_observation_{this};
 };
 
 }  // namespace
@@ -528,8 +559,10 @@ Widget* ShowAgentBridgePointer(View* owner, gfx::Point screen_point) {
 
   auto* widget = new Widget;
   widget->Init(std::move(params));
-  lifetime_ptr->Attach(widget);
-  widget->ShowInactive();
+  lifetime_ptr->Attach(widget, owner->GetWidget());
+  if (owner->GetWidget()->IsVisible()) {
+    widget->ShowInactive();
+  }
   return widget;
 }
 

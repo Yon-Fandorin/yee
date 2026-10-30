@@ -635,6 +635,10 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   }
   auto* controller = ProjectNavigationController::From(browser());
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  // 큰 화면에서도 허브와 Sidebar 양쪽에 스크롤 여유를 만든다.
+  gfx::Rect bounds = browser()->GetWindow()->GetBounds();
+  bounds.set_height(std::min(bounds.height(), 700));
+  browser()->GetWindow()->SetBounds(bounds);
   tabs::VerticalTabStripStateController::From(browser())
       ->SetVerticalTabsEnabled(true);
   auto layout = [&] {

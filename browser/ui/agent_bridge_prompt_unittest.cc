@@ -301,13 +301,31 @@ TEST_F(AgentBridgePromptTest, PointerHidesAndClosesWithOwner) {
   base::RunLoop().RunUntilIdle();
   ASSERT_TRUE(pointer->IsVisible());
 
+  for (int cycle = 0; cycle < 2; ++cycle) {
+    owner_widget()->Hide();
+    base::RunLoop().RunUntilIdle();
+    EXPECT_FALSE(pointer->IsVisible());
+
+    owner_widget()->Show();
+    base::RunLoop().RunUntilIdle();
+    EXPECT_TRUE(pointer->IsVisible());
+    EXPECT_FALSE(pointer->IsActive());
+  }
+
+  // 포인터가 먼저 닫힌 뒤의 부모 표시 변경은 닫힌 포인터를 되살리지 않는다.
+  pointer->CloseNow();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(weak_pointer);
   owner_widget()->Hide();
+  pointer = ShowAgentBridgePointer(owner_view(), gfx::Point(140, 140));
+  ASSERT_TRUE(pointer);
+  weak_pointer = pointer->GetWeakPtr();
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(pointer->IsVisible());
-
   owner_widget()->Show();
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(pointer->IsVisible());
+  EXPECT_FALSE(pointer->IsActive());
 
   CloseOwner();
   base::RunLoop().RunUntilIdle();

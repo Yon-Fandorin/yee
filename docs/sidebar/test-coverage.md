@@ -92,14 +92,16 @@ Windows에서는 `PointerExitAndReentryKeepNativePopupFocus`가 실제 press/rel
 실제 Footer 검사는 별도 프로세스의 UI Automation 클라이언트가 브라우저·팝업
 트리를 보관하는 조건도 포함한다. 클라이언트는 전용 MTA에서 조회하고, 닫힌
 팝업의 현재 속성 조회가 실패하는지 확인한 뒤 COM 참조를 반환한다. 테스트는
-브라우저 STA가 살아 있는 `TearDownOnMainThread`에서 클라이언트 종료와 지연된
-참조 반환을 기다린다. 그 뒤 기존 `ContentTestSuiteBase`의 창·COM 누수 검사를
-그대로 실행한다. 외부 참조를 UI 스레드 종료 뒤까지 남기는 대조 실행에서는
+브라우저 STA가 살아 있는 `TearDownOnMainThread`에서 클라이언트 종료를 기다린다.
+기본 `PostRunTestOnMainThread`가 창을 닫은 뒤 UIA provider를 정리하고,
+10ms 간격으로 메시지 루프를 깨워 남은 COM 참조가 0이 되는지 확인한다.
+그 뒤 기존 `ContentTestSuiteBase`의 창·COM 누수 검사를 그대로 실행한다.
+외부 참조를 UI 스레드 종료 뒤까지 남기는 이전 대조 실행에서는
 `ghost_count=53`, 먼저 정리하는 실행에서는 0으로 차이가 재현됐다.
 UIA 클라이언트 스레드 원칙은
 [Microsoft UI Automation threading](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading)을 따른다.
 
-후속 Windows 검수는 단위 25개와 관련 실제 창 7종을 모두 종료 검사까지
+이전 Windows 검수는 단위 25개와 관련 실제 창 7종을 모두 종료 검사까지
 통과했다. Footer는 외부 UIA 조회를 포함해 3회 반복했다. macOS·Linux는 실제
 실행 대신 Footer의 주요 비-Windows 메서드 6개의 본문과 기존 18/30 팔레트가
 유지되는지 소스로 대조했다. 두 플랫폼의 빌드·실기 결과를 의미하지 않는다.

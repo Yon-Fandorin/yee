@@ -1556,7 +1556,7 @@ index 72fc94f516..9c2b1e39d4 100644
      return SessionStartupPref::LAST;
    }
 diff --git a/chrome/browser/prefs/session_startup_pref_unittest.cc b/chrome/browser/prefs/session_startup_pref_unittest.cc
-index c7ccf4415d..5f5d565e20 100644
+index c7ccf4415d..15e8643da3 100644
 --- a/chrome/browser/prefs/session_startup_pref_unittest.cc
 +++ b/chrome/browser/prefs/session_startup_pref_unittest.cc
 @@ -6,8 +6,12 @@
@@ -1572,7 +1572,29 @@ index c7ccf4415d..5f5d565e20 100644
  #include "chrome/common/pref_names.h"
  #include "components/pref_registry/pref_registry_syncable.h"
  #include "components/sync_preferences/testing_pref_service_syncable.h"
-@@ -86,6 +90,51 @@ TEST_F(SessionStartupPrefTest, URLListIsFixedUp) {
+@@ -20,6 +24,10 @@
+ #include "chrome/browser/flags/android/chrome_feature_list.h"
+ #endif
+ 
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#endif
++
+ // Unit tests for SessionStartupPref.
+ class SessionStartupPrefTest : public testing::Test {
+  public:
+@@ -66,6 +74,10 @@ TEST_F(SessionStartupPrefTest, DefaultStartupType) {
+             SessionStartupPref::GetDefaultStartupType());
+ 
+   base::android::device_info::reset_is_desktop_for_testing();
++#elif BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
++  EXPECT_EQ(yee::IsShellEnabled() ? SessionStartupPref::LAST
++                                  : SessionStartupPref::DEFAULT,
++            SessionStartupPref::GetDefaultStartupType());
+ #else
+   EXPECT_EQ(SessionStartupPref::DEFAULT,
+             SessionStartupPref::GetDefaultStartupType());
+@@ -86,6 +98,51 @@ TEST_F(SessionStartupPrefTest, URLListIsFixedUp) {
    EXPECT_EQ("http://chromium.org/", result.urls[1].spec());
  }
  
@@ -21252,7 +21274,7 @@ index e182430481..f1e1b00b18 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
-index a73f5c6b4e..0e99cd0301 100644
+index a73f5c6b4e..17a1f314f8 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_interactive_uitest.cc
 @@ -4,21 +4,43 @@
@@ -21617,7 +21639,7 @@ index a73f5c6b4e..0e99cd0301 100644
  };
  
  INSTANTIATE_TEST_SUITE_P(
-@@ -424,6 +716,945 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -424,6 +716,956 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                    CheckActiveContentsHasFocus());
  }
  
@@ -22472,7 +22494,18 @@ index a73f5c6b4e..0e99cd0301 100644
 +    views::View* create = actions->GetViewByID(yee::kSidebarHeaderCreateViewId);
 +    views::View* agent = actions->GetViewByID(yee::kSidebarHeaderAgentViewId);
 +    const auto footer_index = region->GetIndexOf(footer);
-+    const auto tab_strip_index = region->GetIndexOf(region->GetTabStripView());
++    views::View* tab_strip_container = region->GetTabStripView();
++    if (!tab_strip_container) {
++      return false;
++    }
++    // Footer와 native 탭 본문이 만나는 공통 부모에서 배치 순서를 확인한다.
++    while (tab_strip_container->parent() != region) {
++      tab_strip_container = tab_strip_container->parent();
++      if (!tab_strip_container) {
++        return false;
++      }
++    }
++    const auto tab_strip_index = region->GetIndexOf(tab_strip_container);
 +    if (actions_count != 1 || footer_count != 1 || !create || !agent ||
 +        actions->children()[0] != create || actions->children()[1] != agent ||
 +        create->GetVisible() != visible || agent->GetVisible() != visible ||
@@ -22563,7 +22596,7 @@ index a73f5c6b4e..0e99cd0301 100644
  // Check that MultiContentsView changes its active view when inactive view is
  // focused using mouse click while a PageInfo bubble is open in the active view.
  // This prevents UI origin confusion issues (e.g. b/488762971).
-@@ -569,16 +1800,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -569,16 +1811,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToMinSize) {
@@ -22589,7 +22622,7 @@ index a73f5c6b4e..0e99cd0301 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, ResizesToSnapPointSize) {
-@@ -673,9 +1903,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -673,9 +1914,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
    // When not in a split, also take into account the top separator when
    // comparing the height of the multi contents view to the contents views.
    const int kTopSeparatorHeight =
@@ -22603,7 +22636,7 @@ index a73f5c6b4e..0e99cd0301 100644
    RunTestSequence(
        Check([&]() {
          gfx::Rect active_contents_bounds =
-@@ -690,8 +1921,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
+@@ -690,8 +1932,12 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, InsetsOnlyInSplit) {
              GetSize(
                  multi_contents_view()->GetInactiveContentsView()->bounds()) +
              GetSize(multi_contents_view()->resize_area_for_testing()->bounds());
@@ -22618,7 +22651,7 @@ index a73f5c6b4e..0e99cd0301 100644
        }));
  }
  
-@@ -713,15 +1948,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -713,15 +1959,13 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
@@ -22638,7 +22671,7 @@ index a73f5c6b4e..0e99cd0301 100644
        InstrumentTab(kWebContentsId),
        NavigateWebContents(kWebContentsId, chrome::ChromeUINewTabURLAsGURL()),
        CreateTabsAndEnterSplitView(), Check([&]() {
-@@ -737,8 +1970,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -737,8 +1981,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22651,7 +22684,7 @@ index a73f5c6b4e..0e99cd0301 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -754,31 +1989,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -754,31 +2000,32 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
          resize_area->OnMousePressed(press_event);
          resize_area->OnMouseReleased(release_event);
        }),
@@ -22704,7 +22737,7 @@ index a73f5c6b4e..0e99cd0301 100644
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
    RunTestSequence(
        // Create a split view with and verify web contents are as expected and
-@@ -798,8 +2034,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -798,8 +2045,10 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                     ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
        }),
        CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
@@ -22717,7 +22750,7 @@ index a73f5c6b4e..0e99cd0301 100644
        Do([&]() {
          auto* resize_area = multi_contents_view()->resize_area_for_testing();
          gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-@@ -809,23 +2047,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
+@@ -809,23 +2058,24 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
                                         ui::EventTimeForNow(), details);
          resize_area->OnGestureEvent(&gesture_event);
        }),
@@ -22757,7 +22790,7 @@ index a73f5c6b4e..0e99cd0301 100644
  }
  
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest,
-@@ -869,12 +2108,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -869,12 +2119,15 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
        WaitForActiveTabChange(2),
@@ -22777,7 +22810,7 @@ index a73f5c6b4e..0e99cd0301 100644
                  }));
  }
  #endif
-@@ -882,11 +2124,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
+@@ -882,11 +2135,14 @@ IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, RoundedCornersForSplitView) {
  IN_PROC_BROWSER_TEST_P(MultiContentsViewUiTest, BackgroundVisibility) {
    RunTestSequence(
        CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
@@ -24618,15 +24651,16 @@ index 85f1aaa590..6eca8bbacb 100644
    base::RetainingOneShotTimer expand_on_hover_heuristic_timer_;
    std::optional<gfx::Point> point_at_expand_on_hover_timer_start_;
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
-index 8d4a5b9362..840f564932 100644
+index 8d4a5b9362..80dfe3170e 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
-@@ -4,7 +4,12 @@
+@@ -4,7 +4,13 @@
  
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
  
 +#include "base/check.h"
 +#include "base/check_op.h"
++#include "base/functional/callback_helpers.h"
 +#include "base/run_loop.h"
  #include "base/test/metrics/histogram_tester.h"
 +#include "base/test/run_until.h"
@@ -24634,7 +24668,7 @@ index 8d4a5b9362..840f564932 100644
  #include "build/build_config.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
-@@ -12,11 +17,94 @@
+@@ -12,11 +18,96 @@
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
  #include "chrome/browser/ui/views/test/vertical_tabs_interactive_test_mixin.h"
@@ -24664,9 +24698,11 @@ index 8d4a5b9362..840f564932 100644
 +#include "base/strings/string_number_conversions.h"
 +#include "base/strings/utf_string_conversions.h"
 +#include "base/test/multiprocess_test.h"
++#include "base/timer/timer.h"
 +#include "base/win/scoped_com_initializer.h"
 +#include "base/win/scoped_handle.h"
 +#include "testing/multiprocess_func_list.h"
++#include "ui/accessibility/platform/ax_platform.h"
 +#include "ui/accessibility/platform/ax_platform_node_win.h"
 +#include "ui/aura/window.h"
 +#include "ui/aura/window_tree_host.h"
@@ -24729,7 +24765,7 @@ index 8d4a5b9362..840f564932 100644
  class VerticalTabStripRegionViewInteractiveUiTest
      : public VerticalTabsInteractiveTestMixin<InteractiveBrowserTest> {
   public:
-@@ -24,10 +112,133 @@ class VerticalTabStripRegionViewInteractiveUiTest
+@@ -24,10 +115,149 @@ class VerticalTabStripRegionViewInteractiveUiTest
  
    base::HistogramTester& histogram_tester() { return histogram_tester_; }
  
@@ -24757,6 +24793,8 @@ index 8d4a5b9362..840f564932 100644
 +    ax_client_ = base::SpawnMultiProcessTestChild(
 +        "YeeFooterAccessibilityClient", command, options);
 +    ASSERT_TRUE(ax_client_.IsValid());
++    base::RepeatingTimer timer;
++    timer.Start(FROM_HERE, base::Milliseconds(10), base::DoNothing());
 +    ASSERT_TRUE(base::test::RunUntil([&]() {
 +      return ::WaitForSingleObject(ax_ready_.get(), 0) == WAIT_OBJECT_0;
 +    }));
@@ -24765,6 +24803,8 @@ index 8d4a5b9362..840f564932 100644
 +  void TearDownOnMainThread() override {
 +    if (ax_client_.IsValid()) {
 +      base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
++      base::RepeatingTimer timer;
++      timer.Start(FROM_HERE, base::Milliseconds(10), base::DoNothing());
 +      // 외부 참조 반환은 브라우저 STA의 메시지 처리가 필요하다. 창·UI 스레드
 +      // 종료 전에 클라이언트를 정리하고, 지연된 COM Release까지 처리한다.
 +      EXPECT_TRUE(::SetEvent(ax_done_.get()));
@@ -24778,12 +24818,24 @@ index 8d4a5b9362..840f564932 100644
 +        ax_client_.Terminate(1, true);
 +        ADD_FAILURE() << "접근성 클라이언트가 종료되지 않았습니다.";
 +      }
++    }
++    VerticalTabsInteractiveTestMixin<
++        InteractiveBrowserTest>::TearDownOnMainThread();
++  }
++
++  void PostRunTestOnMainThread() override {
++    VerticalTabsInteractiveTestMixin<
++        InteractiveBrowserTest>::PostRunTestOnMainThread();
++    if (ax_client_.IsValid()) {
++      base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
++      // 창 종료 후 남은 UIA/COM 참조 반환을 기다린다.
++      ui::AXPlatform::GetInstance().DisableActiveUiaProvider();
++      base::RepeatingTimer timer;
++      timer.Start(FROM_HERE, base::Milliseconds(10), base::DoNothing());
 +      EXPECT_TRUE(base::test::RunUntil([]() {
 +        return ui::AXPlatformNodeWin::GetCounts().ghost_nodes == 0u;
 +      }));
 +    }
-+    VerticalTabsInteractiveTestMixin<
-+        InteractiveBrowserTest>::TearDownOnMainThread();
 +  }
 +
 +#endif
@@ -31501,11 +31553,14 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..f6d59af6d7 100644
+index a050af7ed7..7b5f9aa687 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-@@ -4,17 +4,20 @@
+@@ -2,19 +2,23 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
  
++#include <algorithm>
  #include <string>
  
 +#include "base/command_line.h"
@@ -31525,7 +31580,7 @@ index a050af7ed7..f6d59af6d7 100644
  #include "chrome/browser/ui/tabs/tab_group_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -31,24 +34,34 @@
+@@ -31,24 +35,35 @@
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
  #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
  #include "chrome/browser/ui/views/test/vertical_tabs_interactive_test_mixin.h"
@@ -31557,10 +31612,11 @@ index a050af7ed7..f6d59af6d7 100644
  #include "ui/events/test/event_generator.h"
  #include "ui/views/controls/scroll_view.h"
 +#include "ui/views/controls/separator.h"
++#include "ui/views/focus/focus_manager.h"
  #include "ui/views/interaction/interactive_views_test.h"
  #include "ui/views/interaction/mouse/interaction_test_util_mouse.h"
  #include "ui/views/test/views_test_utils.h"
-@@ -159,6 +172,8 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
+@@ -159,6 +174,8 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
                                      kBrowserCountPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
                                      kDragStatePoller);
@@ -31569,7 +31625,7 @@ index a050af7ed7..f6d59af6d7 100644
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<URLs>,
                                      kTabOrderPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<PinnedURLs>,
-@@ -172,6 +187,28 @@ class VerticalTabDragTest
+@@ -172,6 +189,28 @@ class VerticalTabDragTest
    VerticalTabDragTest() = default;
    ~VerticalTabDragTest() override = default;
  
@@ -31598,7 +31654,7 @@ index a050af7ed7..f6d59af6d7 100644
    const std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures()
        override {
      auto enabled = VerticalTabsInteractiveTestMixin<
-@@ -207,6 +244,43 @@ class VerticalTabDragTest
+@@ -207,6 +246,43 @@ class VerticalTabDragTest
      return *browser_view;
    }
  
@@ -31642,7 +31698,7 @@ index a050af7ed7..f6d59af6d7 100644
    auto RunScheduledLayout() {
      return Do([&]() { views::test::RunScheduledLayout(&GetBrowserView()); });
    }
-@@ -244,6 +318,30 @@ class VerticalTabDragTest
+@@ -244,6 +320,30 @@ class VerticalTabDragTest
          MoveMouseTo(kTabToDragTo), RunScheduledLayout());
    }
  
@@ -31673,7 +31729,7 @@ index a050af7ed7..f6d59af6d7 100644
    auto StartDragFromGroupToTab(int from_group_index, int to_tab_index) {
      const char kGroupToDragFrom[] = "Group to drag";
      const char kTabToDragTo[] = "Tab to drag to";
-@@ -266,6 +364,157 @@ class VerticalTabDragTest
+@@ -266,6 +366,157 @@ class VerticalTabDragTest
          RunScheduledLayout());
    }
  
@@ -31831,7 +31887,7 @@ index a050af7ed7..f6d59af6d7 100644
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +619,354 @@ class VerticalTabDragTest
+@@ -370,8 +621,356 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32066,7 +32122,9 @@ index a050af7ed7..f6d59af6d7 100644
 +      Check([&]() {
 +        return !model->IsTabPinned(yee::kSidebarMetrics.favorites_max_count);
 +      }),
-+      Do([&]() {
++      RunScheduledLayout(), Do([&]() {
++        // ACCESSIBLE_ONLY 탭을 native 키보드 탐색 상태에서 포커스한다.
++        GetBrowserView().GetFocusManager()->SetKeyboardAccessible(true);
 +        GetTabViewAt(yee::kSidebarMetrics.favorites_max_count)->RequestFocus();
 +      }),
 +      Check([&]() { return chrome::HasKeyboardFocusedTab(browser()); }),
@@ -32186,7 +32244,7 @@ index a050af7ed7..f6d59af6d7 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -878,8 +1473,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -878,8 +1477,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32196,7 +32254,7 @@ index a050af7ed7..f6d59af6d7 100644
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1481,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1485,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32207,7 +32265,7 @@ index a050af7ed7..f6d59af6d7 100644
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1493,453 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1497,453 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -32664,7 +32722,20 @@ index a050af7ed7..f6d59af6d7 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1106,7 +2137,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2126,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+   const int kTabCount = 50;
+ 
+   RunTestSequence(
++      Do([&]() {
++        // 큰 화면에서도 아래로 넘칠 만큼의 작업 영역을 준비한다.
++        gfx::Rect bounds = browser()->GetWindow()->GetBounds();
++        bounds.set_height(std::min(bounds.height(), 600));
++        browser()->GetWindow()->SetBounds(bounds);
++      }),
+       // Add many tabs and ensure the first one is active so we start at the
+       // top.
+       Do([this]() {
+@@ -1106,7 +2147,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
@@ -33106,7 +33177,7 @@ index a7784a0305..15a1137859 100644
  };
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
-index 4cca85eb84..d20af680d0 100644
+index 4cca85eb84..0451a70949 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 @@ -6,16 +6,24 @@
@@ -33165,7 +33236,7 @@ index 4cca85eb84..d20af680d0 100644
  
    ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
  
-@@ -215,6 +233,251 @@ TEST_F(TabGroupHeaderViewTest, EditorBubbleButtonVisibilityOnHover) {
+@@ -215,6 +233,275 @@ TEST_F(TabGroupHeaderViewTest, EditorBubbleButtonVisibilityOnHover) {
    check_editor_bubble_button_visible(false);
  }
  
@@ -33231,10 +33302,16 @@ index 4cca85eb84..d20af680d0 100644
 +  auto* header = widget->SetContentsView(std::make_unique<TabGroupHeaderView>(
 +      delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
 +  header->OnDataChanged(data);
++  widget->ShowInactive();
++  EXPECT_FALSE(widget->IsActive());
++  ui::test::EventGenerator generator(GetContext(), widget->GetNativeWindow());
++  MoveMouseTo(generator, header, false);
++  ASSERT_FALSE(header->IsMouseHovered());
 +  const auto resting = yee::ResolveSidebarItemColors(
 +      *header->GetColorProvider(), yee::SidebarItemVisualState::kResting, 0.0,
 +      widget->ShouldPaintAsActive(), /*persistent_surface=*/false);
 +  const auto expect_sidebar_presentation = [&] {
++    EXPECT_FALSE(header->IsMouseHovered());
 +    EXPECT_FALSE(header->background());
 +    EXPECT_EQ(resting.foreground,
 +              header->title_label_for_testing()->GetEnabledColor());
@@ -33341,43 +33418,61 @@ index 4cca85eb84..d20af680d0 100644
 +}
 +
 +TEST_F(TabGroupHeaderViewTest, YeeHorizontalNativeThemeKeepsNativeChipOnHover) {
-+  testing::NiceMock<MockDelegate> delegate;
-+  tab_groups::TabGroupVisualData visual_data(
-+      u"고대비 그룹", tab_groups::TabGroupColorId::kBlue, false);
-+  tabs::TabGroupData data;
-+  data.visual_data = visual_data;
-+  ON_CALL(delegate, GetTabGroupData()).WillByDefault(testing::ReturnRef(data));
-+  auto widget = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
-+  auto* theme = widget->GetNativeTheme();
-+  const auto previous_contrast = theme->preferred_contrast();
-+  base::ScopedClosureRunner restore_contrast(base::BindOnce(
-+      [](ui::NativeTheme* theme, ui::NativeTheme::PreferredContrast contrast) {
-+        theme->set_preferred_contrast(contrast);
-+        theme->NotifyOnNativeThemeUpdated();
-+      },
-+      base::Unretained(theme), previous_contrast));
-+  theme->set_preferred_contrast(ui::NativeTheme::PreferredContrast::kMore);
-+  theme->NotifyOnNativeThemeUpdated();
-+  auto* header = widget->SetContentsView(std::make_unique<TabGroupHeaderView>(
-+      delegate, TabStripOrientation::kHorizontal, nullptr, &visual_data));
-+  header->OnDataChanged(data);
-+  const auto* provider = header->GetColorProvider();
-+  const SkColor native_background =
-+      provider->GetColor(GetTabGroupTabStripColorId(
-+          visual_data.color(), widget->ShouldPaintAsActive()));
-+  const ui::MouseEvent entered(ui::EventType::kMouseEntered, gfx::Point(),
-+                               gfx::Point(), ui::EventTimeForNow(), 0, 0);
-+  header->OnMouseEntered(entered);
-+  ASSERT_TRUE(header->background());
-+  EXPECT_EQ(native_background,
-+            header->background()->color().ResolveToSkColor(provider));
-+  EXPECT_EQ(color_utils::GetColorWithMaxContrast(native_background),
-+            header->title_label_for_testing()->GetEnabledColor());
-+  EXPECT_EQ(gfx::Insets::VH(0, TabGroupStyle::GetInsetsForHeaderChip(
-+                                   TabStripOrientation::kHorizontal)
-+                                   .left()),
-+            header->GetInteriorMargin());
-+  EXPECT_FALSE(widget->IsActive());
++  for (const bool shell_enabled : {true, false}) {
++    SCOPED_TRACE(shell_enabled);
++    base::test::ScopedCommandLine command_line;
++    if (shell_enabled) {
++      command_line.GetProcessCommandLine()->RemoveSwitch(
++          "disable-yee-shell-scaffold");
++    } else {
++      command_line.GetProcessCommandLine()->AppendSwitch(
++          "disable-yee-shell-scaffold");
++    }
++    testing::NiceMock<MockDelegate> delegate;
++    tab_groups::TabGroupVisualData visual_data(
++        u"고대비 그룹", tab_groups::TabGroupColorId::kBlue, false);
++    tabs::TabGroupData data;
++    data.visual_data = visual_data;
++    ON_CALL(delegate, GetTabGroupData())
++        .WillByDefault(testing::ReturnRef(data));
++    auto widget =
++        CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
++    auto* theme = widget->GetNativeTheme();
++    const auto previous_contrast = theme->preferred_contrast();
++    base::ScopedClosureRunner restore_contrast(base::BindOnce(
++        [](ui::NativeTheme* theme,
++           ui::NativeTheme::PreferredContrast contrast) {
++          theme->set_preferred_contrast(contrast);
++          theme->NotifyOnNativeThemeUpdated();
++        },
++        base::Unretained(theme), previous_contrast));
++    theme->set_preferred_contrast(ui::NativeTheme::PreferredContrast::kMore);
++    theme->NotifyOnNativeThemeUpdated();
++    auto* header = widget->SetContentsView(std::make_unique<TabGroupHeaderView>(
++        delegate, TabStripOrientation::kHorizontal, nullptr, &visual_data));
++    header->OnDataChanged(data);
++    const int expected_inset =
++        shell_enabled ? yee::kSidebarMetrics.group_header_horizontal_inset
++                      : TabGroupStyle::GetInsetsForHeaderChip(
++                            TabStripOrientation::kHorizontal)
++                            .left();
++    const auto native_palette_margin = gfx::Insets::VH(0, expected_inset);
++    EXPECT_EQ(native_palette_margin, header->GetInteriorMargin());
++    const auto* provider = header->GetColorProvider();
++    const SkColor native_background =
++        provider->GetColor(GetTabGroupTabStripColorId(
++            visual_data.color(), widget->ShouldPaintAsActive()));
++    const ui::MouseEvent entered(ui::EventType::kMouseEntered, gfx::Point(),
++                                 gfx::Point(), ui::EventTimeForNow(), 0, 0);
++    header->OnMouseEntered(entered);
++    ASSERT_TRUE(header->background());
++    EXPECT_EQ(native_background,
++              header->background()->color().ResolveToSkColor(provider));
++    EXPECT_EQ(color_utils::GetColorWithMaxContrast(native_background),
++              header->title_label_for_testing()->GetEnabledColor());
++    EXPECT_EQ(native_palette_margin, header->GetInteriorMargin());
++    EXPECT_FALSE(widget->IsActive());
++  }
 +}
 +
 +TEST_F(TabGroupHeaderViewTest,
@@ -33417,7 +33512,7 @@ index 4cca85eb84..d20af680d0 100644
  TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
    MockDelegate delegate;
    ON_CALL(delegate, IsGroupFocused()).WillByDefault(testing::Return(true));
-@@ -228,6 +491,27 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
+@@ -228,6 +515,27 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
        delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
    widget->Show();
  
@@ -33445,7 +33540,7 @@ index 4cca85eb84..d20af680d0 100644
    // In focus mode, the 3-dot menu should always be visible and collapse button
    // hidden.
    EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
-@@ -238,11 +522,17 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
+@@ -238,11 +546,17 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
    // Even when hovering over the header, 3-dot button is visible and collapse
    // button is hidden.
    MoveMouseTo(generator, header, true);
