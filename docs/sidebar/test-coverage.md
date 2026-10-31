@@ -392,3 +392,45 @@ overflow·스크롤 범위·offset이 0이며 drop 영역은 viewport를 채우�
 레이어가 버튼 크기·원점에 맞는지 검사한다. Hover·pressed·keyboard focus·disabled·leave를
 구분하고, RTL 125%에서도 제목이나 배경이 보조 버튼의 슬롯 밖으로 밀리지 않아야 한다.
 `--yee-project-paint-capture-dir`로 같은 상태의 실제 창을 저장할 수 있다.
+
+
+`YeeNativePlannerResultMatchesAppliedLayout`와
+`YeeSidePanelGutterPhysicallyResizesBesideWebContents`는 실제 Native layout plan의
+content column·최소 폭·패널 여백에서 증가 가능한 폭을 읽는다. 작은 작업 영역에서
+패널이 이미 상한에 있으면 실제 Sidebar를 접어 공간을 확보하고, 각각 50 DIP와
+64 DIP가 가능한지 입력 전에 확인한다. 기존 정확한 증가량·역방향 드래그·양쪽 정렬,
+포인터 전달과 적용된 Native plan 비교는 유지한다.
+`YeeSplitPanelDevToolsNoticeKeepOwningPane`는 창 크기 요청이 OS에 제한될 수 있으므로
+Sidebar를 접고 가로 분할의 도구 소유 pane에 폭을 배정한다. 실제 Native DevTools
+크기 계산으로 페이지가 남는 조건을 확인한 뒤 양쪽 분할 축과 세 도킹 방향에서
+페이지·InfoBar·Native clip의 소유권과 포함 관계를 검사한다.
+`YeeInactivePaneHeaderActivatesAddressEditing`는 헤더 전체 중앙 대신 실제 배치된
+주소 미리보기의 중앙으로 한 번 이동·클릭한다. 주소 영역의 화면 좌표와 현재
+이벤트 대상, 클릭 뒤 두 WebContents의 identity·개수·동일 분할 유지 및 원래
+활성 탭·주소창 부모·초점을 함께 확인한다. 헤더 안의 닫기 버튼에 대한 오입력을
+주소 활성화로 취급하지 않는다.
+수평 제목 색상 검사는 원래의 표시·비어 있지 않은 bounds·정확한 색상 판정을
+유지하며, 실패할 때 실제 Label의 표시·그리기 상태·bounds·색상과 창·탭 bounds를
+함께 기록한다. 이 관측 추가 자체를 색상 오류의 해결이나 실제 앱 통과로 보지 않는다.
+
+
+수평 그룹의 좁은 창·짧은 이름·접힘 상태에서 새 탭 버튼을 누를 때는 한 번의 이동 뒤
+실제 포인터·현재 버튼 bounds·root hit target을 확인하고 한 번만 클릭한다. 실제로
+추가되고 선택된 새 handle을 식별해 그 탭만 닫고, 원래 ordered handles와 개수가
+돌아온 뒤 이전 활성 handle을 복원한다. gap 검사에 들어가기 전에 이 복원을 확인한다.
+패널의 증가 가능 폭은 Header가 패널 옆에 있는 `kSharedRow`와 패널 위에 있는
+`kTopAbovePanel`의 공통 Native 배분식에서 읽는다. 패널이 실제로 있는지 확인하며
+호출부의 모드별 배치 검사와 기존 정확한 드래그 증가량 검사는 유지한다.
+
+
+그룹 미리보기를 클릭해 펼친 뒤에는 숨겨진 미리보기의 옛 위치를 다시 누르지 않는다.
+현재 그룹 identity와 제목 영역을 다시 찾고 대상·조상의 실제 배치 애니메이션 종료와
+가시 영역을 확인한 뒤 한 번 이동한다. Hover 배치를 반영한 현재 cursor와 정확한
+그룹 Header 입력 대상을 확인하고 한 번 클릭해 접힘을 검사한다. 편집 버튼은 별도
+동작이므로 Header 자식이라는 이유만으로 같은 클릭 대상으로 허용하지 않는다.
+같은 실제 입력 확인은 새 탭과 선택적 split 촬영의 클릭에도 적용하며, 촬영이
+프레임을 처리한 뒤에는 클릭 직전 포인터 대상을 다시 확인한다. 준비 대기는 배치·
+가시 영역만 관찰하며 입력이나 색상 판정을 반복하지 않는다.
+비활성 pane 주소 검사는 한 번 창을 앞으로 가져와 active·visible 상태를 확인한 뒤
+실제 포인터를 이동한다. 클릭 요청 전 상태와 native 입력 완료 단계를 구분해 기록하고,
+실제 클릭 이후의 WebContents·활성 pane·주소창 초점 검사는 그대로 유지한다.
