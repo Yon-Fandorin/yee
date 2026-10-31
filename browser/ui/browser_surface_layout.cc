@@ -93,6 +93,126 @@ gfx::Rect ExcludeBrowserWindowControls(gfx::Rect header_bounds,
   return header_bounds;
 }
 
+SplitPaneHeaderSpacing ResolveSplitPaneHeaderSpacing(bool active,
+                                                     bool compact) {
+  const int edge = kSidebarMetrics.browser_surface_header_control_edge_inset;
+  return {
+      compact
+          ? edge
+          : std::max(
+                edge,
+                kSidebarMetrics.split_pane_address_bar_inset +
+                    (active
+                         ? kSidebarMetrics.split_pane_address_bar_active_padding
+                         : kSidebarMetrics
+                               .split_pane_address_bar_horizontal_padding)),
+      compact ? std::min(kSidebarMetrics.split_pane_address_bar_item_spacing,
+                         kSidebarMetrics.shell_control_horizontal_margin)
+              : kSidebarMetrics.split_pane_address_bar_item_spacing};
+}
+
+int MeasureSplitPaneHeaderMinimumWidth(const SplitPaneHeaderMetrics& metrics,
+                                       const SplitPaneHeaderSpacing& spacing,
+                                       int leading_reservation,
+                                       int trailing_reservation) {
+  const SplitPaneHeaderControlMetrics* previous = nullptr;
+  int previous_trailing = 0;
+  int width = 0;
+  for (const auto& control : metrics.controls) {
+    if (control.width <= 0) {
+      continue;
+    }
+    const int leading = control.margins ? control.margins->left()
+                                        : (previous ? spacing.item_spacing : 0);
+    const int gap =
+        std::max(previous ? previous_trailing
+                          : std::max(spacing.edge_padding, leading_reservation),
+                 leading);
+    width +=
+        control.width +
+        std::max(0, gap - control.internal_padding.left() -
+                        (previous ? previous->internal_padding.right() : 0));
+    previous = &control;
+    previous_trailing =
+        control.margins ? control.margins->right() : spacing.item_spacing;
+  }
+  if (!previous) {
+    return std::max(spacing.edge_padding, leading_reservation) +
+           std::max(spacing.edge_padding, trailing_reservation);
+  }
+  const int trailing = previous->margins ? previous->margins->right() : 0;
+  return width +
+         std::max(0, std::max(trailing, std::max(spacing.edge_padding,
+                                                 trailing_reservation)) -
+                         previous->internal_padding.right());
+}
+
+ResolvedSplitPaneHeaderLayout ResolveSplitPaneHeaderLayout(
+    const SplitPaneHeaderLayoutInput& input) {
+  const int stroke = kSidebarMetrics.split_pane_content_stroke_inset;
+  std::array<int, 2> leading = {};
+  std::array<int, 2> trailing = {};
+  const auto reservations = [&](gfx::Rect pane, int index) {
+    pane.Inset(gfx::Insets::TLBR(stroke, stroke, 0, stroke));
+    pane.set_height(
+        std::max(0, kSidebarMetrics.split_pane_header_height - stroke));
+    const gfx::Rect safe =
+        ExcludeBrowserWindowControls(pane, input.window_controls_bounds);
+    leading[index] = std::max(0, safe.x() - pane.x());
+    trailing[index] = std::max(0, pane.right() - safe.right());
+  };
+  if (input.axis == PaneSplitAxis::kHorizontal) {
+    // 먼저 전체 canvas의 끝을 투영해 좁은 초기 비율이 예약을 양쪽 Pane에
+    // 중복 배분하지 않게 한다.
+    reservations(input.canvas_bounds, 0);
+    trailing[1] = trailing[0];
+    trailing[0] = 0;
+  } else {
+    const auto geometry =
+        ComputeCurrentPaneGeometry(CurrentPaneGeometryInput{input.canvas_bounds,
+                                                            true,
+                                                            input.axis,
+                                                            input.start_ratio,
+                                                            input.divider_size,
+                                                            input.body_minimums,
+                                                            {},
+                                                            {}});
+    reservations(geometry.start, 0);
+    reservations(geometry.end, 1);
+  }
+  const auto resolve = [&](bool compact) {
+    ResolvedSplitPaneHeaderLayout result;
+    result.pane_minimums = input.body_minimums;
+    result.compact = compact;
+    for (size_t i = 0; i < input.headers.size(); ++i) {
+      result.rows[i].spacing =
+          ResolveSplitPaneHeaderSpacing(input.headers[i].active, compact);
+      result.rows[i].interior_margin = gfx::Insets::TLBR(
+          0, std::max(result.rows[i].spacing.edge_padding, leading[i]), 0,
+          std::max(result.rows[i].spacing.edge_padding, trailing[i]));
+      result.rows[i].minimum_width = MeasureSplitPaneHeaderMinimumWidth(
+          input.headers[i], result.rows[i].spacing, leading[i], trailing[i]);
+    }
+    if (input.axis == PaneSplitAxis::kHorizontal) {
+      result.pane_minimums.start = std::max(
+          input.body_minimums.start, result.rows[0].minimum_width + 2 * stroke);
+      result.pane_minimums.end = std::max(
+          input.body_minimums.end, result.rows[1].minimum_width + 2 * stroke);
+      result.supported = result.pane_minimums.start + result.pane_minimums.end +
+                             input.divider_size <=
+                         input.canvas_bounds.width();
+    } else {
+      result.supported =
+          std::max(result.rows[0].minimum_width, result.rows[1].minimum_width) +
+              2 * stroke <=
+          input.canvas_bounds.width();
+    }
+    return result;
+  };
+  auto result = resolve(false);
+  return result.supported ? result : resolve(true);
+}
+
 ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
     const BrowserSurfaceSeedInput& input) {
   ResolvedBrowserSurfaceSeed result;

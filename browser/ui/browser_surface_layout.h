@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_LAYOUT_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_BROWSER_SURFACE_LAYOUT_H_
 
+#include <array>
 #include <optional>
 
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -52,6 +53,65 @@ gfx::Rect ResolveBrowserWindowControlHighlightBounds(gfx::Rect button_bounds);
 // 같은 행에 겹치는 창 버튼 영역만 Header 조작의 가로 배치에서 제외한다.
 gfx::Rect ExcludeBrowserWindowControls(gfx::Rect header_bounds,
                                        const gfx::Rect& controls_bounds);
+
+// Native 조작의 폭과 명시적 여백만 전달한다. 없는 여백은 Yee 기본 간격이다.
+struct SplitPaneHeaderControlMetrics {
+  int width = 0;
+  std::optional<gfx::Insets> margins;
+  gfx::Insets internal_padding;
+};
+
+struct SplitPaneHeaderMetrics {
+  // Sidebar, 뒤로, 앞으로, 새로고침, native 주소창, Pane 닫기 순서다.
+  std::array<SplitPaneHeaderControlMetrics, 6> controls;
+  bool active = false;
+};
+
+struct SplitPaneHeaderSpacing {
+  int edge_padding = 0;
+  int item_spacing = 0;
+
+  bool operator==(const SplitPaneHeaderSpacing&) const = default;
+};
+
+SplitPaneHeaderSpacing ResolveSplitPaneHeaderSpacing(bool active, bool compact);
+
+// Flex의 겹친 여백과 native 내부 padding을 같은 순서로 계산한다.
+int MeasureSplitPaneHeaderMinimumWidth(const SplitPaneHeaderMetrics& metrics,
+                                       const SplitPaneHeaderSpacing& spacing,
+                                       int leading_reservation = 0,
+                                       int trailing_reservation = 0);
+
+struct SplitPaneHeaderLayoutInput {
+  // 이전 View bounds가 아닌 이번 부모 배치의 논리 BrowserView 좌표다.
+  gfx::Rect canvas_bounds;
+  gfx::Rect window_controls_bounds;
+  PaneSplitAxis axis = PaneSplitAxis::kHorizontal;
+  double start_ratio = 0.5;
+  int divider_size = 0;
+  PaneDirectionalMinimums body_minimums;
+  std::array<SplitPaneHeaderMetrics, 2> headers;
+};
+
+struct SplitPaneHeaderRowLayout {
+  SplitPaneHeaderSpacing spacing;
+  gfx::Insets interior_margin;
+  int minimum_width = 0;
+
+  bool operator==(const SplitPaneHeaderRowLayout&) const = default;
+};
+
+struct ResolvedSplitPaneHeaderLayout {
+  PaneDirectionalMinimums pane_minimums;
+  std::array<SplitPaneHeaderRowLayout, 2> rows;
+  bool compact = false;
+  bool supported = false;
+};
+
+// 창 버튼과 필수 Header 조작의 최소 폭을 기존 Pane 최소 배분에 합친다.
+// 폭이 부족하면 같은 간격 규칙으로만 압축하며 저장된 분할 비율은 바꾸지 않는다.
+ResolvedSplitPaneHeaderLayout ResolveSplitPaneHeaderLayout(
+    const SplitPaneHeaderLayoutInput& input);
 
 struct BrowserSurfaceSeedInput {
   gfx::Rect content_column_bounds;

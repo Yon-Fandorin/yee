@@ -9278,7 +9278,7 @@ index 60cf7ccc70..84f7d1cd22 100644
    // and their values stored here, to prevent repeating them across multiple
    // calls.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 7764d4a472..ff0630d878 100644
+index 7764d4a4728973dc075efb308daa3d67ba2e10b6..bcbe25c44fc35a725c448aee388cf42aea1b05a3 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -21,6 +21,8 @@
@@ -10564,7 +10564,7 @@ index 7764d4a472..ff0630d878 100644
  
    // Lay out contents container. The contents container contains the multi-
    // contents view when multi-contents are enabled. The checks here are to
-@@ -1263,25 +1469,119 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1263,25 +1469,93 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // for the combination of minimum-sized contents pane and minimum-sized side
    // panel may exceed the width of the window. In this case, the contents pane
    // slides under the side panel.
@@ -10631,32 +10631,6 @@ index 7764d4a472..ff0630d878 100644
 +    views().multi_contents_view->SetShouldShowTopSeparator(
 +        yee_surface_frame->decoration.show_native_multi_contents_separator);
 +    CHECK_EQ(yee_surface_seed->header_bounds, yee_surface_frame->header_bounds);
-+    gfx::Rect infobar_bounds;
-+    bool show_infobar = false;
-+    content::WebContents* const manager_contents =
-+        views().infobar_container->GetWebContentsForLayout();
-+    if (infobar_visible && infobar_height > 0 && manager_contents) {
-+      const std::optional<gfx::Rect> manager_body_bounds =
-+          views().multi_contents_view->GetCurrentContentsBodyBoundsFor(
-+              contents_bounds.size(), manager_contents);
-+      if (manager_body_bounds) {
-+        gfx::Rect manager_body_bounds_in_browser = *manager_body_bounds;
-+        manager_body_bounds_in_browser.Offset(
-+            contents_bounds.OffsetFromOrigin());
-+        infobar_bounds =
-+            yee::ResolveExternalInfoBarSlot(yee::ExternalInfoBarSlotInput{
-+                manager_body_bounds_in_browser,
-+                yee_surface_frame->notice_flow_bounds, infobar_height,
-+                infobar_additional_offset});
-+        show_infobar = !infobar_bounds.IsEmpty();
-+      }
-+    }
-+    layout.AddChild(views().infobar_container,
-+                    show_infobar ? infobar_bounds : gfx::Rect(), show_infobar);
-+    views().infobar_container->SetPresentationForLayout(
-+        InfoBarContainerPresentation{
-+            yee_surface_frame->decoration.contain_infobar_shadow_horizontally,
-+            yee_surface_frame->decoration.infobar_top_corner_radius});
 +
 +    // The BrowserView background owns only the exterior shell. Keep the main
 +    // card fill in its dedicated child so the fill moves atomically with the
@@ -10699,7 +10673,7 @@ index 7764d4a472..ff0630d878 100644
      if (clip_content_for_animation) {
        // Vertical span is whatever it is, minus any shadow overlay insets.
        unclipped_contents_region.set_y(contents_layout.bounds.y());
-@@ -1306,21 +1606,76 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1306,21 +1580,121 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
            unclipped_contents_region.InsetsFrom(contents_layout.bounds);
  
        // Set the target size of the contents.
@@ -10760,6 +10734,51 @@ index 7764d4a472..ff0630d878 100644
 +    views().multi_contents_view->SetTargetContentBounds(std::nullopt);
 +  }
 +
++#if BUILDFLAG(IS_WIN)
++  std::optional<MultiContentsView::YeeHeaderLayoutContext> header_context;
++  if (uses_yee_browser_surface_geometry && horizontal_layout.split) {
++    const gfx::SizeF exclusion =
++        browser_params.trailing_exclusion.ContentWithPadding();
++    header_context = MultiContentsView::YeeHeaderLayoutContext{
++        contents_layout.bounds,
++        gfx::Rect(browser_params.visual_client_area.right() -
++                      base::ClampCeil(exclusion.width()),
++                  browser_params.visual_client_area.y(),
++                  base::ClampCeil(exclusion.width()),
++                  base::ClampCeil(exclusion.height()))};
++  }
++  views().multi_contents_view->SetYeeHeaderLayoutContext(header_context);
++#endif
++  if (uses_yee_browser_surface_geometry) {
++    // clip이 확정된 같은 current canvas에서 Header와 InfoBar를 계산한다.
++    gfx::Rect infobar_bounds;
++    bool show_infobar = false;
++    content::WebContents* const manager_contents =
++        views().infobar_container->GetWebContentsForLayout();
++    if (infobar_visible && infobar_height > 0 && manager_contents) {
++      const std::optional<gfx::Rect> manager_body_bounds =
++          views().multi_contents_view->GetCurrentContentsBodyBoundsFor(
++              contents_layout.bounds.size(), manager_contents);
++      if (manager_body_bounds) {
++        gfx::Rect manager_body_bounds_in_browser = *manager_body_bounds;
++        manager_body_bounds_in_browser.Offset(
++            contents_layout.bounds.OffsetFromOrigin());
++        infobar_bounds =
++            yee::ResolveExternalInfoBarSlot(yee::ExternalInfoBarSlotInput{
++                manager_body_bounds_in_browser,
++                yee_surface_frame->notice_flow_bounds, infobar_height,
++                infobar_additional_offset});
++        show_infobar = !infobar_bounds.IsEmpty();
++      }
++    }
++    layout.AddChild(views().infobar_container,
++                    show_infobar ? infobar_bounds : gfx::Rect(), show_infobar);
++    views().infobar_container->SetPresentationForLayout(
++        InfoBarContainerPresentation{
++            yee_surface_frame->decoration.contain_infobar_shadow_horizontally,
++            yee_surface_frame->decoration.infobar_top_corner_radius});
++  }
++
 +  if (content_config) {
 +    // Use MultiContentsView's native propagation path so WebContents,
 +    // DevTools, footers, overlays, and split views share the same clip.
@@ -10779,7 +10798,7 @@ index 7764d4a472..ff0630d878 100644
    // Make final visual adjustments required for child views to paint.
    if (layout_data_->tab_strip_type == TabStripType::kVertical) {
      // Need to know the toolbar height relative to the tabstrip, so that
-@@ -1334,8 +1689,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1334,8 +1708,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      int toolbar_height = 0;
      int caption_button_width = 0;
  
@@ -10797,7 +10816,7 @@ index 7764d4a472..ff0630d878 100644
        // Calculate the toolbar height adjacent to the tabstrip. This will be
        // zero if the toolbar is in e.g. an immersive mode overlay, or is not
        // aligned with the tabstrip (which can happen in collapsed mode with
-@@ -1350,7 +1712,9 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1350,7 +1731,9 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      views().vertical_tab_strip_region_view->SetToolbarHeightForLayout(
          std::max(0, toolbar_height));
      views().vertical_tab_strip_region_view->SetCaptionButtonWidthForLayout(
@@ -10808,7 +10827,7 @@ index 7764d4a472..ff0630d878 100644
  
      const int padding =
          GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
-@@ -1401,7 +1765,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1401,7 +1784,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      gfx::Rect scrim_bounds;
      if (is_scrim_visible) {
        int scrim_top = params.visual_client_area.y();
@@ -10817,7 +10836,7 @@ index 7764d4a472..ff0630d878 100644
            IsParentedTo(views().top_container, views().browser_view)) {
          // The top container was already laid out, so we can use its top edge.
          scrim_top =
-@@ -1414,10 +1778,83 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1414,10 +1797,83 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
                      unclipped_contents_region.width(),
                      browser_params.visual_client_area.bottom() - scrim_top);
      }
@@ -10901,7 +10920,7 @@ index 7764d4a472..ff0630d878 100644
    return layout;
  }
  
-@@ -1425,77 +1862,199 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
+@@ -1425,77 +1881,199 @@ gfx::Rect BrowserViewTabbedLayoutImpl::CalculateTopContainerLayout(
      ProposedLayout& layout,
      BrowserLayoutParams params,
      bool needs_exclusion) const {
@@ -11160,7 +11179,7 @@ index 7764d4a472..ff0630d878 100644
    // The top container always draws an opaque background in tabbed browser mode
    // to avoid cracking between visual elements.
    background->SetVisible(true);
-@@ -1545,14 +2104,23 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
+@@ -1545,14 +2123,23 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
  }
  
  void BrowserViewTabbedLayoutImpl::OnLayoutParamsChanged(
@@ -11190,7 +11209,7 @@ index 7764d4a472..ff0630d878 100644
  }
  
  void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
-@@ -1562,14 +2130,196 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
+@@ -1562,14 +2149,196 @@ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
  void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
      const BrowserLayoutParams& params) {
    layout_data_ = std::make_unique<TransientLayoutData>(params);
@@ -11391,7 +11410,7 @@ index 7764d4a472..ff0630d878 100644
    layout_data_->side_panel_content_animation =
        CalculateSidePanelContentAnimation();
  }
-@@ -1577,7 +2327,7 @@ void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
+@@ -1577,7 +2346,7 @@ void BrowserViewTabbedLayoutImpl::DoPreLayoutComputations(
  void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      const BrowserLayoutParams& params) {
    // If the window goes out of glass mode, these changes won't hurt anything.
@@ -11400,7 +11419,7 @@ index 7764d4a472..ff0630d878 100644
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state)) {
-@@ -1595,12 +2345,49 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1595,12 +2364,49 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      views().multi_contents_view->SetBackgroundRadii(content_corners);
    }
  
@@ -11451,7 +11470,7 @@ index 7764d4a472..ff0630d878 100644
  
    const double flyover_panel_opacity =
        features::kGlassExpandOnHoverEnabled.Get() ? kGlassExpandOnHoverOpacity
-@@ -1610,20 +2397,53 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1610,20 +2416,53 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    CustomCorners::ColorChoiceWithAlpha frame_color(CustomCorners::FrameTheme(),
                                                    1.0f);
    CustomCornersBackground* vertical_tabs_background = nullptr;
@@ -11508,7 +11527,7 @@ index 7764d4a472..ff0630d878 100644
        if (!is_fullscreen(layout_data_->window_state)) {
          frame_color.opacity = 0.0f;
        }
-@@ -1681,6 +2501,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1681,6 +2520,25 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
  
@@ -11534,7 +11553,7 @@ index 7764d4a472..ff0630d878 100644
      vertical_tabs_background->SetCorners(vertical_tabs_corners);
  
      // Apply shadow for expand-on-hover.
-@@ -1688,7 +2527,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1688,7 +2546,9 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          views().vertical_tab_strip_region_view->shadow_frame();
      if (vertical_tabs_bottom_corner_amount > 0.0) {
        shadow_frame->SetShadowCornerRadius(vertical_tabs_bottom_corner_size);
@@ -11545,7 +11564,7 @@ index 7764d4a472..ff0630d878 100644
        shadow_frame->SetShadowVisible(true);
      } else {
        shadow_frame->SetShadowVisible(false);
-@@ -1714,8 +2555,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1714,8 +2574,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_outline.top = true;
      }
      if (animation.expand_on_hover_width > 0.0) {
@@ -11561,7 +11580,7 @@ index 7764d4a472..ff0630d878 100644
      vertical_tabs_background->SetOutline(vertical_tabs_outline);
  
      // Cut the vertical tab strip out of the top container.
-@@ -1745,9 +2593,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1745,9 +2612,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
        // Has to be done after most other adjustments to ensure the correct
        // outline path.
@@ -11576,7 +11595,7 @@ index 7764d4a472..ff0630d878 100644
        vertical_tabs_background->SetUseBackgroundBlur(use_blur_background);
        if (use_blur_background) {
          // The opacity of the backdrop needs to fade over the entire animation
-@@ -1761,6 +2611,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1761,6 +2630,11 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
      views().vertical_tab_strip_region_view->UpdatePanelClips();
  
@@ -11588,7 +11607,7 @@ index 7764d4a472..ff0630d878 100644
    } else if (layout_data_->tab_strip_type == TabStripType::kHorizontal &&
               !is_fullscreen(layout_data_->window_state) && in_glass_mode()) {
      frame_color.opacity = 0.0f;
-@@ -1821,6 +2676,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1821,6 +2695,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().toolbar->background()->AsA<CustomCornersBackground>();
    CHECK(toolbar_background)
        << "Expected toolbar to have a CustomCornersBackground.";
@@ -11599,7 +11618,7 @@ index 7764d4a472..ff0630d878 100644
  
    // Set toolbar corners.
    CustomCornersBackground::Corners toolbar_corners;
-@@ -1868,6 +2727,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1868,6 +2746,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        views().top_container->background()->AsA<CustomCornersBackground>();
    CHECK(top_container_background)
        << "Expected top container to have a CustomCornersBackground.";
@@ -11612,7 +11631,7 @@ index 7764d4a472..ff0630d878 100644
  
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
-@@ -1921,29 +2786,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1921,29 +2805,15 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    // Clip the side panel so it doesn't run off the edge of the browser or into
    // the vertical tab strip.
    if (IsParentedToAndVisible(views().side_panel, views().browser_view)) {
@@ -11651,7 +11670,7 @@ index 7764d4a472..ff0630d878 100644
    }
  
    if (views().main_background_region &&
-@@ -1991,10 +2842,81 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1991,10 +2861,81 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            main_background->GetWindowCorner(/*upper=*/false);
      }
  
@@ -11867,10 +11886,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd7278ccf1457 100644
+index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d4984f61551 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,364 @@
+@@ -4,84 +4,377 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -12010,6 +12029,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +#include "content/public/browser/navigation_entry.h"
 +#include "content/public/browser/render_widget_host_view.h"
 +#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_contents_delegate.h"
  #include "content/public/test/browser_test.h"
 +#include "content/public/test/browser_test_utils.h"
  #include "testing/gmock/include/gmock/gmock.h"
@@ -12062,6 +12082,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +#include "ui/views/focus/focus_manager.h"
 +#include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/layout/fill_layout.h"
++#include "ui/views/layout/flex_layout.h"
 +#include "ui/views/paint_info.h"
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
@@ -12130,10 +12151,21 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +  auto result = readback.Take();
 +  ASSERT_TRUE(result && !result->IsEmpty());
 +  auto pixels = result->ScopedAccessSkBitmap();
-+  const auto png = gfx::PNGCodec::EncodeBGRASkBitmap(
-+      pixels.GetOutScopedBitmap(), /*discard_transparency=*/false);
++  const SkBitmap& bitmap = pixels.GetOutScopedBitmap();
++  const auto png =
++      gfx::PNGCodec::EncodeBGRASkBitmap(bitmap, /*discard_transparency=*/false);
 +  ASSERT_TRUE(png);
 +  ASSERT_TRUE(base::WriteFile(path, *png));
++  // 전체 layer 출력은 앞서 읽은 compositor 크기와 다를 수 있다. 결과를
++  // 편집하지 않고 readback 결과와 같은 시점의 크기를 함께 남긴다.
++  const std::string capture_metrics = base::StringPrintf(
++      "result_rect=%s bitmap_px=%dx%d compositor_px=%s root_dip=%s dsf=%.6f\n",
++      result->rect().ToString().c_str(), bitmap.width(), bitmap.height(),
++      compositor->size().ToString().c_str(),
++      widget->GetRootView()->size().ToString().c_str(),
++      compositor->device_scale_factor());
++  ASSERT_TRUE(
++      base::WriteFile(path.AddExtensionASCII("capture.txt"), capture_metrics));
 +}
 +
 +// Windows 창 버튼은 Views 합성 화면에 포함된다. macOS 재질은 compositor
@@ -12238,7 +12270,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +373,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +386,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
@@ -12272,7 +12304,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +411,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +424,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12287,7 +12319,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +666,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +679,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12314,7 +12346,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -387,13 +701,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -387,13 +714,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
    }
  
   private:
@@ -12489,7 +12521,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1076,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1089,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12519,7 +12551,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,175 +1126,4965 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,176 +1139,5047 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12609,6 +12641,37 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +    ASSERT_TRUE(base::CreateDirectory(captures));
    }
 -  EXPECT_EQ(expected, background->primary_color().color);
+-}
+-
+-INSTANTIATE_TEST_SUITE_P(
+-    All,
+-    BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
+-    testing::Values(TopContainerBackgroundTestMode::kDefault,
+-                    TopContainerBackgroundTestMode::kTouch
+-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+-                    ,
+-                    TopContainerBackgroundTestMode::kImmersive
+-#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+-
+-                    ));
+-
+-// Regression test for limiting the amount of WebContents resizing when the
+-// "flyover" animation flag is enabled.
+-class BrowserViewTabbedLayoutImplContentLayoutUiTest
+-    : public BrowserViewTabbedLayoutImplUiTest,
+-      public views::ViewObserver {
+- public:
+-  BrowserViewTabbedLayoutImplContentLayoutUiTest()
+-      : BrowserViewTabbedLayoutImplUiTest(/*disable_animations=*/false) {}
+-  ~BrowserViewTabbedLayoutImplContentLayoutUiTest() override = default;
+-
+-  void SetUpOnMainThread() override {
+-    BrowserViewTabbedLayoutImplUiTest::SetUpOnMainThread();
+-    const auto& container_views = GetContentsContainers();
+-    for (ContentsContainerView* container : container_views) {
+-      auto* const contents = container->contents_view();
+-      resize_data_.emplace(contents, ResizeData());
+-      observation_.AddObservation(contents);
 +  // 배치·테마 전환이 frame view를 교체할 수 있으므로 현재 소유자를
 +  // 조회한다.
 +  auto* const frame =
@@ -12697,25 +12760,20 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +                                             mouse_padding.y(), window));
 +      ASSERT_TRUE(base::test::RunUntil(
 +          [&]() { return button->GetState() == views::Button::STATE_NORMAL; }));
-+    }
-+  }
+     }
+   }
 +  widget->Restore();
 +  theme->SetBrowserColorScheme(original_scheme);
 +  widget->SetZOrderLevel(original_z_order);
 +  RunScheduledLayouts();
- }
++}
  
- INSTANTIATE_TEST_SUITE_P(
--    All,
--    BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest,
--    testing::Values(TopContainerBackgroundTestMode::kDefault,
--                    TopContainerBackgroundTestMode::kTouch
--#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
--                    ,
--                    TopContainerBackgroundTestMode::kImmersive
--#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
--
--                    ));
+-  void TearDownOnMainThread() override {
+-    observation_.RemoveAllObservations();
+-    resize_data_.clear();
+-    BrowserViewTabbedLayoutImplUiTest::TearDownOnMainThread();
+-  }
++INSTANTIATE_TEST_SUITE_P(
 +    CaptionPresentation,
 +    YeeWindowsCaptionInputUiTest,
 +    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
@@ -12725,15 +12783,14 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +             (dark ? "Dark" : "Light") + (maximized ? "Maximized" : "Restored");
 +    }));
  
--// Regression test for limiting the amount of WebContents resizing when the
--// "flyover" animation flag is enabled.
--class BrowserViewTabbedLayoutImplContentLayoutUiTest
--    : public BrowserViewTabbedLayoutImplUiTest,
--      public views::ViewObserver {
-- public:
--  BrowserViewTabbedLayoutImplContentLayoutUiTest()
--      : BrowserViewTabbedLayoutImplUiTest(/*disable_animations=*/false) {}
--  ~BrowserViewTabbedLayoutImplContentLayoutUiTest() override = default;
+-  auto OpenSidePanel() {
+-    return Steps(
+-        InParallel(
+-            RunSubsequence(ReplaceAndShowSidePanel(SidePanelType::kToolbar)),
+-            RunSubsequence(WaitForEvent(kSidePanelElementId,
+-                                        SidePanel::kOpenAnimationCompletedEvent)
+-                               .SetMustBeVisibleAtStart(false))),
+-        Do([this]() { RunScheduledLayouts(); }));
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeWindowsSplitThemeChangesKeepCaptionReservations) {
 +  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
@@ -12749,9 +12806,13 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +    const auto measurements = captures.AppendASCII("viewport-measurements.log");
 +    ASSERT_FALSE(base::PathExists(measurements));
 +    ASSERT_TRUE(base::WriteFile(measurements, std::string()));
-+  }
++    const auto header_measurements =
++        captures.AppendASCII("header-measurements.log");
++    ASSERT_FALSE(base::PathExists(header_measurements));
++    ASSERT_TRUE(base::WriteFile(header_measurements, std::string()));
+   }
 +  gfx::Rect window_bounds = view->GetWidget()->GetWindowBoundsInScreen();
-+  window_bounds.set_size(gfx::Size(1100, 760));
++  window_bounds.set_size(gfx::Size(836, 631));
 +  view->GetWidget()->SetBounds(window_bounds);
 +  ASSERT_TRUE(ui_test_utils::NavigateToURL(
 +      browser(),
@@ -12775,14 +12836,67 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +           "height:8px;background:rgb(0,255,255)'></i>")));
 +  RunScheduledLayouts();
 +  ASSERT_TRUE(view->multi_contents_view()->IsInSplitView());
++  const double saved_ratio = view->multi_contents_view()->GetSplitRatio();
++  const auto check_header = [&](ContentsContainerView* container,
++                                const gfx::Rect& controls) {
++    auto* const header = container->mini_toolbar();
++    const bool active = container->contents_view() ==
++                        view->multi_contents_view()->GetActiveContentsView();
++    const auto metrics = header->GetYeeHeaderMetrics(
++        active, *view->toolbar()->location_bar_view());
++    const auto* const flex =
++        static_cast<views::FlexLayout*>(header->GetLayoutManager());
++    std::string required;
++    for (size_t i = 0; i < metrics.controls.size(); ++i) {
++      const auto& control = metrics.controls[i];
++      required += base::StringPrintf(
++          "slot%zu=%d margin=%s padding=%s; ", i, control.width,
++          control.margins ? control.margins->ToString().c_str() : "default",
++          control.internal_padding.ToString().c_str());
++    }
++    const std::string measurement = base::StringPrintf(
++        "active=%d header=%s minimum=%s actual_margin=%s "
++        "intrinsic_default=%d intrinsic_compact=%d controls=%s\n",
++        active, header->GetBoundsInScreen().ToString().c_str(),
++        header->GetMinimumSize().ToString().c_str(),
++        flex->interior_margin().ToString().c_str(),
++        yee::MeasureSplitPaneHeaderMinimumWidth(
++            metrics, yee::ResolveSplitPaneHeaderSpacing(active, false)),
++        yee::MeasureSplitPaneHeaderMinimumWidth(
++            metrics, yee::ResolveSplitPaneHeaderSpacing(active, true)),
++        required.c_str());
++    SCOPED_TRACE(measurement);
++    if (!captures.empty()) {
++      EXPECT_TRUE(base::AppendToFile(
++          captures.AppendASCII("header-measurements.log"), measurement));
++    }
++    EXPECT_GE(header->width(), header->GetMinimumSize().width());
++    for (views::View* child : header->children()) {
++      if (views::AsViewClass<ToolbarButton>(child) ||
++          child == header->close_button_for_testing()) {
++        const bool sidebar = child->GetProperty(views::kElementIdentifierKey) ==
++                             kVerticalTabStripCollapseButtonElementId;
++        EXPECT_EQ(!sidebar || active, child->IsDrawn());
++      }
++      if (!child->IsDrawn()) {
++        continue;
++      }
++      EXPECT_TRUE(header->GetLocalBounds().Contains(child->bounds()));
++      const gfx::Rect bounds = views::View::ConvertRectToTarget(
++          child, view, child->GetLocalBounds());
++      EXPECT_FALSE(bounds.Intersects(controls)) << bounds.ToString();
++    }
++    EXPECT_DOUBLE_EQ(saved_ratio, view->multi_contents_view()->GetSplitRatio());
++  };
  
--  void SetUpOnMainThread() override {
--    BrowserViewTabbedLayoutImplUiTest::SetUpOnMainThread();
--    const auto& container_views = GetContentsContainers();
--    for (ContentsContainerView* container : container_views) {
--      auto* const contents = container->contents_view();
--      resize_data_.emplace(contents, ResizeData());
--      observation_.AddObservation(contents);
+-  auto ClearResizeCounts() {
+-    return Do([this]() {
+-      const auto& container_views = GetContentsContainers();
+-      for (ContentsContainerView* container : container_views) {
+-        auto* contents = container->contents_view();
+-        auto& data = resize_data_[contents];
+-        data.last_size = contents->size();
+-        data.count = 0U;
 +  for (bool vertical : {false, true}) {
 +    SCOPED_TRACE(vertical);
 +    state->SetVerticalTabsEnabled(vertical);
@@ -12905,14 +13019,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +          content::WaitForCopyableViewInFrame(contents->GetPrimaryMainFrame());
 +          EXPECT_EQ(web_view->GetBoundsInScreen(),
 +                    contents->GetRenderWidgetHostView()->GetViewBounds());
-+          for (views::View* child : header->children()) {
-+            if (!child->IsDrawn()) {
-+              continue;
-+            }
-+            const gfx::Rect bounds = views::View::ConvertRectToTarget(
-+                child, view, child->GetLocalBounds());
-+            EXPECT_FALSE(bounds.Intersects(controls)) << bounds.ToString();
-+          }
++          check_header(container, controls);
 +        }
 +        auto* const location_bar = view->toolbar()->location_bar_view();
 +        ASSERT_TRUE(location_bar->IsDrawn());
@@ -12979,17 +13086,71 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +                      : "side-by-side",
 +                  dark ? "dark" : "light")));
 +        }
-+      }
-     }
+       }
+-    });
++    }
+   }
+-
+-  template <typename... Args>
+-  auto CheckResizeCounts(Args&&... args) {
+-    return CheckResult(
+-               [this]() {
+-                 const auto& container_views = GetContentsContainers();
+-                 std::vector<size_t> counts;
+-                 for (ContentsContainerView* container : container_views) {
+-                   counts.push_back(
+-                       resize_data_[container->contents_view()].count);
+-                 }
+-                 return counts;
+-               },
+-               testing::ElementsAre(
+-                   testing::Matcher<size_t>(std::forward<Args>(args))...))
+-        .SetDescription("CheckResizeCounts()");
++  // 같은 좁은 canvas에서 창 버튼을 가진 Pane가 활성/비활성인 양쪽을 검증한다.
++  state->SetVerticalTabsEnabled(true);
++  view->multi_contents_view()->UpdateSplitVisualData(
++      split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kSideBySide));
++  for (const auto& selected : view->GetContentsContainerViews()) {
++    auto* const contents = selected->contents_view()->web_contents();
++    ASSERT_TRUE(contents && contents->GetDelegate());
++    contents->GetDelegate()->ActivateContents(contents);
++    RunScheduledLayouts();
++    const auto frame_params =
++        view->browser_widget()->GetFrameView()->GetBrowserLayoutParams();
++    ASSERT_FALSE(frame_params.IsEmpty());
++    const auto params = frame_params.InLocalCoordinates(view->bounds());
++    const auto exclusion = params.trailing_exclusion.ContentWithPadding();
++    const gfx::Rect controls = view->GetMirroredRect(gfx::Rect(
++        params.visual_client_area.right() - base::ClampCeil(exclusion.width()),
++        params.visual_client_area.y(), base::ClampCeil(exclusion.width()),
++        base::ClampCeil(exclusion.height())));
++    for (const auto& container : view->GetContentsContainerViews()) {
++      auto* const web_view = container->contents_view();
++      content::RenderFrameSubmissionObserver observer(web_view->web_contents());
++      ASSERT_TRUE(base::test::RunUntil([&]() {
++        return observer.LastRenderFrameMetadata().viewport_size_in_pixels ==
++               gfx::ScaleToCeiledSize(
++                   web_view->size(),
++                   view->GetWidget()->GetCompositor()->device_scale_factor());
++      }));
++      check_header(container, controls);
++    }
++    EXPECT_GE(view->toolbar()->location_bar_view()->width(),
++              view->toolbar()->location_bar_view()->GetMinimumSize().width());
    }
 +  theme->SetBrowserColorScheme(original_scheme);
 +  RunScheduledLayouts();
 +}
  
--  void TearDownOnMainThread() override {
--    observation_.RemoveAllObservations();
--    resize_data_.clear();
--    BrowserViewTabbedLayoutImplUiTest::TearDownOnMainThread();
+-  auto EnterSplitView() {
+-    return Steps(
+-        Do([this]() {
+-          chrome::NewSplitTab(
+-              browser(), split_tabs::SplitTabLayout::kSideBySide,
+-              split_tabs::SplitTabCreatedSource::kToolbarButton);
+-        }),
+-        WaitForShow(MultiContentsResizeArea::kMultiContentsResizeAreaElementId),
+-        Do([this]() { RunScheduledLayouts(); }));
 -  }
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeWindowsHorizontalTabsConnectPageSurfaceToHeader) {
@@ -13010,14 +13171,12 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
 +          "yee-tabbar-capture-dir");
  
--  auto OpenSidePanel() {
--    return Steps(
--        InParallel(
--            RunSubsequence(ReplaceAndShowSidePanel(SidePanelType::kToolbar)),
--            RunSubsequence(WaitForEvent(kSidePanelElementId,
--                                        SidePanel::kOpenAnimationCompletedEvent)
--                               .SetMustBeVisibleAtStart(false))),
--        Do([this]() { RunScheduledLayouts(); }));
+- private:
+-  const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
+-  GetContentsContainers() {
+-    return BrowserView::GetBrowserViewForBrowser(browser())
+-        ->multi_contents_view()
+-        ->contents_container_views();
 -  }
 +  for (bool maximized : {false, true}) {
 +    SCOPED_TRACE(maximized);
@@ -13058,14 +13217,13 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +                    GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
 +                header_bounds.y());
  
--  auto ClearResizeCounts() {
--    return Do([this]() {
--      const auto& container_views = GetContentsContainers();
--      for (ContentsContainerView* container : container_views) {
--        auto* contents = container->contents_view();
--        auto& data = resize_data_[contents];
--        data.last_size = contents->size();
--        data.count = 0U;
+-  // views::ViewObserver:
+-  void OnViewBoundsChanged(views::View* observed_view) override {
+-    if (auto* webview = views::AsViewClass<views::WebView>(observed_view)) {
+-      auto& data = resize_data_[webview];
+-      if (data.last_size != observed_view->size()) {
+-        data.last_size = observed_view->size();
+-        ++data.count;
 +      content::WaitForCopyableViewInFrame(
 +          model->GetActiveWebContents()->GetPrimaryMainFrame());
 +      auto* const compositor = widget->GetCompositor();
@@ -13120,36 +13278,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +            }
 +          }
 +        }
-       }
--    });
--  }
--
--  template <typename... Args>
--  auto CheckResizeCounts(Args&&... args) {
--    return CheckResult(
--               [this]() {
--                 const auto& container_views = GetContentsContainers();
--                 std::vector<size_t> counts;
--                 for (ContentsContainerView* container : container_views) {
--                   counts.push_back(
--                       resize_data_[container->contents_view()].count);
--                 }
--                 return counts;
--               },
--               testing::ElementsAre(
--                   testing::Matcher<size_t>(std::forward<Args>(args))...))
--        .SetDescription("CheckResizeCounts()");
--  }
--
--  auto EnterSplitView() {
--    return Steps(
--        Do([this]() {
--          chrome::NewSplitTab(
--              browser(), split_tabs::SplitTabLayout::kSideBySide,
--              split_tabs::SplitTabCreatedSource::kToolbarButton);
--        }),
--        WaitForShow(MultiContentsResizeArea::kMultiContentsResizeAreaElementId),
--        Do([this]() { RunScheduledLayouts(); }));
++      }
 +      EXPECT_EQ(0U, different_pixels)
 +          << "탭의 테마색과 Header의 페이지색 사이에 틈이나 잘림이 있음; tab="
 +          << tab_bounds.ToString() << ", header=" << header_bounds.ToString();
@@ -13158,8 +13287,8 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +                              captures.AppendASCII(base::StringPrintf(
 +                                  "seam-%s-%s.png", dark ? "dark" : "light",
 +                                  maximized ? "maximized" : "restored")));
-+      }
-+    }
+       }
+     }
    }
 +  widget->Restore();
 +  theme->SetBrowserColorScheme(original_scheme);
@@ -13167,13 +13296,10 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +}
 +#endif
  
-- private:
--  const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
--  GetContentsContainers() {
--    return BrowserView::GetBrowserViewForBrowser(browser())
--        ->multi_contents_view()
--        ->contents_container_views();
--  }
+-  struct ResizeData {
+-    gfx::Size last_size;
+-    size_t count = 0U;
+-  };
 +IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
 +                       YeeHorizontalTabsPreserveRowsColorsAndTabIdentity) {
 +  auto* const state = tabs::VerticalTabStripStateController::From(browser());
@@ -13206,13 +13332,8 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +  ASSERT_TRUE(
 +      yee::UsesHorizontalTabGroupCapsule(*GetTabAnchorForModelIndex(view, 1)));
  
--  // views::ViewObserver:
--  void OnViewBoundsChanged(views::View* observed_view) override {
--    if (auto* webview = views::AsViewClass<views::WebView>(observed_view)) {
--      auto& data = resize_data_[webview];
--      if (data.last_size != observed_view->size()) {
--        data.last_size = observed_view->size();
--        ++data.count;
+-  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
+-  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
 +  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
 +      view->GetBrowserViewLayoutForTesting());
 +  ASSERT_TRUE(layout);
@@ -13318,20 +13439,11 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +        EXPECT_EQ(view->GetYeeHeaderPresentation()->surface,
 +                  bitmap.getColor(x, top->height() / 2));
 +        EXPECT_EQ(SK_AlphaTRANSPARENT, SkColorGetA(bitmap.getColor(x, 0)));
-       }
-     }
--  }
--
--  struct ResizeData {
--    gfx::Size last_size;
--    size_t count = 0U;
-   };
++      }
++    }
++  };
 +  expect_rows(false);
- 
--  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
--  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
--      observation_{this};
--};
++
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -16885,9 +16997,9 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +
 +  std::map<raw_ptr<const views::WebView>, ResizeData> resize_data_;
 +  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
-+      observation_{this};
-+};
-+
+       observation_{this};
+ };
+ 
 +#if BUILDFLAG(IS_MAC)
 +class BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest
 +    : public BrowserViewTabbedLayoutImplContentLayoutUiTest {
@@ -17628,10 +17740,11 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
 +  EXPECT_GT(layout->last_native_layout_for_testing()->side_panel.reveal,
 +            closing_reveal);
 +}
- 
++
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
-@@ -874,10 +6138,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+   if (!features::UseSidePanelFlyoverAnimation()) {
+@@ -874,10 +6232,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18592,7 +18705,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +7099,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7193,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18610,7 +18723,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7163,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7257,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18628,7 +18741,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7183,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7277,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18647,7 +18760,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd727
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7255,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7349,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -20599,7 +20712,7 @@ index 460c40a7c5..1c50365f45 100644
    raw_ptr<views::FlexLayout> flex_layout_manager_;
  };
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index a756f076ff..3c75701e59 100644
+index a756f076ffce50efa86bb84421b4ff8a77e8c581..0c7f158b103e2e8a21777955a0db3687a69ac47b 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -8,6 +8,7 @@
@@ -20618,8 +20731,11 @@ index a756f076ff..3c75701e59 100644
  #include "chrome/browser/ui/view_ids.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
  #include "chrome/browser/ui/views/frame/contents_container_view.h"
-@@ -34,6 +36,9 @@
+@@ -32,8 +34,12 @@
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+ #include "chrome/browser/ui/views/frame/scrim_view.h"
  #include "chrome/browser/ui/views/frame/themed_background.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
  #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 +#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
@@ -20628,7 +20744,7 @@ index a756f076ff..3c75701e59 100644
  #include "chrome/common/pref_names.h"
  #include "chrome/common/webui_url_constants.h"
  #include "components/prefs/pref_service.h"
-@@ -71,12 +76,16 @@ MultiContentsView::MultiContentsView(
+@@ -71,12 +77,16 @@ MultiContentsView::MultiContentsView(
        split_view_insets_(gfx::Insets::TLBR(0,
                                             kSplitViewContentInset,
                                             kSplitViewContentInset,
@@ -20648,7 +20764,7 @@ index a756f076ff..3c75701e59 100644
  
    contents_container_views_.push_back(
        AddChildView(std::make_unique<ContentsContainerView>(browser_view_)));
-@@ -84,7 +93,8 @@ MultiContentsView::MultiContentsView(
+@@ -84,7 +94,8 @@ MultiContentsView::MultiContentsView(
        ->contents_view()
        ->set_is_primary_web_contents_for_window(true);
  
@@ -20658,7 +20774,7 @@ index a756f076ff..3c75701e59 100644
    resize_area_->SetVisible(false);
  
    contents_container_views_.push_back(
-@@ -135,6 +145,26 @@ MultiContentsView::MultiContentsView(
+@@ -135,6 +146,26 @@ MultiContentsView::MultiContentsView(
    lens_overlay_view->SetLayoutManager(std::make_unique<views::FillLayout>());
    lens_overlay_view_ = AddChildView(std::move(lens_overlay_view));
  
@@ -20685,7 +20801,7 @@ index a756f076ff..3c75701e59 100644
    for (auto& contents_container_view : contents_container_views_) {
      auto& view_map = container_focusable_map_[contents_container_view];
  
-@@ -244,6 +274,91 @@ ContentsContainerView* MultiContentsView::GetContentsContainerViewFor(
+@@ -244,6 +275,104 @@ ContentsContainerView* MultiContentsView::GetContentsContainerViewFor(
    return nullptr;
  }
  
@@ -20713,6 +20829,19 @@ index a756f076ff..3c75701e59 100644
 +  const yee::CurrentPaneGeometry geometry =
 +      CalculateCurrentPaneGeometry(multi_contents_size, nullptr);
 +  return plan.matched_pane_index == 0 ? geometry.start_body : geometry.end_body;
++}
++
++void MultiContentsView::SetYeeHeaderLayoutContext(
++    std::optional<YeeHeaderLayoutContext> context) {
++  ContentsWebView* const active = context ? GetActiveContentsView() : nullptr;
++  if (yee_header_layout_context_ == context &&
++      yee_header_active_view_ == active) {
++    return;
++  }
++  yee_header_layout_context_ = std::move(context);
++  yee_header_active_view_ = active;
++  // 원점이나 exclusion만 바뀌어도 같은 크기의 이전 layout은 재사용할 수 없다.
++  InvalidateLayout(/*avoid_propagate_during_layout=*/true);
 +}
 +
 +void MultiContentsView::PrepareExternalInfoBarFlow(
@@ -20777,7 +20906,7 @@ index a756f076ff..3c75701e59 100644
  const MultiContentsView::FocusableViewMap*
  MultiContentsView::GetFocusableViewsMapFor(
      const ContentsContainerView* container) const {
-@@ -272,6 +387,8 @@ void MultiContentsView::SetWebContentsAtIndex(
+@@ -272,6 +401,8 @@ void MultiContentsView::SetWebContentsAtIndex(
      UpdateContentsBorderAndOverlay();
    }
  
@@ -20786,7 +20915,7 @@ index a756f076ff..3c75701e59 100644
    SafeInvoke(web_contents)
        .Then(Overload<content::WebContents*>(
            &tabs::TabInterface::MaybeGetFromContents))
-@@ -289,6 +406,7 @@ void MultiContentsView::ShowSplitView(
+@@ -289,6 +420,7 @@ void MultiContentsView::ShowSplitView(
      resize_area_->SetVisible(true);
      resize_area_->SetLayout(visual_data.split_layout());
      UpdateContentsBorderAndOverlay();
@@ -20794,7 +20923,7 @@ index a756f076ff..3c75701e59 100644
    } else {
      // If the split view is visible, update the split visual data.
      UpdateSplitVisualData(visual_data);
-@@ -307,6 +425,7 @@ void MultiContentsView::CloseSplitView() {
+@@ -307,6 +439,7 @@ void MultiContentsView::CloseSplitView() {
    contents_container_views_[1]->SetVisible(false);
    resize_area_->SetVisible(false);
    UpdateContentsBorderAndOverlay();
@@ -20802,7 +20931,7 @@ index a756f076ff..3c75701e59 100644
  
    SafeInvoke(GetActiveContentsView()->web_contents())
        .Then(Overload<content::WebContents*>(
-@@ -328,6 +447,12 @@ void MultiContentsView::SwapContentsInSplitView() {
+@@ -328,6 +461,12 @@ void MultiContentsView::SwapContentsInSplitView() {
    std::swap(contents_container_views_[0], contents_container_views_[1]);
  
    active_index_ = active_index_ == 0 ? 1 : 0;
@@ -20815,7 +20944,7 @@ index a756f076ff..3c75701e59 100644
  }
  
  void MultiContentsView::SetActiveIndex(int index) {
-@@ -340,6 +465,20 @@ void MultiContentsView::SetActiveIndex(int index) {
+@@ -340,6 +479,20 @@ void MultiContentsView::SetActiveIndex(int index) {
    GetActiveContentsView()->set_is_primary_web_contents_for_window(true);
    GetInactiveContentsView()->set_is_primary_web_contents_for_window(false);
    UpdateContentsBorderAndOverlay();
@@ -20836,7 +20965,7 @@ index a756f076ff..3c75701e59 100644
  }
  
  void MultiContentsView::UpdateSplitVisualData(
-@@ -350,6 +489,12 @@ void MultiContentsView::UpdateSplitVisualData(
+@@ -350,6 +503,12 @@ void MultiContentsView::UpdateSplitVisualData(
  
    visual_data_ = visual_data;
    resize_area_->SetLayout(visual_data.split_layout());
@@ -20849,7 +20978,7 @@ index a756f076ff..3c75701e59 100644
    InvalidateLayout();
  }
  
-@@ -374,6 +519,21 @@ void MultiContentsView::OnSwap() {
+@@ -374,6 +533,21 @@ void MultiContentsView::OnSwap() {
    delegate_->ReverseWebContents();
  }
  
@@ -20871,7 +21000,7 @@ index a756f076ff..3c75701e59 100644
  void MultiContentsView::SetTargetContentBounds(
      std::optional<TargetContentBounds> target_content_bounds) {
    if (target_content_bounds_ == target_content_bounds) {
-@@ -386,6 +546,7 @@ void MultiContentsView::SetTargetContentBounds(
+@@ -386,6 +560,7 @@ void MultiContentsView::SetTargetContentBounds(
  
  void MultiContentsView::SetIsAnimatingContent(bool is_animating,
                                                bool is_origin_changing) {
@@ -20879,13 +21008,14 @@ index a756f076ff..3c75701e59 100644
    for (auto& contents_container_view : contents_container_views_) {
      contents_container_view->contents_view()->SetIsAnimatingBounds(
          is_animating, is_origin_changing);
-@@ -496,6 +657,94 @@ void MultiContentsView::OnReadAnythingOverlayFocused(
+@@ -496,6 +671,134 @@ void MultiContentsView::OnReadAnythingOverlayFocused(
  
  // TODO(crbug.com/397777917): Consider using FlexSpecification weights and
  // interior margins instead of a custom layout once this bug is resolved.
 +yee::CurrentPaneGeometryInput MultiContentsView::BuildCurrentPaneGeometryInput(
 +    const gfx::Size& size,
-+    views::ProposedLayout::ChildLayoutList* supporting_layouts) const {
++    views::ProposedLayout::ChildLayoutList* supporting_layouts,
++    std::optional<gfx::Point> prospective_origin) const {
 +  views::ProposedLayout::ChildLayoutList ignored_layouts;
 +  auto& child_layouts =
 +      supporting_layouts ? *supporting_layouts : ignored_layouts;
@@ -20954,14 +21084,53 @@ index a756f076ff..3c75701e59 100644
 +              notice_body_insets.top(), notice_body_insets.left(),
 +              notice_body_insets.bottom(), notice_body_insets.right()});
 +
-+  return yee::CurrentPaneGeometryInput{available_space,
-+                                       IsInSplitView(),
-+                                       axis,
-+                                       visual_data_.split_ratio(),
-+                                       divider_size,
-+                                       supported_minimum.split_axis,
-+                                       start_body_insets,
-+                                       end_body_insets};
++  yee::CurrentPaneGeometryInput input{available_space,
++                                      IsInSplitView(),
++                                      axis,
++                                      visual_data_.split_ratio(),
++                                      divider_size,
++                                      supported_minimum.split_axis,
++                                      start_body_insets,
++                                      end_body_insets};
++  if (auto header = ResolveYeeHeaderLayout(input, prospective_origin)) {
++    input.minimums = header->pane_minimums;
++  }
++  return input;
++}
++
++std::optional<yee::ResolvedSplitPaneHeaderLayout>
++MultiContentsView::ResolveYeeHeaderLayout(
++    const yee::CurrentPaneGeometryInput& input,
++    std::optional<gfx::Point> prospective_origin) const {
++#if BUILDFLAG(IS_WIN)
++  if (uses_yee_browser_surface_geometry_ && IsInSplitView() &&
++      yee_header_layout_context_ && browser_view_->toolbar() &&
++      browser_view_->toolbar()->location_bar_view()) {
++    gfx::Rect canvas = input.available_space;
++    canvas.Offset(
++        prospective_origin
++            .value_or(yee_header_layout_context_->bounds_in_browser.origin())
++            .OffsetFromOrigin());
++    const views::View& location_bar =
++        *browser_view_->toolbar()->location_bar_view();
++    return yee::ResolveSplitPaneHeaderLayout(yee::SplitPaneHeaderLayoutInput{
++        canvas,
++        yee_header_layout_context_->window_controls_in_browser,
++        input.axis,
++        input.start_ratio,
++        input.divider_size,
++        input.minimums,
++        {contents_container_views_[0]->mini_toolbar()->GetYeeHeaderMetrics(
++             contents_container_views_[0]->contents_view() ==
++                 GetActiveContentsView(),
++             location_bar),
++         contents_container_views_[1]->mini_toolbar()->GetYeeHeaderMetrics(
++             contents_container_views_[1]->contents_view() ==
++                 GetActiveContentsView(),
++             location_bar)}});
++  }
++#endif
++  return std::nullopt;
 +}
 +
 +yee::CurrentPaneGeometry MultiContentsView::CalculateCurrentPaneGeometry(
@@ -20974,7 +21143,7 @@ index a756f076ff..3c75701e59 100644
  views::ProposedLayout MultiContentsView::CalculateProposedLayout(
      const views::SizeBounds& size_bounds) const {
    views::ProposedLayout layouts;
-@@ -505,60 +754,52 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -505,60 +808,59 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
    const int width = size_bounds.width().value();
    const int height = size_bounds.height().value();
  
@@ -21051,6 +21220,13 @@ index a756f076ff..3c75701e59 100644
  }
  
  void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
++  if (auto header = ResolveYeeHeaderLayout(
++          BuildCurrentPaneGeometryInput(layout.host_size, nullptr))) {
++    for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++      contents_container_views_[i]->mini_toolbar()->SetYeeHeaderLayout(
++          header->rows[i]);
++    }
++  }
 +  if (const views::ChildLayout* const corner_layout =
 +          layout.GetLayoutFor(contents_separators_.corner_separator.get());
 +      corner_layout && corner_layout->visible) {
@@ -21062,7 +21238,7 @@ index a756f076ff..3c75701e59 100644
    if (!target_content_bounds_) {
      for (auto& contents : contents_container_views_) {
        contents->SetTargetContentBounds(std::nullopt);
-@@ -573,20 +814,31 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -573,20 +875,39 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
      return;
    }
  
@@ -21079,8 +21255,16 @@ index a756f076ff..3c75701e59 100644
 +    // BrowserView owns Yee's Browser Surface geometry and has already handed
 +    // the resolved split insets to this view. Reuse that value for the target
 +    // layout so animation cannot diverge from the current layout.
++    std::optional<gfx::Point> target_origin;
++    if (yee_header_layout_context_) {
++      // clipped_area는 같은 부모 계획의 target→현재 visible 사각형 차이다.
++      // 음수 inset도 보존하고 RTL을 다시 적용하지 않는다.
++      target_origin = yee_header_layout_context_->bounds_in_browser.origin() -
++                      gfx::Vector2d(target_content_bounds_->clipped_area.left(),
++                                    target_content_bounds_->clipped_area.top());
++    }
 +    target_input = BuildCurrentPaneGeometryInput(
-+        target_content_bounds_->actual_size, nullptr);
++        target_content_bounds_->actual_size, nullptr, target_origin);
 +  } else {
      // Need to temporarily override the split view insets.
      const auto split_view_insets =
@@ -21102,7 +21286,7 @@ index a756f076ff..3c75701e59 100644
  
    const auto& default_clip = target_content_bounds_->clipped_area;
  
-@@ -599,20 +851,18 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -599,20 +920,18 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
        default_clip.top(), 0, default_clip.bottom(), default_clip.left());
    auto* const first = contents_container_views_[0].get();
    auto* const first_current = layout.GetLayoutFor(first);
@@ -21127,7 +21311,7 @@ index a756f076ff..3c75701e59 100644
    }
  
    first->SetTargetContentBounds(first_outsets);
-@@ -714,13 +964,11 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
+@@ -714,13 +1033,11 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
      if (should_show_leading) {
        corner_layout.bounds =
            gfx::Rect(available_space.origin(), corner_preferred_size);
@@ -21141,7 +21325,7 @@ index a756f076ff..3c75701e59 100644
      }
    }
    child_layouts.push_back(corner_layout);
-@@ -799,10 +1047,15 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+@@ -799,10 +1116,15 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
    for (auto& contents_container_view : contents_container_views_) {
      const bool is_active =
          contents_container_view->contents_view() == GetActiveContentsView();
@@ -21162,7 +21346,7 @@ index a756f076ff..3c75701e59 100644
          is_in_split, is_active, is_active && active_contents_view_highlighted_);
    }
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
-index e39f000c2a..35e8345662 100644
+index e39f000c2a9df3a6bc7b65f33a0d6f100840939a..a314b4a6c461f1979dfdbdb154d800267ddb0b50 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.h
 @@ -5,6 +5,7 @@
@@ -21173,7 +21357,7 @@ index e39f000c2a..35e8345662 100644
  #include <memory>
  #include <optional>
  
-@@ -12,6 +13,7 @@
+@@ -12,9 +13,11 @@
  #include "base/functional/callback_forward.h"
  #include "base/gtest_prod_util.h"
  #include "base/memory/raw_ptr.h"
@@ -21181,7 +21365,11 @@ index e39f000c2a..35e8345662 100644
  #include "chrome/browser/ui/tabs/split_tab_highlight_controller.h"
  #include "chrome/browser/ui/ui_features.h"
  #include "chrome/browser/ui/views/frame/contents_container_view.h"
-@@ -23,6 +25,7 @@
++#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+ #include "components/prefs/pref_change_registrar.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "ui/base/interaction/element_identifier.h"
+@@ -23,6 +26,7 @@
  #include "ui/views/controls/resize_area_delegate.h"
  #include "ui/views/layout/proposed_layout.h"
  #include "ui/views/view.h"
@@ -21189,7 +21377,7 @@ index e39f000c2a..35e8345662 100644
  
  class BrowserView;
  class ContentsWebView;
-@@ -38,6 +41,11 @@ namespace content {
+@@ -38,6 +42,11 @@ namespace content {
  class WebContents;
  }  // namespace content
  
@@ -21201,7 +21389,7 @@ index e39f000c2a..35e8345662 100644
  namespace gfx {
  class RoundedCornersF;
  }  // namespace gfx
-@@ -80,6 +88,35 @@ class MultiContentsView
+@@ -80,6 +89,44 @@ class MultiContentsView
    ContentsContainerView* GetContentsContainerViewFor(
        content::WebContents* web_contents) const;
  
@@ -21210,6 +21398,15 @@ index e39f000c2a..35e8345662 100644
 +  std::optional<gfx::Rect> GetCurrentContentsBodyBoundsFor(
 +      const gfx::Size& multi_contents_size,
 +      content::WebContents* web_contents) const;
++
++  // 실제 View가 이동하기 전의 body query도 부모의 최종 논리 배치를 쓴다.
++  struct YeeHeaderLayoutContext {
++    gfx::Rect bounds_in_browser;
++    gfx::Rect window_controls_in_browser;
++
++    bool operator==(const YeeHeaderLayoutContext&) const = default;
++  };
++  void SetYeeHeaderLayoutContext(std::optional<YeeHeaderLayoutContext> context);
 +
 +  struct ExternalInfoBarFlowState {
 +    base::WeakPtr<content::WebContents> manager_contents;
@@ -21237,7 +21434,7 @@ index e39f000c2a..35e8345662 100644
    // Returns the currently active ContentsWebView.
    ContentsWebView* GetActiveContentsView() const;
  
-@@ -118,6 +155,7 @@ class MultiContentsView
+@@ -118,6 +165,7 @@ class MultiContentsView
  
    // Sets the index of the active contents view within contents_views_.
    void SetActiveIndex(int index);
@@ -21245,7 +21442,7 @@ index e39f000c2a..35e8345662 100644
    int GetActiveIndex() const { return active_index_; }
  
    // Updates the size and layout of the contents views based on |visual_data|.
-@@ -138,6 +176,10 @@ class MultiContentsView
+@@ -138,6 +186,10 @@ class MultiContentsView
  
    // If in a split view, swaps the positions of the two active tabs.
    void OnSwap();
@@ -21256,7 +21453,7 @@ index e39f000c2a..35e8345662 100644
  
    // If non-null, specifies an increase in target size so that web contents
    // maintain their maximum extents during browser animations to prevent
-@@ -162,8 +204,15 @@ class MultiContentsView
+@@ -162,8 +214,15 @@ class MultiContentsView
    };
    void SetTargetContentBounds(
        std::optional<TargetContentBounds> target_content_bounds);
@@ -21272,13 +21469,17 @@ index e39f000c2a..35e8345662 100644
  
    // Returns accessible panes to be used in BrowserView to create the order of
    // pane traversal.
-@@ -279,6 +328,15 @@ class MultiContentsView
+@@ -279,6 +338,19 @@ class MultiContentsView
    // `MultiContentsView`. Returns 0 if not in a split view.
    int GetMinViewSize(gfx::Rect available_space) const;
  
 +  yee::CurrentPaneGeometryInput BuildCurrentPaneGeometryInput(
 +      const gfx::Size& size,
-+      views::ProposedLayout::ChildLayoutList* supporting_layouts) const;
++      views::ProposedLayout::ChildLayoutList* supporting_layouts,
++      std::optional<gfx::Point> prospective_origin = std::nullopt) const;
++  std::optional<yee::ResolvedSplitPaneHeaderLayout> ResolveYeeHeaderLayout(
++      const yee::CurrentPaneGeometryInput& input,
++      std::optional<gfx::Point> prospective_origin = std::nullopt) const;
 +  yee::CurrentPaneGeometry CalculateCurrentPaneGeometry(
 +      const gfx::Size& size,
 +      views::ProposedLayout::ChildLayoutList* supporting_layouts) const;
@@ -21288,7 +21489,7 @@ index e39f000c2a..35e8345662 100644
    void UpdateContentsBorderAndOverlay();
  
    double CalculateRatioWithSnapPoints(double start_size,
-@@ -308,6 +366,7 @@ class MultiContentsView
+@@ -308,6 +380,7 @@ class MultiContentsView
    // The handle responsible for resizing the two contents views as relative to
    // each other.
    raw_ptr<MultiContentsResizeArea> resize_area_ = nullptr;
@@ -21296,16 +21497,18 @@ index e39f000c2a..35e8345662 100644
  
    // The views that are shown for entering split view. E.g., this is shown when
    // the user drags a link to the edge of the contents view.
-@@ -332,6 +391,8 @@ class MultiContentsView
+@@ -331,6 +404,10 @@ class MultiContentsView
+ 
    // See `SetTargetContentBounds()`.
    std::optional<TargetContentBounds> target_content_bounds_;
- 
-+  bool is_animating_content_ = false;
++  std::optional<YeeHeaderLayoutContext> yee_header_layout_context_;
++  raw_ptr<ContentsWebView> yee_header_active_view_ = nullptr;
 +
++  bool is_animating_content_ = false;
+ 
    // Initial size of `start_contents_.contents_view_` along the resize axis when
    // a resize action began. Nullopt if not currently resizing.
-   std::optional<int> initial_start_size_on_resize_;
-@@ -350,6 +411,9 @@ class MultiContentsView
+@@ -350,6 +427,9 @@ class MultiContentsView
    // Tracks and handles drag and drop settings change.
    PrefChangeRegistrar pref_change_registrar_;
    bool is_drag_drop_pref_enabled_ = false;
@@ -22972,7 +23175,7 @@ index a73f5c6b4eab68cf0382ace8e32e2fa9d7582ecf..416e05c75fc4cba2c04e957b3491a14e
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index 3d3d583887..7ae361bd7b 100644
+index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c813691da6df8 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,37 +7,61 @@
@@ -23037,7 +23240,7 @@ index 3d3d583887..7ae361bd7b 100644
  #include "ui/views/background.h"
  #include "ui/views/controls/button/image_button.h"
  #include "ui/views/controls/button/image_button_factory.h"
-@@ -73,18 +97,73 @@ void SetAccessibleNameAndTooltip(views::View* view, int string_id) {
+@@ -73,18 +97,63 @@ void SetAccessibleNameAndTooltip(views::View* view, int string_id) {
  
  MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
      BrowserView* browser_view,
@@ -23100,21 +23303,11 @@ index 3d3d583887..7ae361bd7b 100644
 +    yee_reload_button_ =
 +        add_navigation_button(IDC_RELOAD, vector_icons::kRefreshIcon,
 +                              IDS_TOOLTIP_RELOAD, IDS_ACCNAME_RELOAD);
-+#if BUILDFLAG(IS_WIN)
-+    // 창 버튼 예약으로 좁아질 때 앞으로 조작을 먼저 접는다. 주소창의 native
-+    // 최소 폭을 유지해 보안 표시·페이지 action과 Pane 닫기가 겹치지 않는다.
-+    yee_forward_button_->SetProperty(
-+        views::kFlexBehaviorKey,
-+        views::FlexSpecification(
-+            views::MinimumFlexSizeRule::kPreferredSnapToZero,
-+            views::MaximumFlexSizeRule::kPreferred)
-+            .WithOrder(5));
-+#endif
 +  }
  
    // Add favicon, domain label, alert state indicator, and close button.
    favicon_ = AddChildView(std::make_unique<views::ImageView>());
-@@ -106,6 +185,17 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -106,6 +175,17 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
    domain_label_->SetSubpixelRenderingEnabled(false);
    domain_label_->SetEnabledColor(kColorMultiContentsViewMiniToolbarForeground);
    domain_label_->SetBackgroundColor(kColorToolbar);
@@ -23132,7 +23325,7 @@ index 3d3d583887..7ae361bd7b 100644
    alert_state_indicator_ = AddChildView(std::make_unique<views::ImageView>());
    alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
                                        icon_flex_spec.WithOrder(2));
-@@ -134,13 +224,87 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -134,13 +214,132 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
            base::BindRepeating(&MultiContentsViewMiniToolbar::ClearWebContents,
                                base::Unretained(this)));
  
@@ -23193,6 +23386,51 @@ index 3d3d583887..7ae361bd7b 100644
 +  return location_bar;
 +}
 +
++yee::SplitPaneHeaderMetrics MultiContentsViewMiniToolbar::GetYeeHeaderMetrics(
++    bool active,
++    const views::View& native_location_bar) const {
++  yee::SplitPaneHeaderMetrics result;
++  result.active = active;
++  const auto measure = [](const views::View* control, bool minimum) {
++    yee::SplitPaneHeaderControlMetrics metric;
++    if (!control) {
++      return metric;
++    }
++    metric.width = minimum ? control->GetMinimumSize().width()
++                           : control->GetPreferredSize().width();
++    if (const auto* margins = control->GetProperty(views::kMarginsKey)) {
++      metric.margins = *margins;
++    }
++    if (const auto* padding =
++            control->GetProperty(views::kInternalPaddingKey)) {
++      metric.internal_padding = *padding;
++    }
++    return metric;
++  };
++  result.controls = {
++      measure(active ? yee_sidebar_button_.get() : nullptr, false),
++      measure(yee_back_button_, false),
++      measure(yee_forward_button_, false),
++      measure(yee_reload_button_, false),
++      measure(active ? &native_location_bar : nullptr, true),
++      measure(close_button_, false)};
++  return result;
++}
++
++void MultiContentsViewMiniToolbar::SetYeeHeaderLayout(
++    const yee::SplitPaneHeaderRowLayout& layout) {
++  if (yee_header_layout_ == layout) {
++    return;
++  }
++  yee_header_layout_ = layout;
++  static_cast<views::FlexLayout*>(GetLayoutManager())
++      ->SetDefault(views::kMarginsKey,
++                   gfx::Insets::VH(0, layout.spacing.item_spacing));
++  UpdateYeeInteriorMargin();
++  // 기본 간격만 달라져도 Flex의 cached layout을 다시 계산한다.
++  InvalidateLayout(/*avoid_propagate_during_layout=*/true);
++}
++
  void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
                                                 bool is_highlighted) {
 +  if (uses_yee_browser_surface_geometry_) {
@@ -23220,7 +23458,7 @@ index 3d3d583887..7ae361bd7b 100644
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -168,6 +332,94 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -168,6 +367,102 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -23249,6 +23487,14 @@ index 3d3d583887..7ae361bd7b 100644
 +
 +void MultiContentsViewMiniToolbar::UpdateYeeInteriorMargin() {
 +  CHECK(uses_yee_browser_surface_geometry_);
++#if BUILDFLAG(IS_WIN)
++  if (yee_header_layout_) {
++    // 이번 부모 배치에서 정한 여백을 이전 Header bounds로 덮어쓰지 않는다.
++    static_cast<views::FlexLayout*>(GetLayoutManager())
++        ->SetInteriorMargin(yee_header_layout_->interior_margin);
++    return;
++  }
++#endif
 +  const int horizontal_padding = std::max(
 +      yee::kSidebarMetrics.browser_surface_header_control_edge_inset,
 +      yee::kSidebarMetrics.split_pane_address_bar_inset +
@@ -23315,7 +23561,7 @@ index 3d3d583887..7ae361bd7b 100644
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -210,6 +462,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -210,6 +505,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
@@ -23324,7 +23570,7 @@ index 3d3d583887..7ae361bd7b 100644
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -226,7 +480,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -226,7 +523,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    web_contents_ = nullptr;
  }
  
@@ -23354,7 +23600,7 @@ index 3d3d583887..7ae361bd7b 100644
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -244,6 +520,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -244,6 +563,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -23597,7 +23843,7 @@ index 3d3d583887..7ae361bd7b 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -264,14 +776,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -264,14 +819,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -23645,7 +23891,7 @@ index 3d3d583887..7ae361bd7b 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -287,7 +825,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -287,7 +868,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -23662,10 +23908,10 @@ index 3d3d583887..7ae361bd7b 100644
        favicon = ui::ImageModel::FromImageSkia(
            gfx::ImageSkiaOperations::CreateColorMask(favicon.Rasterize(provider),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
-index de2fb5ff5f..6c5a0491a2 100644
+index de2fb5ff5f7f6fc249f729731fe9e2dd7038c2ae..cf3a7d47d01e3d4982b1943e8ef83f9d0c1303a0 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
-@@ -5,16 +5,29 @@
+@@ -5,16 +5,30 @@
  #ifndef CHROME_BROWSER_UI_VIEWS_FRAME_MULTI_CONTENTS_VIEW_MINI_TOOLBAR_H_
  #define CHROME_BROWSER_UI_VIEWS_FRAME_MULTI_CONTENTS_VIEW_MINI_TOOLBAR_H_
  
@@ -23675,6 +23921,7 @@ index de2fb5ff5f..6c5a0491a2 100644
  #include "base/memory/raw_ptr.h"
 +#include "base/memory/weak_ptr.h"
  #include "chrome/browser/ui/color/chrome_color_id.h"
++#include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 +#include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
  #include "ui/base/metadata/metadata_header_macros.h"
  #include "ui/views/view.h"
@@ -23695,7 +23942,7 @@ index de2fb5ff5f..6c5a0491a2 100644
  
  namespace content {
  class WebContents;
-@@ -22,7 +35,8 @@ class WebContents;
+@@ -22,7 +36,8 @@ class WebContents;
  
  namespace tabs {
  enum class TabAlert;
@@ -23705,7 +23952,7 @@ index de2fb5ff5f..6c5a0491a2 100644
  
  namespace views {
  class ImageButton;
-@@ -31,50 +45,110 @@ class Label;
+@@ -31,50 +46,118 @@ class Label;
  class WebView;
  }  // namespace views
  
@@ -23729,6 +23976,13 @@ index de2fb5ff5f..6c5a0491a2 100644
    ~MultiContentsViewMiniToolbar() override;
  
    void UpdateState(bool is_active, bool is_highlighted);
+ 
++  // 이번 활성 Pane와 Toolbar 소유 주소창으로 재부착 전에도 측정한다.
++  yee::SplitPaneHeaderMetrics GetYeeHeaderMetrics(
++      bool active,
++      const views::View& native_location_bar) const;
++  void SetYeeHeaderLayout(const yee::SplitPaneHeaderRowLayout& layout);
++
 +  void SetYeePresentationUpdatesSuspended(bool suspended);
 +
 +  // ContentsContainerView owns the presentation outlet as a member while this
@@ -23740,7 +23994,7 @@ index de2fb5ff5f..6c5a0491a2 100644
 +  // Header; navigation and close controls remain lightweight command facades.
 +  void AttachYeeSplitLocationBar(views::View* location_bar);
 +  views::View* ReleaseYeeSplitLocationBarForReparent();
- 
++
    // Trigger an update of the tab data used to populate the mini toolbar.
    void UpdateContents();
  
@@ -23813,6 +24067,7 @@ index de2fb5ff5f..6c5a0491a2 100644
 +  base::CallbackListSubscription yee_presentation_subscription_;
 +  std::optional<yee::BrowserSurfacePresentation> yee_presentation_;
 +  const bool uses_yee_browser_surface_geometry_;
++  std::optional<yee::SplitPaneHeaderRowLayout> yee_header_layout_;
 +  bool is_active_ = false;
 +  bool yee_presentation_updates_suspended_ = false;
 +  bool yee_presentation_update_pending_ = false;

@@ -838,6 +838,134 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
   EXPECT_EQ(gfx::Rect(152, 6, 154, 42),
             ExcludeBrowserWindowControls(gfx::Rect(6, 6, 300, 42),
                                          gfx::Rect(14, 7, 138, 40)));
+
+  // Native 크기와 명시적 여백을 입력값으로 사용한다. 이전 Flex margin이나
+  // 주소창의 현재 부모는 측정에 포함하지 않는다.
+  const auto header_metrics = [](bool active, int address_width = 130) {
+    SplitPaneHeaderMetrics metrics;
+    metrics.active = active;
+    for (size_t index = 0; index < 4; ++index) {
+      if (index == 0 && !active) {
+        continue;
+      }
+      metrics.controls[index] = {30, gfx::Insets::VH(0, 1), {}};
+    }
+    if (active) {
+      metrics.controls[4] = {address_width, gfx::Insets::VH(0, 5), {}};
+    }
+    metrics.controls[5] = {24, std::nullopt, {}};
+    return metrics;
+  };
+  const auto active = header_metrics(true);
+  const auto inactive = header_metrics(false);
+  EXPECT_EQ(304, MeasureSplitPaneHeaderMinimumWidth(
+                     active, ResolveSplitPaneHeaderSpacing(true, false)));
+  EXPECT_EQ(146, MeasureSplitPaneHeaderMinimumWidth(
+                     inactive, ResolveSplitPaneHeaderSpacing(false, false)));
+  EXPECT_EQ(303, MeasureSplitPaneHeaderMinimumWidth(
+                     active, ResolveSplitPaneHeaderSpacing(true, true)));
+  EXPECT_EQ(133, MeasureSplitPaneHeaderMinimumWidth(
+                     inactive, ResolveSplitPaneHeaderSpacing(false, true)));
+  EXPECT_EQ(324, MeasureSplitPaneHeaderMinimumWidth(
+                     header_metrics(true, 150),
+                     ResolveSplitPaneHeaderSpacing(true, false)));
+  auto explicit_zero = inactive;
+  explicit_zero.controls[5].margins = gfx::Insets();
+  EXPECT_EQ(141,
+            MeasureSplitPaneHeaderMinimumWidth(
+                explicit_zero, ResolveSplitPaneHeaderSpacing(false, false)));
+  SplitPaneHeaderMetrics padded;
+  padded.controls[0] = {10, std::nullopt, gfx::Insets::TLBR(0, 1, 0, 2)};
+  padded.controls[1] = {10, std::nullopt, gfx::Insets::TLBR(0, 3, 0, 4)};
+  EXPECT_EQ(32, MeasureSplitPaneHeaderMinimumWidth(padded, {8, 6}));
+
+  for (int active_index : {0, 1}) {
+    for (bool leading_controls : {false, true}) {
+      SplitPaneHeaderLayoutInput input;
+      input.canvas_bounds = gfx::Rect(250, 6, 582, 600);
+      input.window_controls_bounds = leading_controls
+                                         ? gfx::Rect(244, 7, 138, 40)
+                                         : gfx::Rect(700, 7, 138, 40);
+      input.divider_size = 12;
+      input.body_minimums = {58, 58};
+      input.headers[active_index] = active;
+      input.headers[1 - active_index] = inactive;
+      const auto plan = ResolveSplitPaneHeaderLayout(input);
+      EXPECT_TRUE(plan.supported);
+      EXPECT_TRUE(plan.compact);
+      EXPECT_EQ(575, plan.pane_minimums.start + plan.pane_minimums.end + 12);
+      for (const auto& row : plan.rows) {
+        EXPECT_GE(row.interior_margin.left(), 8);
+        EXPECT_GE(row.interior_margin.right(), 8);
+        EXPECT_EQ(1, row.spacing.item_spacing);
+      }
+      const auto current = ComputeCurrentPaneGeometry(CurrentPaneGeometryInput{
+          input.canvas_bounds, true, PaneSplitAxis::kHorizontal,
+          input.start_ratio, input.divider_size, plan.pane_minimums,
+          gfx::Insets::TLBR(42, 1, 1, 1), gfx::Insets::TLBR(42, 1, 1, 1)});
+      EXPECT_GE(current.start.width(), plan.pane_minimums.start);
+      EXPECT_GE(current.end.width(), plan.pane_minimums.end);
+      EXPECT_EQ(current.start.right(), current.divider.x());
+      EXPECT_EQ(current.divider.right(), current.end.x());
+      EXPECT_EQ(current.start.x() + 1, current.start_body.x());
+      EXPECT_EQ(current.start.y() + 42, current.start_body.y());
+      EXPECT_DOUBLE_EQ(0.5, input.start_ratio);
+      auto target_input = input;
+      target_input.canvas_bounds = gfx::Rect(100, 6, 1100, 600);
+      target_input.window_controls_bounds = leading_controls
+                                                ? gfx::Rect(94, 7, 138, 40)
+                                                : gfx::Rect(1068, 7, 138, 40);
+      const auto target_plan = ResolveSplitPaneHeaderLayout(target_input);
+      EXPECT_TRUE(target_plan.supported);
+      EXPECT_FALSE(target_plan.compact);
+      const auto target = ComputeTargetPaneGeometry(
+          TargetPaneGeometryInput{target_input.canvas_bounds, true,
+                                  PaneSplitAxis::kHorizontal, 0.5, 12,
+                                  target_plan.pane_minimums},
+          current);
+      EXPECT_GE(target.start.width(), target_plan.pane_minimums.start);
+      EXPECT_GE(target.end.width(), target_plan.pane_minimums.end);
+      // 창 버튼과 다른 행이면 그 예약을 다음 행으로 전달하지 않는다.
+      input.window_controls_bounds.Offset(0, 200);
+      const auto separate_row = ResolveSplitPaneHeaderLayout(input);
+      EXPECT_FALSE(separate_row.compact);
+      EXPECT_EQ(304 + 146 + 4, separate_row.pane_minimums.start +
+                                   separate_row.pane_minimums.end);
+      input.axis = PaneSplitAxis::kVertical;
+      input.window_controls_bounds.Offset(0, -200);
+      const auto stacked = ResolveSplitPaneHeaderLayout(input);
+      EXPECT_TRUE(stacked.supported);
+      EXPECT_EQ(input.body_minimums, stacked.pane_minimums);
+      EXPECT_EQ(ResolveSplitPaneHeaderSpacing(input.headers[1].active, false)
+                    .edge_padding,
+                leading_controls ? stacked.rows[1].interior_margin.left()
+                                 : stacked.rows[1].interior_margin.right());
+    }
+  }
+  for (int width : {575, 574}) {
+    SplitPaneHeaderLayoutInput input;
+    input.canvas_bounds = gfx::Rect(250, 6, width, 600);
+    input.window_controls_bounds = gfx::Rect(250 + width - 132, 7, 138, 40);
+    input.headers = {inactive, active};
+    input.body_minimums = {58, 58};
+    input.divider_size = 12;
+    const auto plan = ResolveSplitPaneHeaderLayout(input);
+    EXPECT_EQ(width == 575, plan.supported);
+    const auto current = ComputeCurrentPaneGeometry(
+        CurrentPaneGeometryInput{input.canvas_bounds,
+                                 true,
+                                 PaneSplitAxis::kHorizontal,
+                                 0.5,
+                                 12,
+                                 plan.pane_minimums,
+                                 {},
+                                 {}});
+    EXPECT_GE(current.start.width(), 0);
+    EXPECT_GE(current.end.width(), 0);
+    if (!plan.supported) {
+      EXPECT_EQ((width - 12 + 1) / 2, current.start.width());
+    }
+  }
 }
 
 TEST(YeeSurfaceGeometryTest,
