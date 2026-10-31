@@ -11867,10 +11867,10 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a506c6543 100644
+index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..80e97f513956ef8084a9a34c807fd7278ccf1457 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-@@ -4,84 +4,358 @@
+@@ -4,84 +4,364 @@
  
  #include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
  
@@ -11902,6 +11902,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
  #include "base/test/scoped_feature_list.h"
 +#include "base/test/test_future.h"
 +#include "base/time/time.h"
++#include "cc/trees/render_frame_metadata.h"
 +#include "chrome/browser/actor/ui/actor_overlay_web_view.h"
 +#include "chrome/browser/enterprise/data_protection/data_protection_overlay_view.h"
 +#include "chrome/browser/glic/browser_ui/context_sharing_border_view.h"
@@ -12122,7 +12123,8 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 +      viz::CopyOutputRequest::ResultFormat::RGBA,
 +      viz::CopyOutputRequest::ResultDestination::kSystemMemory,
 +      readback.GetCallback());
-+  request->set_area(gfx::Rect(compositor->size()));
++  // 전체 root layer를 읽는다. 물리 픽셀인 compositor 크기를 area로 넘기면
++  // layer 좌표 변환에서 배율이 한 번 더 적용된다.
 +  compositor->root_layer()->RequestCopyOfOutput(std::move(request));
 +  compositor->ScheduleFullRedraw();
 +  auto result = readback.Take();
@@ -12134,9 +12136,12 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 +  ASSERT_TRUE(base::WriteFile(path, *png));
 +}
 +
-+// macOS 재질은 Views compositor 밖의 native 창이 제공한다.
-+// 전체 모양을 판단할 때는 창 snapshot을 사용한다.
++// Windows 창 버튼은 Views 합성 화면에 포함된다. macOS 재질은 compositor
++// 밖의 native 창에서만 얻을 수 있다.
 +void CaptureYeeWindowFrame(views::Widget* widget, const base::FilePath& path) {
++#if BUILDFLAG(IS_WIN)
++  CaptureYeeCompositorFrame(widget, path);
++#else
 +  auto* const compositor = widget->GetCompositor();
 +  compositor->ScheduleFullRedraw();
 +  ASSERT_TRUE(ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
@@ -12149,6 +12154,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 +  ASSERT_TRUE(png && png->size());
 +  ASSERT_TRUE(
 +      base::WriteFile(path, static_cast<base::span<const uint8_t>>(*png)));
++#endif
 +}
 +
 +}  // namespace
@@ -12232,7 +12238,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
      set_open_about_blank_on_browser_launch(true);
      InteractiveBrowserTest::SetUp();
    }
-@@ -93,20 +367,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -93,20 +373,30 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
  
    void SetUpOnMainThread() override {
      InteractiveBrowserTest::SetUpOnMainThread();
@@ -12266,7 +12272,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
            CHECK(!registry->GetEntryForKey(key) || registry->Deregister(key));
            CHECK(registry->Register(std::make_unique<SidePanelEntry>(
                type, key, base::BindRepeating([](SidePanelEntryScope&) {
-@@ -121,8 +405,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -121,8 +411,12 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
                  return content_view;
                }),
                /*default_content_width_callback=*/base::NullCallback())));
@@ -12281,7 +12287,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
          }),
          WaitForShow(kSidePanelElementId),
          If(
-@@ -372,6 +660,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -372,6 +666,26 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
      return steps;
    }
  
@@ -12308,7 +12314,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
    void SetBookmarkBarVisible(bool visible = true) {
      PrefService* const prefs = user_prefs::UserPrefs::Get(GetProfile());
      if (base::FeatureList::IsEnabled(
-@@ -387,13 +695,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
+@@ -387,13 +701,174 @@ class BrowserViewTabbedLayoutImplUiTest : public InteractiveBrowserTest {
    }
  
   private:
@@ -12483,7 +12489,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         HorizontalTabsFirstTabActive) {
    RunTestSequence(
-@@ -601,18 +1070,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -601,18 +1076,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                         TestMinimumWindowSizeWhenSidePanelIsOpen) {
    gfx::Rect toolbar_bounds_in_screen;
@@ -12513,7 +12519,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,177 +1120,5020 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,175 +1126,4965 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12856,92 +12862,39 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 +          auto* const web_view = container->contents_view();
 +          auto* const contents = web_view->web_contents();
 +          ASSERT_TRUE(contents);
-+          // Views 배치만 끝난 순간의 이전 renderer 프레임을 캡처하지 않는다.
++          // DOM visualViewport는 스크롤바를 제외하므로 전체 native viewport와
++          // 다를 수 있다. 실제 활성화된 renderer 프레임의 전체 크기를 비교한다.
++          content::RenderFrameSubmissionObserver frame_observer(contents);
 +          gfx::Size expected_pixels;
 +          gfx::Size renderer_pixels;
-+          std::string renderer_metrics;
 +          const bool renderer_size_matches = base::test::RunUntil([&]() {
 +            expected_pixels = gfx::ScaleToCeiledSize(
 +                web_view->size(),
 +                view->GetWidget()->GetCompositor()->device_scale_factor());
-+            // 두 축과 진단 값을 같은 renderer 상태에서 읽는다. 시간 초과 뒤에는
-+            // 추가 RPC 없이 마지막으로 관측한 값을 남긴다.
-+            const auto sample = content::EvalJs(contents, R"JS(
-+              (() => {
-+                const viewport = visualViewport;
-+                const root = document.documentElement;
-+                const body = document.body;
-+                const scroller = document.scrollingElement;
-+                return {
-+                  width: Math.round(viewport.width * devicePixelRatio),
-+                  height: Math.round(viewport.height * devicePixelRatio),
-+                  detail: JSON.stringify({
-+                    title: document.title, compatMode: document.compatMode,
-+                    visualWidth: viewport.width, visualHeight: viewport.height,
-+                    dpr: devicePixelRatio, scale: viewport.scale,
-+                    visualOffsetX: viewport.offsetLeft,
-+                    visualOffsetY: viewport.offsetTop,
-+                    innerWidth, innerHeight, scrollX, scrollY,
-+                    rootClientWidth: root.clientWidth,
-+                    rootClientHeight: root.clientHeight,
-+                    rootScrollWidth: root.scrollWidth,
-+                    rootScrollHeight: root.scrollHeight,
-+                    bodyClientWidth: body.clientWidth,
-+                    bodyClientHeight: body.clientHeight,
-+                    bodyScrollWidth: body.scrollWidth,
-+                    bodyScrollHeight: body.scrollHeight,
-+                    scroller: scroller?.tagName,
-+                    scrollerClientWidth: scroller?.clientWidth,
-+                    scrollerClientHeight: scroller?.clientHeight,
-+                    rootOverflowX: getComputedStyle(root).overflowX,
-+                    rootOverflowY: getComputedStyle(root).overflowY,
-+                    bodyOverflowX: getComputedStyle(body).overflowX,
-+                    bodyOverflowY: getComputedStyle(body).overflowY
-+                  })
-+                };
-+              })()
-+            )JS");
-+            const auto& values = sample.ExtractDict();
-+            const auto width = values.FindInt("width");
-+            const auto height = values.FindInt("height");
-+            const auto* const detail = values.FindString("detail");
-+            CHECK(width && height && detail);
-+            renderer_pixels = gfx::Size(*width, *height);
-+            renderer_metrics = *detail;
++            renderer_pixels = frame_observer.LastRenderFrameMetadata()
++                                  .viewport_size_in_pixels;
 +            return renderer_pixels == expected_pixels;
 +          });
-+          auto* const renderer_view = contents->GetRenderWidgetHostView();
 +          const std::string measurement = base::StringPrintf(
 +              "vertical=%d split_layout=%d dark=%d matched=%d "
-+              "web_view=%s holder=%s viewport=%s "
-+              "renderer_view=%s visible_dip=%s visible_px=%s dsf=%.6f "
-+              "expected_px=%s observed_px=%s dom=%s\n",
++              "web_view=%s holder=%s expected_px=%s renderer_frame_px=%s "
++              "dsf=%.6f renderer_frame_dsf=%.6f widget_outer=%s "
++              "root_dip=%s compositor_px=%s\n",
 +              vertical, static_cast<int>(split_layout), dark,
 +              renderer_size_matches,
 +              web_view->GetBoundsInScreen().ToString().c_str(),
 +              web_view->holder()->GetBoundsInScreen().ToString().c_str(),
-+              container->GetPageViewportGeometry()
-+                  .current_viewport_in_container.ToString()
-+                  .c_str(),
-+              renderer_view ? renderer_view->GetViewBounds().ToString().c_str()
-+                            : "missing",
-+              renderer_view
-+                  ? renderer_view->GetVisibleViewportSize().ToString().c_str()
-+                  : "missing",
-+              renderer_view ? renderer_view->GetVisibleViewportSizeDevicePx()
-+                                  .ToString()
-+                                  .c_str()
-+                            : "missing",
-+              view->GetWidget()->GetCompositor()->device_scale_factor(),
 +              expected_pixels.ToString().c_str(),
-+              renderer_pixels.ToString().c_str(), renderer_metrics.c_str());
++              renderer_pixels.ToString().c_str(),
++              view->GetWidget()->GetCompositor()->device_scale_factor(),
++              frame_observer.LastRenderFrameMetadata().device_scale_factor,
++              view->GetWidget()->GetWindowBoundsInScreen().ToString().c_str(),
++              view->GetWidget()->GetRootView()->size().ToString().c_str(),
++              view->GetWidget()->GetCompositor()->size().ToString().c_str());
 +          if (!captures.empty()) {
 +            EXPECT_TRUE(base::AppendToFile(
 +                captures.AppendASCII("viewport-measurements.log"),
 +                measurement));
-+          }
-+          if (!renderer_size_matches) {
-+            LOG(ERROR) << "Yee caption viewport measurement: " << measurement;
 +          }
 +          ASSERT_TRUE(renderer_size_matches) << measurement;
 +          ASSERT_TRUE(content::EvalJs(
@@ -13379,8 +13332,6 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 -  base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
 -      observation_{this};
 -};
--
--IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
 +  const auto group_header = [&]() {
 +    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
 +        kTabGroupHeaderElementId,
@@ -17677,12 +17628,10 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
 +  EXPECT_GT(layout->last_native_layout_for_testing()->side_panel.reveal,
 +            closing_reveal);
 +}
-+
-+IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+ 
+ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
-   if (!features::UseSidePanelFlyoverAnimation()) {
-     GTEST_SKIP();
-@@ -874,10 +6185,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6138,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18643,7 +18592,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +7146,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7099,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18661,7 +18610,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7210,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7163,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18679,7 +18628,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7230,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7183,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18698,7 +18647,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..185b05f643c2ded19f20a09f3c47c24a
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7302,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7255,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
