@@ -69,6 +69,7 @@
 #include "chrome/browser/yee_projects/project_tab_coordinator.h"
 #include "chrome/browser/yee_projects/project_tab_helper.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/javascript_dialogs/app_modal_dialog_controller.h"
@@ -87,6 +88,7 @@
 #include "ui/base/hit_test.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
+#include "ui/base/test/ui_controls.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/canvas_painter.h"
 #include "ui/compositor/compositor.h"
@@ -128,6 +130,10 @@
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+
+#if BUILDFLAG(IS_WIN)
+#include "ui/aura/test/ui_controls_aurawin.h"
+#endif
 
 #if BUILDFLAG(IS_MAC)
 #include "chrome/browser/ui/views/yee/projects/project_navigation_test_util.h"
@@ -1157,6 +1163,12 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
   gfx::ScopedAnimationDurationScaleMode duration(
       gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+#if BUILDFLAG(IS_WIN)
+  aura::test::EnableUIControlsAuraWin();
+#else
+  ui_controls::EnableUIControls();
+#endif
+  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   auto project = service()->CreateProject(u"선택 목적지");
   ASSERT_TRUE(project);
   auto* model = browser()->tab_strip_model();
@@ -1206,10 +1218,50 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     const auto actual = bitmap.getColor(2, bitmap.height() / 2);
     EXPECT_EQ(SkPreMultiplyColor(expected), SkPreMultiplyColor(actual));
   };
+  const auto prepare_resting =
+      [&](TabView* tab, views::View* surface, int presentation,
+          const char* stage) -> testing::AssertionResult {
+    const std::string key =
+        "HubMaskHover_" + std::to_string(presentation) + "_" + stage;
+    RecordProperty(
+        key + "_before",
+        std::to_string(tab->tab_styling()->GetHoverAnimationValue()));
+    const gfx::Rect content_bounds =
+        view->multi_contents_view()->GetBoundsInScreen();
+    const gfx::Point parking = content_bounds.CenterPoint();
+    if (content_bounds.IsEmpty() || !surface->IsDrawn() ||
+        surface->GetBoundsInScreen().Contains(parking)) {
+      return testing::AssertionFailure()
+             << "content=" << content_bounds.ToString()
+             << " surface=" << surface->GetBoundsInScreen().ToString();
+    }
+    if (!ui_test_utils::SendMouseMoveSync(
+            parking, view->GetWidget()->GetNativeWindow())) {
+      return testing::AssertionFailure() << "native pointer parking failed";
+    }
+    // 실제 포인터를 탭 밖에 두고 논리 hover와 페인트 fade가 함께 끝나야 한다.
+    const bool ready = base::test::RunUntil([&] {
+      return !surface->IsMouseHovered() && !tab->IsMouseHovered() &&
+             !tab->IsHoverAnimationActive() &&
+             tab->tab_styling()->GetHoverAnimationValue() == 0.0;
+    });
+    RecordProperty(
+        key + "_after",
+        std::to_string(tab->tab_styling()->GetHoverAnimationValue()));
+    if (!ready) {
+      return testing::AssertionFailure()
+             << "surface_hover=" << surface->IsMouseHovered()
+             << " tab_hover=" << tab->IsMouseHovered()
+             << " animation=" << tab->IsHoverAnimationActive()
+             << " progress=" << tab->tab_styling()->GetHoverAnimationValue();
+    }
+    return testing::AssertionSuccess();
+  };
   for (int presentation : {0, 1, 2, 3}) {
     SCOPED_TRACE(presentation);
-    if (presentation == 1)
+    if (presentation == 1) {
       model->SetTabPinned(model->GetIndexOfTab(active), true);
+    }
     if (presentation == 2) {
       model->SetTabPinned(model->GetIndexOfTab(active), false);
       model->AddToNewGroup({model->GetIndexOfTab(active)});
@@ -1236,16 +1288,13 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     ASSERT_FALSE(tab->IsClosing());
     ASSERT_EQ(TabStripOrientation::kVertical,
               tab->collection_node()->orientation());
-    tab->UpdateHovered(false);
     views::View* surface = tab;
     if (presentation == 3) {
       auto* split = views::AsViewClass<SplitTabView>(tab->parent());
       ASSERT_TRUE(split);
-      ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::Point(),
-                          gfx::Point(), base::TimeTicks::Now(), 0, 0);
-      split->OnMouseExited(exit);
       surface = split;
     }
+    ASSERT_TRUE(prepare_resting(tab, surface, presentation, "native"));
     EXPECT_TRUE(tab->tab_styling()->IsApparentlyActive());
     expect_fill(tab, surface, SidebarItemVisualState::kActive,
                 presentation == 1 || presentation == 3);
@@ -1253,6 +1302,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     layout();
     tab = FindNativeTab(view, active);
     ASSERT_TRUE(tab);
+    ASSERT_TRUE(prepare_resting(tab, surface, presentation, "hub"));
     EXPECT_TRUE(tab->IsActive());
     EXPECT_EQ(active, model->GetActiveTab());
     EXPECT_FALSE(tab->tab_styling()->IsApparentlyActive());
@@ -1264,6 +1314,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                 presentation == 1 || presentation == 3);
     controller->ExitHub();
     layout();
+    ASSERT_TRUE(prepare_resting(tab, surface, presentation, "restored"));
     EXPECT_TRUE(tab->tab_styling()->IsApparentlyActive());
     tab->GetViewAccessibility().GetAccessibleNodeData(&data);
     EXPECT_TRUE(data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));

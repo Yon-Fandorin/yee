@@ -382,6 +382,11 @@ bounds를 따라 폭을 보간한다. 접힘 순간 멤버의 제목·아이콘 
 프로젝트의 `--yee-project-paint-capture-dir`는 행의 상태·키보드 초점, 프로젝트 제목의
 펼침·접힘과 허브, 두 탭 방향의 넓은·좁은 허브를 실제 창으로 저장한다.
 
+`HubMasksNativeTabSelectionWithoutChangingModel`은 일반·Favorite·그룹·분할 Favorite의
+각 단계에서 실제 포인터를 탭 밖의 현재 본문 중앙으로 옮긴다. 논리 hover와 Native
+호버 애니메이션의 종료를 확인한 뒤 정확한 바탕색, 선택 마스킹, 모델 선택, AX 선택,
+닫기 버튼과 복귀 상태를 검사한다.
+
 프로젝트로 모든 native 일반 행을 숨긴 뒤에는 이전 ScrollView contents 높이를
 재사용하지 않는다. `ProjectTabsAppearOnceAndReturnToNativeNavigation`은 빈 일반 영역의
 overflow·스크롤 범위·offset이 0이며 drop 영역은 viewport를 채우는지 확인한다.
