@@ -11886,7 +11886,7 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d4984f61551 100644
+index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..6b68db364eee8329394843b3416d2f2695c4f427 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 @@ -4,84 +4,377 @@
@@ -12551,7 +12551,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,176 +1139,5047 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,176 +1139,5063 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -12814,26 +12814,37 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
 +  gfx::Rect window_bounds = view->GetWidget()->GetWindowBoundsInScreen();
 +  window_bounds.set_size(gfx::Size(836, 631));
 +  view->GetWidget()->SetBounds(window_bounds);
-+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-+      browser(),
-+      GURL("data:text/html,<title>Pane A</title><body style='margin:0;"
-+           "padding:32px;box-sizing:border-box;background:rgb(242,245,250);"
-+           "color:rgb(25,55,90);font:20px sans-serif'><h1>Pane A</h1>"
-+           "<p>Left / top page</p><hr><p>Page content remains inside "
-+           "its own rounded card during theme changes.</p>"
-+           "<i style='position:fixed;left:8px;top:8px;width:8px;"
-+           "height:8px;background:rgb(255,0,255)'></i>")));
++  const GURL pane_a_url(
++      "data:text/html,<title>Pane A</title><body style='margin:0;"
++      "padding:32px;box-sizing:border-box;background:rgb(242,245,250);"
++      "color:rgb(25,55,90);font:20px sans-serif'><h1>Pane A</h1>"
++      "<p>Left / top page</p><hr><p>Page content remains inside "
++      "its own rounded card during theme changes.</p>"
++      "<i style='position:fixed;left:8px;top:8px;width:8px;"
++      "height:8px;background:rgb(255,0,255)'></i>");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), pane_a_url));
++  auto* const pane_a_contents =
++      browser()->tab_strip_model()->GetActiveWebContents();
++  ASSERT_TRUE(pane_a_contents);
++  ASSERT_EQ(pane_a_url, pane_a_contents->GetLastCommittedURL());
++  ASSERT_EQ(u"Pane A", pane_a_contents->GetTitle());
 +  chrome::NewSplitTab(browser(), split_tabs::SplitTabLayout::kSideBySide,
 +                      split_tabs::SplitTabCreatedSource::kToolbarButton);
-+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-+      browser(),
-+      GURL("data:text/html,<title>Pane B</title><body style='margin:0;"
-+           "padding:32px;box-sizing:border-box;background:rgb(21,24,32);"
-+           "color:rgb(225,232,245);font:20px sans-serif'><h1>Pane B</h1>"
-+           "<p>Right / bottom page</p><hr><p>Independent page colors "
-+           "make clipping and overlap visible.</p>"
-+           "<i style='position:fixed;left:8px;top:8px;width:8px;"
-+           "height:8px;background:rgb(0,255,255)'></i>")));
++  const GURL pane_b_url(
++      "data:text/html,<title>Pane B</title><body style='margin:0;"
++      "padding:32px;box-sizing:border-box;background:rgb(21,24,32);"
++      "color:rgb(225,232,245);font:20px sans-serif'><h1>Pane B</h1>"
++      "<p>Right / bottom page</p><hr><p>Independent page colors "
++      "make clipping and overlap visible.</p>"
++      "<i style='position:fixed;left:8px;top:8px;width:8px;"
++      "height:8px;background:rgb(0,255,255)'></i>");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), pane_b_url));
++  auto* const pane_b_contents =
++      browser()->tab_strip_model()->GetActiveWebContents();
++  ASSERT_TRUE(pane_b_contents);
++  ASSERT_NE(pane_a_contents, pane_b_contents);
++  ASSERT_EQ(pane_b_url, pane_b_contents->GetLastCommittedURL());
++  ASSERT_EQ(u"Pane B", pane_b_contents->GetTitle());
 +  RunScheduledLayouts();
 +  ASSERT_TRUE(view->multi_contents_view()->IsInSplitView());
 +  const double saved_ratio = view->multi_contents_view()->GetSplitRatio();
@@ -12976,6 +12987,12 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
 +          auto* const web_view = container->contents_view();
 +          auto* const contents = web_view->web_contents();
 +          ASSERT_TRUE(contents);
++          ASSERT_TRUE(contents == pane_a_contents ||
++                      contents == pane_b_contents);
++          const bool is_pane_a = contents == pane_a_contents;
++          ASSERT_EQ(is_pane_a ? pane_a_url : pane_b_url,
++                    contents->GetLastCommittedURL());
++          ASSERT_EQ(is_pane_a ? u"Pane A" : u"Pane B", contents->GetTitle());
 +          // DOM visualViewport는 스크롤바를 제외하므로 전체 native viewport와
 +          // 다를 수 있다. 실제 활성화된 renderer 프레임의 전체 크기를 비교한다.
 +          content::RenderFrameSubmissionObserver frame_observer(contents);
@@ -13069,10 +13086,9 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
 +                                            compositor->device_scale_factor());
 +          ASSERT_TRUE(
 +              gfx::Rect(bitmap.width(), bitmap.height()).Contains(marker));
-+          const SkColor expected =
-+              web_view->web_contents()->GetTitle() == u"Pane A"
-+                  ? SkColorSetRGB(255, 0, 255)
-+                  : SkColorSetRGB(0, 255, 255);
++          const SkColor expected = web_view->web_contents() == pane_a_contents
++                                       ? SkColorSetRGB(255, 0, 255)
++                                       : SkColorSetRGB(0, 255, 255);
 +          EXPECT_EQ(expected, bitmap.getColor(marker.x(), marker.y()))
 +              << "viewport=" << web_view->GetBoundsInScreen().ToString();
 +        }
@@ -17744,7 +17760,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -874,10 +6232,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6248,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18705,7 +18721,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +7193,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7209,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18723,7 +18739,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7257,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7273,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18741,7 +18757,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7277,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7293,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18760,7 +18776,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..f78a6f9905c105a59aab97256ce25d49
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7349,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7365,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -41975,3 +41991,49 @@ index 2344ea9e80..e1c9f1d727 100644
  }
  
  :host-context(cr-searchbox-match:-webkit-any(:focus-within, [selected])) #icon {
+diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
+index 7cb8c985a5292b8832910044929df5652401df23..eda4f6c8722f94a1cba8d36aee33c4eb6385aa5e 100644
+--- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
++++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
+@@ -1502,6 +1502,26 @@ IN_PROC_BROWSER_TEST_P(TabSearchPageHandlerTest, RemoveSplit_NTP) {
+   ASSERT_TRUE(ui_test_utils::NavigateToURL(
+       browser1(), GURL(chrome::kChromeUISplitViewNewTabPageURL)));
+ 
++  // 분할 새 탭이 아직 현재 문서인 동안 다음 이동의 표시 URL로 판정하면
++  // 비동기 응답이 false가 되어 사용자가 입력한 이동을 새 탭으로 덮어쓴다.
++  auto* const split_contents = tab_strip_model->GetActiveWebContents();
++  const GURL split_url(chrome::kChromeUISplitViewNewTabPageURL);
++  ASSERT_EQ(split_url, split_contents->GetLastCommittedURL());
++  content::TestNavigationManager pending_navigation(split_contents, tab_url2_);
++  split_contents->GetController().LoadURL(
++      tab_url2_, content::Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
++  ASSERT_TRUE(pending_navigation.WaitForRequestStart());
++  EXPECT_EQ(tab_url2_, split_contents->GetVisibleURL());
++  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
++  base::test::TestFuture<bool> is_split;
++  handler()->GetIsSplit(is_split.GetCallback());
++  EXPECT_TRUE(is_split.Get());
++  // 실패한 baseline도 멈춘 이동을 취소한 뒤 원래 분할 해제 검사를 계속한다.
++  split_contents->Stop();
++  EXPECT_TRUE(pending_navigation.WaitForNavigationFinished());
++  EXPECT_FALSE(pending_navigation.was_committed());
++  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
++
+   base::RunLoop run_loop;
+   EXPECT_CALL(page_, TabUnsplit()).WillOnce([&]() { run_loop.Quit(); });
+   tab_strip_model->RemoveSplit(split_id);
+diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+index 6079c8cdf13507b4557baecdf454739d9106d40c..304af58b7107e38bac3f1c4d5d3bd4cb3b2e491b 100644
+--- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
++++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+@@ -351,7 +351,9 @@ tabs::TabInterface* TabSearchPageHandler::GetTabInterface(int32_t tab_id) {
+ 
+ void TabSearchPageHandler::GetIsSplit(GetIsSplitCallback callback) {
+   bool is_split = false;
+-  GURL url = web_ui_->GetWebContents()->GetURL();
++  // 응답을 받는 현재 SplitNTP 문서를 판정한다. 다음 이동의 표시 URL을 쓰면
++  // false 응답의 비동기 redirect가 그 이동을 새 탭으로 덮어쓸 수 있다.
++  const GURL& url = web_ui_->GetWebContents()->GetLastCommittedURL();
+   if (url.spec() == chrome::kChromeUISplitViewNewTabPageURL) {
+     is_split = tabs::TabInterface::GetFromContents(web_ui_->GetWebContents())
+                    ->IsSplit();
