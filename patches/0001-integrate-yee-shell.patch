@@ -32020,14 +32020,15 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c1a37d75f 100644
+index a050af7ed7..e2f7b75868 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-@@ -2,19 +2,24 @@
+@@ -2,19 +2,25 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
 +#include <algorithm>
++#include <memory>
 +#include <optional>
  #include <string>
  
@@ -32048,7 +32049,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
  #include "chrome/browser/ui/tabs/tab_group_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -25,30 +30,43 @@
+@@ -25,30 +31,43 @@
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
  #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
@@ -32092,16 +32093,20 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
  #include "ui/views/interaction/interactive_views_test.h"
  #include "ui/views/interaction/mouse/interaction_test_util_mouse.h"
  #include "ui/views/test/views_test_utils.h"
-@@ -159,6 +177,8 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
+@@ -159,6 +178,12 @@ DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<size_t>,
                                      kBrowserCountPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
                                      kDragStatePoller);
++DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
++                                    kGroupMiddleDragLayoutReady);
++DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
++                                    kGroupMiddleDragEntryReady);
 +DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
 +                                    kProjectNativeRowHidden);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<URLs>,
                                      kTabOrderPoller);
  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<PinnedURLs>,
-@@ -172,6 +192,28 @@ class VerticalTabDragTest
+@@ -172,6 +197,28 @@ class VerticalTabDragTest
    VerticalTabDragTest() = default;
    ~VerticalTabDragTest() override = default;
  
@@ -32130,7 +32135,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
    const std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures()
        override {
      auto enabled = VerticalTabsInteractiveTestMixin<
-@@ -207,6 +249,43 @@ class VerticalTabDragTest
+@@ -207,6 +254,43 @@ class VerticalTabDragTest
      return *browser_view;
    }
  
@@ -32174,7 +32179,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
    auto RunScheduledLayout() {
      return Do([&]() { views::test::RunScheduledLayout(&GetBrowserView()); });
    }
-@@ -244,6 +323,30 @@ class VerticalTabDragTest
+@@ -244,6 +328,30 @@ class VerticalTabDragTest
          MoveMouseTo(kTabToDragTo), RunScheduledLayout());
    }
  
@@ -32205,7 +32210,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
    auto StartDragFromGroupToTab(int from_group_index, int to_tab_index) {
      const char kGroupToDragFrom[] = "Group to drag";
      const char kTabToDragTo[] = "Tab to drag to";
-@@ -266,6 +369,163 @@ class VerticalTabDragTest
+@@ -266,6 +374,163 @@ class VerticalTabDragTest
          RunScheduledLayout());
    }
  
@@ -32369,7 +32374,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +630,431 @@ class VerticalTabDragTest
+@@ -370,8 +635,487 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32560,10 +32565,16 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
 +  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
 +  TabStripModel* model = browser()->GetTabStripModel();
 +  ASSERT_NE(nullptr, model);
-+  std::optional<tabs::TabHandle> source_handle;
-+  std::optional<tabs::TabHandle> settings_handle;
-+  std::optional<tabs::TabHandle> version_handle;
++  struct GroupMiddleDragHandles {
++    std::optional<tabs::TabHandle> source;
++    std::optional<tabs::TabHandle> bookmarks;
++    std::optional<tabs::TabHandle> settings;
++    std::optional<tabs::TabHandle> version;
++  };
++  // 실패 뒤에도 polling이 남을 수 있으므로 callback이 handle 묶음을 소유한다.
++  auto handles = std::make_shared<GroupMiddleDragHandles>();
 +  gfx::Point middle_drop_point;
++  bool middle_drop_point_valid = false;
 +  const URLs expected_order({TabGroupURLs(
 +      {chrome::kChromeUIBookmarksURL, chrome::kChromeUISettingsURL,
 +       url::kAboutBlankURL, chrome::kChromeUIVersionURL})});
@@ -32572,14 +32583,61 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
 +      AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
 +      AddInstrumentedTab(kFourthTab, GURL(chrome::kChromeUIVersionURL), 3),
 +      AddTabsToNewGroup({1, 2, 3}), Do([&]() {
-+        source_handle = model->GetTabAtIndex(0)->GetHandle();
-+        settings_handle = model->GetTabAtIndex(2)->GetHandle();
-+        version_handle = model->GetTabAtIndex(3)->GetHandle();
++        handles->source = model->GetTabAtIndex(0)->GetHandle();
++        handles->bookmarks = model->GetTabAtIndex(1)->GetHandle();
++        handles->settings = model->GetTabAtIndex(2)->GetHandle();
++        handles->version = model->GetTabAtIndex(3)->GetHandle();
 +      }),
 +      PollState(kDragStatePoller, GetDragActive()),
 +      PollState(kTabOrderPoller, GetTabOrder(model)),
-+      StartDragBetweenTabs(0, 1), WaitForState(kDragStatePoller, true),
-+      Do([&]() {
++      // 활성화 입력 뒤 Favorites 공간이 열린 실제 배치를 먼저 관찰한다.
++      // 이때 그룹 멤버가 바뀔 수 있으므로 목적지는 인덱스 대신 handle로 찾는다.
++      StartDragTabWithinSidebar(0), WaitForState(kDragStatePoller, true),
++      PollState(kGroupMiddleDragLayoutReady,
++                base::BindLambdaForTesting([this]() {
++                  return GetFavoritesDropZone().GetVisible() &&
++                         GetFavoritesDropZone().height() ==
++                             yee::kSidebarMetrics.favorites_drop_zone_height &&
++                         GetTabStripView().unpinned_tabs_scroll_view()->y() ==
++                             yee::kSidebarMetrics.favorites_drop_zone_height +
++                                 yee::kSidebarMetrics.section_gap;
++                })),
++      WaitForState(kGroupMiddleDragLayoutReady, true),
++      StopObservingState(kGroupMiddleDragLayoutReady),
++      NameView(
++          "Current expanded group entry", base::BindLambdaForTesting([&]() {
++            auto* root = GetBrowserView()
++                             .vertical_tab_strip_region_view_for_testing()
++                             ->root_node_for_testing();
++            auto* node =
++                root ? root->GetNodeForHandle(*handles->bookmarks) : nullptr;
++            return node ? node->view() : nullptr;
++          })),
++      MoveMouseTo("Current expanded group entry"), RunScheduledLayout(),
++      PollState(kGroupMiddleDragEntryReady,
++                base::BindLambdaForTesting([this, handles]() {
++                  auto* root = GetBrowserView()
++                                   .vertical_tab_strip_region_view_for_testing()
++                                   ->root_node_for_testing();
++                  if (!root || !handles->source || !handles->settings ||
++                      !handles->version) {
++                    return false;
++                  }
++                  auto* source = root->GetNodeForHandle(*handles->source);
++                  auto* settings = root->GetNodeForHandle(*handles->settings);
++                  auto* version = root->GetNodeForHandle(*handles->version);
++                  auto* group = settings ? views::AsViewClass<TabGroupView>(
++                                               settings->view()->parent())
++                                         : nullptr;
++                  return source && version && group &&
++                         source->view()->parent() == group &&
++                         version->view()->parent() == group &&
++                         !group->IsCollapsed() && group->IsHandlingDrag() &&
++                         group->drag_axes() ==
++                             DraggedTabsContainer::DragAxes::kVerticalOnly;
++                })),
++      WaitForState(kGroupMiddleDragEntryReady, true),
++      StopObservingState(kGroupMiddleDragEntryReady), Do([&]() {
 +        RootTabCollectionNode* root =
 +            GetBrowserView()
 +                .vertical_tab_strip_region_view_for_testing()
@@ -32589,9 +32647,9 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
 +          auto* node = root->GetNodeForHandle(handle);
 +          return node ? node->view() : nullptr;
 +        };
-+        views::View* source = view_of(*source_handle);
-+        views::View* settings = view_of(*settings_handle);
-+        views::View* version = view_of(*version_handle);
++        views::View* source = view_of(*handles->source);
++        views::View* settings = view_of(*handles->settings);
++        views::View* version = view_of(*handles->version);
 +        ASSERT_NE(nullptr, source);
 +        ASSERT_NE(nullptr, settings);
 +        ASSERT_NE(nullptr, version);
@@ -32645,7 +32703,10 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
 +        ASSERT_NE(nullptr, unpinned);
 +        ASSERT_EQ(static_cast<DraggedTabsContainer*>(group),
 +                  &unpinned->GetTabDragTarget(middle_drop_point));
++        middle_drop_point_valid = true;
 +      }),
++      // Do의 치명적 단언은 callback만 끝낸다. 좌표가 없으면 입력을 중단한다.
++      Check([&]() { return middle_drop_point_valid; }),
 +      MoveMouseTo(
 +          base::BindLambdaForTesting([&]() { return middle_drop_point; })),
 +      RunScheduledLayout(), Do([&]() {
@@ -32801,7 +32862,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -609,6 +1292,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
+@@ -609,6 +1353,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
                                      })),
        // Dragging from index 0 to index 2 (split) should put the dragged tab to
        // index 3.
@@ -32828,7 +32889,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
        ContinueDragToTab(2),
        WaitForState(kTabOrderPoller, URLs({
                                          url::kAboutBlankURL,
-@@ -878,8 +1581,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -878,8 +1642,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32838,7 +32899,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1589,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1650,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32849,7 +32910,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1601,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1662,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -33366,7 +33427,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2290,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2351,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -33379,7 +33440,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2311,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2372,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),

@@ -306,6 +306,12 @@ allocation은 유지한다. Header clip도 native가 계산한 현재 paint allo
 `--yee-group-marker-capture-dir`를 주면 편입·해제 후 실제 창도 저장한다.
 `interactive`에는 세로 그룹의 편입·내부 정렬·해제·접기·헤더 드래그와
 Favorites 경계 및 취소 사례도 포함한다.
+`YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle`는 드래그 활성화 뒤 Favorites
+공간과 목록 배치가 열린 상태를 관찰하고, handle로 찾은 Bookmark의 현재 위치로
+별도 진입한다. 실제 그룹 처리와 세로 축을 확인한 뒤 중간 슬롯을 계산하며, 좌표
+계산이 실패하면 다음 포인터 입력을 중단한다. 같은 입력을 반복하거나 제한 시간을
+늘려 성공을 기다리지 않으며 기존 정확한 순서·그룹·미리보기 검사는 유지한다.
+관찰 callback은 handle 묶음을 소유하며, 준비가 확인되면 즉시 관찰을 종료한다.
 RTL의 방향 이동 사례는 논리적인 앞·뒤를 화면 좌표로 반전하여 실행한다.
 `DragSingleTabRightOfRightmostGroup`는 마지막 탭 중앙에서 그룹 바깥쪽으로
 1 DIP 이동하는 부호도 RTL에서 반전한다.
