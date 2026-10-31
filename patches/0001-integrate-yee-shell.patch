@@ -31677,10 +31677,10 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bdbe6de309 100644
+index a050af7ed78c088608c69f9a150cee1583d63287..2947ef95175ae03ebaa28a35f180b04c1a37d75f 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-@@ -2,19 +2,25 @@
+@@ -2,19 +2,24 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
@@ -31692,7 +31692,6 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/i18n/base_i18n_switches.h"
-+#include "base/logging.h"
  #include "base/test/bind.h"
  #include "base/test/scoped_feature_list.h"
 +#include "chrome/browser/ui/browser_commands.h"
@@ -31706,13 +31705,14 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
  #include "chrome/browser/ui/tabs/tab_group_model.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -25,30 +31,42 @@
+@@ -25,30 +30,43 @@
  #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
  #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
 +#include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
  #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
  #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
  #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
@@ -32026,7 +32026,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +630,468 @@ class VerticalTabDragTest
+@@ -370,8 +630,431 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32220,97 +32220,10 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
 +  std::optional<tabs::TabHandle> source_handle;
 +  std::optional<tabs::TabHandle> settings_handle;
 +  std::optional<tabs::TabHandle> version_handle;
-+  gfx::Point requested_point;
-+  // 원래 중심 입력을 유지하고, 실패 시점까지 남는 상태 기록만 추가한다.
-+  auto trace_state = [&](const char* phase) {
-+    RootTabCollectionNode* root =
-+        GetBrowserView()
-+            .vertical_tab_strip_region_view_for_testing()
-+            ->root_node_for_testing();
-+    if (!root) {
-+      LOG(INFO) << "YeeGroupMiddleTrace phase=" << phase << " root=null";
-+      return;
-+    }
-+    auto index_of = [&](const std::optional<tabs::TabHandle>& handle) {
-+      return handle ? model->GetIndexOfTab(handle->Get()) : -1;
-+    };
-+    auto view_of =
-+        [&](const std::optional<tabs::TabHandle>& handle) -> views::View* {
-+      auto* node = handle ? root->GetNodeForHandle(*handle) : nullptr;
-+      return node ? node->view() : nullptr;
-+    };
-+    views::View* source = view_of(source_handle);
-+    views::View* settings = view_of(settings_handle);
-+    views::View* version = view_of(version_handle);
-+    LOG(INFO) << "YeeGroupMiddleTrace phase=" << phase
-+              << " requested=" << requested_point.ToString()
-+              << " source_index=" << index_of(source_handle)
-+              << " settings_index=" << index_of(settings_handle)
-+              << " version_index=" << index_of(version_handle);
-+    for (int i = 0; i < model->count(); ++i) {
-+      auto* tab = model->GetTabAtIndex(i);
-+      auto* node = root->GetNodeForHandle(tab->GetHandle());
-+      views::View* view = node ? node->view() : nullptr;
-+      LOG(INFO) << "YeeGroupMiddleTrace model index=" << i
-+                << " url=" << model->GetWebContentsAt(i)->GetURL().spec()
-+                << " grouped=" << model->GetTabGroupForTab(i).has_value()
-+                << " view=" << static_cast<const void*>(view) << " parent="
-+                << (view ? static_cast<const void*>(view->parent()) : nullptr)
-+                << " screen="
-+                << (view ? view->GetBoundsInScreen().ToString() : "null");
-+    }
-+    auto trace_container = [&](const char* name,
-+                               DraggedTabsContainer* container,
-+                               views::View* host) {
-+      LOG(INFO) << "YeeGroupMiddleTrace container=" << name
-+                << " screen=" << host->GetBoundsInScreen().ToString()
-+                << " handling=" << container->IsHandlingDrag();
-+      if (!container->IsHandlingDrag()) {
-+        return;
-+      }
-+      const gfx::Rect zero =
-+          container->GetDraggingViewsBoundsAtPoint(gfx::Point());
-+      const gfx::Rect current = container->GetDraggingViewsBounds();
-+      gfx::Point processed =
-+          gfx::PointAtOffsetFromOrigin(current.origin() - zero.origin());
-+      views::View::ConvertPointToScreen(host, &processed);
-+      LOG(INFO) << "YeeGroupMiddleTrace drag=" << current.ToString()
-+                << " zero=" << zero.ToString()
-+                << " processed_screen=" << processed.ToString();
-+      bool after_source = false;
-+      for (const auto& row :
-+           container->GetTargetLayoutForDrag().child_layouts) {
-+        views::View* child = row.child_view;
-+        const char* identity = child == source     ? "source"
-+                               : child == settings ? "settings"
-+                               : child == version  ? "version"
-+                                                   : "other";
-+        if (child == source) {
-+          after_source = true;
-+        }
-+        // 경계 값은 공개 배치에서 계산한 예측이며 native 선택 관측값은 아니다.
-+        const int predicted_boundary = row.bounds.CenterPoint().y() +
-+                                       current.height() / 2 -
-+                                       (after_source ? current.height() : 0);
-+        LOG(INFO) << "YeeGroupMiddleTrace row=" << identity
-+                  << " visible=" << row.visible
-+                  << " target=" << row.bounds.ToString() << " actual="
-+                  << (child ? child->GetBoundsInScreen().ToString() : "null")
-+                  << " after_source=" << after_source
-+                  << " predicted_boundary=" << predicted_boundary;
-+      }
-+    };
-+    if (settings) {
-+      if (auto* group = views::AsViewClass<TabGroupView>(settings->parent())) {
-+        trace_container("group", group, group);
-+      }
-+    }
-+    auto* unpinned = views::AsViewClass<UnpinnedTabContainerView>(
-+        GetTabStripView().unpinned_tabs_scroll_view()->contents());
-+    if (unpinned) {
-+      trace_container("unpinned", unpinned, unpinned);
-+    }
-+  };
++  gfx::Point middle_drop_point;
++  const URLs expected_order({TabGroupURLs(
++      {chrome::kChromeUIBookmarksURL, chrome::kChromeUISettingsURL,
++       url::kAboutBlankURL, chrome::kChromeUIVersionURL})});
 +  RunTestSequence(
 +      AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUIBookmarksURL), 1),
 +      AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
@@ -32323,31 +32236,81 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
 +      PollState(kDragStatePoller, GetDragActive()),
 +      PollState(kTabOrderPoller, GetTabOrder(model)),
 +      StartDragBetweenTabs(0, 1), WaitForState(kDragStatePoller, true),
-+      // Resolve a stable destination after the compact group layout has
-+      // reacted to entry. The source can move to index 3 during entry, so a
-+      // numeric index captured before drag start would point back to it.
-+      Steps(Log("Continue drag to a stable destination tab"),
-+            MoveMouseTo(base::BindLambdaForTesting([&]() {
-+              requested_point =
-+                  GetTabViewAt(
-+                      GetUniqueTabIndex(GURL(chrome::kChromeUISettingsURL)))
-+                      ->GetBoundsInScreen()
-+                      .CenterPoint();
-+              trace_state("before-final-move");
-+              return requested_point;
-+            })),
-+            RunScheduledLayout()),
 +      Do([&]() {
-+        trace_state("before-release");
++        RootTabCollectionNode* root =
++            GetBrowserView()
++                .vertical_tab_strip_region_view_for_testing()
++                ->root_node_for_testing();
++        ASSERT_NE(nullptr, root);
++        auto view_of = [&](tabs::TabHandle handle) -> views::View* {
++          auto* node = root->GetNodeForHandle(handle);
++          return node ? node->view() : nullptr;
++        };
++        views::View* source = view_of(*source_handle);
++        views::View* settings = view_of(*settings_handle);
++        views::View* version = view_of(*version_handle);
++        ASSERT_NE(nullptr, source);
++        ASSERT_NE(nullptr, settings);
++        ASSERT_NE(nullptr, version);
++        auto* group = views::AsViewClass<TabGroupView>(settings->parent());
++        ASSERT_NE(nullptr, group);
++        ASSERT_EQ(group, source->parent());
++        ASSERT_EQ(group, version->parent());
++        ASSERT_FALSE(group->IsCollapsed());
++        ASSERT_TRUE(group->IsHandlingDrag());
++        ASSERT_EQ(DraggedTabsContainer::DragAxes::kVerticalOnly,
++                  group->drag_axes());
++        const gfx::Rect zero =
++            group->GetDraggingViewsBoundsAtPoint(gfx::Point());
++        ASSERT_GT(zero.height(), 0);
++        const TabDragHandler& drag_handler =
++            root->GetController()->GetDragHandler();
++        std::optional<int> after_settings;
++        std::optional<int> before_version;
++        bool after_source = false;
++        int dragged_count = 0;
++        // 진입 때 원본이 그룹 끝으로 옮겨져도 Settings 뒤 슬롯을 지정한다.
++        // native가 원본 행을 제외하는 경계와 실제 잡은 위치를 함께 반영한다.
++        for (const auto& row : group->GetTargetLayoutForDrag().child_layouts) {
++          if (drag_handler.IsViewDragging(*row.child_view)) {
++            EXPECT_EQ(source, row.child_view);
++            ++dragged_count;
++            after_source = true;
++            continue;
++          }
++          if (row.child_view != settings && row.child_view != version) {
++            continue;
++          }
++          ASSERT_TRUE(row.visible);
++          const int boundary = row.bounds.CenterPoint().y() +
++                               zero.height() / 2 -
++                               (after_source ? zero.height() : 0);
++          (row.child_view == settings ? after_settings : before_version) =
++              boundary;
++        }
++        ASSERT_EQ(1, dragged_count);
++        ASSERT_TRUE(after_settings.has_value());
++        ASSERT_TRUE(before_version.has_value());
++        ASSERT_LT(*after_settings, *before_version);
++        middle_drop_point = views::View::ConvertPointFromScreen(
++            group, settings->GetBoundsInScreen().CenterPoint());
++        middle_drop_point.set_y((*after_settings + *before_version) / 2 -
++                                zero.CenterPoint().y());
++        views::View::ConvertPointToScreen(group, &middle_drop_point);
++        auto* unpinned = views::AsViewClass<UnpinnedTabContainerView>(
++            GetTabStripView().unpinned_tabs_scroll_view()->contents());
++        ASSERT_NE(nullptr, unpinned);
++        ASSERT_EQ(static_cast<DraggedTabsContainer*>(group),
++                  &unpinned->GetTabDragTarget(middle_drop_point));
++      }),
++      MoveMouseTo(
++          base::BindLambdaForTesting([&]() { return middle_drop_point; })),
++      RunScheduledLayout(), Do([&]() {
++        EXPECT_EQ(expected_order, GetTabOrder(model).Run());
 +        ExpectDragPreviewAlignedWithTab(0);
 +      }),
 +      ReleaseMouse(), WaitForState(kDragStatePoller, false),
-+      Do([&]() { trace_state("after-release"); }),
-+      WaitForState(
-+          kTabOrderPoller,
-+          URLs({TabGroupURLs({chrome::kChromeUIBookmarksURL,
-+                              chrome::kChromeUISettingsURL, url::kAboutBlankURL,
-+                              chrome::kChromeUIVersionURL})})));
++      WaitForState(kTabOrderPoller, expected_order));
 +}
 +
 +IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
@@ -32495,7 +32458,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -609,6 +1329,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
+@@ -609,6 +1292,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
                                      })),
        // Dragging from index 0 to index 2 (split) should put the dragged tab to
        // index 3.
@@ -32522,7 +32485,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
        ContinueDragToTab(2),
        WaitForState(kTabOrderPoller, URLs({
                                          url::kAboutBlankURL,
-@@ -878,8 +1618,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -878,8 +1581,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -32532,7 +32495,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1626,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1589,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -32543,7 +32506,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1638,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1601,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -33060,7 +33023,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2327,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2290,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -33073,7 +33036,7 @@ index a050af7ed78c088608c69f9a150cee1583d63287..b52275c56f2d0dbf3ce2ded54591f7bd
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2348,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2311,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
