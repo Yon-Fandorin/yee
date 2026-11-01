@@ -620,7 +620,11 @@ class YeeOmniboxRestingTextView : public views::View {
     origin_->SetEnabledColor(primary);
     title_->SetEnabledColor(secondary);
     separator_->SetBackground(views::CreateSolidBackground(divider));
-    SetVisible(visible);
+    // 표시 의도와 Flex가 공간 부족으로 숨긴 상태를 구분한다.
+    if (requested_visible_ != visible) {
+      requested_visible_ = visible;
+      SetVisible(visible);
+    }
   }
 
  private:
@@ -628,6 +632,7 @@ class YeeOmniboxRestingTextView : public views::View {
   raw_ptr<views::View> separator_ = nullptr;
   raw_ptr<views::Label> origin_ = nullptr;
   SkColor background_color_ = gfx::kPlaceholderColor;
+  bool requested_visible_ = true;
 };
 
 BEGIN_METADATA(YeeCombinedSurfaceOutlineView)

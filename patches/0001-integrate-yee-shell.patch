@@ -23477,7 +23477,7 @@ index a73f5c6b4eab68cf0382ace8e32e2fa9d7582ecf..ba2f8e88b75eb72db24e5fcd21651efa
        // Add a regular tab to the tab strip
        AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c813691da6df8 100644
+index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..a562f23271670e58b5fc1d87001559bcd61425cc 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,37 +7,61 @@
@@ -23627,7 +23627,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
    alert_state_indicator_ = AddChildView(std::make_unique<views::ImageView>());
    alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
                                        icon_flex_spec.WithOrder(2));
-@@ -134,13 +214,132 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -134,13 +214,136 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
            base::BindRepeating(&MultiContentsViewMiniToolbar::ClearWebContents,
                                base::Unretained(this)));
  
@@ -23740,18 +23740,22 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
 +    UpdateYeeInteriorMargin();
 +
 +    SetVisible(!is_highlighted);
-+    favicon_->SetVisible(!is_active);
-+    domain_label_->SetVisible(false);
-+    if (yee_resting_text_) {
-+      yee_resting_text_->SetVisible(!is_active);
-+    }
-+    alert_state_indicator_->SetVisible(!is_active);
++    auto* const layout = static_cast<views::FlexLayout*>(GetLayoutManager());
++    // 폭 부족으로 Flex가 숨긴 자식을 같은 표시 요청으로 되살리지 않는다.
++    const auto set_child_visible = [layout](views::View* child, bool visible) {
++      if (layout->CanBeVisible(child) != visible) {
++        child->SetVisible(visible);
++      }
++    };
++    set_child_visible(favicon_, !is_active);
++    set_child_visible(domain_label_, false);
++    set_child_visible(alert_state_indicator_, !is_active);
 +    if (yee_sidebar_button_) {
-+      yee_sidebar_button_->SetVisible(is_active);
++      set_child_visible(yee_sidebar_button_, is_active);
 +    }
-+    yee_back_button_->SetVisible(true);
-+    yee_forward_button_->SetVisible(true);
-+    yee_reload_button_->SetVisible(true);
++    set_child_visible(yee_back_button_, true);
++    set_child_visible(yee_forward_button_, true);
++    set_child_visible(yee_reload_button_, true);
 +    SetFocusBehavior(is_active ? FocusBehavior::NEVER : FocusBehavior::ALWAYS);
 +    UpdateYeeHeaderPresentation();
 +    return;
@@ -23760,7 +23764,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -168,6 +367,102 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -168,6 +371,102 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -23863,7 +23867,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -210,6 +505,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -210,6 +509,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
@@ -23872,7 +23876,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -226,7 +523,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -226,7 +527,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    web_contents_ = nullptr;
  }
  
@@ -23902,7 +23906,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -244,6 +563,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -244,6 +567,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -24145,7 +24149,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -264,14 +819,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -264,14 +823,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -24193,7 +24197,7 @@ index 3d3d583887d6be2eca64ad91fef3e5b7d979b353..556d115f618221cb016a41c6bd5c8136
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -287,7 +868,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -287,7 +872,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -26157,7 +26161,7 @@ index be1fb0ad07..f3d9ed26de 100644
  
  source_set("icon_label_bubble") {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index d07cbfe86c..b3d5d56d7e 100644
+index d07cbfe86cf9b1e6693e6bfac7e88d11b868a619..3da0fc1c68d6ce3dc483dd00f7a0544e1c9e8a78 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -26666,7 +26670,7 @@ index d07cbfe86c..b3d5d56d7e 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1486,6 +1746,78 @@ void LocationBarView::RefreshBackground() {
+@@ -1486,6 +1746,79 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -26738,14 +26742,15 @@ index d07cbfe86c..b3d5d56d7e 100644
 +                                      origin, *compact_shell_presentation_,
 +                                      visible, background_color_);
 +  } else {
-+    compact_shell_resting_text_view_->SetVisible(false);
++    yee::UpdateOmniboxRestingTextView(*compact_shell_resting_text_view_, title,
++                                      origin, background_color_, false);
 +  }
 +}
 +
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1560,7 +1892,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1560,7 +1893,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -26753,7 +26758,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    }
  }
  
-@@ -1587,10 +1918,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
+@@ -1587,10 +1919,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
                                  : features::IsRoundedIconsEnabled()
                                      ? kCloseIcon
                                      : kTabCloseNormalOldIcon;
@@ -26782,7 +26787,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    clear_all_button_->SetBorder(views::CreateEmptyBorder(
        GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING)));
  }
-@@ -1815,6 +2160,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1815,6 +2161,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -26795,7 +26800,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1851,9 +2202,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1851,9 +2203,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
@@ -26808,7 +26813,7 @@ index d07cbfe86c..b3d5d56d7e 100644
  }
  
  int LocationBarView::GetDragOperationsForView(views::View* sender,
-@@ -1952,6 +2303,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1952,6 +2304,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -26819,7 +26824,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -2148,6 +2503,10 @@ void LocationBarView::OnChanged() {
+@@ -2148,6 +2504,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -26830,7 +26835,7 @@ index d07cbfe86c..b3d5d56d7e 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2381,9 +2740,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2381,9 +2741,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -26855,7 +26860,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2400,6 +2774,8 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2400,6 +2775,8 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -26864,7 +26869,7 @@ index d07cbfe86c..b3d5d56d7e 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2434,18 +2810,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2434,18 +2811,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -26918,7 +26923,7 @@ index d07cbfe86c..b3d5d56d7e 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2544,7 +2949,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2544,7 +2950,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  

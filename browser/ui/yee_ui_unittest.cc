@@ -31,6 +31,8 @@
 #include "ui/native_theme/native_theme_base.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/layout/flex_layout.h"
+#include "ui/views/test/views_test_utils.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -512,7 +514,16 @@ TEST_F(YeeRestingTextViewTest,
 }
 
 TEST_F(YeeRestingTextViewTest, RestingTextSharesHoveredControlSurface) {
-  auto* resting = widget_->SetContentsView(CreateOmniboxRestingTextView());
+  auto* host = widget_->SetContentsView(std::make_unique<views::View>());
+  auto* row = host->AddChildView(std::make_unique<views::View>());
+  auto* layout = row->SetLayoutManager(std::make_unique<views::FlexLayout>());
+  auto* resting = row->AddChildView(CreateOmniboxRestingTextView());
+  resting->SetProperty(
+      views::kFlexBehaviorKey,
+      views::FlexSpecification(
+          views::LayoutOrientation::kHorizontal,
+          views::MinimumFlexSizeRule::kScaleToMinimumSnapToZero,
+          views::MaximumFlexSizeRule::kUnbounded));
   for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorRED}) {
     const auto presentation =
         ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
@@ -528,6 +539,46 @@ TEST_F(YeeRestingTextViewTest, RestingTextSharesHoveredControlSurface) {
         EXPECT_EQ(background, label->GetBackgroundColor());
       }
     }
+  }
+
+  for (bool rtl : {false, true}) {
+    base::i18n::ScopedRTLForTesting scoped_rtl(rtl);
+    SCOPED_TRACE(rtl);
+    row->SetBounds(0, 0, 400, 40);
+    views::test::RunScheduledLayout(row);
+    ASSERT_TRUE(resting->GetVisible());
+    EXPECT_TRUE(row->GetLocalBounds().Contains(resting->bounds()));
+
+    // 버튼이 주소 표면의 공간을 모두 사용하면 Flex가 표시를 잠시 숨긴다.
+    row->SetSize(gfx::Size(0, 40));
+    views::test::RunScheduledLayout(row);
+    ASSERT_FALSE(resting->GetVisible());
+    ASSERT_TRUE(layout->CanBeVisible(resting));
+    for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, SK_ColorWHITE}) {
+      const auto presentation =
+          ResolveBrowserSurfacePresentation(surface, 1, 1, 1);
+      UpdateOmniboxRestingTextView(*resting, u"Title", u"example.test",
+                                   presentation, true);
+      // 테마 갱신 직후에도 옛 bounds로 다시 표시하지 않는다.
+      EXPECT_FALSE(resting->GetVisible());
+      views::test::RunScheduledLayout(row);
+      EXPECT_FALSE(resting->GetVisible());
+    }
+
+    row->SetSize(gfx::Size(400, 40));
+    views::test::RunScheduledLayout(row);
+    EXPECT_TRUE(resting->GetVisible());
+    EXPECT_TRUE(row->GetLocalBounds().Contains(resting->bounds()));
+    const auto presentation =
+        ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1);
+    UpdateOmniboxRestingTextView(*resting, u"Title", u"example.test",
+                                 presentation, false);
+    EXPECT_FALSE(resting->GetVisible());
+    UpdateOmniboxRestingTextView(*resting, u"Title", u"example.test",
+                                 presentation, true);
+    views::test::RunScheduledLayout(row);
+    EXPECT_TRUE(resting->GetVisible());
+    EXPECT_TRUE(row->GetLocalBounds().Contains(resting->bounds()));
   }
 }
 

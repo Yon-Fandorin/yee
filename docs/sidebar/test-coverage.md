@@ -439,3 +439,9 @@ Sidebar를 접고 가로 분할의 도구 소유 pane에 폭을 배정한다. �
 비활성 pane 주소 검사는 한 번 창을 앞으로 가져와 active·visible 상태를 확인한 뒤
 실제 포인터를 이동한다. 클릭 요청 전 상태와 native 입력 완료 단계를 구분해 기록하고,
 실제 클릭 이후의 WebContents·활성 pane·주소창 초점 검사는 그대로 유지한다.
+
+`RestingTextSharesHoveredControlSurface`는 실제 Flex가 폭 부족으로 숨긴 주소 표면에
+같은 표시 요청으로 테마를 다시 적용해도, 다음 배치를 강제 실행하기 전에 숨김을
+유지하는지 LTR·RTL에서 검사한다. 폭을 다시 확보한 뒤의 표시와 편집·표시 의도의
+false→true 전환도 확인하며, 기존 주소 표면·Label 색상 판정을 유지한다.
+분할 Header의 자식 포함 관계와 창 버튼 예약 영역 검사는 그대로 유지한다.
