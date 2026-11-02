@@ -6,6 +6,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "base/command_line.h"
 #include "base/files/file_util.h"
@@ -360,6 +361,16 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* state = tabs::VerticalTabStripStateController::From(browser());
+#if BUILDFLAG(IS_WIN)
+  ui_test_utils::ScopedNativeInputTrace native_trace(view->GetWidget());
+  const auto record_input = [&](std::string_view phase,
+                                const gfx::Point& intended) {
+    native_trace.Snapshot(phase, intended);
+    RecordProperty("YeeProtectionNativeInput", native_trace.ToJson());
+  };
+#else
+  const auto record_input = [](std::string_view, const gfx::Point&) {};
+#endif
   for (bool vertical : {false, true}) {
     SCOPED_TRACE(vertical);
     state->SetVerticalTabsEnabled(vertical);
@@ -394,19 +405,31 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
     for (bool expected_open : {true, false, true, false}) {
       SCOPED_TRACE(++click);
       SCOPED_TRACE(expected_open);
+      const std::string phase =
+          (vertical ? "vertical-" : "horizontal-") + std::to_string(click);
       auto* root = button->GetWidget()->GetRootView();
-      auto point = button->GetBoundsInScreen().CenterPoint();
+      const auto intended = button->GetBoundsInScreen().CenterPoint();
+      auto point = intended;
       views::View::ConvertPointFromScreen(root, &point);
       auto* target = root->GetEventHandlerForPoint(point);
       ASSERT_TRUE(target && (target == button || button->Contains(target)));
-      ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-          button->GetBoundsInScreen().CenterPoint(), native_window));
+      record_input(phase + "-before-move", intended);
+      const bool moved =
+          ui_test_utils::SendMouseMoveSync(intended, native_window);
+      record_input(phase + "-after-move", intended);
+      ASSERT_TRUE(moved);
       ASSERT_TRUE(button->IsMouseHovered())
           << "실제 포인터가 Protection 버튼에 도착하지 않았습니다";
-      ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
+      const bool clicked = ui_test_utils::SendMouseEventsSync(
           ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
-          native_window));
+          native_window);
+      record_input(phase + "-after-click", intended);
+      ASSERT_TRUE(clicked);
       base::RunLoop().RunUntilIdle();
+      record_input(phase + "-after-idle", intended);
+      RecordProperty("YeeProtectionInputPhase", phase);
+      RecordProperty("YeeProtectionCurrentButtonBounds",
+                     button->GetBoundsInScreen().ToString());
       ASSERT_EQ(expected_open, IsSiteControlsBubbleShowing());
     }
   }

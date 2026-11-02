@@ -58,6 +58,10 @@ class CoordinatorFactory : public ProfileKeyedServiceFactory {
 
 }  // namespace
 
+void ProjectTabCoordinator::EnsureFactoryBuilt() {
+  CoordinatorFactory::GetInstance();
+}
+
 ProjectTabCoordinator* ProjectTabCoordinator::GetForProfile(Profile* profile) {
   if (!profile || profile->IsOffTheRecord() || !profile->IsRegularProfile() ||
       profile->IsGuestSession()) {

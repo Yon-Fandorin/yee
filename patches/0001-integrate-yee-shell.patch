@@ -1668,24 +1668,26 @@ index f569264cf0..e90d8ae786 100644
      "//components/autofill/content/browser",
      "//components/breadcrumbs/core:status",
 diff --git a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
-index a281709c54..f32b521712 100644
+index a281709c54..bac6ba4147 100644
 --- a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
 +++ b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
-@@ -296,6 +296,8 @@
+@@ -296,6 +296,9 @@
  #include "chrome/browser/webid/federated_identity_api_permission_context_factory.h"
  #include "chrome/browser/webid/federated_identity_auto_reauthn_permission_context_factory.h"
  #include "chrome/browser/webid/federated_identity_permission_context_factory.h"
 +#include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 +#include "chrome/browser/yee_projects/project_service_factory.h"
++#include "chrome/browser/yee_projects/project_tab_coordinator.h"
  #include "chrome/common/buildflags.h"
  #include "chrome/common/chrome_features.h"
  #include "components/autofill/content/browser/autofill_log_router_factory.h"
-@@ -915,6 +917,8 @@ void ChromeBrowserMainExtraPartsProfiles::
+@@ -915,6 +918,9 @@ void ChromeBrowserMainExtraPartsProfiles::
    controlled_frame::ControlledFrameMediaPermissionCacheFactory::GetInstance();
  #endif
    CookieSettingsFactory::GetInstance();
 +  yee::content_blocking::ContentBlockingServiceFactory::GetInstance();
 +  yee::projects::ProjectServiceFactory::GetInstance();
++  yee::projects::ProjectTabCoordinator::EnsureFactoryBuilt();
  #if !BUILDFLAG(IS_ANDROID)
    metrics::CriticalUserJourneyServiceFactory::GetInstance();
  #endif  // BUILDFLAG(!IS_ANDROID)
@@ -11886,7 +11888,7 @@ index 462a89218b..b15ad3bec4 100644
    mutable int last_vertical_tab_strip_width_ = 0;
  };
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
-index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4cf69d2c6 100644
+index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..8c472da714442ac0e1be476185a6d9f907b661bf 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl_interactive_uitest.cc
 @@ -4,84 +4,379 @@
@@ -12580,7 +12582,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
  }
  
  // Regression tests for cases where preferred width for side panel is
-@@ -652,176 +1161,5247 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
+@@ -652,176 +1161,5325 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplUiTest,
                    VerifyLayout());
  }
  
@@ -15679,11 +15681,19 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
 +  auto* const tools =
 +      menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId);
 +#if BUILDFLAG(IS_WIN)
++  // 화면을 다시 만든 메뉴의 배치를 마친 뒤 native 입력 좌표를 읽는다.
++  menu->GetWidget()->LayoutRootViewIfNecessary();
 +  // keyup까지 처리한 뒤에도 focus와 activation이 메뉴에 남아야 한다.
 +  ASSERT_TRUE(menu->GetWidget()->IsActive());
 +  ASSERT_TRUE(tools->HasFocus());
++  ASSERT_TRUE(tools->IsDrawn());
 +#endif
 +  const gfx::Point row_center = tools->GetBoundsInScreen().CenterPoint();
++#if BUILDFLAG(IS_WIN)
++  RecordProperty("YeeFlyoutPointerReturnInitialCenter", row_center.ToString());
++  RecordProperty("YeeFlyoutPointerReturnInitialBounds",
++                 tools->GetBoundsInScreen().ToString());
++#endif
 +  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(row_center, menu_window));
 +  ASSERT_TRUE(tools->HasFocus());
 +  ASSERT_TRUE(menu->GetWidget()->IsActive());
@@ -15698,14 +15708,84 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
 +  EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
 +            menu->GetFocusManager()->focus_change_reason());
 +#if BUILDFLAG(IS_WIN)
-+  // Windows SendInput의 물리 좌표는 1px 오차를 허용한다. 125%에서도 실제
-+  // 이동이 발생하도록 같은 행 안의 충분히 다른 위치를 사용한다.
-+  const gfx::Point pointer_return =
-+      row_center + gfx::Vector2d(tools->width() / 4, 0);
++  // Tab 순회 뒤 현재 배치에서 좌표를 다시 읽는다. 125%에서도 실제 이동이
++  // 발생하도록 같은 행 안의 충분히 다른 위치를 사용한다.
++  menu->GetWidget()->LayoutRootViewIfNecessary();
++  const gfx::Point pointer_return = tools->GetBoundsInScreen().CenterPoint() +
++                                    gfx::Vector2d(tools->width() / 4, 0);
++  const auto record_row = [&](const char* phase) {
++    auto* const current_menu = yee::GetSidebarFooterMenuForTesting(*footer);
++    auto* const current_tools =
++        current_menu == menu
++            ? menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId)
++            : nullptr;
++    if (current_tools != tools) {
++      RecordProperty(phase, "menu or row changed");
++      return;
++    }
++    auto* const widget = menu->GetWidget();
++    auto* const root = widget->GetRootView();
++    const gfx::Point cursor = display::Screen::Get()->GetCursorScreenPoint();
++    auto* const hit = root->GetEventHandlerForPoint(
++        views::View::ConvertPointFromScreen(root, cursor));
++    RecordProperty(
++        phase,
++        base::StringPrintf(
++            "bounds=%s visible=%s cursor=%s hit=%s "
++            "active=%d drawn=%d focused=%d background=%d "
++            "reason=%d",
++            tools->GetBoundsInScreen().ToString().c_str(),
++            tools->GetVisibleBounds().ToString().c_str(),
++            cursor.ToString().c_str(), hit ? hit->GetClassName() : "null",
++            widget->IsActive(), tools->IsDrawn(), tools->HasFocus(),
++            tools->background() != nullptr,
++            static_cast<int>(menu->GetFocusManager()->focus_change_reason())));
++  };
++  ui_test_utils::ScopedNativeInputTrace native_trace(menu->GetWidget());
++  native_trace.Snapshot("before-pointer-return", pointer_return);
++  record_row("YeeFlyoutPointerReturnReady");
++  RecordProperty("YeeFlyoutPointerReturnBounds",
++                 tools->GetBoundsInScreen().ToString());
++  RecordProperty("YeeFlyoutPointerReturnVisibleBounds",
++                 tools->GetVisibleBounds().ToString());
++  RecordProperty("YeeFlyoutPointerReturnTarget", pointer_return.ToString());
++  RecordProperty("YeeFlyoutPointerReturnNativeInput", native_trace.ToJson());
++  ASSERT_TRUE(tools->IsDrawn());
++  ASSERT_TRUE(tools->GetVisibleBounds().Contains(
++      views::View::ConvertPointFromScreen(tools, pointer_return)));
++  auto* const menu_root = menu->GetWidget()->GetRootView();
++  ASSERT_EQ(tools, menu_root->GetEventHandlerForPoint(
++                       views::View::ConvertPointFromScreen(menu_root,
++                                                           pointer_return)));
++  const bool pointer_move_sent =
++      ui_test_utils::SendMouseMoveSync(pointer_return, menu_window);
++  native_trace.Snapshot("after-pointer-return", pointer_return);
++  record_row("YeeFlyoutPointerReturnSent");
++  RecordProperty("YeeFlyoutPointerReturnNativeInput", native_trace.ToJson());
++  ASSERT_TRUE(pointer_move_sent);
++  // Windows 입력 완료는 행의 hover 처리를 보증하지 않는다. 재입력 없이
++  // 실제 포인터 표시와 focus 이유가 함께 바뀌는 상태를 관찰한다.
++  const bool pointer_state_observed = base::test::RunUntil([&] {
++    return yee::GetSidebarFooterMenuForTesting(*footer) == menu &&
++           menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId) ==
++               tools &&
++           tools->HasFocus() && tools->background() &&
++           menu->GetFocusManager()->focus_change_reason() ==
++               views::FocusManager::FocusChangeReason::kDirectFocusChange;
++  });
++  native_trace.Snapshot("after-pointer-state-observation", pointer_return);
++  record_row("YeeFlyoutPointerReturnObservedState");
++  RecordProperty("YeeFlyoutPointerReturnNativeInput", native_trace.ToJson());
++  RecordProperty("YeeFlyoutPointerReturnObserved",
++                 pointer_state_observed ? 1 : 0);
++  EXPECT_TRUE(pointer_state_observed);
++  ASSERT_EQ(menu, yee::GetSidebarFooterMenuForTesting(*footer));
++  ASSERT_EQ(tools,
++            menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId));
 +#else
 +  const gfx::Point pointer_return = row_center + gfx::Vector2d(1, 0);
-+#endif
 +  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(pointer_return, menu_window));
++#endif
 +  EXPECT_TRUE(tools->HasFocus());
 +  EXPECT_TRUE(tools->background());
 +  EXPECT_EQ(views::FocusManager::FocusChangeReason::kDirectFocusChange,
@@ -17971,7 +18051,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         HorizontalTabsSinglePaneOpenSidePanel) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -874,10 +6454,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -874,10 +6532,959 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18932,7 +19012,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
  IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
                         VerticalTabsSinglePaneExpand) {
    if (!features::UseSidePanelFlyoverAnimation()) {
-@@ -886,8 +7415,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -886,8 +7493,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18950,7 +19030,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
                    CheckResizeCounts(1U, 0U));
  }
  
-@@ -943,8 +7479,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -943,8 +7557,15 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18968,7 +19048,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -956,8 +7499,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
+@@ -956,8 +7577,17 @@ IN_PROC_BROWSER_TEST_F(BrowserViewTabbedLayoutImplContentLayoutUiTest,
    tabs::VerticalTabStripStateController::From(browser())
        ->SetVerticalTabsEnabled(true);
    RunScheduledLayouts();
@@ -18987,7 +19067,7 @@ index 49b4f6dd0db50c3ac7998096b5d4321cdf818029..88ac525964d1735bf18f758f932af1e4
                    CheckResizeCounts(1U, 1U));
  }
  
-@@ -1019,3 +7571,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
+@@ -1019,3 +7649,390 @@ IN_PROC_BROWSER_TEST_F(BrowserViewHorizontalTabStripOldLayoutUiTest,
          LOG(INFO) << "TopContainer top (px): " << top_container_top_px;
        }));
  }
@@ -32311,7 +32391,7 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
-index a050af7ed7..e2f7b75868 100644
+index a050af7ed7..e4763714ee 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc
 @@ -2,19 +2,25 @@
@@ -32426,7 +32506,16 @@ index a050af7ed7..e2f7b75868 100644
    const std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures()
        override {
      auto enabled = VerticalTabsInteractiveTestMixin<
-@@ -207,6 +254,43 @@ class VerticalTabDragTest
+@@ -188,6 +235,8 @@ class VerticalTabDragTest
+   }
+ 
+  protected:
++  void DragUngroupedTabIntoExpandedGroupMiddle(DragPosition position);
++
+   BrowserWindowInterface& GetLatestBrowser() {
+     CHECK(!GlobalBrowserCollection::GetInstance()->IsEmpty());
+     BrowserWindowInterface* latest_browser = nullptr;
+@@ -207,6 +256,43 @@ class VerticalTabDragTest
      return *browser_view;
    }
  
@@ -32470,7 +32559,7 @@ index a050af7ed7..e2f7b75868 100644
    auto RunScheduledLayout() {
      return Do([&]() { views::test::RunScheduledLayout(&GetBrowserView()); });
    }
-@@ -244,6 +328,30 @@ class VerticalTabDragTest
+@@ -244,6 +330,30 @@ class VerticalTabDragTest
          MoveMouseTo(kTabToDragTo), RunScheduledLayout());
    }
  
@@ -32501,7 +32590,7 @@ index a050af7ed7..e2f7b75868 100644
    auto StartDragFromGroupToTab(int from_group_index, int to_tab_index) {
      const char kGroupToDragFrom[] = "Group to drag";
      const char kTabToDragTo[] = "Tab to drag to";
-@@ -266,6 +374,163 @@ class VerticalTabDragTest
+@@ -266,6 +376,163 @@ class VerticalTabDragTest
          RunScheduledLayout());
    }
  
@@ -32665,7 +32754,7 @@ index a050af7ed7..e2f7b75868 100644
    auto PressEscAsync() {
      return Do([&]() {
        ASSERT_TRUE(ui_controls::SendKeyPress(
-@@ -370,8 +635,487 @@ class VerticalTabDragTest
+@@ -370,8 +637,514 @@ class VerticalTabDragTest
    gfx::AnimationTestApi::RenderModeResetter disable_animation_ =
        gfx::AnimationTestApi::SetRichAnimationRenderMode(
            gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -32851,8 +32940,11 @@ index a050af7ed7..e2f7b75868 100644
 +      }));
 +}
 +
-+IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
-+                       YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle) {
++void VerticalTabDragTest::DragUngroupedTabIntoExpandedGroupMiddle(
++    DragPosition position) {
++  const bool from_below = position == DragPosition::kBelow;
++  const int source_index = from_below ? 3 : 0;
++  const int group_start = from_below ? 0 : 1;
 +  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
 +  TabStripModel* model = browser()->GetTabStripModel();
 +  ASSERT_NE(nullptr, model);
@@ -32873,17 +32965,27 @@ index a050af7ed7..e2f7b75868 100644
 +      AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUIBookmarksURL), 1),
 +      AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
 +      AddInstrumentedTab(kFourthTab, GURL(chrome::kChromeUIVersionURL), 3),
-+      AddTabsToNewGroup({1, 2, 3}), Do([&]() {
-+        handles->source = model->GetTabAtIndex(0)->GetHandle();
-+        handles->bookmarks = model->GetTabAtIndex(1)->GetHandle();
-+        handles->settings = model->GetTabAtIndex(2)->GetHandle();
-+        handles->version = model->GetTabAtIndex(3)->GetHandle();
++      Do([&]() {
++        if (from_below) {
++          model->MoveWebContentsAt(0, source_index, false);
++        }
++        RecordProperty("group_middle_entry_direction",
++                       from_below ? "below" : "above");
++        RecordProperty("initial_ungrouped_source_index", source_index);
++      }),
++      AddTabsToNewGroup({group_start, group_start + 1, group_start + 2}),
++      Do([&]() {
++        handles->source = model->GetTabAtIndex(source_index)->GetHandle();
++        handles->bookmarks = model->GetTabAtIndex(group_start)->GetHandle();
++        handles->settings = model->GetTabAtIndex(group_start + 1)->GetHandle();
++        handles->version = model->GetTabAtIndex(group_start + 2)->GetHandle();
 +      }),
 +      PollState(kDragStatePoller, GetDragActive()),
 +      PollState(kTabOrderPoller, GetTabOrder(model)),
 +      // 활성화 입력 뒤 Favorites 공간이 열린 실제 배치를 먼저 관찰한다.
 +      // 이때 그룹 멤버가 바뀔 수 있으므로 목적지는 인덱스 대신 handle로 찾는다.
-+      StartDragTabWithinSidebar(0), WaitForState(kDragStatePoller, true),
++      StartDragTabWithinSidebar(source_index),
++      WaitForState(kDragStatePoller, true),
 +      PollState(kGroupMiddleDragLayoutReady,
 +                base::BindLambdaForTesting([this]() {
 +                  return GetFavoritesDropZone().GetVisible() &&
@@ -32895,15 +32997,18 @@ index a050af7ed7..e2f7b75868 100644
 +                })),
 +      WaitForState(kGroupMiddleDragLayoutReady, true),
 +      StopObservingState(kGroupMiddleDragLayoutReady),
-+      NameView(
-+          "Current expanded group entry", base::BindLambdaForTesting([&]() {
-+            auto* root = GetBrowserView()
-+                             .vertical_tab_strip_region_view_for_testing()
-+                             ->root_node_for_testing();
-+            auto* node =
-+                root ? root->GetNodeForHandle(*handles->bookmarks) : nullptr;
-+            return node ? node->view() : nullptr;
-+          })),
++      NameView("Current expanded group entry",
++               base::BindLambdaForTesting([this, handles, from_below]() {
++                 auto* root = GetBrowserView()
++                                  .vertical_tab_strip_region_view_for_testing()
++                                  ->root_node_for_testing();
++                 // 위에서는 첫 행, 아래에서는 마지막 행을 통해 그룹에 진입한다.
++                 auto* node = root ? root->GetNodeForHandle(
++                                         from_below ? *handles->version
++                                                    : *handles->bookmarks)
++                                   : nullptr;
++                 return node ? node->view() : nullptr;
++               })),
 +      MoveMouseTo("Current expanded group entry"), RunScheduledLayout(),
 +      PollState(kGroupMiddleDragEntryReady,
 +                base::BindLambdaForTesting([this, handles]() {
@@ -33002,10 +33107,21 @@ index a050af7ed7..e2f7b75868 100644
 +          base::BindLambdaForTesting([&]() { return middle_drop_point; })),
 +      RunScheduledLayout(), Do([&]() {
 +        EXPECT_EQ(expected_order, GetTabOrder(model).Run());
-+        ExpectDragPreviewAlignedWithTab(0);
++        ExpectDragPreviewAlignedWithTab(2);
 +      }),
 +      ReleaseMouse(), WaitForState(kDragStatePoller, false),
 +      WaitForState(kTabOrderPoller, expected_order));
++}
++
++IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
++                       YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle) {
++  DragUngroupedTabIntoExpandedGroupMiddle(DragPosition::kAbove);
++}
++
++IN_PROC_BROWSER_TEST_F(
++    VerticalTabDragTest,
++    YeeSidebarTopLevelTabCanEnterExpandedGroupMiddleFromBelow) {
++  DragUngroupedTabIntoExpandedGroupMiddle(DragPosition::kBelow);
 +}
 +
 +IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
@@ -33153,7 +33269,7 @@ index a050af7ed7..e2f7b75868 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinUnpinnedContainer) {
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
-@@ -609,6 +1353,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
+@@ -609,6 +1382,26 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOverSplit) {
                                      })),
        // Dragging from index 0 to index 2 (split) should put the dragged tab to
        // index 3.
@@ -33180,7 +33296,193 @@ index a050af7ed7..e2f7b75868 100644
        ContinueDragToTab(2),
        WaitForState(kTabOrderPoller, URLs({
                                          url::kAboutBlankURL,
-@@ -878,8 +1642,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
+@@ -775,8 +1568,52 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragWithinGroup) {
+ }
+ 
+ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOutOfGroup) {
++  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(ui::test::PollingStateObserver<bool>,
++                                      kDragOutLayoutReady);
+   TabStripModel* tab_strip_model = browser()->GetTabStripModel();
+   ASSERT_NE(nullptr, tab_strip_model);
++  std::optional<tabs::TabHandle> source_handle;
++  std::optional<tabs::TabHandle> target_handle;
++  std::optional<tab_groups::TabGroupId> original_group;
++  bool snapshot_valid = false;
++  bool destination_valid = false;
++  gfx::Point destination;
++  const URLs expected_order({TabGroupURLs({url::kAboutBlankURL}),
++                             chrome::kChromeUISettingsURL,
++                             chrome::kChromeUIBookmarksURL});
++#if BUILDFLAG(IS_WIN)
++  ui_test_utils::ScopedNativeInputTrace native_input(
++      GetBrowserView().GetWidget());
++#endif
++  const auto record_drag = [&](const std::string& phase) {
++    snapshot_valid = false;
++    auto* root = GetBrowserView()
++                     .vertical_tab_strip_region_view_for_testing()
++                     ->root_node_for_testing();
++    if (!root || !source_handle || !target_handle) {
++      return;
++    }
++    auto* source = root->GetNodeForHandle(*source_handle);
++    auto* target = root->GetNodeForHandle(*target_handle);
++    if (!source || !target || !source->view() || !target->view()) {
++      return;
++    }
++    RecordProperty(phase + "_source_bounds",
++                   source->view()->GetBoundsInScreen().ToString());
++    RecordProperty(phase + "_target_bounds",
++                   target->view()->GetBoundsInScreen().ToString());
++    RecordProperty(phase + "_unpinned_y",
++                   GetTabStripView().unpinned_tabs_scroll_view()->y());
++    RecordProperty(phase + "_drag_active", TabDragController::IsActive());
++    RecordProperty(phase + "_tab_order",
++                   testing::PrintToString(GetTabOrder(tab_strip_model).Run()));
++#if BUILDFLAG(IS_WIN)
++    native_input.Snapshot(phase,
++                          target->view()->GetBoundsInScreen().CenterPoint());
++    RecordProperty("drag_out_native_input", native_input.ToJson());
++#endif
++    snapshot_valid = true;
++  };
+   RunTestSequence(
+       AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUIBookmarksURL), 1),
+       AddTabsToNewGroup({0, 1}),
+@@ -789,15 +1626,103 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOutOfGroup) {
+                                         }),
+                                         chrome::kChromeUISettingsURL,
+                                     })),
+-      StartDragBetweenTabs(1, 2),
+-      WaitForState(kTabOrderPoller, URLs({
+-                                        TabGroupURLs({
+-                                            url::kAboutBlankURL,
+-                                        }),
+-                                        chrome::kChromeUISettingsURL,
+-                                        chrome::kChromeUIBookmarksURL,
+-                                    })),
+-      ReleaseMouse(), Do([&]() {
++      Do([&]() {
++        source_handle = tab_strip_model->GetTabAtIndex(1)->GetHandle();
++        target_handle = tab_strip_model->GetTabAtIndex(2)->GetHandle();
++        original_group = tab_strip_model->GetTabAtIndex(0)->GetGroup();
++        record_drag("before_activation");
++      }),
++      Check([&]() { return snapshot_valid && original_group.has_value(); }),
++      PollState(kDragStatePoller, GetDragActive()),
++      // 첫 이동으로 열린 Favorites 공간이 목적지 행을 옮긴 뒤 좌표를 읽는다.
++      StartDragTabWithinSidebar(1), WaitForState(kDragStatePoller, true),
++      PollState(kDragOutLayoutReady, base::BindLambdaForTesting([this]() {
++                  return GetFavoritesDropZone().GetVisible() &&
++                         GetFavoritesDropZone().height() ==
++                             yee::kSidebarMetrics.favorites_drop_zone_height &&
++                         GetTabStripView().unpinned_tabs_scroll_view()->y() ==
++                             yee::kSidebarMetrics.favorites_drop_zone_height +
++                                 yee::kSidebarMetrics.section_gap;
++                })),
++      WaitForState(kDragOutLayoutReady, true),
++      StopObservingState(kDragOutLayoutReady), RunScheduledLayout(),
++      Do([&]() { record_drag("after_activation"); }),
++      Check([&]() { return snapshot_valid; }), Do([&]() {
++        destination_valid = false;
++        auto* root = GetBrowserView()
++                         .vertical_tab_strip_region_view_for_testing()
++                         ->root_node_for_testing();
++        if (!root || !source_handle || !target_handle) {
++          return;
++        }
++        auto* source = root->GetNodeForHandle(*source_handle);
++        auto* target = root->GetNodeForHandle(*target_handle);
++        if (!source || !source->view() || !target || !target->view() ||
++            !target->view()->IsDrawn() ||
++            target->view()->GetBoundsInScreen().IsEmpty()) {
++          return;
++        }
++        auto* unpinned = views::AsViewClass<UnpinnedTabContainerView>(
++            target->view()->parent());
++        ASSERT_NE(nullptr, unpinned);
++        ASSERT_EQ(unpinned, source->view()->parent());
++        ASSERT_TRUE(unpinned->IsHandlingDrag());
++        ASSERT_EQ(DraggedTabsContainer::DragAxes::kVerticalOnly,
++                  unpinned->drag_axes());
++        const gfx::Rect zero =
++            unpinned->GetDraggingViewsBoundsAtPoint(gfx::Point());
++        ASSERT_GT(zero.height(), 0);
++        const TabDragHandler& drag_handler =
++            root->GetController()->GetDragHandler();
++        std::optional<int> after_target;
++        bool after_source = false;
++        int dragged_count = 0;
++        // 활성화 중 원본이 이미 목적지 뒤로 나와도 같은 '뒤' 슬롯을 지정한다.
++        // native 삽입 경계처럼 원본 행을 제외하고 실제 잡은 위치를 반영한다.
++        for (const auto& row :
++             unpinned->GetTargetLayoutForDrag().child_layouts) {
++          if (drag_handler.IsViewDragging(*row.child_view)) {
++            EXPECT_EQ(source->view(), row.child_view);
++            ++dragged_count;
++            after_source = true;
++            continue;
++          }
++          if (row.child_view != target->view()) {
++            continue;
++          }
++          ASSERT_TRUE(row.visible);
++          after_target = row.bounds.CenterPoint().y() + zero.height() / 2 -
++                         (after_source ? zero.height() : 0);
++        }
++        ASSERT_EQ(1, dragged_count);
++        ASSERT_TRUE(after_target.has_value());
++        destination = views::View::ConvertPointFromScreen(
++            unpinned, target->view()->GetBoundsInScreen().CenterPoint());
++        destination.set_y(*after_target + zero.height() / 2 -
++                          zero.CenterPoint().y());
++        views::View::ConvertPointToScreen(unpinned, &destination);
++        ASSERT_EQ(static_cast<DraggedTabsContainer*>(unpinned),
++                  &unpinned->GetTabDragTarget(destination));
++        RecordProperty("destination_after_target_boundary", *after_target);
++        RecordProperty("destination_drag_bounds_at_zero", zero.ToString());
++        RecordProperty("resolved_destination", destination.ToString());
++#if BUILDFLAG(IS_WIN)
++        native_input.Snapshot("resolved_destination", destination);
++        RecordProperty("drag_out_native_input", native_input.ToJson());
++#endif
++        destination_valid = true;
++      }),
++      Check([&]() { return destination_valid; }),
++      MoveMouseTo(base::BindLambdaForTesting([&]() { return destination; })),
++      RunScheduledLayout(), Do([&]() { record_drag("after_target_move"); }),
++      Check([&]() { return snapshot_valid; }),
++      WaitForState(kTabOrderPoller, expected_order),
++      // 활성화 때 관찰한 이전 값만으로 대기가 끝나지 않도록 실제 모델도 읽는다.
++      CheckResult([&]() { return GetTabOrder(tab_strip_model).Run(); },
++                  expected_order),
++      Do([&]() { record_drag("outside_group"); }),
++      Check([&]() { return snapshot_valid; }), ReleaseMouse(),
++      WaitForState(kDragStatePoller, false), Do([&]() {
+         ASSERT_EQ(3, tab_strip_model->count());
+         EXPECT_EQ(GURL(url::kAboutBlankURL),
+                   tab_strip_model->GetWebContentsAt(0)->GetURL());
+@@ -805,7 +1730,19 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragOutOfGroup) {
+                   tab_strip_model->GetWebContentsAt(1)->GetURL());
+         EXPECT_EQ(GURL(chrome::kChromeUIBookmarksURL),
+                   tab_strip_model->GetWebContentsAt(2)->GetURL());
++        EXPECT_EQ(original_group,
++                  tab_strip_model->GetTabAtIndex(0)->GetGroup());
++        EXPECT_FALSE(tab_strip_model->GetTabAtIndex(2)->GetGroup().has_value());
++        EXPECT_EQ(*source_handle,
++                  tab_strip_model->GetTabAtIndex(2)->GetHandle());
++        EXPECT_EQ(*target_handle,
++                  tab_strip_model->GetTabAtIndex(1)->GetHandle());
++        record_drag("released");
+       }));
++#if BUILDFLAG(IS_WIN)
++  // 대기나 입력 단계가 실패해도 마지막 실제 이벤트 기록은 남긴다.
++  RecordProperty("drag_out_native_input", native_input.ToJson());
++#endif
+ }
+ 
+ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -878,8 +1815,7 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragSplitWithinPinnedContainer) {
        ReleaseMouse());
  }
  
@@ -33190,7 +33492,7 @@ index a050af7ed7..e2f7b75868 100644
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
    ASSERT_NE(nullptr, tab_strip_model);
    RunTestSequence(
-@@ -887,8 +1650,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -887,8 +1823,8 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
        AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUISettingsURL), 2),
        PinTabAt(0),
  
@@ -33201,7 +33503,7 @@ index a050af7ed7..e2f7b75868 100644
        StartDragBetweenTabs(0, 1), PollState(kDragStatePoller, GetDragActive()),
        WaitForState(kDragStatePoller, true),
        PollState(kPinnedTabOrderPoller, GetPinnedTabOrder(tab_strip_model)),
-@@ -899,16 +1662,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
+@@ -899,16 +1835,513 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest,
                                          chrome::kChromeUIBookmarksURL,
                                          chrome::kChromeUISettingsURL,
                                      })),
@@ -33718,7 +34020,7 @@ index a050af7ed7..e2f7b75868 100644
  IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragGroupHeader) {
    DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kFourthTab);
    TabStripModel* tab_strip_model = browser()->GetTabStripModel();
-@@ -1091,6 +2351,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1091,6 +2524,12 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
    const int kTabCount = 50;
  
    RunTestSequence(
@@ -33731,7 +34033,7 @@ index a050af7ed7..e2f7b75868 100644
        // Add many tabs and ensure the first one is active so we start at the
        // top.
        Do([this]() {
-@@ -1106,7 +2372,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
+@@ -1106,7 +2545,18 @@ IN_PROC_BROWSER_TEST_F(VerticalTabDragTest, DragToScroll) {
              0, TabStripUserGestureDetails(
                     TabStripUserGestureDetails::GestureType::kOther));
        }),
@@ -33752,7 +34054,7 @@ index a050af7ed7..e2f7b75868 100644
        WaitForState(kScrollOffsetPoller, 0),
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index 413c423e53..a4184481f6 100644
+index 413c423e53..23fef283f8 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -4,6 +4,7 @@
@@ -33870,8 +34172,12 @@ index 413c423e53..a4184481f6 100644
    UpdateEditorBubbleButtonVisibility();
    if (!delegate_->IsFocusInTabStrip()) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kFocus);
-@@ -444,9 +480,15 @@ void TabGroupHeaderView::AddedToWidget() {
+@@ -442,11 +478,19 @@ void TabGroupHeaderView::OnBlur() {
+ 
+ void TabGroupHeaderView::AddedToWidget() {
    views::FlexLayoutView::AddedToWidget();
++  // 생성자에서 보류한 테마별 여백을 실제 창에 붙은 뒤 계산한다.
++  SetInteriorMargin(GetHeaderInsets());
    GetFocusManager()->AddFocusChangeListener(this);
    editor_bubble_tracker_.SetScrollView(GetScrollView(this));
 +  paint_as_active_subscription_ =
@@ -33886,7 +34192,7 @@ index 413c423e53..a4184481f6 100644
    GetFocusManager()->RemoveFocusChangeListener(this);
    views::FlexLayoutView::RemovedFromWidget();
  }
-@@ -557,7 +599,33 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -557,7 +601,33 @@ void TabGroupHeaderView::OnDataChanged(
  
    SetInteriorMargin(GetHeaderInsets());
    UpdateColors();
@@ -33920,7 +34226,7 @@ index 413c423e53..a4184481f6 100644
      UpdateAttentionState(
          data_sharing::features::IsDataSharingFunctionalityEnabled() &&
          tab_group_data.needs_attention);
-@@ -591,7 +659,9 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -591,7 +661,9 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    }
    needs_attention_ = needs_attention;
  
@@ -33931,7 +34237,7 @@ index 413c423e53..a4184481f6 100644
      attention_indicator_->SetVisible(true);
      attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
          kDefaultTouchFaviconMaskCustomIcon, GetForegroundColor(),
-@@ -638,6 +708,18 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
+@@ -638,6 +710,18 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
          frame_active ? ui::kColorSysOnSurfacePrimary
                       : ui::kColorSysOnSurfacePrimaryInactive);
    }
@@ -33950,7 +34256,7 @@ index 413c423e53..a4184481f6 100644
    return color_utils::GetColorWithMaxContrast(GetBackgroundColor());
  }
  
-@@ -694,6 +776,121 @@ void TabGroupHeaderView::UpdateColors() {
+@@ -694,6 +778,121 @@ void TabGroupHeaderView::UpdateColors() {
        views::CreateRoundedRectBackground(background_color, GetCornerRadii()));
  }
  
@@ -33994,7 +34300,7 @@ index 413c423e53..a4184481f6 100644
 +}
 +
 +bool TabGroupHeaderView::UsesYeeGroupPresentation() const {
-+  return yee::IsShellEnabled() &&
++  return yee::IsShellEnabled() && GetWidget() &&
 +         !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme()) &&
 +         (!delegate_->IsValid() || !delegate_->GetTabGroup().is_ephemeral()) &&
 +         (orientation_ == TabStripOrientation::kVertical ||
@@ -34072,7 +34378,7 @@ index 413c423e53..a4184481f6 100644
  void TabGroupHeaderView::UpdateEditorBubbleButtonVisibility() {
    // The editor bubble button only exists in the vertical orientation.
    if (!editor_bubble_button_) {
-@@ -717,7 +914,7 @@ void TabGroupHeaderView::OnBubbleOpened() {
+@@ -717,7 +916,7 @@ void TabGroupHeaderView::OnBubbleOpened() {
    }
  
    UpdateEditorBubbleButtonVisibility();
@@ -34081,7 +34387,7 @@ index 413c423e53..a4184481f6 100644
  }
  
  void TabGroupHeaderView::OnBubbleClosed() {
-@@ -726,7 +923,7 @@ void TabGroupHeaderView::OnBubbleClosed() {
+@@ -726,7 +925,7 @@ void TabGroupHeaderView::OnBubbleClosed() {
      closing_helper->ResumeMouseWatcher();
    }
    UpdateEditorBubbleButtonVisibility();
@@ -34090,7 +34396,7 @@ index 413c423e53..a4184481f6 100644
  }
  
  void TabGroupHeaderView::SetEditorBubbleButtonVisibilityOnHover(
-@@ -764,6 +961,9 @@ void TabGroupHeaderView::ShowEditorBubble() {
+@@ -764,6 +963,9 @@ void TabGroupHeaderView::ShowEditorBubble() {
  }
  
  int TabGroupHeaderView::GetCornerRadius() const {
@@ -34100,7 +34406,7 @@ index 413c423e53..a4184481f6 100644
    return TabGroupStyle::GetChipCornerRadius(orientation_);
  }
  
-@@ -786,6 +986,18 @@ int TabGroupHeaderView::GetHorizontalInset() const {
+@@ -786,6 +988,18 @@ int TabGroupHeaderView::GetHorizontalInset() const {
  }
  
  gfx::Insets TabGroupHeaderView::GetHeaderInsets() const {
@@ -34988,14 +35294,16 @@ index 383e9e7810..947c25f876 100644
  
  bool TabStripCollectionController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
-index 987d4cbbfe..49b2f0e94f 100644
+index 987d4cbbfec13877dccb82aa2f93f54560f93492..7a90642040f567ed3592ae59c953de23d62d0215 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc
-@@ -2,40 +2,60 @@
+@@ -2,40 +2,63 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
 +#include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
++
++#include <string_view>
 +
  #include "base/run_loop.h"
  #include "base/task/single_thread_task_runner.h"
@@ -35031,6 +35339,7 @@ index 987d4cbbfe..49b2f0e94f 100644
  #include "chrome/common/webui_url_constants.h"
 +#include "chrome/grit/generated_resources.h"
  #include "chrome/test/base/in_process_browser_test.h"
++#include "chrome/test/base/interactive_test_utils.h"
  #include "chrome/test/interaction/interactive_browser_test.h"
  #include "components/tab_groups/tab_group_id.h"
  #include "components/tabs/public/tab_group.h"
@@ -35052,7 +35361,7 @@ index 987d4cbbfe..49b2f0e94f 100644
  
  namespace {
  
-@@ -44,9 +64,10 @@ const char kSecondTabName[] = "SecondTab";
+@@ -44,9 +67,10 @@ const char kSecondTabName[] = "SecondTab";
  const char kThirdTabName[] = "ThirdTab";
  const int kShift = ui::EF_LEFT_MOUSE_BUTTON | ui::EF_SHIFT_DOWN;
  
@@ -35066,7 +35375,7 @@ index 987d4cbbfe..49b2f0e94f 100644
  
  class TabStripCollectionControllerInteractiveUiTest
      : public VerticalTabsInteractiveTestMixin<InteractiveBrowserTest>,
-@@ -64,7 +85,10 @@ class TabStripCollectionControllerInteractiveUiTest
+@@ -64,7 +88,10 @@ class TabStripCollectionControllerInteractiveUiTest
      VerticalTabsInteractiveTestMixin<
          InteractiveBrowserTest>::SetUpOnMainThread();
      if (is_horizontal()) {
@@ -35078,7 +35387,7 @@ index 987d4cbbfe..49b2f0e94f 100644
      }
    }
  
-@@ -84,6 +108,24 @@ class TabStripCollectionControllerInteractiveUiTest
+@@ -84,6 +111,24 @@ class TabStripCollectionControllerInteractiveUiTest
                         : nullptr;
    }
  
@@ -35103,7 +35412,7 @@ index 987d4cbbfe..49b2f0e94f 100644
    ui::ElementIdentifier tab_strip_anchor_element() const {
      return is_horizontal() ? kNewTabButtonElementId
                             : kVerticalTabStripBottomContainerElementId;
-@@ -443,6 +485,234 @@ IN_PROC_BROWSER_TEST_P(TabStripCollectionControllerInteractiveUiTest,
+@@ -443,6 +488,285 @@ IN_PROC_BROWSER_TEST_P(TabStripCollectionControllerInteractiveUiTest,
                    2));
  }
  
@@ -35114,6 +35423,27 @@ index 987d4cbbfe..49b2f0e94f 100644
 +  auto* model = browser()->GetTabStripModel();
 +  tabs::TabInterface* ordinary_source = nullptr;
 +  tabs::TabInterface* pinned_source = nullptr;
++  TabDragContext* original_context = nullptr;
++  gfx::Point last_intended;
++#if BUILDFLAG(IS_WIN)
++  ui_test_utils::ScopedNativeInputTrace native_trace(
++      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget());
++  const auto record_input = [&](std::string_view phase,
++                                const gfx::Point& intended) {
++    native_trace.Snapshot(phase, intended);
++    RecordProperty("YeeCollectionNativeInput", native_trace.ToJson());
++  };
++#else
++  const auto record_input = [](std::string_view, const gfx::Point&) {};
++#endif
++  const auto traced_center =
++      [&](const char* phase) -> RelativePositionCallback {
++    return base::BindLambdaForTesting([&, phase](ui::TrackedElement* element) {
++      last_intended = element->GetScreenBounds().CenterPoint();
++      record_input(phase, last_intended);
++      return last_intended;
++    });
++  };
 +  bool observed_unready_layout = false;
 +  const auto drag_layout_ready = [&] {
 +    bool ready = !BrowserAnimationController::From(browser())->IsAnimating(
@@ -35143,7 +35473,7 @@ index 987d4cbbfe..49b2f0e94f 100644
 +    return tab->Contains(root->GetEventHandlerForPoint(point));
 +  };
 +  const auto expect_drag_presentation = [&](tabs::TabInterface* source,
-+                                            bool pinned) {
++                                            bool pinned, int source_index) {
 +    auto* strip = GetTabStripView();
 +    ASSERT_TRUE(strip);
 +    auto* preview = strip->GetViewByID(yee::kSidebarFavoritesDragPreviewViewId);
@@ -35152,10 +35482,26 @@ index 987d4cbbfe..49b2f0e94f 100644
 +    ASSERT_TRUE(controller);
 +    EXPECT_EQ(!is_horizontal() && pinned,
 +              controller->GetDragHandler().UseFavoritesSlotPreview());
-+    auto* source_view = GetTabViewAt(model->GetIndexOfTab(source));
++    auto* source_view = GetTabViewAt(source_index);
 +    ASSERT_TRUE(source_view->layer());
 +    EXPECT_EQ(is_horizontal() ? 1.0f : 0.0f, source_view->layer()->opacity());
 +    EXPECT_EQ(pinned, source->IsPinned());
++  };
++  const auto check_drag_presentation = [&](tabs::TabInterface* source,
++                                           bool pinned, const char* phase) {
++    const int source_index = model->GetIndexOfTab(source);
++    const bool attached = TabDragController::IsAttachedTo(original_context);
++    RecordProperty(std::string(phase) + "OriginalIndex", source_index);
++    RecordProperty(std::string(phase) + "OriginalModelCount", model->count());
++    RecordProperty(std::string(phase) + "OriginalAttached", attached ? 1 : 0);
++    record_input(phase, last_intended);
++    // 같은 콜백 안에서 원래 소유권과 index를 확인한 뒤 view를 조회한다.
++    // false는 InteractionSequence를 중단시켜 잡고 있는 입력도 정리한다.
++    if (!attached || !model->ContainsIndex(source_index)) {
++      return false;
++    }
++    expect_drag_presentation(source, pinned, source_index);
++    return !testing::Test::HasFatalFailure();
 +  };
 +  RunTestSequence(
 +      WaitForShow(kTabStripRegionElementId), Do([&] {
@@ -35171,6 +35517,10 @@ index 987d4cbbfe..49b2f0e94f 100644
 +        views::test::RunScheduledLayout(
 +            BrowserView::GetBrowserViewForBrowser(browser()));
 +        ASSERT_TRUE(GetTabStripView());
++        ASSERT_TRUE(vertical_tab_strip_controller());
++        original_context =
++            vertical_tab_strip_controller()->GetDragHandler().GetDragContext();
++        ASSERT_TRUE(original_context);
 +        EXPECT_EQ(is_horizontal(), root_node()->orientation() ==
 +                                       TabStripOrientation::kHorizontal);
 +        EXPECT_EQ(!is_horizontal(),
@@ -35198,10 +35548,15 @@ index 987d4cbbfe..49b2f0e94f 100644
 +      }),
 +      CheckResult([&] { return center_hits_tab(3); }, true),
 +      CheckResult([&] { return center_hits_tab(2); }, true),
-+      MoveMouseTo(kFirstTabName),
-+      DragMouseTo(kSecondTabName, CenterPoint(), /*release=*/false),
++      MoveMouseTo(kFirstTabName, traced_center("ordinary-move-request")),
++      DragMouseTo(kSecondTabName, traced_center("ordinary-drag-request"),
++                  /*release=*/false),
 +      WaitForState(kYeeCollectionDragActive, true),
-+      Do([&] { expect_drag_presentation(ordinary_source, false); }),
++      CheckResult(
++          [&] {
++            return check_drag_presentation(ordinary_source, false, "ordinary");
++          },
++          true),
 +      ReleaseMouse(), WaitForState(kYeeCollectionDragActive, false), Do([&] {
 +        EXPECT_EQ(2, model->IndexOfFirstNonPinnedTab());
 +        EXPECT_FALSE(ordinary_source->IsPinned());
@@ -35223,10 +35578,15 @@ index 987d4cbbfe..49b2f0e94f 100644
 +      }),
 +      CheckResult([&] { return center_hits_tab(0); }, true),
 +      CheckResult([&] { return center_hits_tab(1); }, true),
-+      MoveMouseTo("PinnedDragSource"),
-+      DragMouseTo("PinnedDragTarget", CenterPoint(), /*release=*/false),
++      MoveMouseTo("PinnedDragSource", traced_center("pinned-move-request")),
++      DragMouseTo("PinnedDragTarget", traced_center("pinned-drag-request"),
++                  /*release=*/false),
 +      WaitForState(kYeeCollectionDragActive, true),
-+      Do([&] { expect_drag_presentation(pinned_source, true); }),
++      CheckResult(
++          [&] {
++            return check_drag_presentation(pinned_source, true, "pinned");
++          },
++          true),
 +      ReleaseMouse(), WaitForState(kYeeCollectionDragActive, false), Do([&] {
 +        EXPECT_EQ(2, model->IndexOfFirstNonPinnedTab());
 +        EXPECT_TRUE(pinned_source->IsPinned());
@@ -36785,7 +37145,7 @@ index ae7f210dc7..47a406d82e 100644
          return StartSystemDnDSessionIfNecessary(attached_context_,
                                                  point_in_screen);
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
-index 83ab00a709..933d68e273 100644
+index 83ab00a709aba7745c2337c4d176ac500c2cd008..29f015a75a73bd95dd02f44f5dc1e4c41ae37b29 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 @@ -12,19 +12,24 @@
@@ -37260,7 +37620,85 @@ index 83ab00a709..933d68e273 100644
  // Canceling tab dragging while the detached tab is reattached should
  // not cause dangling ptr. (crbug.com/459242414)
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-@@ -4857,9 +5189,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4641,17 +4973,73 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+   tab_groups::TabGroupId group = model->AddToNewGroup({0, 1, 2});
+   StopAnimating(tab_strip);
+   EnsureFocusToTabStrip(tab_strip);
++  const auto* source = model->GetTabAtIndex(0);
++  const auto* original_context = tab_strip->GetDragContext();
++#if BUILDFLAG(IS_WIN)
++  ui_test_utils::ScopedNativeInputTrace native_trace(tab_strip->GetWidget());
++#endif
++  const auto record_phase = [&](const char* phase,
++                                [[maybe_unused]] const gfx::Point& intended) {
++    const std::string prefix = std::string("YeeGroupRevert-") + phase;
++    const int source_index = model->GetIndexOfTab(source);
++    RecordProperty(prefix + "-source-index", source_index);
++    RecordProperty(prefix + "-model-count", model->count());
++    RecordProperty(prefix + "-drag-active",
++                   TabDragController::IsActive() ? 1 : 0);
++    RecordProperty(prefix + "-original-attached",
++                   TabDragController::IsAttachedTo(original_context) ? 1 : 0);
++    if (model->ContainsIndex(source_index)) {
++      RecordProperty(prefix + "-source-in-original-group",
++                     model->GetTabGroupForTab(source_index) == group ? 1 : 0);
++      if (source_index < tab_strip->GetTabCount()) {
++        RecordProperty(
++            prefix + "-view-in-original-group",
++            tab_strip->tab_at(source_index)->group() == group ? 1 : 0);
++      }
++    }
++    RecordProperty(prefix + "-ids", IDString(model));
++    RecordProperty(
++        prefix + "-group-range",
++        model->group_model()->ContainsTabGroup(group)
++            ? model->group_model()->GetTabGroup(group)->ListTabs().ToString()
++            : "missing");
++#if BUILDFLAG(IS_WIN)
++    native_trace.Snapshot(phase, intended);
++    RecordProperty("YeeGroupRevertNativeInput", native_trace.ToJson());
++#endif
++  };
+ 
+   // Drag the first tab in the group to after the group.
+-  ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(0)));
+-  ASSERT_TRUE(DragInputToCenter(tab_strip->tab_at(3)));
++  const auto press_point = GetCenterInScreenCoordinates(tab_strip->tab_at(0));
++  record_phase("before-press", press_point);
++  const bool pressed = PressInputAtCenter(tab_strip->tab_at(0));
++  record_phase("after-press", press_point);
++  ASSERT_TRUE(pressed);
++  const auto drag_point = GetCenterInScreenCoordinates(tab_strip->tab_at(3));
++  record_phase("before-drag", drag_point);
++  const bool dragged = DragInputToCenter(tab_strip->tab_at(3));
++  record_phase("after-drag", drag_point);
++  ASSERT_TRUE(dragged);
++  // 실제 드래그와 그룹 이탈을 확인한 뒤 Escape 복원을 검사한다.
++  EXPECT_TRUE(TabDragController::IsActive());
++  EXPECT_TRUE(TabDragController::IsAttachedTo(original_context));
++  const int dragged_index = model->GetIndexOfTab(source);
++  EXPECT_TRUE(model->ContainsIndex(dragged_index));
++  if (model->ContainsIndex(dragged_index)) {
++    EXPECT_FALSE(model->GetTabGroupForTab(dragged_index).has_value());
++  }
+ 
+-  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
++  record_phase("before-escape", drag_point);
++  const bool escaped = ui_test_utils::SendKeyPressToWindowSync(
+       browser()->GetWindow()->GetNativeWindow(), ui::VKEY_ESCAPE, false, false,
+-      false, false));
++      false, false);
++  record_phase("after-escape", drag_point);
++  ASSERT_TRUE(escaped);
+   StopAnimating(tab_strip);
++  record_phase("after-layout", drag_point);
+ 
+   EXPECT_EQ("0 1 2 3", IDString(model));
++  ASSERT_TRUE(model->group_model()->ContainsTabGroup(group));
+   EXPECT_EQ(model->group_model()->GetTabGroup(group)->ListTabs(),
+             gfx::Range(0, 3));
+ }
+@@ -4857,9 +5245,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the last tab to the left should cause it to swap places with the
    // collapsed group header.
    ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(3)));
@@ -37275,7 +37713,7 @@ index 83ab00a709..933d68e273 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -4894,12 +5228,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4894,12 +5284,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the first tab to the right should cause it to swap places with the
    // collapsed group header.
    const gfx::NativeWindow window_hint = GetWindowHint(tab_strip);
@@ -40004,6 +40442,52 @@ index 1f019a8240..838581babe 100644
    model_->ResetToDefault();
  }
  
+diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+index 6079c8cdf13507b4557baecdf454739d9106d40c..304af58b7107e38bac3f1c4d5d3bd4cb3b2e491b 100644
+--- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
++++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+@@ -351,7 +351,9 @@ tabs::TabInterface* TabSearchPageHandler::GetTabInterface(int32_t tab_id) {
+ 
+ void TabSearchPageHandler::GetIsSplit(GetIsSplitCallback callback) {
+   bool is_split = false;
+-  GURL url = web_ui_->GetWebContents()->GetURL();
++  // 응답을 받는 현재 SplitNTP 문서를 판정한다. 다음 이동의 표시 URL을 쓰면
++  // false 응답의 비동기 redirect가 그 이동을 새 탭으로 덮어쓸 수 있다.
++  const GURL& url = web_ui_->GetWebContents()->GetLastCommittedURL();
+   if (url.spec() == chrome::kChromeUISplitViewNewTabPageURL) {
+     is_split = tabs::TabInterface::GetFromContents(web_ui_->GetWebContents())
+                    ->IsSplit();
+diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
+index 7cb8c985a5292b8832910044929df5652401df23..eda4f6c8722f94a1cba8d36aee33c4eb6385aa5e 100644
+--- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
++++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
+@@ -1502,6 +1502,26 @@ IN_PROC_BROWSER_TEST_P(TabSearchPageHandlerTest, RemoveSplit_NTP) {
+   ASSERT_TRUE(ui_test_utils::NavigateToURL(
+       browser1(), GURL(chrome::kChromeUISplitViewNewTabPageURL)));
+ 
++  // 분할 새 탭이 아직 현재 문서인 동안 다음 이동의 표시 URL로 판정하면
++  // 비동기 응답이 false가 되어 사용자가 입력한 이동을 새 탭으로 덮어쓴다.
++  auto* const split_contents = tab_strip_model->GetActiveWebContents();
++  const GURL split_url(chrome::kChromeUISplitViewNewTabPageURL);
++  ASSERT_EQ(split_url, split_contents->GetLastCommittedURL());
++  content::TestNavigationManager pending_navigation(split_contents, tab_url2_);
++  split_contents->GetController().LoadURL(
++      tab_url2_, content::Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
++  ASSERT_TRUE(pending_navigation.WaitForRequestStart());
++  EXPECT_EQ(tab_url2_, split_contents->GetVisibleURL());
++  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
++  base::test::TestFuture<bool> is_split;
++  handler()->GetIsSplit(is_split.GetCallback());
++  EXPECT_TRUE(is_split.Get());
++  // 실패한 baseline도 멈춘 이동을 취소한 뒤 원래 분할 해제 검사를 계속한다.
++  split_contents->Stop();
++  EXPECT_TRUE(pending_navigation.WaitForNavigationFinished());
++  EXPECT_FALSE(pending_navigation.was_committed());
++  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
++
+   base::RunLoop run_loop;
+   EXPECT_CALL(page_, TabUnsplit()).WillOnce([&]() { run_loop.Quit(); });
+   tab_strip_model->RemoveSplit(split_id);
 diff --git a/chrome/browser/ui/webui/theme_colors_source_manager.cc b/chrome/browser/ui/webui/theme_colors_source_manager.cc
 index 5d8a77b3bc..9ca5413a1a 100644
 --- a/chrome/browser/ui/webui/theme_colors_source_manager.cc
@@ -40727,11 +41211,286 @@ index f7779bf105..1e10635c8b 100644
          "//chrome/browser/ui/views/zoom:interactive_ui_tests",
          "//chrome/test/base:chrome_unit_test_suite",
          "//chrome/test/interaction:interactive_ui_tests",
+diff --git a/chrome/test/base/interactive_test_utils.h b/chrome/test/base/interactive_test_utils.h
+index 3fda254dc902cbd35fdbf0d00a1859f5ce365617..43b9c585d46c2b6de7533f8a2ebb73f63013ffe0 100644
+--- a/chrome/test/base/interactive_test_utils.h
++++ b/chrome/test/base/interactive_test_utils.h
+@@ -5,6 +5,9 @@
+ #ifndef CHROME_TEST_BASE_INTERACTIVE_TEST_UTILS_H_
+ #define CHROME_TEST_BASE_INTERACTIVE_TEST_UTILS_H_
+ 
++#include <memory>
++#include <string>
++#include <string_view>
+ #include <utility>
+ 
+ #include "base/callback_list.h"
+@@ -34,6 +37,25 @@ class Widget;
+ 
+ namespace ui_test_utils {
+ 
++#if BUILDFLAG(IS_WIN)
++// UI 스레드에서 실제 앱에 도착한 입력과 창·포인터 상태를 제한된 버퍼에 보관한다.
++// Snapshot과 ToJson은 메시지 루프를 돌리지 않는 읽기 전용 진단이다.
++class ScopedNativeInputTrace {
++ public:
++  explicit ScopedNativeInputTrace(views::Widget* widget);
++  ScopedNativeInputTrace(const ScopedNativeInputTrace&) = delete;
++  ScopedNativeInputTrace& operator=(const ScopedNativeInputTrace&) = delete;
++  ~ScopedNativeInputTrace();
++
++  void Snapshot(std::string_view phase, const gfx::Point& intended_screen_dip);
++  std::string ToJson() const;
++
++ private:
++  class Observer;
++  std::unique_ptr<Observer> observer_;
++};
++#endif
++
+ #if !BUILDFLAG(IS_ANDROID)
+ 
+ // Use in browser interactive uitests to wait until a browser is set to active.
 diff --git a/chrome/test/base/interactive_test_utils_win.cc b/chrome/test/base/interactive_test_utils_win.cc
-index de52ce6fb3..de578dbbc0 100644
+index de52ce6fb3df6628e15ff5e799ffa4524840d8a3..32afeb40abfb7252003cdf85ee477dc6b8c6f461 100644
 --- a/chrome/test/base/interactive_test_utils_win.cc
 +++ b/chrome/test/base/interactive_test_utils_win.cc
-@@ -60,6 +60,13 @@ bool ShowAndFocusNativeWindow(gfx::NativeWindow window) {
+@@ -8,19 +8,26 @@
+ 
+ #include <Psapi.h>
+ 
++#include <algorithm>
++#include <array>
++#include <deque>
+ #include <memory>
+ 
+ #include "base/command_line.h"
+ #include "base/compiler_specific.h"
+ #include "base/files/file_path.h"
+ #include "base/functional/bind.h"
++#include "base/json/json_writer.h"
+ #include "base/location.h"
+ #include "base/logging.h"
+ #include "base/process/process_handle.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/stringprintf.h"
+ #include "base/test/test_timeouts.h"
+ #include "base/threading/platform_thread.h"
+ #include "base/time/time.h"
+ #include "base/timer/timer.h"
++#include "base/values.h"
+ #include "chrome/test/base/interactive_test_utils_aura.h"
+ #include "chrome/test/base/process_lineage_win.h"
+ #include "chrome/test/base/save_desktop_snapshot.h"
+@@ -28,10 +35,207 @@
+ #include "ui/aura/window_tree_host.h"
+ #include "ui/base/test/ui_controls.h"
+ #include "ui/base/win/foreground_helper.h"
++#include "ui/display/win/screen_win.h"
++#include "ui/events/event.h"
++#include "ui/events/event_observer.h"
++#include "ui/views/event_monitor.h"
+ #include "ui/views/focus/focus_manager.h"
++#include "ui/views/widget/widget.h"
++#include "ui/views/win/hwnd_util.h"
+ 
+ namespace ui_test_utils {
+ 
++class ScopedNativeInputTrace::Observer final : public ui::EventObserver {
++ public:
++  explicit Observer(views::Widget* widget)
++      : expected_window_(widget ? views::HWNDForWidget(widget) : nullptr),
++        monitor_(views::EventMonitor::CreateApplicationMonitor(
++            this,
++            widget ? widget->GetNativeWindow() : nullptr,
++            {ui::EventType::kMouseMoved, ui::EventType::kMouseDragged,
++             ui::EventType::kMousePressed, ui::EventType::kMouseReleased,
++             ui::EventType::kKeyPressed, ui::EventType::kKeyReleased})) {}
++  ~Observer() override = default;
++
++  void OnEvent(const ui::Event& event) override {
++    auto& record = events_[event_count_ % kEventCapacity];
++    ++event_count_;
++    record.name = event.GetName();
++    record.flags = event.flags();
++    record.timestamp = event.time_stamp();
++    record.observed = base::TimeTicks::Now();
++    record.located = event.IsLocatedEvent();
++    if (record.located) {
++      record.screen_dip = event.AsLocatedEvent()->root_location_f();
++    }
++    record.has_native = event.HasNativeEvent();
++    if (record.has_native) {
++      record.message = event.native_event();
++      record.native_pid = 0;
++      record.native_thread =
++          ::GetWindowThreadProcessId(record.message.hwnd, &record.native_pid);
++      record.extra_info = ::GetMessageExtraInfo();
++    }
++  }
++
++  void Snapshot(std::string_view phase, const gfx::Point& intended) {
++    base::DictValue value;
++    value.Set("phase", phase);
++    value.Set("observed_us", Micros(base::TimeTicks::Now()));
++    value.Set("events_seen", event_count_);
++    value.Set("intended_screen_dip", intended.ToString());
++    value.Set("expected_window", Window(expected_window_));
++    value.Set("foreground_window", Window(::GetForegroundWindow()));
++    value.Set("calling_thread_capture", Window(::GetCapture()));
++    const DWORD target_thread =
++        ::GetWindowThreadProcessId(expected_window_, nullptr);
++    GUITHREADINFO gui = {};
++    gui.cbSize = sizeof(gui);
++    const bool gui_ok =
++        target_thread && ::GetGUIThreadInfo(target_thread, &gui);
++    value.Set("target_thread_gui_query_ok", gui_ok);
++    if (gui_ok) {
++      value.Set("target_thread_capture", Window(gui.hwndCapture));
++      value.Set("target_thread_focus", Window(gui.hwndFocus));
++      value.Set("target_thread_active", Window(gui.hwndActive));
++    }
++    auto* screen = display::win::GetScreenWin();
++    value.Set("screen_win_available", screen != nullptr);
++    if (screen) {
++      const auto physical = screen->DIPToScreenPoint(intended);
++      value.Set("intended_screen_physical", physical.ToString());
++      value.Set("window_at_intended_point",
++                Window(::WindowFromPoint({physical.x(), physical.y()})));
++    }
++    POINT cursor = {};
++    const bool cursor_ok = ::GetCursorPos(&cursor);
++    value.Set("cursor_query_ok", cursor_ok);
++    if (cursor_ok) {
++      value.Set("cursor_screen_physical",
++                gfx::Point(cursor.x, cursor.y).ToString());
++      value.Set("window_at_cursor", Window(::WindowFromPoint(cursor)));
++      if (screen) {
++        value.Set("cursor_screen_dip",
++                  screen->ScreenToDIPPoint(gfx::PointF(cursor.x, cursor.y))
++                      .ToString());
++      }
++    }
++    value.Set("expected_window_dpi",
++              static_cast<int>(::GetDpiForWindow(expected_window_)));
++    if (snapshots_.size() == kSnapshotCapacity) {
++      snapshots_.pop_front();
++      ++dropped_snapshots_;
++    }
++    snapshots_.push_back(std::move(value));
++  }
++
++  std::string ToJson() const {
++    base::DictValue root;
++    root.Set("observation_boundary", "application_pre_target");
++    root.Set("process_id", static_cast<int>(::GetCurrentProcessId()));
++    root.Set("force_device_scale_factor",
++             base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++                 "force-device-scale-factor"));
++    root.Set("force_ui_direction",
++             base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++                 "force-ui-direction"));
++    root.Set("dropped_events", std::max(0, event_count_ - kEventCapacity));
++    root.Set("dropped_snapshots", dropped_snapshots_);
++    base::ListValue events;
++    for (int sequence = std::max(0, event_count_ - kEventCapacity);
++         sequence < event_count_; ++sequence) {
++      const auto& record = events_[sequence % kEventCapacity];
++      base::DictValue value;
++      value.Set("sequence", sequence + 1);
++      value.Set("name", record.name);
++      value.Set("flags", record.flags);
++      value.Set("event_us", Micros(record.timestamp));
++      value.Set("observed_us", Micros(record.observed));
++      if (record.located) {
++        value.Set("screen_dip", record.screen_dip.ToString());
++      }
++      value.Set("has_native_message", record.has_native);
++      if (record.has_native) {
++        value.Set("native_hwnd", Address(record.message.hwnd));
++        value.Set("native_pid", static_cast<int>(record.native_pid));
++        value.Set("native_thread", static_cast<int>(record.native_thread));
++        value.Set("native_message", static_cast<int>(record.message.message));
++        value.Set("native_wparam", base::NumberToString(record.message.wParam));
++        value.Set("native_lparam", base::NumberToString(record.message.lParam));
++        value.Set("native_time_ms", base::NumberToString(record.message.time));
++        value.Set(
++            "native_screen_point",
++            gfx::Point(record.message.pt.x, record.message.pt.y).ToString());
++        value.Set("current_message_extra_info",
++                  base::NumberToString(record.extra_info));
++      }
++      events.Append(std::move(value));
++    }
++    base::ListValue snapshots;
++    for (const auto& snapshot : snapshots_) {
++      snapshots.Append(snapshot.Clone());
++    }
++    root.Set("events", std::move(events));
++    root.Set("snapshots", std::move(snapshots));
++    std::string json;
++    base::JSONWriter::Write(root, &json);
++    return json;
++  }
++
++ private:
++  static constexpr int kEventCapacity = 64;
++  static constexpr size_t kSnapshotCapacity = 32;
++  struct EventRecord {
++    std::string name;
++    int flags = 0;
++    base::TimeTicks timestamp;
++    base::TimeTicks observed;
++    bool located = false;
++    gfx::PointF screen_dip;
++    bool has_native = false;
++    CHROME_MSG message = {};
++    DWORD native_pid = 0;
++    DWORD native_thread = 0;
++    LPARAM extra_info = 0;
++  };
++
++  static std::string Micros(base::TimeTicks time) {
++    return base::NumberToString(time.since_origin().InMicroseconds());
++  }
++  static std::string Address(HWND window) {
++    return base::StringPrintf("%p", static_cast<void*>(window));
++  }
++  static base::DictValue Window(HWND window) {
++    DWORD pid = 0;
++    const DWORD thread = ::GetWindowThreadProcessId(window, &pid);
++    return base::DictValue()
++        .Set("hwnd", Address(window))
++        .Set("root_hwnd", Address(::GetAncestor(window, GA_ROOT)))
++        .Set("owner_hwnd", Address(::GetWindow(window, GW_OWNER)))
++        .Set("valid", !!::IsWindow(window))
++        .Set("pid", static_cast<int>(pid))
++        .Set("thread", static_cast<int>(thread));
++  }
++
++  const HWND expected_window_;
++  std::array<EventRecord, kEventCapacity> events_;
++  int event_count_ = 0;
++  std::deque<base::DictValue> snapshots_;
++  int dropped_snapshots_ = 0;
++  std::unique_ptr<views::EventMonitor> monitor_;
++};
++
++ScopedNativeInputTrace::ScopedNativeInputTrace(views::Widget* widget)
++    : observer_(std::make_unique<Observer>(widget)) {}
++ScopedNativeInputTrace::~ScopedNativeInputTrace() = default;
++void ScopedNativeInputTrace::Snapshot(std::string_view phase,
++                                      const gfx::Point& intended_screen_dip) {
++  observer_->Snapshot(phase, intended_screen_dip);
++}
++std::string ScopedNativeInputTrace::ToJson() const {
++  return observer_->ToJson();
++}
++
+ void HideNativeWindow(gfx::NativeWindow window) {
+   HWND hwnd = window->GetHost()->GetAcceleratedWidget();
+   ::ShowWindow(hwnd, SW_HIDE);
+@@ -60,6 +264,13 @@ bool ShowAndFocusNativeWindow(gfx::NativeWindow window) {
      if (foreground_window == hwnd)
        return true;
  
@@ -42145,6 +42904,30 @@ index 5a278b3f99..11b90443e5 100644
  
    TestLayerAnimationObserver(const TestLayerAnimationObserver&) = delete;
    TestLayerAnimationObserver& operator=(const TestLayerAnimationObserver&) =
+diff --git a/ui/base/test/ui_controls_internal_win.cc b/ui/base/test/ui_controls_internal_win.cc
+index 5a32dca62d..806fb69ab6 100644
+--- a/ui/base/test/ui_controls_internal_win.cc
++++ b/ui/base/test/ui_controls_internal_win.cc
+@@ -663,13 +663,16 @@ void AppendKeyboardInput(ui::KeyboardCode key,
+   INPUT key_input = {};
+   key_input.type = INPUT_KEYBOARD;
+   key_input.ki.wVk = ui::WindowsKeyCodeForKeyboardCode(key);
++  const UINT scan_code = MapVirtualKeyToScanCode(key_input.ki.wVk);
+   if (ShouldSendThroughScanCode(key)) {
+-    key_input.ki.wScan = MapVirtualKeyToScanCode(key_input.ki.wVk);
++    key_input.ki.wScan = scan_code;
+     // When KEYEVENTF_SCANCODE is used, ki.wVk is ignored, so we do not need to
+     // clear it.
+     key_input.ki.dwFlags = KEYEVENTF_SCANCODE;
+-    if ((key_input.ki.wScan & 0xFF00) != 0)
+-      key_input.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
++  }
++  // 가상 키 전송에서도 전용 방향키를 숫자 키패드 Alt 입력과 구분한다.
++  if ((scan_code & 0xFF00) != 0) {
++    key_input.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
+   }
+   if (key_up)
+     key_input.ki.dwFlags |= KEYEVENTF_KEYUP;
 diff --git a/ui/color/color_provider_manager.cc b/ui/color/color_provider_manager.cc
 index 78cdb93466..c1eb85613a 100644
 --- a/ui/color/color_provider_manager.cc
@@ -42343,49 +43126,3 @@ index 2344ea9e80..e1c9f1d727 100644
  }
  
  :host-context(cr-searchbox-match:-webkit-any(:focus-within, [selected])) #icon {
-diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-index 7cb8c985a5292b8832910044929df5652401df23..eda4f6c8722f94a1cba8d36aee33c4eb6385aa5e 100644
---- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-+++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-@@ -1502,6 +1502,26 @@ IN_PROC_BROWSER_TEST_P(TabSearchPageHandlerTest, RemoveSplit_NTP) {
-   ASSERT_TRUE(ui_test_utils::NavigateToURL(
-       browser1(), GURL(chrome::kChromeUISplitViewNewTabPageURL)));
- 
-+  // 분할 새 탭이 아직 현재 문서인 동안 다음 이동의 표시 URL로 판정하면
-+  // 비동기 응답이 false가 되어 사용자가 입력한 이동을 새 탭으로 덮어쓴다.
-+  auto* const split_contents = tab_strip_model->GetActiveWebContents();
-+  const GURL split_url(chrome::kChromeUISplitViewNewTabPageURL);
-+  ASSERT_EQ(split_url, split_contents->GetLastCommittedURL());
-+  content::TestNavigationManager pending_navigation(split_contents, tab_url2_);
-+  split_contents->GetController().LoadURL(
-+      tab_url2_, content::Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
-+  ASSERT_TRUE(pending_navigation.WaitForRequestStart());
-+  EXPECT_EQ(tab_url2_, split_contents->GetVisibleURL());
-+  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
-+  base::test::TestFuture<bool> is_split;
-+  handler()->GetIsSplit(is_split.GetCallback());
-+  EXPECT_TRUE(is_split.Get());
-+  // 실패한 baseline도 멈춘 이동을 취소한 뒤 원래 분할 해제 검사를 계속한다.
-+  split_contents->Stop();
-+  EXPECT_TRUE(pending_navigation.WaitForNavigationFinished());
-+  EXPECT_FALSE(pending_navigation.was_committed());
-+  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
-+
-   base::RunLoop run_loop;
-   EXPECT_CALL(page_, TabUnsplit()).WillOnce([&]() { run_loop.Quit(); });
-   tab_strip_model->RemoveSplit(split_id);
-diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
-index 6079c8cdf13507b4557baecdf454739d9106d40c..304af58b7107e38bac3f1c4d5d3bd4cb3b2e491b 100644
---- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
-+++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
-@@ -351,7 +351,9 @@ tabs::TabInterface* TabSearchPageHandler::GetTabInterface(int32_t tab_id) {
- 
- void TabSearchPageHandler::GetIsSplit(GetIsSplitCallback callback) {
-   bool is_split = false;
--  GURL url = web_ui_->GetWebContents()->GetURL();
-+  // 응답을 받는 현재 SplitNTP 문서를 판정한다. 다음 이동의 표시 URL을 쓰면
-+  // false 응답의 비동기 redirect가 그 이동을 새 탭으로 덮어쓸 수 있다.
-+  const GURL& url = web_ui_->GetWebContents()->GetLastCommittedURL();
-   if (url.spec() == chrome::kChromeUISplitViewNewTabPageURL) {
-     is_split = tabs::TabInterface::GetFromContents(web_ui_->GetWebContents())
-                    ->IsSplit();

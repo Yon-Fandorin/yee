@@ -1,193 +1,215 @@
 # pilot Chromium 157 통합 체크포인트와 빌드 인수인계
 
-2026-10-29 · 사용자가 MacBook 빌드를 병행하려고 검수 완료 전 소스 공유를 요청했고,
-이후 **버전 업 반영 대상을 `pilot`으로 지정했다.** Stable157 이식과 최신 Mac 프로필 메뉴
-작업을 `pilot`에 통합한다. Windows 전체 앱 빌드는 재개 대상이며, Windows 실제 앱 검수와
-macOS 빌드·검수는 미완료다. 이 체크포인트는 배포 승인 기록이 아니다.
+2026-11-02 KST · 사용자가 Windows 실제 앱 검수가 막힌 상태에서 Mac으로 인계하고
+현재 수정본을 커밋·푸시하도록 요청했다. 전달 대상은 **`origin/pilot`**이다.
+Windows 앱·검사 대상 빌드, native 검사와 기술적 미디어 검증은 아래 범위까지 완료했다.
+Windows 실제 앱 18개와 macOS 빌드·검수는 미완료다. 이 체크포인트는 배포 승인 기록이 아니다.
 
-## MacBook에서 빌드 시작하기
+## 현재 상태
 
-Yee 저장소에서 기존 작업을 보존한 뒤 브랜치를 받는다.
+| 항목 | 값·상태 |
+| --- | --- |
+| 브랜치 | `pilot`; 앞선 로컬 17개 커밋과 이번 수정본을 함께 전달 |
+| 초기 통합 | Stable157 `2483ff9` + Mac 프로필 메뉴 `f1565ce`; 공통 기반 `7e9443d` |
+| 공통 Chromium | `157.0.8103.27` / `f9d7b13a569b352a0267234ea5740fdecc83ffa2` |
+| 버전 기준 | [chromium-version.json](../build/chromium-version.json) 하나를 Windows·macOS가 공유 |
+| Windows 앱·후속 검사 대상 빌드 | **완료**, 아래 source 지문과 EXE/DLL 564개를 빌드 출처에 연결 |
+| Windows native 24개 gate | **818 통과·1 조건부 생략·실패 0**; 실행 후 기록 검증은 별도 복구 절차 |
+| Windows 추가 native / 집중 검사 | **40 통과 / 21 통과**; 중복 범위를 합산하지 않음 |
+| Windows 기술적 앱·미디어 | **5단계 통과**; 전체 창 조작·실제 청취 검수와 구분 |
+| Windows 실제 앱 18개 | **0 통과·18 미검증**; 외부 제어 도구의 URL 판별 중단 |
+| macOS 빌드·native·실제 앱·CLI/MCP | **이번 수정본으로 미검증** |
+| 설치판·실사용 프로필 | 기존 환경 보존. 이번 체크포인트에서 교체·배포하지 않음 |
+
+Windows 검증은 Yee HEAD `3593947320557f732b39e993b7b74b28cf48b5d2`에 검토된 13개
+변경 파일을 적용한 상태에서 수행했다. 전달 문서 갱신은 그 뒤의 문서 변경이다.
+전달 커밋의 런타임 소스와 검증한 파일의 일치를 별도 확인하며, 과거 기록의 source commit이나
+지문을 새 전달 커밋으로 소급 변경하지 않는다.
+
+## 수정한 원인과 미확정 문제
+
+| 분류 | 확인한 원인·변경 | 근거와 한계 |
+| --- | --- | --- |
+| 제품 수명 | Widget에 붙기 전 그룹 Header의 테마 조회를 막고, 부착 뒤 inset을 다시 계산 | `tab_group_presentation.cc`, 0001의 `tab_group_header_view.cc`; unattached/attached 단위 판정과 최종 실제 그룹 복원에서 dump 0건 |
+| 제품 초기화 | 프로젝트 coordinator factory를 Chromium의 프로필 생성 전 등록 단계에서 준비 | `project_tab_coordinator.{h,cc}`, 0001의 profile factory 목록; 실제 서비스 생성은 기존 lazy 경로 유지 |
+| 테스트 입력 | Windows 가상 키 전송에서 방향키의 `KEYEVENTF_EXTENDEDKEY` 누락 보완 | 0001의 `ui_controls_internal_win.cc`; 제품 Omnibox의 Alt·숫자 키패드 처리는 변경하지 않음 |
+| 드래그 fixture | 실제 활성화·배치·Favorites 준비 뒤 현재 탭 handle과 source 제외 슬롯으로 드롭 위치 결정 | 0001의 그룹 드래그 검사; 원래 정확한 순서·그룹·URL 판정 유지, 집중 3개와 전체 gate의 해당 사례 통과 |
+| URL 관측 | native Omnibox·문서 URL·편집 초안·Escape·탭/분할 전환·실제 탐색 검사 추가 | [Omnibox 검사](../browser/ui/omnibox_accessibility_browsertest.cc), GN, [공개 집중 실행기](../tools/dev/test-omnibox-accessibility.sh); 외부 도구의 URL 판별 성공을 뜻하지 않음 |
+| 앱 복원 검사 | 정상 종료 뒤 새 검수 프로필의 Crashpad `.dmp`를 해시와 함께 확인하고 존재하면 실패 | [그룹 세션 복원 검사](../tools/dev/test-group-session-restore.mjs); Windows 전용이며 Mac 실행기로 사용하지 않음 |
+
+이전 153→157 이식의 API·GN 의존·브랜딩·WebUI·프로필 메뉴 변경과 이전 17개 커밋도
+함께 전달한다. 소유 소스는 `browser/` 등에 두고 Chromium 연결은
+`patches/0001-integrate-yee-shell.patch`에 유지했다. 최종 0001은 332개 구간이며,
+마지막 수명 수정에서 변경한 구간은 그룹 Header와 profile factory 두 곳이다.
+
+회귀 전체를 Chromium Stable 자체, Yee 테마 또는 AI 에이전트 기능 하나에 귀속할
+근거는 없다. 실제 제품 수명 문제와 검사 입력·fixture 문제를 구분한다.
+Shell 표시를 끈 비교도 Yee 패치가 없는 순정 Chromium 대조 실험은 아니다.
+프로젝트의 대화·작업 provider는 여전히 후속 범위다.
+
+과거 COM callback 충돌은 현재 해당 사례가 통과했지만 근본 원인은 미확정이다.
+입력 간섭이나 AI 기능 문제로 단정하지 않는다. queue drain·1 DIP·double-click 경고도
+원시 로그에 남아 있으며 assertion 실패와 구분한다.
+
+## Windows에서 실제로 확인한 범위
+
+| 검사 | 결과 |
+| --- | --- |
+| 앱·후속 빌드 | initial `1a830e05-6df2-45d4-a21a-ddabf51cfa1d`, followup `4b6c3e7a-b900-487d-8fad-e7ff7d029323` 통과 |
+| native 24개 gate | 실제 XML 819개: 818 통과·1 생략, 재시도·실패 0. 필수 29개·프로필 필수 3개·PRE/UIA·unified 조건과 RTL 125% 57개 확인 |
+| 조건부 생략 | `projects-default`의 `ProjectNavigationBrowserTest.UnifiedHorizontalLayoutToleratesMissingNativeAllocation`; unified gate의 대응 사례는 통과 |
+| 추가 native 40개 | provider 12·loader 27·fallback 1 통과. method별 subresource wrapper 전체 coverage를 뜻하지 않음 |
+| 집중 native 21개 | Omnibox 18·그룹 드래그 3 통과. 실제 URL 값 46개와 HTTP/HTTPS 탐색·초안 취소·history 확인 |
+| 기술적 앱·미디어 5단계 | Toolbar flags, 정상 그룹 세션 복원, 직접 MP4+MSE AAC/H.264, 요청 다시보기, 별도 실제 공개 라이브 통과 |
+| 최종 그룹 세션 복원 | 실제 앱 3회 정상 시작·종료, 탭·그룹 복원 및 사용자 시작 설정 유지, dump 0건 |
+| 요청 영상 `NS322Aijayo` | 다시보기 64.388초·1935 frame 진행. 혼합 Opus/AAC 기록이므로 이 영상의 AAC 디코딩은 별도 입증되지 않음 |
+| 당시 공개 라이브 `0sfDth4lMLc` | 2026-11-02 06:24 KST 검수: live 메타데이터·62.380초·1872 frame·AAC 디코딩 확인. 다음 검수에서는 live 여부를 새로 확인 |
+| 영상 표시 | 두 영상의 페이지 viewport PNG에서 영상 확인. 전체 native 창·실제 청취·실제 앱 18개 통과로 확대하지 않음 |
+| 독립 검토 | 최종 소유 소스 13개·native glue·0001, 위 native·미디어 원시 결과에서 추가 조치 사항 없음 |
+
+native 사례 실행 자체는 중단 없이 끝났지만, 그 뒤 실행기의
+`expectedPriorGateCaseCounts` 누락으로 후처리가 실패했다.
+원래 실패 기록과 원시 XML을 보존하고, 별도 완료 검증으로 6,723개 고정 파일·사례 수·
+실행 소유권·바이너리·후속 소스 지문을 다시 확인했다. 이 복구는 native를 재실행하지
+않았으며 **단일 연속 end-to-end 통과가 아니다.** 초기 도구 157 통과·22 생략 같은
+이전 결과도 현재 native 수에 합산하지 않는다.
+
+## URL 제어 중단과 남은 실제 앱 18개
+
+Windows native UIA 진단에서는 실제 주소창 Edit와 Document가 URL을 노출했고,
+새 native 테스트에서도 URL·초안·문서·활성 탭의 관계를 확인했다.
+그러나 외부 Windows 제어 도구는 새 전용 프로필·영어 locale·전체 URL 표시·
+`https://example.com/`에서도 현재 URL을 정책 적용에 충분한 확신으로 판별하지 못했다.
+새 앱은 `Example Domain - Yee` 창으로 확인했지만, 도구의 상태 캡처 단계에서 중단됐다.
+
+따라서 제품 접근성 결함이나 제어 도구 내부 resolver의 정확한 원인은 확정하지 못했다.
+브라우저 정체성·실제 URL·AX 역할이나 도구 정책을 위장·변경하지 않았으며,
+도구가 중단한 뒤 다른 입력 경로로 우회하지 않았다. 테스트 코드의 Omnibox 18개와
+아래 실제 앱 18개는 서로 다른 목록이다.
+
+| 실제 앱 항목 | 남은 확인 |
+| --- | --- |
+| 1. 실행 식별 | 새 앱·전용 프로필·전체 창·시작 URL |
+| 2. 주소 탐색 | 주소 편집·이동·뒤로·앞으로 |
+| 3. 수평 탭 | 생성·전환·닫기 |
+| 4. 수직 탭 | 배치 전환·행과 Header 표시 |
+| 5. 그룹 접기 | 만들기·접기·펼치기 |
+| 6. 그룹 첫 탭 닫기 | 남은 멤버·그룹·순서 유지 |
+| 7. 그룹 편집 | 편집기 열기·닫기·표시 |
+| 8. 위에서 드래그 | 실제 포인터로 그룹 중간 진입 |
+| 9. 아래에서 드래그 | 실제 포인터로 그룹 중간 진입 |
+| 10. Favorites | 추가·선택·재정렬·일반 탭 복귀 |
+| 11. 분할 | 생성·활성 pane 전환·divider 조절·한쪽 닫기 |
+| 12. 프로젝트 | A→B→A와 현재 창 탭 보존 |
+| 13. 프로필 | 전용 로컬 프로필 전환·다른 창 생성/재사용 |
+| 14. 맞춤설정 | 테마·배치, 실제 어두운 두 pane와 비활성 Header 전환 |
+| 15. 창 버튼 | 최대화·복원·최소화·복귀 |
+| 16. 전체화면 | 실제 진입·복귀 |
+| 17. 정상 종료·복원 | 같은 전용 프로필에서 탭·그룹 복원 |
+| 18. 미디어 표시 | 실제 앱 전체 창에서 영상·재생 진행·현재 공개 라이브 |
+
+전 항목은 현재 미검증이다. 기술적 그룹 복원·미디어 검사나 native 결과를
+자동으로 이 목록의 통과로 올리지 않는다. 초기 프로필 검수와 실사용 데이터 이전,
+기본 속도 모션과 촬영용 느린 모션을 구분한다.
+
+## Mac에서 받기·빌드·검수
+
+기존 작업을 보존하고 Yee 저장소 루트에서 받는다.
 
 ```sh
 git status --short
-git remote set-branches origin pilot
-git fetch origin
-git switch --track origin/pilot
+git fetch origin pilot
+git switch pilot
+git merge --ff-only origin/pilot
 ```
 
-통합이 끝난 핸즈오프·Stable157 임시 원격 브랜치는 정리했고 `pilot`만 유지한다.
-`set-branches`로 가져올 브랜치를 `pilot`으로 맞춰, 예전 설정이 삭제된 브랜치를
-계속 찾다가 `fetch`에 실패하지 않게 한다.
-같은 로컬 브랜치가 이미 있다면 마지막 명령 대신 `git switch pilot`,
-`git pull --ff-only`를 사용한다. 미커밋 변경 때문에 전환이 거부되면 먼저 기존 작업을
-보존한다. 강제 초기화하거나 기존 Chromium 소스를 새 버전으로 덮어쓰지 않는다.
+로컬 `pilot`이 없으면 마지막 두 명령 대신 `git switch --track origin/pilot`을 사용한다.
+전환·fast-forward가 거부되면 기존 변경·커밋을 보존하고 차이를 검토한다.
+강제 초기화·강제 푸시·별도 원격 브랜치 재생성을 하지 않는다.
 
-다음은 **같은 터미널에서**, Yee 저장소 루트에 위치한 채 실행한다.
+같은 터미널에서 기존 157 빌드 루트를 선택한다. 아래 경로는 기본 예시다.
+다른 157 루트를 이미 사용했다면 그 경로를 유지하고 캐시를 재사용한다.
 
 ```sh
 export YEE_LOCAL_BUILD_ROOT="$PWD/.local-build/stable157"
 export YEE_OUT_NAME=YeeStable157
 
+# 이 루트가 없는 최초 준비에서만 실행한다.
 ./tools/dev/checkout.sh
 ./tools/dev/setup-metal.sh
+
 python3 tools/dev/chromium-version.py verify "$YEE_LOCAL_BUILD_ROOT/chromium/src" --platform macos
 ./tools/dev/configure.sh
 ./tools/dev/build.sh
-```
-
-- 새 원본은 `.local-build/stable157/chromium/src`에 준비한다. 도구·캐시도 새 루트에
-  생긴다. 이 루트는 Git에서 제외되며 기존 `.local-build/chromium`의 153 환경을 보존한다.
-- 새 앱은 `.local-build/stable157/chromium/src/out/YeeStable157/Yee.app`이다.
-  Mac에서는 `YEE_LOCAL_BUILD_ROOT`가 원본 루트를 고른다. Windows의
-  `YEE_CHROMIUM_ROOT`를 대신 지정하지 않는다.
-- 병렬 수는 `YEE_BUILD_JOBS`로 조정하며 기본값은 3이다. Mac의 메모리를 확인해 정한다.
-  최초 준비에는 도구의 120/115 GiB 여유 공간 검사가 있다. 부분 다운로드는 출력된
-  재개 명령으로 이어가며 삭제하지 않는다.
-- 위 명령은 저장소 기본 `build/args.gn`을 사용한다. 기본은 static 빌드,
-  `is_debug=false`, symbol 0, `dcheck_always_on=false`, AAC/H.264 지원이다.
-  Windows에서 진행 중인 component 후보와 빌드 형태를 구분한다.
-- 다른 터미널에서 이어갈 때도 위 두 환경 변수를 다시 지정한다.
-
-앱 빌드 성공 후 같은 환경에서 실행한다.
-
-```sh
 ./tools/dev/smoke-test.sh
 ./tools/dev/run.sh
 ```
 
-`run.sh`는 새 루트의 `runtime-profile`을 사용한다. 기존 실사용 프로필이나 설치된 앱을
-자동 교체하지 않는다. smoke 검사는 기본 렌더러 확인이며 실제 UI·미디어 검수를 대신하지
-않는다. 자세한 환경 준비는 [개발 도구](../tools/dev/README.md)를 따른다.
+- 새 앱은 `$YEE_LOCAL_BUILD_ROOT/chromium/src/out/YeeStable157/Yee.app`이다.
+  `run.sh`는 해당 루트의 `runtime-profile`을 사용한다. 설치판·실사용 프로필을 보존한다.
+- macOS 원본 선택에는 `YEE_LOCAL_BUILD_ROOT`를 사용한다.
+  Windows의 `YEE_CHROMIUM_ROOT`를 대신 지정하지 않는다.
+- 기본 Mac 설정은 static·symbol 0·release/AAC/H.264이며 Windows component 후보와 다르다.
+  병렬 수는 `YEE_BUILD_JOBS`로 조절한다. 새 최초 준비의 공간 검사도 유지한다.
+- 이미 같은 출력에서 빌드 중이면 추가 Ninja/Siso를 띄우지 않는다.
+  새 터미널에서는 두 환경 변수를 다시 지정한다.
 
-## 공통 기준과 커밋 범위
+빌드 뒤 URL 비교는 같은 환경에서 실행할 수 있다.
 
-| 항목 | 값·상태 |
+```sh
+./tools/dev/test-omnibox-accessibility.sh
+```
+
+이 명령은 검사 대상을 빌드하고 native 테스트 코드를 실행한다. macOS에서는
+`Presentation/OmniboxAccessibilityBrowserTest.*` 16개를 확인하며, Windows/Linux용
+Alt+방향키 탐색 2개는 생략된다. 이미 같은 소스의 검사 바이너리를 빌드했을 때만
+`--no-build`를 사용한다. [Header 검사 범위](header/test-coverage.md)를 함께 읽는다.
+
+그다음 [Browser Surface 단계별 gate](../AGENTS.md#verify), Header·Sidebar·프로젝트·
+프로필 gate를 변경 범위에 맞춰 실행하고, 별도 프로필의 실제 앱 18개를 확인한다.
+먼저 주소창의 접근성 역할·값·문서 URL을 확인한 뒤 제어 도구 관측·입력을 대조한다.
+native 값 노출과 외부 도구의 URL 인식 성공을 별도 결과로 남긴다.
+어두운 실제 두 pane·테마 전환·비활성 Header는 테스트 색상 주입 없이 확인한다.
+
+Windows 전용 `test-group-session-restore.mjs`, `test-media-codecs.mjs`와
+PC 전용 `diagnose-live.mjs`를 Mac 실행기로 사용하지 않는다.
+Mac에서는 실제 앱에서 정상 종료·복원, 직접 MP4와 MSE의 AAC/H.264,
+요청 다시보기와 검수 시점의 실제 공개 라이브를 별도로 확인한다.
+과거 live ID의 재생 성공으로 현재 라이브 검증을 대신하지 않는다.
+CLI/MCP의 새 앱 연결·관찰·입력·탭 전환·취소도 확인한다.
+Windows 결과를 Mac 통과로 기록하거나 transport 비활성을 통과로 세지 않는다.
+
+## Windows 증거 위치와 재개 조건
+
+제품 기준 저장소는 `F:/yee/pilot-repo`의 `pilot`, 검수 작업 폴더는
+`F:/yee/worktrees/project-navigation-handoff`다.
+Chromium은 `F:/yee/chromium-stable157/src`, 출력은 `out/YeeStable157`다.
+검증한 Windows 후보는 component·symbol 0·jobs 4이며 설치용 릴리즈가 아니다.
+
+원시 기록은 검수 폴더의 `.local-build/chromium-stable-upgrade-20261029/`에 있다.
+아래 경로는 이 Windows PC의 로컬 기록이며 Git으로 전송하지 않는다.
+Mac에서 확인할 소스·패치·정식 검사 코드는 커밋에 포함한다.
+
+| 기록 | SHA-256 |
 | --- | --- |
-| 브랜치 | `pilot` |
-| 통합 입력 | Stable157 `2483ff9` + Mac 프로필 메뉴 `f1565ce`; 공통 기반은 AAC/H.264 작업 `7e9443d` |
-| 공통 원본 | `157.0.8103.27` / `f9d7b13a569b352a0267234ea5740fdecc83ffa2` |
-| 버전 기준 | `build/chromium-version.json` 하나를 Windows·macOS가 공유 |
-| Windows 전체 앱 빌드 | **진행 중, 완료 판정 전** |
-| Windows native·실제 앱·미디어 | **이번 157 바이너리로 미검증** |
-| macOS 빌드·실제 앱·CLI/MCP | **미검증** |
-| 설치판·실사용 프로필 | 기존 환경 보존. 이번 체크포인트에서 교체·배포하지 않음 |
+| `source-review-frozen.json` | `da5a58337d4f1b1514154de4b49ef77e65a2d6144d6331ae684fcb10b097bc25` |
+| `build-provenance-4b6c3e7a-b900-487d-8fad-e7ff7d029323.json` | `ad1f7b87ea6d82ff2ed1bde773b8c9499feb591c4777d6ebfdf0ea9e32328986` |
+| 원래 `core24-current-3593947-cc0209d2.json` | `b039a768c35058da0c4020baf7d2598632f2a8c3afe4fae715932fe60c1b0bfb` |
+| 별도 `native819-completion-cf68aed4.json` | `5866e0ca2166278a5795dd0e04ce1d759034ead84dba092258f8946728144650` |
+| `additional-native-3593947-da5a583-a43e639e/run.json` | `29d56a17b12627194cf10b31bfbcea20891ef7cc93a1ec5728077a909a37f508` |
+| `acceptance-input-21-current-3593947-fd07f684.json` | `2ba0b73ba7ae1f856248291312a711377d2a578b235dff2a71de302ff5a0773c` |
+| `current-app-media-3593947-509656d7/run.json` | `e2a3bffa8800f2f468861e366f2690dae6b1c2079c32557da922e0355b126c92` |
+| `current-media-3593947-result.json` | `79524698aa52c0c1ef1257ab472acd7f2ef111026c0d45b9936d82b9172b8649` |
 
-커밋에는 현재 제품 소스, 정식 개발 도구·도구 검사, 브랜드 생성물, canonical 패치와
-문서를 담는다. Chromium 체크아웃·빌드 캐시·실사용 데이터·Windows PC 전용 임시 검수
-실행기는 Git에 포함하지 않는다. Mac 빌드에 필요한 제품 소스의 별도 미커밋 묶음은 없다.
+현재 Windows 입력 검수는 **사용자 요청에 따른 인계 상태**로 두며 새 지시 없이 재개하지 않는다.
+최신 `handoff-state.json`·실제 결과·프로세스를 먼저 확인하고, 오래된 실행 ID·커밋을
+고정해서 재사용하지 않는다. PC 전용 보조 실행기는 Mac 명령이 아니다.
+`source-fingerprint.py`·`capture-build-provenance.py`·`run-windows-native-gates.py`의
+출처 검증을 유지하고, 원래 실패·이전 지문·복구 전 기록을 수동 성공 처리하지 않는다.
+이후 런타임 변경은 새 검토·명시적 지문 고정·캐시 재빌드·영향받는 재검을 거친다.
 
-## 반영한 소스 작업
-
-- 153→157의 패치 충돌과 API 차이를 해결했다. GN 공개 헤더와 구현 의존을 분리해
-  새 frame/layout/contents 대상 사이의 순환을 해소했다.
-- 프로젝트·Site Controls는 `BrowserWindowInterface`, 공유 제품명은 작은 `brand`
-  대상으로 연결한다. Chromium 탭 모델의 소유권을 유지한다.
-- Favorites 전용 420ms 시계, 배치별 드래그·그룹 표시와 Side Panel 반올림을 보완했다.
-  Mac glass의 전체 창 경로와 서비스 워커 factory의 새 sandbox 검사를 보존했다.
-- 157의 WebUI 그림자 경로에서 AIM 여백과 native host 투명도 계약을 맞췄다.
-  C++ 회귀 사례를 추가했지만 아직 새 검사 바이너리로 실행하지 않았다.
-- 생성 자산·문구와 패치의 중복 소유를 제거했다. 실제 파일 헤더가 패치 선언과 다르면
-  적용 전에 거부한다. 개발 명령은 공통 핀을 먼저 검사한다.
-- native 목록에서 필수 패턴별 실제 사례가 없으면 실행을 차단한다. 세 회귀 명령의
-  고정 이름 117개를 원본·OS 조건과 대조하고 Windows/Mac 필터를 분리했다.
-- Mac 프로필 메뉴 변경을 보존하고, 해당 연결과 브라우저 검사를 157의
-  `BrowserWindowInterface` 및 GN 의존 구조에 맞춘다. 숨김 프로필 검사도 Chromium의
-  ephemeral 조건을 지키며 원래 메타데이터를 복원한다.
-- 첫 Windows 빌드의 WebUI 설치 실패를 보완했다. npm 10이 요구하는 선택 peer 의존성
-  9개를 잠금 파일에 추가했으며 직접 핀과 기존 141개 항목·플랫폼별 패키지는 보존했다.
-  실제로 실패한 리소스 생성 명령은 설치·형식·Svelte 검사와 정적 빌드까지 통과했다.
-
-충돌에서 확인한 연결 경계와 후속 후보는
-[빌드 문서](../build/README.md#이식에서-유지할-연결-경계)에 있다.
-후속 후보까지 구현했다고 기록하지 않는다.
-
-## 확인한 결과와 미검증 범위
-
-| 검사 | 결과 |
-| --- | --- |
-| 전체 도구 검사 | 179개 중 157 통과·22 건너뜀·실패 0 — 앞선 완료점의 결과 |
-| Windows native `build/util/version_test.py` | 12개 통과. 변경 없는 RC 파일 재작성 보완 |
-| 공통 핀·GN 생성·관련 GN 헤더 의존 검사 | 통과. Mac 컴파일 통과를 뜻하지 않음 |
-| owned 소스·브랜드 자산 | 동기화 대기 0개, 브랜드 86개 일치 |
-| canonical 패치 | 0001 320경로·0002 66경로·0003 2경로, 소유 중복 없음 |
-| 0001·0002 역방향 적용·원본 공백 검사 | 통과 |
-| 제품 소스 독립 검토 | 발견 사항 수정 후 최종 범위별 검토에서 추가 조치 사항 없음 |
-| Windows 전용 임시 검수 도구 | 가짜 프로세스·입력 검사 26/21/67개와 별도 독립 검토 통과 |
-| 새 Windows·Mac 실제 실행 | **미완료. 위 소스·도구 검사로 대체하지 않음** |
-
-22개 생략에는 Windows의 zsh 부재 등이 포함된다. Mac에서 해당 검사를 확인해야 한다.
-별도 실행의 수를 합쳐 하나의 전수 통과로 기록하지 않는다. 사용자가 Mac 빌드를 병행하려고
-요청한 중간 체크포인트이며, 검수 완료 전 커밋이라는 점을 유지한다.
-
-## Windows에서 이어갈 작업
-
-제품 기준 저장소는 `F:/yee/pilot-repo`의 `pilot`이다. 기존 캐시를 쓰는 Windows 검수
-작업 폴더 `F:/yee/worktrees/project-navigation-handoff`도 같은 통합 커밋에 맞춘다. 원본은
-`F:/yee/chromium-stable157/src`, 출력은 `out/YeeStable157`이다.
-기존 `F:/yee/chromium/src/out/YeePilot`과 설치판·실사용 프로필을 보존한다.
-
-같은 PC의 `.local-build/chromium-stable-upgrade-20261029/handoff-state.json`과
-`build-result.json`을 먼저 확인한다. **이미 실행 중인 출력에 Ninja/Siso를 추가로 띄우지
-않는다.** 현재 후보는 component 개발 빌드, symbol 0, jobs 4이며 설치용 릴리즈가 아니다.
-
-임시 검수 도구는 같은 작업 폴더에 있다.
-
-- `source-fingerprint.py`·`capture-build-provenance.py`·두 PowerShell 빌드 실행기:
-  원본·활성 Git 의존성 156개·설정·실행 ID·실행 파일/DLL을 연결한다.
-- `run-windows-native-gates.py`와 자체 검사: 사례별 실행, 목록·XML, PRE 프로필과 재개
-  기록을 관리한다. 손상된 기록과 이전 성공 결과를 통과로 재사용하지 않는다.
-- `diagnose-live.mjs`와 자체 검사: 요청 플레이어의 본영상만 측정하며 광고·소스 전환,
-  오래된 표본, 잘린 AAC 정보와 정상 종료 실패를 구분한다.
-
-이 보조 도구는 이 PC의 절대 경로를 가정하며 Mac용 정식 명령이 아니다. 과거
-`handoff-validation-tools.zip`은 결함 수정 전의 역사적 초안이므로 현재 실행기 대신
-사용하지 않는다. 자체 검사와 실제 native·앱 실행 통과를 구분한다.
-
-첫 Windows 실행은 19:48 KST에 WebUI `npm ci`의 잠금 파일 불일치로 종료됐다.
-20,129개 작업 완료·18,127개 남음으로 기록됐고 캐시는 유지했다. 해당 실패 단계만
-재실행해 보완을 확인했다. 이 수는 작업 수이며 전체 소요 시간의 진행률은 아니다.
-
-통합 소스 검토 후 새 커밋에 지문을 다시 고정하고 같은 출력에서 앱 빌드를 재개한다.
-저장소 HEAD·문서가 바뀌면 이전 지문과 다르므로 새 성공 기록을 통합 커밋에 연결한다.
-이전 기록을 수동으로 성공 처리하거나 지문 확인을 끄거나 빌드 캐시를 지우지 않는다.
-
-그 뒤 후속 native 대상 빌드, 실제 목록·검사·캡처, 격리 프로필의 실제 앱과 미디어를
-검증한다. 작업 수는 실행마다 집계되고 캐시 판정에 따라 분모도 변하므로 이전 실행과
-단순 합산하지 않는다.
-
-## 남은 검수와 보존
-
-[전수 검사 행렬](../build/README.md#stable-이식-후-전수-재검사)을 OS별로 수행한다.
-Layout all, Header·Sidebar, 프로젝트 전체·서비스, Site Controls·내부 페이지·차단·Agent
-계약을 포함한다. unified 조건부 사례와 RTL 125%를 기본 조건과 구분하고, 서비스 워커
-새 사례 3개도 실제 `content_unittests`에서 실행한다.
-프로필 메뉴의 `SidebarFooterPolicyTest.*`, `SidebarFooterViewTest.*`,
-`SidebarFooterBrowserTest.*`도 새 바이너리로 실행한다. 원래 창의 프로필·탭 유지,
-이름·목록 갱신, 다른 프로필 창의 생성·재사용과 종료를 실제 앱에서 확인한다.
-
-실제 앱의 탭·그룹 접기/펼치기·첫 탭 닫기·Favorites 드래그·분할·맞춤설정·창 버튼·주소창·
-미디어·전체화면·정상 종료와 복원을 확인한다. 기본 속도 모션과 촬영용 느린 모션,
-초기 프로필 검사와 실사용 데이터 이전 검사를 구분한다.
-
-새 실행 파일로 직접 MP4·MSE의 AAC/H.264 디코딩을 확인한다. 요청 영상
-`https://www.youtube.com/watch?v=NS322Aijayo`는 2026-10-29 공개 조회에서 종료된
-다시보기였으므로 현재 재생 가능 상태를 다시 확인하고 별도 진행 중 라이브도 검증한다.
-현재 라이브 ID는 실행 직전 조회하며 과거 YTN ID를 고정해 재사용하지 않는다.
-
-Mac에서는 CLI/MCP의 새 앱 연결·관찰·입력·탭 전환·취소도 확인한다. Windows의 현재
-transport 비활성을 통과로 세거나 이번 이식에서 지원 범위를 조용히 넓히지 않는다.
-
-작업 규칙은 [AGENTS.md](../AGENTS.md), [CONTRIBUTING.md](../CONTRIBUTING.md)와
-두 필수 스킬 `codebase-architecture`·`codewright`다. 이후 코드 수정도 검사·별도 독립 검토·
-영향받는 실제 실행 검수를 거친다.
-
-기존 원본·출력·설치판·실사용 프로필·빌드 캐시와 필요한 UX 시안을 보존한다.
-Windows 작업 폴더의 `native-before.tar.gz`·JSON·기존 stash는 복구 자료다.
-`resolve-batch*.py`, `port-*.py`, `refresh-canonical-patches.py`, `fix-webui-shadow.py`,
-`finish-webui-shadow-test.py`는 일회성 도구이므로 다시 실행하지 않는다.
-0001은 정식 `tools/overlay/regenerate-shell-patch.py --chromium-src ...`를 사용하고,
-0002에는 생성 BRANDING·GRD·owned 소스를 다시 넣지 않는다.
-
-검수 후 현재 작업이 만든 임시 프로필·원시 캡처·로그는 필요한 요약을 남겨 정리한다.
-이 체크포인트의 미완료 상태를 최종 검수 완료나 배포 승인으로 사용하지 않는다.
+기존 원본·출력·설치판·실사용 프로필·캐시·실패 증거를 보존한다.
+일회성 `resolve-batch*.py`·`port-*.py` 등 과거 이식 초안을 다시 실행하지 않는다.
+0001 갱신은 정식 `tools/overlay/regenerate-shell-patch.py --chromium-src ...`를 사용한다.
+제품 소스와 canonical 패치의 일치를 유지하고, [작업 규칙](../AGENTS.md)과
+[기여 절차](../CONTRIBUTING.md)의 소유권·독립 검토·실제 앱 확인을 따른다.

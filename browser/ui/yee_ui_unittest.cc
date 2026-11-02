@@ -409,7 +409,12 @@ class YeeRestingTextViewTest : public ChromeViewsTestBase {
 };
 
 TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
-  auto* view = widget_->SetContentsView(std::make_unique<views::View>());
+  auto detached = std::make_unique<views::View>();
+  EXPECT_FALSE(UsesHorizontalTabGroupCapsule(*detached));
+  EXPECT_EQ(gfx::Insets::VH(0, 8),
+            ResolveHorizontalTabGroupHeaderInsets(*detached, 8, 12, true));
+  auto* view = widget_->SetContentsView(std::move(detached));
+  EXPECT_TRUE(UsesHorizontalTabGroupCapsule(*view));
   EXPECT_EQ(38, ResolveHorizontalTabMinimumInactiveWidth(*view, 32, 18));
   EXPECT_EQ(64, ResolveHorizontalTabMinimumInactiveWidth(*view, 64, 18));
   EXPECT_EQ(gfx::Insets::TLBR(0, 18, 0, 18),

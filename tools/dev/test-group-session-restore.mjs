@@ -2,6 +2,7 @@
 // 실제 앱을 정상 종료·재시작해 그룹과 사용자 시작 설정의 복원을 검증한다.
 import assert from 'node:assert/strict';
 import {execFileSync, spawn} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -45,6 +46,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 let child, browser, worker, debuggingPort;
 let launchCount = 0;
 const endpointOwnership = [];
+const diagnosticChecks = [];
 
 function verifyPeer(port, pid, type, id) {
   return peer => {
@@ -154,6 +156,7 @@ async function startupSetting(value) {
 
 async function shutdown() {
   worker?.close(); worker = undefined;
+  const closedPid = child?.pid;
   if (child) {
     await closeOwnedBrowser(child, browser, pid => {
       requireWindowsBrowserOwner(executable, profile, pid);
@@ -164,6 +167,26 @@ async function shutdown() {
     await waitForShutdown(runningProcesses);
   }
   child = undefined; browser = undefined;
+  if (closedPid) {
+    // 새 프로필의 비치명적 진단도 실제 종료·복원 성공과 별도로 실패시킨다.
+    const directory = path.join(profile, 'Crashpad', 'reports');
+    const reports = [];
+    let entries;
+    try {entries = await fs.readdir(directory, {withFileTypes: true});} catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      entries = [];
+    }
+    for (const entry of entries.filter(item => item.isFile() && item.name.endsWith('.dmp'))
+      .sort((a, b) => a.name.localeCompare(b.name))) {
+      const data = await fs.readFile(path.join(directory, entry.name));
+      reports.push({file: entry.name, bytes: data.length,
+        sha256: createHash('sha256').update(data).digest('hex')});
+    }
+    diagnosticChecks.push({launch: launchCount, pid: closedPid, reports});
+    await fs.writeFile(path.join(output, 'crashpad-checks.json'),
+      JSON.stringify(diagnosticChecks, null, 2));
+    assert.equal(reports.length, 0, '그룹 생성·복원 중 충돌 또는 비치명적 진단 기록 발생');
+  }
 }
 
 // 재실행마다 바뀔 수 있는 그룹 ID 대신 이름·색상·접힘과 실제 탭 순서를 비교한다.
@@ -227,7 +250,8 @@ try {
     '새 탭 시작을 선택한 프로필에 이전 검사 탭을 강제 복원하지 않음');
   assert.equal(await startupSetting(), 5, '재실행 뒤 사용자 시작 설정 보존');
   await shutdown();
-  console.log(JSON.stringify({passed: true, output, groups: before.groups, explicitNewTab}, null, 2));
+  console.log(JSON.stringify({passed: true, output, groups: before.groups,
+    explicitNewTab, diagnosticChecks}, null, 2));
 } finally {
   try {await shutdown();} finally {
     await fs.writeFile(path.join(output, 'endpoint-owners.json'),

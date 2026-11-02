@@ -3,6 +3,38 @@
 이 문서는 Header와 Omnibox의 사용자 가시 계약을 자동 테스트와 실제 화면 검수로
 나눈다. 테스트 이름은 구현 함수가 아니라 보장하는 결과를 기준으로 둔다.
 
+주소창 접근성은 `test-omnibox-accessibility.sh`의 별도 집중 gate로 검사한다.
+`site_controls_browsertests`의
+`Presentation/OmniboxAccessibilityBrowserTest.*`가 네 시나리오를 HTTP·유효한 HTTPS,
+Yee Shell·Shell 표시를 끈 native Toolbar의 조합으로 총 16개 실행한다. 이 비교는 장식·호스팅 차이를
+분리하며 무패치 Chromium과의 비교를 뜻하지 않는다.
+`YeeShell/OmniboxNavigationBrowserTest.*`는 HTTP·HTTPS에서 실제 Enter 이동과
+Alt+왼쪽·오른쪽의 문서·주소 동기화를 두 사례로 추가한다. 이 입력 조합을 쓰는
+Windows/Linux의 집중 gate는 총 18사례이며, macOS에서는 새 두 사례를 생략한다.
+이 수는 아래의 실제 앱 18개 사용자 시나리오와 다른 집계다.
+
+Windows 검사 입력은 가상 키 방식으로 전송할 때도 전용 방향키의 확장 표시를
+보존한다. 이 표시가 없으면 Alt+왼쪽·오른쪽이 숫자 키패드의 Alt 문자 입력으로
+분류되어, 주소창이 정상적으로 단축키 처리를 건너뛴다. 입력 지원 코드에서만
+수정하며 제품 주소창의 숫자 키패드 처리와 단축키 정책은 유지한다.
+
+- Resting 표시가 입력·접근성에서 제외되고 원래 주소창의 값이 유지되는지 확인한다.
+- 실제 Ctrl/⌘ L로 native 편집 URL과 전체 선택을 확인한다. HTTPS scheme 복원과 HTTP scheme 생략을 구분한다.
+- 같은 제목의 탭 전환, 분할 pane 전환·해제에서 같은 native 주소창과 활성 URL을 확인한다.
+- 편집 초안은 편집 가능한 값으로 노출하되 현재 문서 URL은 바뀌지 않고 취소 가능한지 확인한다.
+  첫 Escape는 열린 제안만 닫고 초안을 유지하며, 다음 Escape가 편집을 취소하는 native 순서를 각각 확인한다.
+
+Windows에서는 AX 데이터뿐 아니라 `IRawElementProviderSimple`과 `IValueProvider`의
+Edit 역할·실제 값·편집 가능 여부를 확인한다. HTTP는 편집 중에도 scheme을 생략하는 native 규칙을
+유지한다. 현재 문서 URL과 편집 중 문자열은 구분하며 title을 URL 대신 사용하지 않는다.
+이 gate는 외부 제어 도구의 URL 인식 성공이나 18개 수동 앱 검수를 대신 통과 처리하지 않는다.
+
+Windows에서도 같은 테스트 코드를 직접 실행할 수 있다.
+
+```powershell
+& ./out/YeeStable157/site_controls_browsertests.exe --single-process-tests --test-launcher-preserve-desktop-windows --test-launcher-jobs=1 --test-launcher-retry-limit=0 '--gtest_filter=Presentation/OmniboxAccessibilityBrowserTest.*:YeeShell/OmniboxNavigationBrowserTest.*'
+```
+
 표면 구조는 `browser_surface_layout`의 `BrowserSurfaceMode`와
 `ResolvedBrowserSurfaceDecoration`이 결정한다. 모드는 Chromium에 실제 적용된
 탭 배치에서 읽으며 전체화면의 일시적인 표시 여부와 구분한다. 일반 Header,

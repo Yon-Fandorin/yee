@@ -384,6 +384,7 @@ test("site_controls_browsertests") {
     "extensions/extensions_browsertest.cc",
     "history/history_browsertest.cc",
     "internal_urls_browsertest.cc",
+    "omnibox_accessibility_browsertest.cc",
     "projects/project_navigation_browsertest.cc",
     "sidebar_footer_browsertest.cc",
     "site_controls_browsertest.cc",
@@ -411,6 +412,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/prefs:util",
     "//chrome/browser/profiles:profile_io_data",
     "//chrome/browser/sessions:test_support",
+    "//chrome/browser/ui:browser_commands",
     "//chrome/browser/ui:browser_tabstrip",
     "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui:ui_features",
@@ -423,6 +425,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/animations",
     "//chrome/browser/ui/views/frame:browser_view_header",
+    "//chrome/browser/ui/views/omnibox",
     "//chrome/browser/ui/views/page_info",
     "//chrome/browser/ui/views/tabs:new_tab_button",
     "//chrome/browser/ui/views/tabs:tab_style_views",
@@ -457,6 +460,7 @@ test("site_controls_browsertests") {
     "//extensions/common",
     "//net:test_support",
     "//testing/gtest",
+    "//ui/accessibility",
     "//ui/compositor:test_support",
     "//ui/events:test_support",
     "//ui/snapshot",
@@ -480,7 +484,6 @@ test("site_controls_browsertests") {
     deps += [
       "//chrome/browser/accessibility:test_support",
       "//chrome/browser/lifetime",
-      "//ui/accessibility",
       "//ui/aura:test_support",
     ]
   }

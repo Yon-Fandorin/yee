@@ -11,6 +11,9 @@
 실제 앱에서 그룹 두 개와 탭 다섯 개를 만들고 정상 종료한 뒤, 복원 강제 옵션 없이
 같은 격리 프로필을 재실행한다. 그룹 이름·색상·접힘과 탭 소속·순서를 비교하고,
 명시적 새 탭 시작 설정을 선택하면 이전 세션을 강제로 불러오지 않는지도 확인한다.
+각 정상 종료 뒤 새 프로필의 Crashpad 기록도 검사한다. 그룹 생성·복원이 성공해도
+충돌 또는 비치명적 진단 덤프가 생기면 파일 이름·크기·지문을 남기고 실패한다.
+그룹의 테마 판정은 실제 창에 붙은 뒤 수행하고, 부착 시 헤더 여백을 다시 계산한다.
 `site_controls_browsertests --gtest_filter=SessionStartupPrefTest.*`는 기본값,
 사용자 시작 설정·관리자 정책의 우선순위와 Yee 비활성화 시 native 기본값을 검사한다.
 
@@ -131,7 +134,7 @@ theme 변경과 즉시 다시 열기에서 이전 anchor·잠금이 남지 않�
 | 출발점/도착점 | 자동 검증 |
 | --- | --- |
 | 일반 Tab → 목록 처음·중간·끝, 취소 | `DragWithinUnpinnedContainer`, `CancelDragWithinUnpinnedContainer` |
-| 일반 Tab → 펼친 Group 중간, Group 행과 같은 preview 정렬 | `YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle` |
+| 위·아래의 일반 Tab → 펼친 Group 중간, Group 행과 같은 preview 정렬 | `YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle`, `YeeSidebarTopLevelTabCanEnterExpandedGroupMiddleFromBelow` |
 | Group Tab → Group 내부 위치, Group 밖 목록 | `DragWithinGroup`, `DragOutOfGroup` |
 | Group Tab → 기존 Favorite 오른쪽 슬롯 | `YeeSidebarGroupedTabCanBecomeFavorite` |
 | Favorite → 목록 처음·중간·끝 | `DragFavoriteIntoTabList`, `DragFavoriteBeforeFirstTabCommitsFirst`, `DragFavoriteBelowLastTabCommitsLast` |
@@ -312,6 +315,16 @@ Favorites 경계 및 취소 사례도 포함한다.
 계산이 실패하면 다음 포인터 입력을 중단한다. 같은 입력을 반복하거나 제한 시간을
 늘려 성공을 기다리지 않으며 기존 정확한 순서·그룹·미리보기 검사는 유지한다.
 관찰 callback은 handle 묶음을 소유하며, 준비가 확인되면 즉시 관찰을 종료한다.
+`YeeSidebarTopLevelTabCanEnterExpandedGroupMiddleFromBelow`는 같은 판정을 유지하되
+그룹 아래의 독립 탭에서 시작해 마지막 그룹 행을 거쳐 중간으로 진입한다.
+XML에 시작 index와 진입 방향을 남기고, 최종 순서에서 source가 놓인 index 2의
+실제 행을 기준으로 미리보기 정렬을 확인한다.
+`DragOutOfGroup`도 먼저 실제 드래그를 활성화하고 Favorites 공간의 배치가 열린
+뒤 저장한 목적지 handle에서 원본 행을 제외한 native 삽입 경계를 계산한다.
+실제 잡은 위치를 반영해 목적지 뒤 슬롯으로 이동하고, 대기 값과 별도로 현재
+모델의 순서도 읽는다. 원래 그룹 밖 순서와 그룹·탭의 동일성을 유지하며,
+좌표를 얻지 못하면 입력을 중단한다. Windows에서는 이동
+전후의 행·목록 배치와 실제 입력을 남기고 시퀀스 실패 뒤에도 기록을 저장한다.
 RTL의 방향 이동 사례는 논리적인 앞·뒤를 화면 좌표로 반전하여 실행한다.
 `DragSingleTabRightOfRightmostGroup`는 마지막 탭 중앙에서 그룹 바깥쪽으로
 1 DIP 이동하는 부호도 RTL에서 반전한다.
@@ -445,3 +458,32 @@ Sidebar를 접고 가로 분할의 도구 소유 pane에 폭을 배정한다. �
 유지하는지 LTR·RTL에서 검사한다. 폭을 다시 확보한 뒤의 표시와 편집·표시 의도의
 false→true 전환도 확인하며, 기존 주소 표면·Label 색상 판정을 유지한다.
 분할 Header의 자식 포함 관계와 창 버튼 예약 영역 검사는 그대로 유지한다.
+
+
+Windows의 Protection 클릭·collection 탭 드래그·그룹 밖 드래그 취소 검사는 같은
+읽기 전용 입력 관찰기를 사용한다. 최대 64개 앱 pre-target 입력과 32개 단계별
+창·포인터 상태를 보관하며, 실제 요청한 화면 DIP·변환된 물리 좌표, 수신 native
+메시지·HWND·PID·스레드, foreground·capture·focus와 입력 태그를 XML에 남긴다.
+이 경계의 관찰은 최종 Button callback 도달과 구분한다. 관찰기는 입력을 생성하거나
+메시지 루프를 돌리지 않으며, 입력·기대값·기존 시간 제한은 유지한다.
+
+`YeeDragPreviewFollowsStripOrientation`는 원래 drag context에 계속 붙어 있고 source
+탭이 원래 모델에 남았는지 확인한 바로 그 콜백에서 view를 조회한다. 소유권이
+어긋나면 InteractionSequence가 정상 실패와 입력 정리를 수행한다. 가로·세로의
+일반·고정 탭 미리보기, 불투명도, pin 상태와 최종 index 2·1 판정은 유지한다.
+Protection 검사는 두 방향에서 각 네 번의 실제 클릭과 true·false·true·false
+팝업 상태를 유지하며, 이동·클릭·idle 처리 후의 입력 단계를 구분해 기록한다.
+
+`RevertTabDragOutOfGroup`는 Escape 전 실제 드래그가 시작되어 원래 context에
+붙어 있고 source가 그룹 밖으로 이동했는지도 확인한다. 누름·이동·Escape·배치
+이후의 모델·view 그룹, 원래 source index와 탭 순서를 기록한다. Escape 후 원래
+순서와 정확한 그룹 범위 복원 판정은 유지한다. 이러한 진단 보강의 통과만으로
+이전 실패의 제품 원인이 해결됐다고 판단하지 않는다.
+
+`YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds`의 Windows 입력은 메뉴 화면을
+다시 만든 뒤와 Tab·Shift+Tab 순회 뒤에 해당 메뉴의 배치를 마치고 현재 좌표를
+읽는다. 현재 가시 영역과 같은 root의 행 입력 대상을 확인한 뒤 한 번만 실제
+포인터를 이동한다. 이동 완료 직후와 제한된 상태 관찰 이후의 행 bounds·cursor·
+hit target·active·drawn·focus·배경·focus 이유를 각각 기록한다. 순회 전의 행
+중앙과 bounds도 남겨 좌표 변화와 상태 전달 지연을 구분한다. 포인터 재입력이나
+직접 focus 변경 없이 기존 행 focus·배경·직접 입력 이유 판정을 모두 유지한다.

@@ -27,6 +27,8 @@ class ProjectService;
 // 않는다.
 class ProjectTabCoordinator : public KeyedService {
  public:
+  // 프로필 생성 전에 factory와 의존 factory를 등록한다. 서비스는 만들지 않는다.
+  static void EnsureFactoryBuilt();
   static ProjectTabCoordinator* GetForProfile(Profile* profile);
   ProjectTabCoordinator(Profile* profile, ProjectService* service);
   ~ProjectTabCoordinator() override;

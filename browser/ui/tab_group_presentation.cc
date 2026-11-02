@@ -220,7 +220,8 @@ bool ShouldHideHorizontalTabGroupMemberContents(const views::View& view,
 }
 
 bool UsesHorizontalTabGroupCapsule(const views::View& view) {
-  return IsShellEnabled() &&
+  // 생성 중인 view에는 아직 창의 테마가 없으므로 native 여백을 유지한다.
+  return IsShellEnabled() && view.GetWidget() &&
          !ShouldUseNativeHorizontalTabTheme(*view.GetNativeTheme(),
                                             view.GetThemeProvider());
 }
