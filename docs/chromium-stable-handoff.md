@@ -3,7 +3,8 @@
 2026-11-02 KST · 사용자가 Windows 실제 앱 검수가 막힌 상태에서 Mac으로 인계하고
 현재 수정본을 커밋·푸시하도록 요청했다. 전달 대상은 **`origin/pilot`**이다.
 Windows 앱·검사 대상 빌드, native 검사와 기술적 미디어 검증은 아래 범위까지 완료했다.
-Windows 실제 앱 18개와 macOS 빌드·검수는 미완료다. 이 체크포인트는 배포 승인 기록이 아니다.
+Windows 실제 앱 18개는 미완료다. macOS 결과는 2026-11-03 갱신한 아래 표와
+[macOS 검증 결과](#macos-검증-결과-2026-11-03)를 따른다. 이 체크포인트는 배포 승인 기록이 아니다.
 
 ## 현재 상태
 
@@ -18,8 +19,11 @@ Windows 실제 앱 18개와 macOS 빌드·검수는 미완료다. 이 체크포�
 | Windows 추가 native / 집중 검사 | **40 통과 / 21 통과**; 중복 범위를 합산하지 않음 |
 | Windows 기술적 앱·미디어 | **5단계 통과**; 전체 창 조작·실제 청취 검수와 구분 |
 | Windows 실제 앱 18개 | **0 통과·18 미검증**; 외부 제어 도구의 URL 판별 중단 |
-| macOS 빌드·native·실제 앱·CLI/MCP | **이번 수정본으로 미검증** |
-| 설치판·실사용 프로필 | 기존 환경 보존. 이번 체크포인트에서 교체·배포하지 않음 |
+| macOS 빌드·집중 native | **완료**, 기본 10/10·RTL 125% 10/10 (2026-11-03) |
+| macOS 실제 앱 18개 | **14 통과·2 부분·2 미확인**; 남은 4개는 모두 실제 포인터 드래그 계열 |
+| macOS 미디어·CLI/MCP | 코덱 2/2·전면 live·VOD 청취 확인; CLI 통과·MCP 9개 사례 통과 |
+| Windows 설치판·실사용 프로필 | 기존 환경 보존. 이번 체크포인트에서 교체·배포하지 않음 |
+| macOS 설치판 | 사용자 승인으로 `/Applications/Yee.app`을 157 ad-hoc 테스트 패키지로 교체, 프로필·북마크 보존 |
 
 Windows 검증은 Yee HEAD `3593947320557f732b39e993b7b74b28cf48b5d2`에 검토된 13개
 변경 파일을 적용한 상태에서 수행했다. 전달 문서 갱신은 그 뒤의 문서 변경이다.
@@ -179,6 +183,24 @@ Mac에서는 실제 앱에서 정상 종료·복원, 직접 MP4와 MSE의 AAC/H.
 CLI/MCP의 새 앱 연결·관찰·입력·탭 전환·취소도 확인한다.
 Windows 결과를 Mac 통과로 기록하거나 transport 비활성을 통과로 세지 않는다.
 
+## macOS 검증 결과 (2026-11-03)
+
+`7777daf`에 검토한 Mac 후속 변경을 적용한 상태로 `out/YeeStable157`을 빌드해 검수했다.
+그 변경은 `b462c19`로 커밋했으며, 검수 뒤 바뀐 것은 테스트 주석과 검사 범위 문서뿐이다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 집중 native | 기본 10/10·RTL 125% 10/10, 재시도·생략 0. 분할 경계 실제 마우스 드래그, native 창 크기 변경, Favorites·그룹 드래그 포함 |
+| 미디어 | 현재 앱 AAC/H.264 직접 MP4·MSE 2/2, 전면 유지 strict live 90초 통과, 사용자 VOD 음성 청취 확인 |
+| 실제 앱 18개 | 14 통과·2 부분(Favorites 재정렬, 분할 경계)·2 미확인(그룹 중간 위·아래 드래그) |
+| CLI/MCP | CLI 범위 검사 통과. MCP 9개 사례 통과, 첫 탭 연결 승인이 만료돼 재시도했으므로 중단 없는 단일 통과는 아님 |
+| 설치 | `package-macos.sh --skip-build`와 `test-macos-installer.mjs` 복원 검사 통과. ad-hoc 서명이며 Developer ID·공증 별도 |
+
+남은 Mac 실제 앱 4개는 같은 동작의 실제 포인터 native 회귀가 통과했지만 수동 통과로 올리지 않았다.
+원시 기록은 Mac 로컬 `.local-exclude/`에 있으며 Git으로 전송하지 않는다. Windows 결과를 Mac 통과로,
+Mac 결과를 Windows 통과로 기록하지 않는다. 다음 Chromium 이식은 [개발 도구](../tools/dev/README.md)의
+사전 컴파일 점검과 빌드 루트·출력 선택 규칙을 따른다.
+
 ## Windows 증거 위치와 재개 조건
 
 제품 기준 저장소는 `F:/yee/pilot-repo`의 `pilot`, 검수 작업 폴더는
@@ -213,3 +235,30 @@ Mac에서 확인할 소스·패치·정식 검사 코드는 커밋에 포함한�
 0001 갱신은 정식 `tools/overlay/regenerate-shell-patch.py --chromium-src ...`를 사용한다.
 제품 소스와 canonical 패치의 일치를 유지하고, [작업 규칙](../AGENTS.md)과
 [기여 절차](../CONTRIBUTING.md)의 소유권·독립 검토·실제 앱 확인을 따른다.
+
+## Windows 후속 작업 (2026-11-03 Mac에서 넘김)
+
+Mac에서 아래 도구 개선을 zsh 쪽에만 적용했다. Windows 작업은 이 목록을 기준으로 Windows PC에서
+구현·검증한다. Mac 결과를 Windows 통과로 기록하지 않는다.
+
+1. **빌드 루트·출력 선택 가드의 `.ps1` 대응.** `tools/dev/lib/paths.ps1`은 `YEE_OUT_NAME`이 없으면
+   `YeePilot`, `YEE_CHROMIUM_ROOT`가 없으면 `LocalBuildRoot\chromium`으로 조용히 정한다. Mac의
+   `tools/dev/lib/paths.zsh`·`preflight.zsh`와 같은 규칙을 적용한다.
+   - 출력: `YEE_OUT_NAME` 미지정, 기본 출력에 `build.ninja` 없음, 같은 `out\*\build.ninja` 후보 존재 →
+     후보와 지정 방법을 출력하고 종료 코드 18. `configure.ps1`(gn gen 전), `build.ps1`·`build-ui.ps1`
+     (디스크 검사 전), `lib/build.ps1` 공통 빌드, `run.ps1`·`smoke-test.ps1`·`package-windows.ps1`
+     등 부작용 전에 확인한다.
+   - 루트: `YEE_CHROMIUM_ROOT`·`YEE_LOCAL_BUILD_ROOT` 모두 미지정, 기본 위치에 depot_tools·소스 없음,
+     저장소 `.local-build\*\chromium\src\BUILD.gn` 후보 존재일 때만 종료 코드 17. `F:\yee\...`처럼
+     저장소 밖 루트는 찾지 않으므로 안내에 `YEE_CHROMIUM_ROOT` 지정 방법을 넣는다.
+   - 명시값은 항상 우선하고, 후보가 없는 새 장비의 기존 동작은 유지한다.
+   - `tests/tooling`의 PowerShell 조건부 테스트로 검증한다. Mac 동작 기준은
+     `tests/tooling/test_build_selection.py`다.
+2. **플랫폼 미컴파일 파일의 Windows 점검.** Mac의 `tools/dev/check-compile.sh --list`는 현재 graph에서
+   object가 없는 13개 파일을 따로 보고한다. 그중 `*_win.cc`, Aura, `ui_controls_internal_win.cc` 등
+   Windows 전용 파일은 다음 Chromium 이식 때 긴 Windows 빌드 전에 먼저 컴파일한다.
+   `check-compile.sh`는 macOS 전용이며 Windows 대응 실행기는 아직 없다.
+3. **native 실행 기록.** Mac `run_native_test_gate`의 실행 기록은 Windows 실행기에 적용되지 않는다.
+   Windows는 기존 `run-windows-native-gates.py`의 출처 검증을 유지한다.
+4. **Windows 실제 앱 18개.** 위 [URL 제어 중단과 남은 실제 앱 18개](#url-제어-중단과-남은-실제-앱-18개)의
+   미검증 상태 그대로다.
