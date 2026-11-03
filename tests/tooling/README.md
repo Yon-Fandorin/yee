@@ -21,6 +21,11 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test
 브랜딩 적용 테스트는 Windows에서 PowerShell, macOS에서 zsh 진입점을 사용한다.
 새 원본에 적용·이름 변경·반복 적용과 생성 경로의 패치 재진입 거부를 검사한다.
 
+`test_patch_ratchet.py`는 파일 분류·지표 측정·멤버 선언 근사 판정, 최초 기준선 기록,
+감소분만 저장하는 `--update`, 증가·예외 허용량·잘못된 설정을 임시 패치로 검사한다.
+`test_overlay_tools.py`의 `test_regenerate_saves_patch_then_fails_when_ratchet_grows`는
+래칫 증가 시에도 `0001`을 먼저 저장한 뒤 실패 코드를 반환하는지 확인한다.
+
 `test_native_test_discovery.py`는 일반·타입·값 매개변수 목록, 양수·음수 필터,
 비활성 테스트, 패턴 일부 누락과 순수 Python CLI를 가짜 목록으로 확인한다.
 zsh가 있으면 가짜 바이너리로 목록 조회·실제 실행의 인수 일치와 실패 코드 전파도 확인한다.

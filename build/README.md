@@ -5,6 +5,7 @@
 - [`args.gn`](args.gn): 디버그 정보를 줄인 Chromium 빌드 설정
 - [`chromium-version.json`](chromium-version.json): Windows·macOS가 함께 쓰는 Stable 원본 버전·커밋
 - [`overlay.json`](overlay.json): 패치 순서, 소스 복사 경로, 생성 자산과 새 연결 파일 목록
+- [`patch-ratchet.json`](patch-ratchet.json): 패치 역할별 결합 지표의 경로별 기준선과 검토한 예외
 
 Chromium 소스, 캐시와 빌드 결과는 Git에서 제외된 `.local-build/`에 생성한다.
 표시 이름과 로고는 [`branding/brand.json`](../branding/brand.json)에서 설정한다.

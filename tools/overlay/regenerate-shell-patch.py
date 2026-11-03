@@ -4,6 +4,7 @@
 import argparse
 import pathlib
 from lib.overlay_tools import chromium_path, load_catalog, shell_exclusions
+from lib.patch_ratchet import run as check_ratchet
 import subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -39,6 +40,9 @@ def main():
                    cwd=src, input=patch, check=True)
     PATCH.write_bytes(patch)
     print(f'Validated {len(patch)} bytes -> {PATCH.relative_to(ROOT)}')
+    # 패치는 실제 변경 내역이므로 먼저 저장하고, 결합 지표 증가는 실패 코드로 알린다.
+    if check_ratchet(ROOT, role='shell', patch=PATCH, missing_ok=True):
+        raise SystemExit('0001은 저장했지만 패치 래칫 검사에 실패했다.')
 
 
 if __name__ == '__main__':

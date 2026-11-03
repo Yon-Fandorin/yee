@@ -20,6 +20,7 @@
 | `audit_logo_assets.py` | GRIT·네이티브·공통 WebUI·삽화의 독립 로고 경로와 적용 상태 검사 |
 | `audit-branding.py` | 브랜딩 적용 대상과 남은 문구 점검 |
 | `regenerate-shell-patch.py` | 실제 변경 내역에서 `0001` 다시 만들기 |
+| `check-patch-ratchet.py` | 패치의 경로별 결합 지표와 기준선·예외 검사 |
 | `vendor-yee-adblock.py` | 외부 Rust 원본 확인과 빌드 파일 생성 |
 
 공통 코드는 [`lib/`](lib/README.md)에 있다.
@@ -119,6 +120,27 @@ UI 개선은 기존 `0001`에 반영한다.
 저장소 루트 공백 검사에서는 패치 파일을 제외한다.
 상세 절차는 [패치 작업 규칙](../../patches/AGENTS.md)과
 [루트 작업 규칙](../../AGENTS.md)을 따른다.
+
+## 패치 래칫
+
+저장소 루트에서 패치가 수정한 Chromium 파일의 결합 지표를 검사한다.
+
+```sh
+python3 tools/overlay/check-patch-ratchet.py
+python3 tools/overlay/check-patch-ratchet.py --update
+```
+
+[`build/patch-ratchet.json`](../../build/patch-ratchet.json)의 경로별 기준선보다 늘면
+실패한다. 증가는 검토한 예외(`metric`, `path`, `allowed`, `reason`)로 허용하며,
+`allowed`는 해당 지표·경로의 절대 허용 수로 기준선보다 커야 한다.
+감소한 값은 `--update`로 잠근다. 이 옵션은 기준선을 올리지 않으며,
+쓰지 않는 예외 허용량은 직접 낮추거나 불필요한 예외를 제거한다.
+
+`--role`의 기본값은 `shell`이고, `--init`은 해당 role의 기준선이 없을 때만 쓴다.
+검사 종료 코드는 통과 `0`, 위반 `1`, 설정 오류 `2`다.
+`regenerate-shell-patch.py`도 `0001` 저장 후 래칫을 실행하고 실패 시 non-zero로 끝난다.
+저장한 패치는 유지하며, 해당 role의 기준선이 없으면 재생성의 래칫 검사만 건너뛴다.
+지표·예외 규칙과 후속 범위는 [이식 구조](../../docs/chromium-upgrade-structure.md)에 있다.
 
 현재 UI와 기능은 [브라우저 코드](../../browser/README.md),
 [Sidebar 결정](../../docs/sidebar/README.md), [Header 테스트](../../docs/header/README.md),

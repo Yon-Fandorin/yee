@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/overlay'))
 from lib.overlay_tools import (apply_patch_plan, load_catalog, patch_paths, patch_plan,
                                shell_exclusions, source_plan, sync_sources)
+from lib.patch_ratchet import METRICS
 
 
 def git(src, *args):
@@ -148,6 +149,30 @@ class OverlayToolsTest(unittest.TestCase):
         self.assertEqual(patch_paths(patch), ['shell.cc', 'new-glue.cc'])
         git(self.src, 'apply', '--reverse', '--check', str(patch))
         self.assertEqual(index_before, git(self.src, 'diff', '--cached', '--binary'))
+
+    def test_regenerate_saves_patch_then_fails_when_ratchet_grows(self):
+        """0001을 먼저 저장하고, 래칫 기준선보다 늘어난 분기는 실패 코드로 알린다."""
+        tool = self.overlay / 'tools/overlay'
+        tool.mkdir(parents=True)
+        shutil.copy(ROOT/'tools/overlay/regenerate-shell-patch.py', tool)
+        shutil.copytree(ROOT/'tools/overlay/lib', tool/'lib',
+                        ignore=shutil.ignore_patterns('__pycache__'))
+        baseline = {metric: {} for metric in METRICS}
+        ratchet = {'schema_version': 1,
+                   'roles': {'shell': {'baseline': baseline, 'exceptions': []}}}
+        (self.overlay/'build/patch-ratchet.json').write_text(json.dumps(ratchet))
+        (self.src/'shell.cc').write_text('if (yee::IsShellEnabled()) {}\n')
+        command = [sys.executable, str(tool/'regenerate-shell-patch.py'),
+                   '--chromium-src', str(self.src)]
+        result = subprocess.run(command, cwd=self.base, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('[증가] shell_branches shell.cc: 현재 1, 허용 0', result.stdout)
+        patch = self.overlay/'patches/0001-integrate-yee-shell.patch'
+        self.assertIn('+if (yee::IsShellEnabled()) {}', patch.read_text())
+        baseline['shell_branches'] = {'shell.cc': 1}
+        (self.overlay/'build/patch-ratchet.json').write_text(json.dumps(ratchet))
+        result = subprocess.run(command, cwd=self.base, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_late_patch_conflict_is_rejected_before_any_write(self):
         (self.src / 'windows.bat').write_text('conflict\n')

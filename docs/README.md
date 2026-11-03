@@ -8,6 +8,7 @@
 | 주제 | 문서 |
 | --- | --- |
 | 파일 배치와 Chromium 적용 경로 | [프로젝트 구조](project-structure.md) |
+| Chromium 버전 이식 구조와 패치 래칫 | [이식 구조](chromium-upgrade-structure.md) |
 | 화면 배치와 용어 | [셸 명세](browser-shell-spec.md), [레이아웃 용어](browser-shell-layout-glossary.md) |
 | 사이드바의 제품 결정 | [Sidebar 문서](sidebar/README.md) |
 | 프로젝트 탐색 UX와 후속 작업 | [설계 핸드오프·캡처](project-navigation-handoff.md), [상세 구현 계획](project-navigation-implementation-plan.md) |

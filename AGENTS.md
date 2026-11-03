@@ -53,6 +53,9 @@ Ask before guessing, especially for:
 - `.local-build/` is generated. After Chromium glue changes, regenerate
   `0001` as a `git diff` of every touched Chromium file, and drop files
   that match upstream again.
+- After regenerating `0001`, `python3 tools/overlay/check-patch-ratchet.py`
+  must pass. Growth requires a reviewed exception (`metric`, `path`, `allowed`,
+  `reason`) in `build/patch-ratchet.json`; lock reductions with `--update`.
 - `0001` is itself a unified diff. Repository-root `git diff --check` can
   misreport its required single-space context lines as trailing whitespace.
   Check the actual Chromium source paths with
