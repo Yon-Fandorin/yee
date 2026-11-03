@@ -12,6 +12,8 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_run_loop_timeout.h"
+#include "base/time/time.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -698,6 +700,7 @@ TEST_F(SidebarFooterViewTest,
 }
 
 TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
+  base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
@@ -708,7 +711,10 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
     return !GetSidebarFooterMenuForTesting(*footer_) && footer_->HasFocus() &&
            footer_->GetFocusManager()->focus_change_reason() ==
                views::FocusManager::FocusChangeReason::kFocusTraversal;
-  }));
+  })) << "owner_active="
+      << widget()->IsActive() << " footer_focus=" << footer_->HasFocus()
+      << " focus_reason="
+      << static_cast<int>(footer_->GetFocusManager()->focus_change_reason());
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_TRUE(footer_->HasFocus());
@@ -733,8 +739,9 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
 #endif
 }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
+  base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
   footer_ = nullptr;
   auto root = std::make_unique<views::View>();
   views::View* const container = root.get();
@@ -758,10 +765,27 @@ TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
   container->AddChildView(std::move(detached));
   focus_target->RequestFocus();
   base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return widget()->IsActive() && focus_target->HasFocus(); }));
   EXPECT_TRUE(focus_target->HasFocus());
   EXPECT_FALSE(footer_->HasFocus());
 }
+#endif
 
+#if BUILDFLAG(IS_MAC)
+TEST_F(SidebarFooterViewTest, EscapeRestoreDoesNotRevealHiddenOwner) {
+  views::View* const menu = OpenBubble();
+  ASSERT_TRUE(menu);
+  ASSERT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
+      ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
+  widget()->Hide();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
+  EXPECT_FALSE(widget()->IsVisible());
+}
+#endif
+
+#if BUILDFLAG(IS_WIN)
 TEST_F(SidebarFooterViewTest, PointerExitAndReentryKeepNativePopupFocus) {
   widget()->Show();
   const gfx::Point center = footer_->GetLocalBounds().CenterPoint();

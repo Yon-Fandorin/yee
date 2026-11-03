@@ -165,6 +165,56 @@ IN_PROC_BROWSER_TEST_F(SidebarFooterBrowserTest,
   EXPECT_EQ(static_cast<HoverButton *>(first)->title()->GetText(), u"테스트용");
 }
 
+// 새 프로필 맞춤설정은 Pref를 바꾸지 않고 native 이름만 갱신한다.
+IN_PROC_BROWSER_TEST_F(SidebarFooterBrowserTest,
+                       NativeProfileNameReachesCurrentAndNewWindows) {
+  PrepareCurrentProfile();
+  Profile* const profile = browser()->GetProfile();
+  const auto previous_pref_name =
+      profile->GetPrefs()->GetString(prefs::kProfileName);
+  auto* const entry = g_browser_process->profile_manager()
+                          ->GetProfileAttributesStorage()
+                          .GetProfileAttributesWithPath(profile->GetPath());
+  ASSERT_TRUE(entry);
+  views::View* const first = FooterFor(browser());
+  ASSERT_TRUE(first);
+  BrowserWindowInterface* const second_browser = CreateBrowser(profile);
+  views::View* const second = FooterFor(second_browser);
+  ASSERT_TRUE(second);
+
+  entry->SetLocalProfileName(u"새 검수 프로필", false);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return static_cast<HoverButton*>(first)->title()->GetText() ==
+               u"새 검수 프로필" &&
+           static_cast<HoverButton*>(second)->title()->GetText() ==
+               u"새 검수 프로필";
+  }));
+  EXPECT_EQ(profile->GetPrefs()->GetString(prefs::kProfileName),
+            previous_pref_name);
+  for (views::View* footer : {first, second}) {
+    EXPECT_NE(
+        footer->GetViewAccessibility().GetCachedName().find(u"새 검수 프로필"),
+        std::u16string::npos);
+  }
+  views::View* const menu = OpenContexts(browser());
+  ASSERT_TRUE(menu);
+  auto* const row = ContextNamed(menu, u"새 검수 프로필");
+  ASSERT_TRUE(row);
+  ui::AXNodeData selected;
+  row->GetViewAccessibility().GetAccessibleNodeData(&selected);
+  EXPECT_TRUE(selected.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
+  ClickFooterControl(first);
+  base::RunLoop().RunUntilIdle();
+
+  BrowserWindowInterface* const third_browser = CreateBrowser(profile);
+  views::View* const third = FooterFor(third_browser);
+  ASSERT_TRUE(third);
+  EXPECT_EQ(static_cast<HoverButton*>(third)->title()->GetText(),
+            u"새 검수 프로필");
+  CloseBrowserSynchronously(third_browser);
+  CloseBrowserSynchronously(second_browser);
+}
+
 // 다른 프로필의 생성·이름·숨김·삭제가 열린 창의 실제 목록에 반영된다.
 IN_PROC_BROWSER_TEST_F(SidebarFooterBrowserTest,
                        ProfileListTracksNativeChanges) {

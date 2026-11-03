@@ -36,6 +36,8 @@ case "$(uname -s)" in
     ;;
 esac
 INTERACTIVE_FILTER+=':All/TabStripCollectionControllerInteractiveUiTest.YeeDragPreviewFollowsStripOrientation/*:All/TabStripCollectionControllerInteractiveUiTest.YeePinnedSplitBorderFollowsStripOrientation/*'
+INTERACTIVE_FILTER+=':All/TabStripCollectionControllerInteractiveUiTest.YeeClosingTabCanReattachWithoutModel/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeDividerMouseDragResizesBothPanesAndKeepsTabs/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Sidebar regression targets"

@@ -243,11 +243,14 @@ void ProjectHubView::RestoreScrollPosition(int position) {
 }
 
 void ProjectHubView::Layout(PassKey) {
-  const int column_width = std::min(720, std::max(0, width() - 48));
-  for (const auto& host : hosts_)
+  const gfx::Rect body_bounds = GetContentsBounds();
+  const int column_width = std::min(720, std::max(0, body_bounds.width() - 48));
+  for (const auto& host : hosts_) {
     host->SetVisible(column_width >= 640);
-  for (const auto& state : states_)
+  }
+  for (const auto& state : states_) {
     state->SetVisible(column_width >= 380);
+  }
   auto* body_layout =
       static_cast<views::BoxLayout*>(scroll_->contents()->GetLayoutManager());
   auto* actions_layout =
@@ -270,7 +273,8 @@ void ProjectHubView::Layout(PassKey) {
       actions_width <= available_width
           ? views::BoxLayout::CrossAxisAlignment::kCenter
           : views::BoxLayout::CrossAxisAlignment::kStart);
-  scroll_->SetBounds((width() - column_width) / 2, 0, column_width, height());
+  scroll_->SetBounds(body_bounds.x() + (body_bounds.width() - column_width) / 2,
+                     body_bounds.y(), column_width, body_bounds.height());
   LayoutSuperclass<views::View>(this);
   if (pending_scroll_position_) {
     // 새 viewport와 contents 높이가 정해진 뒤 유효한 범위 안에 복원한다.

@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license in LICENSE.
 
 #include <algorithm>
+#include <cmath>
 #include <set>
 #include <string_view>
+#include <vector>
 
 #include "base/check.h"
 #include "base/command_line.h"
@@ -11,7 +13,9 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/logging.h"
 #include "base/run_loop.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
@@ -41,6 +45,8 @@
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/infobars/confirm_infobar.h"
+#include "chrome/browser/ui/views/infobars/infobar_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
@@ -58,6 +64,7 @@
 #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
 #include "chrome/browser/ui/views/tabs/tab_style_views.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
 #include "chrome/browser/ui/views/yee/projects/project_hub_view.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 #include "chrome/browser/ui/views/yee/projects/project_row_view.h"
@@ -72,12 +79,16 @@
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/infobars/content/content_infobar_manager.h"
+#include "components/infobars/core/confirm_infobar_delegate.h"
 #include "components/javascript_dialogs/app_modal_dialog_controller.h"
 #include "components/javascript_dialogs/app_modal_dialog_view.h"
 #include "components/sessions/core/command_storage_read_status.h"
 #include "components/sessions/core/session_service_commands.h"
 #include "components/sessions/core/session_types.h"
 #include "components/tabs/public/split_tab_data.h"
+#include "components/viz/common/frame_sinks/copy_output_request.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -266,6 +277,15 @@ views::Label* FindLabel(views::View* root, const std::u16string& text) {
 bool HasLabel(views::View* root, const std::u16string& text) {
   return FindLabel(root, text) != nullptr;
 }
+
+class HubInfoBarDelegate : public ConfirmInfoBarDelegate {
+ public:
+  InfoBarIdentifier GetIdentifier() const override { return TEST_INFOBAR; }
+  std::u16string GetMessageText() const override {
+    return u"허브에서도 native 안내 문구와 닫기 조작을 유지합니다.";
+  }
+  int GetButtons() const override { return BUTTON_OK; }
+};
 
 class ProjectNavigationBrowserTest : public InProcessBrowserTest {
  protected:
@@ -1412,6 +1432,213 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     base::RunLoop().RunUntilIdle();
     view->DeprecatedLayoutImmediately();
     EXPECT_FALSE(controller->showing_hub());
+  }
+}
+
+// 창 크기 변경이나 전체 강제 redraw 없이 안내 문구·버튼의 합성 출력을
+// 유지하고, 단일·분할 화면의 native 안내 아래에 허브 본문을 배치한다.
+IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
+                       HubKeepsNativeNoticeVisibleAndReservesItsBody) {
+  auto rich = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  auto project = service()->CreateProject(u"안내와 허브");
+  ASSERT_TRUE(project);
+  auto* controller = ProjectNavigationController::From(browser());
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* widget = view->GetWidget();
+  auto* compositor = widget->GetCompositor();
+  ASSERT_TRUE(compositor);
+  RecordProperty("HubNoticeDeviceScaleFactorX100",
+                 static_cast<int>(compositor->device_scale_factor() * 100));
+  LOG(INFO) << "HubNoticeReadback dsf=" << compositor->device_scale_factor();
+  const auto layout = [&] {
+    base::RunLoop().RunUntilIdle();
+    view->DeprecatedLayoutImmediately();
+    widget->LayoutRootViewIfNecessary();
+  };
+  struct Readback {
+    gfx::Rect pixels_in_root;
+    std::vector<SkColor> colors;
+  };
+  const auto read_pixels = [&](gfx::Rect area) {
+    const auto root = widget->GetRootView()->GetBoundsInScreen();
+    area.Offset(-root.x(), -root.y());
+    const gfx::Rect pixels = gfx::ToEnclosingRect(
+        gfx::ScaleRect(gfx::RectF(area), compositor->device_scale_factor()));
+    base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> readback;
+    auto request = std::make_unique<viz::CopyOutputRequest>(
+        viz::CopyOutputRequest::ResultFormat::RGBA,
+        viz::CopyOutputRequest::ResultDestination::kSystemMemory,
+        readback.GetCallback());
+    // cc가 root layer 좌표에 render surface 배율을 적용한다.
+    // 요청 영역에 다시 배율을 곱하면 다른 위치와 크기를 읽는다.
+    request->set_area(area);
+    compositor->root_layer()->RequestCopyOfOutput(std::move(request));
+    // 전체 무효화는 허브 진입 때 빠진 paint를 대신 수행하므로 사용하지 않는다.
+    compositor->ScheduleDraw();
+    auto result = readback.Take();
+    Readback captured{pixels, {}};
+    EXPECT_TRUE(result && !result->IsEmpty());
+    if (!result || result->IsEmpty()) {
+      return captured;
+    }
+    auto access = result->ScopedAccessSkBitmap();
+    const auto bitmap = access.GetOutScopedBitmap();
+    EXPECT_EQ(pixels.size(), gfx::Size(bitmap.width(), bitmap.height()));
+    for (int y = 0; y < bitmap.height(); ++y) {
+      for (int x = 0; x < bitmap.width(); ++x) {
+        captured.colors.push_back(bitmap.getColor(x, y));
+      }
+    }
+    return captured;
+  };
+  for (int mode : {0, 1, 2}) {
+    SCOPED_TRACE(mode);
+    if (mode == 1) {
+      chrome::NewSplitTab(browser(), split_tabs::SplitTabLayout::kSideBySide,
+                          split_tabs::SplitTabCreatedSource::kToolbarButton);
+    } else if (mode == 2) {
+      auto* model = browser()->tab_strip_model();
+      model->ActivateTabAt(model->count() - 1);
+      ASSERT_TRUE(model->GetActiveTab()->GetSplit());
+      model->UpdateSplitLayout(model->GetActiveTab()->GetSplit().value(),
+                               split_tabs::SplitTabLayout::kStacked);
+    }
+    auto* contents = browser()->tab_strip_model()->GetActiveWebContents();
+    auto* manager = infobars::ContentInfoBarManager::FromWebContents(contents);
+    ASSERT_TRUE(manager);
+    auto* notice = static_cast<ConfirmInfoBar*>(manager->AddInfoBar(
+        ConfirmInfoBar::Create(std::make_unique<HubInfoBarDelegate>())));
+    ASSERT_TRUE(notice);
+    notice->SetBackground(
+        views::CreateSolidBackground(SkColorSetRGB(255, 0, 255)));
+    for (bool vertical : {true, false}) {
+      SCOPED_TRACE(vertical ? "vertical" : "horizontal");
+      tabs::VerticalTabStripStateController::From(browser())
+          ->SetVerticalTabsEnabled(vertical);
+      layout();
+      ASSERT_TRUE(notice->IsDrawn());
+      auto* label = FindLabel(notice, HubInfoBarDelegate().GetMessageText());
+      auto* dismiss = views::ElementTrackerViews::GetInstance()->GetUniqueView(
+          InfoBarView::kDismissButtonElementId, view->GetElementContext());
+      ASSERT_TRUE(label && dismiss && notice->Contains(dismiss));
+      const std::vector<views::View*> controls{label, dismiss};
+      const gfx::Rect notice_bounds = notice->GetBoundsInScreen();
+      const auto radii = notice->layer()->rounded_corner_radii();
+      // 부분 픽셀과 둥근 clip 바깥은 Hub가 가린 pane 배경을 포함한다.
+      // 색상과 무관하게 native 곡률 안쪽으로 1 DIP 여유를 둔 영역을 고정한다.
+      const int inset = 1 + static_cast<int>(std::ceil(std::max(
+                                {radii.upper_left(), radii.upper_right(),
+                                 radii.lower_left(), radii.lower_right()})));
+      gfx::Rect stable = notice_bounds;
+      stable.Inset(gfx::Insets(inset));
+      ASSERT_FALSE(stable.IsEmpty());
+      std::vector<Readback> foreground;
+      std::vector<gfx::Rect> control_bounds;
+      for (auto* control : controls) {
+        ASSERT_TRUE(stable.Contains(control->GetBoundsInScreen()));
+        control_bounds.push_back(control->GetBoundsInScreen());
+        foreground.push_back(read_pixels(control_bounds.back()));
+        ASSERT_GT(std::ranges::count_if(
+                      foreground.back().colors,
+                      [](SkColor color) { return color != SK_ColorMAGENTA; }),
+                  5);
+      }
+      const auto root_bounds = widget->GetRootView()->GetBoundsInScreen();
+      stable.Offset(-root_bounds.x(), -root_bounds.y());
+      const gfx::Rect stable_pixels = gfx::ToEnclosedRect(gfx::ScaleRect(
+          gfx::RectF(stable), compositor->device_scale_factor()));
+      const auto initial = read_pixels(notice_bounds);
+      ASSERT_GT(std::ranges::count_if(initial.colors,
+                                      [](SkColor color) {
+                                        return SkColorGetR(color) >= 240u &&
+                                               SkColorGetG(color) <= 15u &&
+                                               SkColorGetB(color) >= 240u;
+                                      }),
+                100);
+      for (int refresh = 0; refresh < 2; ++refresh) {
+        SCOPED_TRACE(refresh);
+        controller->ShowHub(*project);
+        layout();
+        auto* hub = view->GetViewByID(ProjectNavigationController::kHubViewId);
+        ASSERT_TRUE(hub);
+        auto* title = FindLabel(hub, u"안내와 허브");
+        auto* scroll = FindScrollView(hub);
+        ASSERT_TRUE(title && scroll);
+        auto* multi = view->multi_contents_view();
+        auto* pane = multi->GetContentsContainerViewFor(contents);
+        ASSERT_TRUE(pane);
+        gfx::Rect page_environment =
+            pane->GetPageViewportGeometry().page_environment_in_container;
+        views::View::ConvertRectToScreen(pane, &page_environment);
+        if (mode == 2) {
+          EXPECT_GT(page_environment.y(),
+                    multi->GetBoundsInScreen().y() + multi->height() / 2);
+        }
+        EXPECT_EQ(page_environment.y(), scroll->GetBoundsInScreen().y());
+        EXPECT_GE(title->GetBoundsInScreen().y(), page_environment.y());
+        EXPECT_EQ(multi->bounds(), hub->bounds());
+        EXPECT_EQ(contents,
+                  view->infobar_container()->GetWebContentsForLayout());
+        EXPECT_TRUE(notice->IsDrawn());
+        EXPECT_EQ(notice_bounds, notice->GetBoundsInScreen());
+        EXPECT_EQ(radii, notice->layer()->rounded_corner_radii());
+        for (size_t i = 0; i < controls.size(); ++i) {
+          EXPECT_EQ(control_bounds[i], controls[i]->GetBoundsInScreen());
+          const auto current = read_pixels(control_bounds[i]);
+          EXPECT_TRUE(foreground[i].colors == current.colors)
+              << "안내 문구 또는 닫기 버튼의 픽셀이 달라졌다: " << i;
+        }
+        const auto current = read_pixels(notice_bounds);
+        ASSERT_FALSE(initial.pixels_in_root.IsEmpty());
+        ASSERT_EQ(initial.pixels_in_root, current.pixels_in_root);
+        ASSERT_EQ(initial.colors.size(), current.colors.size());
+        gfx::Rect differences;
+        size_t changed = 0;
+        size_t changed_inside = 0;
+        std::string first_pixels;
+        for (size_t i = 0; i < initial.colors.size(); ++i) {
+          if (initial.colors[i] == current.colors[i]) {
+            continue;
+          }
+          const int x = initial.pixels_in_root.x() +
+                        static_cast<int>(i % initial.pixels_in_root.width());
+          const int y = initial.pixels_in_root.y() +
+                        static_cast<int>(i / initial.pixels_in_root.width());
+          if (changed < 4) {
+            first_pixels +=
+                base::StringPrintf(" (%d,%d:%08x>%08x)", x, y,
+                                   initial.colors[i], current.colors[i]);
+          }
+          ++changed;
+          changed_inside += stable_pixels.Contains(x, y);
+          differences.Union(gfx::Rect(x, y, 1, 1));
+        }
+        LOG(INFO) << "HubNoticePixelDiff mode=" << mode
+                  << " vertical=" << vertical << " refresh=" << refresh
+                  << " dip=" << notice_bounds.ToString()
+                  << " pixels=" << initial.pixels_in_root.ToString()
+                  << " radii=" << radii.ToString()
+                  << " stable=" << stable_pixels.ToString()
+                  << " changed=" << changed << " inside=" << changed_inside
+                  << " bounds=" << differences.ToString() << first_pixels;
+        EXPECT_EQ(0u, changed_inside);
+      }
+      controller->ExitHub();
+      layout();
+      EXPECT_TRUE(notice->IsDrawn());
+    }
+    controller->ShowHub(*project);
+    layout();
+    manager->RemoveInfoBar(notice);
+    layout();
+    auto* hub = view->GetViewByID(ProjectNavigationController::kHubViewId);
+    ASSERT_TRUE(hub);
+    EXPECT_TRUE(hub->GetInsets().IsEmpty());
+    controller->ExitHub();
+    layout();
   }
 }
 

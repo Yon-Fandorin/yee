@@ -64,6 +64,7 @@ source_set("project_navigation") {
     "//chrome/browser/ui/navigator",
     "//chrome/browser/ui/views/frame:browser_view_header",
     "//chrome/browser/ui/views/frame:multi_contents_view",
+    "//chrome/browser/ui/views/infobars",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/toolbar",
     "//chrome/browser/yee_projects:browser",
@@ -392,6 +393,7 @@ test("site_controls_browsertests") {
   ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   deps = [
+    ":page_viewport_geometry",
     ":project_navigation",
     ":yee_ui",
     "bookmarks",
@@ -425,6 +427,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/animations",
     "//chrome/browser/ui/views/frame:browser_view_header",
+    "//chrome/browser/ui/views/infobars",
     "//chrome/browser/ui/views/omnibox",
     "//chrome/browser/ui/views/page_info",
     "//chrome/browser/ui/views/tabs:new_tab_button",
@@ -446,6 +449,8 @@ test("site_controls_browsertests") {
     "//components/history/core/browser",
     "//components/history/core/common",
     "//components/history/core/test",
+    "//components/infobars/content",
+    "//components/infobars/core",
     "//components/javascript_dialogs",
     "//components/omnibox/browser",
     "//components/policy/core/common:test_support",
@@ -453,6 +458,7 @@ test("site_controls_browsertests") {
     "//components/sessions",
     "//components/split_tabs",
     "//components/sync_preferences:test_support",
+    "//components/viz/common",
     "//components/yee_branding",
     "//content/test:test_support",
     "//extensions:test_support",

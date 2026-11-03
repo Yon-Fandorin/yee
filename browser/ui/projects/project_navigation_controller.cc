@@ -31,6 +31,7 @@
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/infobars/infobar_container_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/projects/project_hub_view.h"
@@ -58,6 +59,7 @@
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
+#include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/controls/button/md_text_button.h"
@@ -682,14 +684,37 @@ void ProjectNavigationController::AfterBrowserLayout() {
   }
   conceal(view->toolbar(), false);
   // Native Toolbar의 배경·클립은 남기고 페이지 조작만 가린다.
-  for (const auto& child : view->toolbar()->children())
+  for (const auto& child : view->toolbar()->children()) {
     conceal(child, true);
+  }
   hub->SetBoundsRect(multi->bounds());
+  // 배경은 전체 면을 가린 채 본문만 native 안내의 흐름 아래로 내린다.
+  // Mac 전체화면의 Toolbar reveal은 안내 paint만 옮기므로 여백에 더하지 않는다.
+  const auto* infobar = view->infobar_container();
+  auto* const manager_contents = infobar->GetWebContentsForLayout();
+  const auto& notice_flow = multi->external_infobar_flow_for_layout();
+  int top_inset = 0;
+  if (infobar->GetVisible() &&
+      notice_flow.manager_contents.get() == manager_contents &&
+      notice_flow.semantic_stack_height > 0) {
+    const auto manager_body =
+        multi->GetCurrentContentsBodyBoundsFor(multi->size(), manager_contents);
+    if (manager_body) {
+      top_inset =
+          std::clamp(manager_body->y() + notice_flow.semantic_stack_height, 0,
+                     hub->height());
+    }
+  }
+  const gfx::Insets body_insets = gfx::Insets::TLBR(top_inset, 0, 0, 0);
+  if (hub->GetInsets() != body_insets) {
+    hub->SetBorder(views::CreateEmptyBorder(body_insets));
+  }
   hub->layer()->SetRoundedCornerRadius(multi->GetBackgroundRadii());
   hub->layer()->SetIsFastRoundedCorner(true);
   // 본문 다음에 두어 InfoBar·공통 outline·Sidebar flyout의 순서를 보존한다.
-  if (auto index = view->GetIndexOf(multi))
+  if (auto index = view->GetIndexOf(multi)) {
     view->ReorderChildView(hub, *index + 1);
+  }
 
   auto* toolbar = view->toolbar();
   // macOS immersive에서는 Toolbar가 다른 부모로 이동할 수 있다.
@@ -941,6 +966,13 @@ void ProjectNavigationController::Refresh() {
     selector->SetProject(project->name, true);
   hub_toolbar_tracker_.view()->SetVisible(true);
   AfterBrowserLayout();
+  // 새 합성 면을 삽입한 뒤 기존 안내 레이어의 문구·버튼도 갱신한다.
+  // 부모만 무효화하면 자체 레이어를 가진 안내의 paint cache는 남는다.
+  if (auto* infobar = view->infobar_container(); infobar->IsDrawn()) {
+    for (const auto& child : infobar->children()) {
+      child->SchedulePaint();
+    }
+  }
   hub->RestoreFocus(focus);
   if (scroll_position) {
     hub->RestoreScrollPosition(*scroll_position);

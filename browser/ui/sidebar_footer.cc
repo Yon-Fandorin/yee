@@ -1016,7 +1016,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
 
   void SetFooterVisible(bool visible) {
     if (!visible) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
       restore_keyboard_focus_pending_ = false;
 #endif
       CloseBubble();
@@ -1034,7 +1034,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   void AddedToWidget() override {
     HoverButton::AddedToWidget();
     if (views::Widget* const widget = GetWidget()) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
       owner_widget_observation_.Observe(widget);
 #endif
       paint_as_active_subscription_ =
@@ -1045,7 +1045,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   }
 
   void RemovedFromWidget() override {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
     owner_widget_observation_.Reset();
     restore_keyboard_focus_pending_ = false;
 #endif
@@ -1054,7 +1054,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   }
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
     restore_keyboard_focus_pending_ = false;
 #endif
     bubble_reopen_suppressor_.OnMousePressed();
@@ -1063,7 +1063,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
 
   void OnGestureEvent(ui::GestureEvent* event) override {
     if (event->type() == ui::EventType::kGestureTapDown) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
       restore_keyboard_focus_pending_ = false;
 #endif
       bubble_reopen_suppressor_.OnMousePressed();
@@ -1122,7 +1122,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
     UpdateSurface();
   }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   void OnWidgetActivationChanged(views::Widget* widget, bool active) override {
     if (active && restore_keyboard_focus_pending_) {
       // native 활성화가 저장 포커스를 복원한 뒤 traversal 이유를 적용한다.
@@ -1140,7 +1140,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
 
  private:
   void ToggleBubble(const ui::Event& event) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
     restore_keyboard_focus_pending_ = false;
 #endif
     const bool is_pointer_interaction =
@@ -1236,7 +1236,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
     }
     UpdateSurface();
     if (restore_keyboard_focus && GetVisible()) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
       // bubble의 지연 삭제와 부모 창 활성화가 끝난 뒤 포커스를 복원한다.
       restore_keyboard_focus_pending_ = true;
       base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -1249,15 +1249,30 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
     }
   }
 
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   void RestoreKeyboardFocus() {
     if (!restore_keyboard_focus_pending_ || !GetVisible() ||
         bubble_tracker_.view() || !GetWidget()) {
       restore_keyboard_focus_pending_ = false;
       return;
     }
+#if BUILDFLAG(IS_MAC)
+    if (!GetWidget()->IsVisible() || GetWidget()->IsClosed() ||
+        GetWidget()->IsMinimized()) {
+      restore_keyboard_focus_pending_ = false;
+      return;
+    }
+#endif
     if (!GetWidget()->IsActive()) {
+#if BUILDFLAG(IS_MAC)
+      // Cocoa의 활성화 허용 조건을 지키고 실제 활성화 뒤 이유를 다시 적용한다.
+      FocusForReason(*this, FocusChangeReason::kFocusTraversal);
+      if (HasKeyboardTraversalFocus(*this)) {
+        restore_keyboard_focus_pending_ = false;
+      }
+#else
       GetWidget()->Activate();
+#endif
       return;
     }
     restore_keyboard_focus_pending_ = false;
@@ -1363,7 +1378,7 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
   raw_ptr<views::Label> account_label_ = nullptr;
   raw_ptr<views::ImageView> chevron_ = nullptr;
   views::ViewTracker bubble_tracker_;
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       owner_widget_observation_{this};
   bool restore_keyboard_focus_pending_ = false;

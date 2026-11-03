@@ -99,6 +99,11 @@ Windows에서는 `PointerExitAndReentryKeepNativePopupFocus`가 실제 press/rel
 에서 OS pointer 이동과 Escape 후 focus를 검증한다.
 `EscapeRestoreIsCancelledWhenTriggerLeavesWidget`는 Escape 직후 trigger를
 분리·재부착한 뒤 다른 컨트롤의 focus를 지연 복원 작업이 빼앗지 않는지 확인한다.
+Windows와 macOS는 Escape의 traversal focus를 지연 복원한다. native 활성화가
+발생하면 저장된 focus의 복원 뒤에 traversal 이유를 다시 적용한다.
+macOS는 native 포커스 요청의 활성화 허용 조건을 유지하며, 숨김·닫힘·
+최소화 상태에서는 복원 요청을 취소한다. `EscapeRestoreDoesNotRevealHiddenOwner`는
+대기 중 owner를 숨겨도 복원 작업이 창을 다시 표시하지 않는지 확인한다.
 
 실제 Footer 검사는 별도 프로세스의 UI Automation 클라이언트가 브라우저·팝업
 트리를 보관하는 조건도 포함한다. 클라이언트는 전용 MTA에서 조회하고, 닫힌
@@ -157,6 +162,18 @@ capture-loss 이벤트를 보낸다. 활성 drag의 landing Group을 지운 경�
 다시 찾는다. 기존 첫·최종 순서 단언은 유지한다. 이 fixture의 기존 애니메이션
 비활성화 설정은 그대로이므로 실제 전환 중 체감은 별도 화면 검수 대상이다.
 
+macOS의 context menu 검사는 실제 native 메뉴가 열린 동안 검증·닫기 작업을 전달한다.
+정원 초과 시 pin 차단과 기존 Favorite의 unpin 허용을 모두 확인한다.
+Favorites 슬롯 입력은 논리 셀 사각형을 dock의 RTL 좌표로 한 번 변환한 뒤 화면으로
+옮긴다. `YeeSidebarSingleFavoriteDragReordersWithinDock`의 최종 URL 순서 단언은
+그대로 유지하며 Browser Surface의 기본·RTL 125% 경로에도 포함한다.
+
+`YeeDividerMouseDragResizesBothPanesAndKeepsTabs`는 실제 resize area에서 마우스를
+누른 채 이동하고 놓는다. 좌우·상하 분할 각각에서 양쪽 크기와 ratio가 바뀌고,
+capture가 해제되며 WebContents·분할 ID·활성 탭·순서가 유지되는지 확인한다.
+RTL의 좌우 분할에서는 논리 start pane이 커지는 방향으로 이동한다.
+`test-sidebar.sh interactive`에 포함하며 `OnResize` 직접 호출 검사를 대체하지 않는다.
+
 ## 4. 실제 화면에서만 확인할 것
 
 다음은 상태나 geometry 한 프레임을 통과했다고 UX가 보장되지 않는다. 자동
@@ -195,6 +212,30 @@ Header의 전체 폭 유지와 패널이 그 아래에 배치되는지 확인한
 최소 폭의 수평·세로 배치를 검사한다. 제목과 favicon·개수·native 조작 아이콘의
 겹침 및 잘림, 펼친 뒤 요약의 숨김, 한 줄 축약과 전체 접근성 이름을 확인한다.
 선택적 캡처에는 최소 폭의 이름·접힘 조합 12개가 추가된다.
+
+macOS의 `YeeMacHorizontalFullscreenExitRestoresToolbarWithoutFocus`는 일반 gfx
+모션으로 키보드 전체화면을 왕복한다. 종료 뒤 강제 layout·redraw·초점 변경 없이
+Header·Toolbar의 배치와 레이어·접근성 상태를 확인한다. 종료 요청 전에 등록한
+표시 콜백은 전환 중 성공 프레임을 확인할 뿐, 복귀한 Header의 픽셀을 증명하지 않는다.
+캡처 옵션은 자동 숨김·항상 표시 각각의 현재 native 창 이미지를 두 장 저장한다.
+복귀 후 실제 표시 여부는 이 이미지와 실제 앱에서 별도로 검수한다.
+다음 진입 키를 보내기 전에는 현재 Space에서의 가시성·창 활성화·활성 표시를 기다린다.
+종료 후 페이지 초점도 추가 입력 없이 5초 안에 자연 복귀해야 한다. 각 단계의
+전체화면·화면 가시성·활성화·현재/저장된 초점과 경과 시간을 XML에 남겨, 툴바 복원과
+비동기 창 활성화 문제를 구분한다. 이 대기는 layout·redraw·초점 복원을 강제하지 않는다.
+원인 조사 때는 검사 바이너리에 `--yee-mac-window-state-trace`를 지정해 창·Space·
+활성화 알림, 현재 key/main 창 번호와 전면 PID, 마우스 좌표·modifier를 기록할 수 있다.
+진단은 입력 이벤트를 그대로 전달하며 문자 내용이나 창 제목은 기록하지 않는다.
+
+macOS의 `YeeMacNativeResizeKeepsWindowedChromeGeometry`는 일반 모션에서 수직·수평
+탭의 native 창을 작은 크기·현재 화면의 work area·원래 크기로 전환한다.
+각 resize 뒤 강제 layout·redraw 없이 chrome의 가시 배치와 현재 native layout,
+top-container 레이어 및 탭 identity를 확인한다. 선등록한 표시 콜백은 전환 중
+성공 프레임을 확인할 뿐 크기 변경을 반영한 프레임이나 픽셀을 식별하지 않는다.
+native 최소 크기보다 화면이 작거나 서로 다른 유효 크기를 만들 수 없으면 생략한다.
+`test-browser-surface-layout.sh interactive`에 포함한다. 실제 창 메뉴 명령이나
+화면 간 이동, 표시된 픽셀의 검증을 뜻하지 않는다.
+
 Windows 수평 모드에서는 검색·새 탭 버튼·드래그 여백과 창 버튼의 예약 폭까지
 포함한 현재 최소 창 너비를 사용한다. 세로 모드의 최소 너비도 접힌 그룹의
 favicon 요약과 native 펼치기 아이콘을 포함하며, 모든 자식의 실제 경계를 검사한다.
@@ -381,6 +422,13 @@ bounds를 따라 폭을 보간한다. 접힘 순간 멤버의 제목·아이콘 
 선행 일반 탭 유무, 첫 두 멤버의 연속 닫기와 마지막 닫기에서 실제 파비콘의 paint 범위를
 확인한다. TabIcon의 attention ring용 빈 여백은 포함하지 않는다. 접기·펼치기는 양 끝
 사이의 실제 중간 폭과 배경 가시성을 모두 확인한다.
+`YeeClosingTabCanReattachWithoutModel`은 가로·세로 unified 탭을 실제 모델에서 닫은 뒤
+애니메이션 중인 View를 다른 부모에 다시 붙인다. 종료 중인 View에 모델 구독을 복원하지
+않고 비활성 상태와 남은 탭 수를 유지하며 정상 삭제되는지 검사한다.
+`YeeGroupRenameRefreshesInactiveTabAccessibleNames`는 가로·세로 unified 그룹의
+비활성 탭 두 개에서 이름 없음→이름 지정→접힌 상태의 이름 변경→이름 제거를 검사한다.
+그룹명 변경 알림만으로 접근성 이름을 갱신해야 하며 초점·탐색·강제 배치를 사용하지 않는다.
+선택 탭과 멤버 소속·탭 개수도 유지되는지 확인한다.
 
 공통 수평 행은 고대비 팔레트로 전환해도 Header의 기본 안쪽 여백을 유지하며,
 알약 대신 별도의 밑줄을 더하지 않는다. 펼친 그룹 뒤의 구분선은 바깥 탭이 한 번만
@@ -399,6 +447,14 @@ bounds를 따라 폭을 보간한다. 접힘 순간 멤버의 제목·아이콘 
 각 단계에서 실제 포인터를 탭 밖의 현재 본문 중앙으로 옮긴다. 논리 hover와 Native
 호버 애니메이션의 종료를 확인한 뒤 정확한 바탕색, 선택 마스킹, 모델 선택, AX 선택,
 닫기 버튼과 복귀 상태를 검사한다.
+
+`HubKeepsNativeNoticeVisibleAndReservesItsBody`는 단일 화면·좌우 분할·아래쪽 pane의
+상하 분할에서 native 안내 아래로 허브 본문이 배치되는지 확인한다. 허브의 전체 배경과
+곡률은 유지하며 안내가 사라지면 본문 여백도 해제한다. 두 탭 방향에서 허브 진입 전후의
+문구·닫기 버튼과 안내의 불투명한 안정 영역을 정확한 합성 픽셀로 비교한다. 안정 영역은
+native 곡률 안쪽으로 1 DIP 여유를 두고 고정하며 두 조작의 전체 bounds를 포함해야 한다.
+전체 차이의 수·범위·최초 좌표도 기록해 경계 바깥의 배경 변화와 가려짐을 구분한다.
+창 크기 변경이나 전체 강제 redraw 없이 검사하며 실제 픽셀 출력을 켠 native 실행이 필요하다.
 
 프로젝트로 모든 native 일반 행을 숨긴 뒤에는 이전 ScrollView contents 높이를
 재사용하지 않는다. `ProjectTabsAppearOnceAndReturnToNativeNavigation`은 빈 일반 영역의
