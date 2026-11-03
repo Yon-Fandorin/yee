@@ -565,6 +565,9 @@ const selected = await vm.runInNewContext(`(async () => {
   await closeBrowser();
   return [yeeApp, yeeBrowserBin, shutdown];
 })()`, {root, path, execFile, fs,
+  profile: '/tmp/yee-observer-test-profile',
+  inspectDevelopmentProcesses: () => ({owned: []}),
+  waitForShutdown: async inspect => assert.equal(inspect().length, 0),
   promisify: fn => async (...args) => {
     if (args[0] === 'zsh') ++selections;
     return promisify(fn)(...args);

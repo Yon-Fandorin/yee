@@ -1,8 +1,10 @@
 // Lifecycle helpers for the native fixture; dependencies are injectable in tests.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {realpathSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import {filterValidationProcesses} from './lib/macos_installer_processes.mjs';
 
 // Windows의 검수용 본체를 실행 파일과 전용 프로필까지 함께 확인한다.
 export function requireWindowsBrowserOwner(executable, profile, pid, run = execFileSync) {
@@ -134,6 +136,13 @@ export function exited(browser) {
 export function requireShutdown(processes) {
   assert.equal(processes.length, 0,
     `Gracefully shut down product browsers before validation: ${JSON.stringify(processes)}`);
+}
+// 설치판은 번들 ID 조회에서 제외하고, 선택한 개발 앱·검수 프로필의 경계만 적용한다.
+export function inspectDevelopmentProcesses(executable, profile, run = execFileSync) {
+  const script = fileURLToPath(new URL('./browser_bundle_executables.py', import.meta.url));
+  const processes = JSON.parse(run('python3', [script, '--running', '--details'], {encoding: 'utf8'}));
+  const application = path.resolve(realpathSync(executable), '../../..');
+  return filterValidationProcesses(processes, {application, profile});
 }
 // 정상 종료를 요청한 뒤 본체보다 늦게 끝나는 보조 프로세스도 기다린다.
 export async function waitForShutdown(inspectProcesses, wait = pause) {

@@ -9,7 +9,8 @@ import {promisify} from 'node:util';
 import net from 'node:net';
 import http from 'node:http';
 import {gzip} from 'node:zlib';
-import {connectCDP, closeOwnedBrowser, pause, requireShutdown, uiTestWindowArgs} from './content_blocking_test_runtime.mjs';
+import {connectCDP, closeOwnedBrowser, inspectDevelopmentProcesses, pause, requireShutdown,
+  uiTestWindowArgs, waitForShutdown} from './content_blocking_test_runtime.mjs';
 import {sanitizeTraceEvent} from './performance_trace.mjs';
 import {classifyProfileScript, summarizeCPUWindow} from './performance_cpu.mjs';
 
@@ -270,9 +271,13 @@ async function launch(label, app, mode, profile, performanceCase=false) {
   const windowArgs = uiTestWindowArgs();
   if(app===yeeApp) await promisify(execFile)('zsh', ['-c',
     'source "$1"; require_integrated_yee_app_current', 'yee-live-review', path.join(root,'tools/dev/common.zsh')]);
-  const {stdout} = await promisify(execFile)('python3',
-    [path.join(root, 'tools/dev/browser_bundle_executables.py'), '--running']);
-  requireShutdown(JSON.parse(stdout));
+  const processes = inspectDevelopmentProcesses(yeeBrowserBin, profile);
+  const unrelated = {label, count: processes.unrelated.length,
+    paths: processes.unrelated.map(process => process.executable)};
+  (report.unrelatedProcesses ??= []).push(unrelated);
+  console.log('검사 범위 밖의 개발 번들 프로세스:', JSON.stringify(unrelated));
+  await saveReport();
+  requireShutdown(processes.owned);
   const directory = path.join(output, label); await fs.mkdir(directory, {recursive: true});
   await fs.mkdir(profile, {recursive: true});
   await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
@@ -288,11 +293,14 @@ async function launch(label, app, mode, profile, performanceCase=false) {
   const browser = spawn('/usr/bin/open', args, {stdio: ['ignore', log.fd, log.fd]});
   await new Promise((resolve, reject) => {browser.once('spawn', resolve); browser.once('error', reject);});
   let browserCDP, tabCDP, audio, audioDirectory, audioSpawnError, pid;
-  const closeBrowser=()=>closeOwnedBrowser(browser,browserCDP,async()=>{
-    if(app===yeeApp&&pid) await promisify(execFile)(shutdown,
-      [yeeBrowserBin,`--pid=${pid}`]);
-    else throw new Error('Browser did not close through Browser.close');
-  });
+  const closeBrowser=async()=>{
+    await closeOwnedBrowser(browser,browserCDP,async()=>{
+      if(app===yeeApp&&pid) await promisify(execFile)(shutdown,
+        [yeeBrowserBin,`--pid=${pid}`]);
+      else throw new Error('Browser did not close through Browser.close');
+    });
+    await waitForShutdown(()=>inspectDevelopmentProcesses(yeeBrowserBin,profile).owned);
+  };
   try {
     let version;
     for (let i = 0; i < 200; i++) {

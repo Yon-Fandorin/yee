@@ -35,6 +35,14 @@ SIGINT 계약 검사는 가짜 실행기의 500ms 자식 정리와 후속 handle
 가짜 ps 목록의 설치판·개발판·검사 앱·Helper·검사 프로필을 섞고 정확한 경로 경계와
 제품명의 공백·정규식 문자를 검사한다. 실제 ps 조회·브라우저 실행·종료는 수행하지 않는다.
 
+`test_observation_processes.py`는 가짜 개발 번들 목록으로 선택한 앱·정확한 검수 프로필과
+다른 out·worktree의 경계를 확인한다. Helper만 남은 종료 대기와 두 관찰 스크립트의 실제
+종료 검사 연결부도 실행하며, 무관한 프로세스의 개수·경로만 기록하는지 검사한다.
+`test_browser_bundle_executables.py`는 임시 plist·가짜 ps 목록으로 설치판 제외와
+`--running`·출력 경로의 기존 CLI, `--details`의 Helper·커널 argv 해석을 확인한다.
+공백이 붙은 다른 프로필과 환경 변수는 검수 프로필로 오인하지 않는다.
+실제 앱·ps·컴파일러는 실행하지 않는다.
+
 `test_compile_preflight.py`는 임시 overlay·가짜 Ninja와 PATH의 가짜 autoninja로
 패치의 삭제 파일 제외, owned 목적지·제외 규칙, graph의 미컴파일 분류, 한 번의
 keep-going 호출과 실패 코드·파일 보고를 검사한다. 미빌드 object의 기본 제외,

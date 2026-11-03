@@ -567,11 +567,20 @@ Windows에서 `node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>
 `perf`, `smoke`로 단계만 선택할 수 있다. `smoke-on`은 차단 켠 앱의 재생·출력
 오디오를 짧게 확인한다. 마지막 인자는 재생·광고 관측 초수다
 (`ads`/`all` 기본 600초, 영상별 상한 1,200초).
-`observe-youtube-live.mjs`와 `test-content-blocking.mjs`는 실행 전에
-`browser_bundle_executables.py --running`으로 조회한 bundle ID `org.chromium.Chromium`의
-개발 번들이 실행 중이면 정상 종료를 요구한다. 선택한 out 외의 개발 번들도 포함하며,
-설치판 ID `io.github.yon-fandorin.yee`는 이 조회 대상이 아니다. 설치 검사는 앞서 설명한
-검사 앱·검사 프로필만 종료 대상으로 삼는다.
+`observe-youtube-live.mjs`와 `test-content-blocking.mjs`는 선택한 개발 앱 내부의 실행 파일
+(Helper 포함)이나 이번 검사의 정확한 `--user-data-dir`를 쓰는 개발 번들 프로세스만
+정상 종료 요구·종료 대기 대상으로 삼는다. 관찰기는 공통 zsh 선택의 앱 경로를,
+콘텐츠 차단 검사는 인자로 받은 실행 파일의 앱 경로를 사용한다.
+`browser_bundle_executables.py --running --details`로 bundle ID `org.chromium.Chromium`의
+본체·Helper와 macOS 커널의 실제 argv를 읽어 프로필 인수 값을 완전 일치로 비교한다.
+공백으로 펼친 명령줄의 프로필 접두사를 일치로 취급하지 않는다.
+다른 out·worktree의 무관한 프로세스에는 종료를 요구하지 않는다.
+무관한 프로세스의 개수·실행 경로만 표준 출력과 관찰기의 `report.json`, 콘텐츠 차단 검사의
+`yee-content-blocking-browser-evidence.json`에 남긴다. argv는 기록하지 않는다.
+이미 끝난 PID는 상세 조회에서 제외하고, 다른 인수 조회 오류는 종료 요구 없이 검사를 중단한다.
+기존 `--running`의 본체 목록과 출력 경로 인자의 번들 탐색 동작은 유지한다.
+설치판 ID `io.github.yon-fandorin.yee`는 개발 번들 조회 대상이 아니다. 설치 검사는 앞서
+설명한 검사 앱·검사 프로필만 종료 대상으로 삼는다.
 앱 출력 오디오 helper는
 Xcode 도구로 자동 빌드하며, 정확한 브라우저 PID의 자식 오디오 프로세스만
 Core Audio tap에 포함한다. 마이크는 사용하지 않는다. 광고 구간의 PCM은 최대

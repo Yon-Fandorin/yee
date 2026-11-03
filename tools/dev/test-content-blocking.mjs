@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Native Yee with real tabs and an owned HTTP server. Requires all Yee browser
-// processes to be gracefully shut down first, as required by AGENTS.md.
+// 실제 탭과 전용 HTTP 서버로 검사한다. 선택한 앱·검수 프로필의 프로세스만 정상 종료해야 한다.
 import assert from 'node:assert/strict';
 import {execFile, spawn} from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -9,7 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
-import {closeOwnedBrowser, connectCDP, pause, requireShutdown, uiTestWindowArgs} from './content_blocking_test_runtime.mjs';
+import {closeOwnedBrowser, connectCDP, inspectDevelopmentProcesses, pause, requireShutdown,
+  uiTestWindowArgs, waitForShutdown} from './content_blocking_test_runtime.mjs';
 
 const root = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const executable = process.argv[2];
@@ -40,10 +40,13 @@ const server = http.createServer((request, response) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 
-async function requireYeeShutdown() {
-  const {stdout} = await promisify(execFile)('python3',
-    [path.join(root, 'tools/dev/browser_bundle_executables.py'), '--running']);
-  requireShutdown(JSON.parse(stdout));
+function requireYeeShutdown(profile, mode) {
+  const processes = inspectDevelopmentProcesses(executable, profile);
+  const unrelated = {mode, count: processes.unrelated.length,
+    paths: processes.unrelated.map(process => process.executable)};
+  unrelatedProcesses.push(unrelated);
+  console.log('검사 범위 밖의 개발 번들 프로세스:', JSON.stringify(unrelated));
+  requireShutdown(processes.owned);
 }
 async function prepareShutdownHelper() {
   const source = path.join(root, 'tools/dev/gracefully-quit-yee.swift');
@@ -59,14 +62,16 @@ async function prepareShutdownHelper() {
 }
 
 const evidence = [];
+const unrelatedProcesses = [];
 let passed = false, failure;
 try {
   const shutdownHelper = await prepareShutdownHelper();
   for (const mode of ['off', 'on', 'site-exception']) {
     const windowArgs = uiTestWindowArgs();
-    await requireYeeShutdown();
     requests = [];
     const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'yee-blocking-'));
+    try {requireYeeShutdown(profile, mode);}
+    catch (error) {await fs.rm(profile, {recursive: true, force: true}); throw error;}
     const log = await fs.open(path.join(profile, 'browser.log'), 'w');
     const extra = mode === 'off' ? ['--disable-features=YeeContentBlocking'] :
       mode === 'site-exception' ? ['--yee-content-blocking-disabled-sites=yee-fixture.test'] : [];
@@ -178,6 +183,7 @@ try {
         await closeOwnedBrowser(browser, browserCDP, async pid => {
           await promisify(execFile)(shutdownHelper, [executable, `--pid=${pid}`], {timeout: 20000});
         });
+        await waitForShutdown(() => inspectDevelopmentProcesses(executable, profile).owned);
         if (modePassed) {
           await fs.rm(profile, {recursive: true, force: true});
           entry.profileRetained = false;
@@ -194,5 +200,5 @@ try {
   await new Promise(resolve => server.close(resolve));
   const output = path.join(root, '.local-build/yee-content-blocking-browser-evidence.json');
   await fs.writeFile(output, JSON.stringify({schema: 'yee.content-blocking-browser.v2', passed,
-    failure, evidence}, null, 2) + '\n');
+    failure, unrelatedProcesses, evidence}, null, 2) + '\n');
 }
