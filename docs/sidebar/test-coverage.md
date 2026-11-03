@@ -48,6 +48,10 @@ Widget이 비활성인지 확인한다. Footer도 비활성으로 시작하며 p
 ## 2. 펼친 Sidebar의 실제 View 구조
 
 `test-sidebar.sh interactive`가 실제 Yee 창과 `TabStripModel`을 함께 사용한다.
+실행 파일은 `yee_interactive_ui_tests`이며 split 시나리오는
+`browser/ui/split_pane_interactive_uitest.cc`의 `YeeMultiContentsViewUiTest`로 선택한다.
+원본 `MultiContentsViewUiTest`는 같은 실행 파일에 수정 없이 포함한다.
+2026-11-04 macOS 테스트 이전 검증에서 Sidebar interactive gate 60/60이 통과했다.
 주소줄·Header의 실제 색상·popup·renderer 연결 검사는
 [`test-header.sh interactive`](../header/test-coverage.md)가 소유하며 여기서 중복
 실행하지 않는다. 두 영역을 함께 바꾸면 두 gate를 선택한다. 아래의 Sidebar flyout

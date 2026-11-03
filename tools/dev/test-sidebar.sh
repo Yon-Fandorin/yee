@@ -29,7 +29,7 @@ require_yee_output_selection
 UNIT_FILTER='Favorites*:*GroupMarkSignalsTest.*:SidebarFooter*:*SplitPaneControlsTest.*:YeeSurfaceColorTest.*:YeeSurfaceGeometryTest.*:YeeShellColorTest.*:YeeSidebarItemColorTest.*:TabGroupHeaderViewTest.Yee*:All/TabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation/*:All/TabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity/*:All/TabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock/*'
 # Header의 주소줄·팝업 검사는 test-header.sh가 소유한다. Sidebar 구조와
 # 실제 drag·split 조작만 선택해 같은 창 검사를 두 번 실행하지 않는다.
-INTERACTIVE_FILTER='VerticalTabDragTest.*Favorite*:VerticalTabDragTest.LoneTabCanPinAndUnpinInsideItsOwnSidebar:VerticalTabDragTest.YeeSidebar*:VerticalTabDragTest.DragWithinUnpinnedContainer:VerticalTabDragTest.CancelDragWithinUnpinnedContainer:VerticalTabDragTest.DragSplitTabs:VerticalTabDragTest.DragOverSplit:VerticalTabDragTest.DragOverSplitInGroup:VerticalTabDragTest.DragMultipleTabs:VerticalTabDragTest.DragMultipleTabsInGroup:VerticalTabDragTest.DragWithinGroup:VerticalTabDragTest.DragOutOfGroup:VerticalTabDragTest.DragGroupHeader:VerticalTabDragTest.DragCollapsedGroupStaysCollapsed:VerticalTabDragTest.DragCollapsedGroupOverExpandedGroup:VerticalTabDragTest.DragToScroll:All/TabStripCollectionControllerInteractiveUiTest.YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin/Vertical:SplitTabLayout/MultiContentsViewUiTest.YeeSidebarControlsPersistAcrossSplitAndCollapse/*:SplitTabLayout/MultiContentsViewUiTest.YeeSplitCommandsUpdateChromiumModel/*:SplitTabLayout/MultiContentsViewUiTest.InsetsOnlyInSplit/*:SplitTabLayout/MultiContentsViewUiTest.ResizeMouseDoubleClickEqualizesSplitViews/*:SplitTabLayout/MultiContentsViewUiTest.RoundedCornersForSplitView/*:SplitTabLayout/MultiContentsViewUiTest.BackgroundVisibility/*'
+INTERACTIVE_FILTER='VerticalTabDragTest.*Favorite*:VerticalTabDragTest.LoneTabCanPinAndUnpinInsideItsOwnSidebar:VerticalTabDragTest.YeeSidebar*:VerticalTabDragTest.DragWithinUnpinnedContainer:VerticalTabDragTest.CancelDragWithinUnpinnedContainer:VerticalTabDragTest.DragSplitTabs:VerticalTabDragTest.DragOverSplit:VerticalTabDragTest.DragOverSplitInGroup:VerticalTabDragTest.DragMultipleTabs:VerticalTabDragTest.DragMultipleTabsInGroup:VerticalTabDragTest.DragWithinGroup:VerticalTabDragTest.DragOutOfGroup:VerticalTabDragTest.DragGroupHeader:VerticalTabDragTest.DragCollapsedGroupStaysCollapsed:VerticalTabDragTest.DragCollapsedGroupOverExpandedGroup:VerticalTabDragTest.DragToScroll:All/TabStripCollectionControllerInteractiveUiTest.YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin/Vertical:SplitTabLayout/YeeMultiContentsViewUiTest.YeeSidebarControlsPersistAcrossSplitAndCollapse/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeeSplitCommandsUpdateChromiumModel/*:SplitTabLayout/YeeMultiContentsViewUiTest.InsetsOnlyInSplit/*:SplitTabLayout/YeeMultiContentsViewUiTest.ResizeMouseDoubleClickEqualizesSplitViews/*:SplitTabLayout/YeeMultiContentsViewUiTest.RoundedCornersForSplitView/*:SplitTabLayout/YeeMultiContentsViewUiTest.BackgroundVisibility/*'
 # Windows의 실제 popup 포인터 동작 검사는 해당 플랫폼에서만 컴파일된다.
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
@@ -38,7 +38,7 @@ case "$(uname -s)" in
 esac
 INTERACTIVE_FILTER+=':All/TabStripCollectionControllerInteractiveUiTest.YeeDragPreviewFollowsStripOrientation/*:All/TabStripCollectionControllerInteractiveUiTest.YeePinnedSplitBorderFollowsStripOrientation/*'
 INTERACTIVE_FILTER+=':All/TabStripCollectionControllerInteractiveUiTest.YeeClosingTabCanReattachWithoutModel/*'
-INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeDividerMouseDragResizesBothPanesAndKeepsTabs/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeDividerMouseDragResizesBothPanesAndKeepsTabs/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Sidebar regression targets"
@@ -48,7 +48,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
   [[ "$MODE" == "unit" || "$MODE" == "all" ]] && \
     targets+=(chrome/browser/ui/views/tabs/common:yee_layout_unittests)
   [[ "$MODE" == "interactive" || "$MODE" == "all" ]] && \
-    targets+=(interactive_ui_tests)
+    targets+=(chrome/browser/ui/views/yee:yee_interactive_ui_tests)
   build_regression_targets "Sidebar" "${targets[@]}"
 fi
 
@@ -65,7 +65,7 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Interactive Sidebar regressions open real Yee windows and may take focus."
   prepare_ui_test_display
   gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \

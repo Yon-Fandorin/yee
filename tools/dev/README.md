@@ -457,6 +457,15 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh horizontal`: 수평 탭 전환·그룹 요약·색상·분할·전체화면 확인
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
+
+세 `.sh` gate의 `interactive`와 `horizontal` 모드는
+`//chrome/browser/ui/views/yee:yee_interactive_ui_tests`만 빌드하고
+`out/<선택한 이름>/yee_interactive_ui_tests`를 실행한다. Yee 테스트는
+`browser/ui/browser_surface_interactive_uitest.cc`와
+`browser/ui/split_pane_interactive_uitest.cc`에 있으며 fixture 이름은 `Yee`로 시작한다.
+같은 실행 파일에 원본 guard와 아직 이전하지 않은 drag·Omnibox·플랫폼 테스트를
+선택해 넣는다. 모든 필수 필터의 실제 사례 발견 검사는 그대로 적용한다.
+Windows `.ps1` gate의 실행 파일·필터 전환은 후속 작업이다.
 - `all`: 여러 변경을 마친 뒤 전체 확인
 
 이 세 게이트는 각 바이너리 실행 직전에 같은 필터·특성·창 인수에

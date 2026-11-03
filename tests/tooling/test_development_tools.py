@@ -167,7 +167,7 @@ done
         self.write_tool(self.bin / 'xcrun',
                         'print "display-probe" >> "$YEE_TEST_LOG"\n'
                         'print -r -- --window-position=1776,-1395\n')
-        for binary in ('yee_layout_unittests', 'yee_header_unittests', 'interactive_ui_tests'):
+        for binary in ('yee_layout_unittests', 'yee_header_unittests', 'yee_interactive_ui_tests'):
             self.write_tool(self.out / binary,
                             'listing=false\nfilter=""\n'
                             'for argument in "$@"; do\n'
@@ -195,18 +195,24 @@ done
                     ((), [unit_binary]),
                     (('--no-build',), [unit_binary]),
                     (('unit', '--no-build'), [unit_binary]),
-                    (('interactive', '--no-build'), ['interactive_ui_tests'] * interactive_runs),
-                    (('all', '--no-build'), [unit_binary] + ['interactive_ui_tests'] * interactive_runs)):
+                    (('interactive',), ['yee_interactive_ui_tests'] * interactive_runs),
+                    (('interactive', '--no-build'), ['yee_interactive_ui_tests'] * interactive_runs),
+                    (('all', '--no-build'), [unit_binary] + ['yee_interactive_ui_tests'] * interactive_runs)):
                 with self.subTest(name=name, arguments=arguments):
                     self.log.unlink(missing_ok=True)
                     result = self.run_script(name, *arguments)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual([event.removeprefix('run:') for event in self.events()
                                       if event.startswith('run:')], expected)
-                    visible_runs = expected.count('interactive_ui_tests')
+                    visible_runs = expected.count('yee_interactive_ui_tests')
                     self.assertEqual(self.events().count('display-probe'), visible_runs)
                     self.assertEqual(self.events().count('arg:--window-position=1776,-1395'),
                                      visible_runs)
+                    if arguments == ('interactive',):
+                        self.assertEqual([event for event in self.events()
+                                          if event.startswith('target:')],
+                                         ['target:-C out/YeePilot -j 3 '
+                                          'chrome/browser/ui/views/yee:yee_interactive_ui_tests'])
                     if arguments == ('interactive', '--no-build'):
                         filters[name] = next(event.removeprefix('arg:--gtest_filter=')
                                              for event in self.events()
@@ -222,12 +228,12 @@ done
                              'YeePresentationFollowsSingleAndSplitSources',
                              'YeeInactivePaneHeaderActivatesAddressEditing',
                              'YeeOmniboxPopupFollowsSingleAndSplitHeader'):
-                case = f'SplitTabLayout/MultiContentsViewUiTest.{contract}/{layout}'
+                case = f'SplitTabLayout/YeeMultiContentsViewUiTest.{contract}/{layout}'
                 self.assertTrue(selected('test-header.sh', case), case)
                 self.assertFalse(selected('test-sidebar.sh', case), case)
             for contract in ('YeeSidebarControlsPersistAcrossSplitAndCollapse',
                              'YeeSplitCommandsUpdateChromiumModel'):
-                case = f'SplitTabLayout/MultiContentsViewUiTest.{contract}/{layout}'
+                case = f'SplitTabLayout/YeeMultiContentsViewUiTest.{contract}/{layout}'
                 self.assertTrue(selected('test-sidebar.sh', case), case)
 
     def test_layout_gates_require_only_cases_compiled_for_the_host(self):
@@ -237,7 +243,7 @@ done
         self.write_tool(self.bin / 'xcrun', 'exit 0\n')
         self.write_tool(self.bin / 'pgrep', 'exit 1\n')
         for binary in ('yee_layout_unittests', 'multi_contents_geometry_unittests',
-                       'interactive_ui_tests', 'browser_tests'):
+                       'yee_interactive_ui_tests', 'browser_tests'):
             self.write_tool(self.out / binary, '''listing=false
 filter=""
 for argument in "$@"; do
@@ -258,7 +264,7 @@ if [[ "$listing" == true ]]; then
           ( "$pattern" == ImmersiveModeControllerMac* ||
             "$pattern" == BrowserNativeWidgetMacGlassTest.* ||
             "$pattern" == OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState ||
-            "$pattern" == BrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth ) ]]; then
+            "$pattern" == YeeBrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth ) ]]; then
       continue
     fi
     pattern="${pattern//\\*/Fixture}"
@@ -280,9 +286,13 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
                     ('test-sidebar.sh', 'all', 2)):
                 with self.subTest(platform=platform, script=name, mode=mode):
                     self.log.unlink(missing_ok=True)
-                    result = self.run_script(name, mode, '--no-build',
-                                             YEE_TEST_PLATFORM=platform)
+                    # 가짜 build도 실행해 원본 전체 target을 다시 요청하지 않는지 확인한다.
+                    result = self.run_script(name, mode, YEE_TEST_PLATFORM=platform)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    targets = [event for event in self.events() if event.startswith('target:')]
+                    self.assertEqual(len(targets), 1)
+                    self.assertIn('chrome/browser/ui/views/yee:yee_interactive_ui_tests', targets[0])
+                    self.assertNotIn(' interactive_ui_tests', targets[0])
                     filters = [event.removeprefix('arg:--gtest_filter=')
                                for event in self.events()
                                if event.startswith('arg:--gtest_filter=')]
@@ -295,6 +305,10 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
                         self.assertNotIn('YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus',
                                          combined)
                         if name == 'test-browser-surface-layout.sh' and mode != 'horizontal':
+                            self.assertNotIn('All/BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest.'
+                                             'TopContainerBackground/*', combined)
+                            self.assertIn('All/YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest.'
+                                          'TopContainerBackground/*', combined)
                             self.assertIn('BrowserNativeWidgetMacGlassTest.', combined)
                             self.assertIn('MultiWindowActivationRestartsAutocompleteWithoutStaleState',
                                           combined)

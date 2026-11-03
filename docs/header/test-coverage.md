@@ -222,6 +222,14 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 사이트 제어·내부 페이지와 외부 UIA 클라이언트의 접근성 종료 검사를 포함한다.
 
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
+실행 파일은 `yee_interactive_ui_tests`이며 Header 시나리오는
+`browser/ui/split_pane_interactive_uitest.cc`의 `YeeMultiContentsViewUiTest`와
+`YeePopupWindowUiTest`가 소유한다. `SplitTabLayout/` 매개변수와 사례 이름은 유지한다.
+2026-11-04 macOS 테스트 이전 검증에서 새 실행 파일로 Header interactive gate
+기본 15/15·RTL 125% 4/4, 레이아웃 interactive gate 기본 70/72·RTL 125% 43/43·
+통합 탭 스트립 4/4가 통과했다. 레이아웃 실패 2건은 옮기지 않은
+`ImmersiveModeControllerMacInteractiveTest`의 전체화면 전환 시간 초과로, 같은 조건의
+기존 `interactive_ui_tests`에서도 재현돼 이전과 무관하다.
 렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
 단위·GUI 실행 모두 launcher retry를 0으로 고정한다.
 실제 View parent·renderer·popup·입력 전달 계약은 순수 geometry 검사로 대체하지
@@ -241,7 +249,7 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | 선행 일반 탭 유무와 관계없이 수평 그룹의 첫 두 멤버를 연속으로 닫아도 실제 파비콘이 이름을 침범하지 않음. 접기·펼치기 모두 알약 배경을 유지하며 양 끝 사이의 중간 폭을 거치고 마지막 멤버도 정상적으로 닫힘 | `YeeHorizontalGroupTransitionsKeepHeaderClear` |
 | 맞춤설정 패널이 세로·수평 모두 창 Header 아래 행에 도킹해 닫기 버튼을 분리 | `YeeCustomizationPanelStaysBelowWindowHeader` |
 | macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
-| macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `BrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
+| macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
 
 `BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque`의 선택적
 `--yee-fullscreen-capture-dir`는 수평 탭바와 주소줄을 함께 호스팅하는 실제

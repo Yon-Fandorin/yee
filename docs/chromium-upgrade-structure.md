@@ -3,17 +3,17 @@
 153→157 Stable 이식에서는 Chromium 테스트 파일의 충돌 해결과 약 3일의
 런타임·테스트 안정화에 시간이 많이 들었다. 컴파일 오류 해결이 주된 비용은 아니었다.
 다음 이식에서는 원본 테스트 변경을 줄이고, Yee 상태의 수명과 Chromium 연결 경계를
-명확히 한다. 현재 구현 범위는 패치 래칫과 측정 기준선이며, 아래 구조 변경은 후속 계획이다.
+명확히 한다. 패치 래칫과 테스트 이전 1단계를 구현하고 macOS에서 검증했다.
+Windows 검증과 나머지 구조 변경은 후속 작업이다.
 
 ## 현재 패치 구성
 
-`0001-integrate-yee-shell.patch`의 래칫 측정 결과다. 추가 줄의 절반 이상이
-Chromium 테스트 파일에 있다.
+테스트 이전 1단계 뒤 `0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
 
 | 구분 | 파일 | 추가 줄 | 삭제 줄 |
 | --- | ---: | ---: | ---: |
 | 수정한 제품 파일 | 296 | 12,335 | 1,652 |
-| 수정한 Chromium 테스트 파일 | 34 | 14,661 | 371 |
+| 수정한 Chromium 테스트 파일 | 31 | 5,664 | 134 |
 | 새 파일 | 5 | 1,152 | 0 |
 
 줄 수는 결합 정도의 근사치다. 실제 이식 비용은 충돌과 빌드·gate 소요 시간을
@@ -82,17 +82,23 @@ Yee 소유의 선택형 interactive 테스트 실행 파일을 두고
 `chrome/test/BUILD.gn`의 `captured_sites_interactive_tests`와
 `accessibility_live_site_tests`가 같은 main을 쓰는 선례다. 오버레이에는 이미
 [`browser/ui/BUILD.gn`](../browser/ui/BUILD.gn)의 `site_controls_browsertests`처럼
-전체 테스트 목록과 독립된 실행 파일이 있다. 새 실행 파일의 링크 비용은 별도로 측정한다.
+전체 테스트 목록과 독립된 실행 파일이 있다. macOS에서 실행 파일만 다시 만든 순수 링크
+시간은 새 실행 파일 121–133초, `interactive_ui_tests` 125–128초로 차이가 없었다.
+둘 다 브라우저 전체를 링크하므로 이 실행 파일의 이점은 링크 시간이 아니라
+원본 테스트 파일 변경을 없애는 데 있다.
 
 공통 대기 API는 `WaitForApplied(ticket, conditions)`로 두고 Chromium observer와
 결합한다. 새 Yee 시나리오는 upstream 테스트 파일에 추가하지 않는다.
 이전한 upstream 테스트 파일은 pristine upstream으로 복원한다.
 Yee 셸을 켰을 때 실패하는 원본 테스트는 실행 filter로 제외하고 원본을 수정하지 않는다.
 
-현재 [interactive gate](../tools/dev/test-browser-surface-layout.sh)가 실행하는
-`VerticalTabDragTest.DragWithinGroup`, `*TopContainerBackground*`,
-`ImmersiveModeControllerMacInteractiveTest.*` 같은 원본 guard 테스트는 pristine
-upstream 소스를 Yee 실행 파일에 함께 컴파일하고 filter로 선택한다.
+`.sh` gate는 Yee 실행 파일 하나만 빌드한다. 이 실행 파일은 이전한 Yee 테스트와 함께
+gate가 고르는 원본 테스트 파일을 그대로 컴파일한다. 1단계에서 복원한 두 파일은 pristine
+원본이고, drag·omnibox popup·Mac immersive 등 2단계 대상 파일은 아직 `0001`이 수정한
+상태로 들어간다. 원본 테스트 중 Yee 셸에서 실패하는 것은 filter에서 빼고, 같은 시나리오를
+Yee 셸 기준으로 고친 Yee 복사본을 실행한다. 예를 들어 원본
+`BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`는 제외하고
+`YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`를 실행한다.
 
 `0001`은 단일 패치 파일로 유지한다. 별도 유지보수 checkout에서 관심사별 commit
 series로 관리한 뒤 `0001`로 export한다. 콘텐츠 차단 배포 코드의 패치 분리는 첫 범위
@@ -119,10 +125,10 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 | 지표 | 세는 내용 | 현재 합계 |
 | --- | --- | ---: |
-| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 14,661 |
-| `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 72 |
-| `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 71 |
-| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 219 |
+| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,664 |
+| `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 61 |
+| `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 30 |
+| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 206 |
 | `yee_members` | 수정한 헤더의 Yee 이름·타입 멤버 선언(여러 줄 선언은 하나로 합침) | 55 |
 
 [`build/patch-ratchet.json`](../build/patch-ratchet.json)은 `schema_version: 1`과
@@ -152,7 +158,7 @@ python3 tools/overlay/check-patch-ratchet.py --update
 범위는 위의 도구·기준선과 패치 재생성 연결이다. 이 단계는 구현되어 있다.
 
 - 완료 기준: 현재 패치의 지표·크기를 기록하고 읽기 전용 검사가 통과한다.
-  현재 합계는 `14661 / 72 / 71 / 219 / 55`이며 검사 통과를 확인했다.
+  초기 합계는 `14661 / 72 / 71 / 219 / 55`이며 검사 통과를 확인했다.
 - 기대 효과: 연결 증가를 검토 대상으로 드러내고, 줄어든 값을 다시 늘리지 못하게 잠근다.
 
 ### 2. 테스트 이전
@@ -162,6 +168,21 @@ python3 tools/overlay/check-patch-ratchet.py --update
 추가 줄 7,437개가 있고 upstream fixture도 수정한다.
 `multi_contents_view_interactive_uitest.cc`에는 Yee 테스트 11개가 있다.
 필요한 helper를 Yee 소유 fixture로 복사해 원본 fixture 변경을 없앤다.
+
+1단계의 코드 이전은 완료했다. 추가·수정된 테스트를 모두 포함해
+`browser/ui/browser_surface_interactive_uitest.cc`에 41개,
+`browser/ui/split_pane_interactive_uitest.cc`에 17개를 두며 fixture 이름은 `Yee`로 시작한다.
+두 원본 파일과 `chrome/test/BUILD.gn`은 pristine으로 복원했다.
+`.sh` gate는 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`를 빌드·실행한다.
+래칫 합계는 `5664 / 61 / 30 / 206 / 55`로 낮췄다.
+2026-11-04 macOS에서 새 실행 파일과 기존 `interactive_ui_tests`가 모두 빌드됐고,
+interactive gate는 header 기본 15/15·RTL 125% 4/4, sidebar 60/60,
+레이아웃 기본 70/72·RTL 125% 43/43·통합 탭 스트립 4/4가 통과했다. 레이아웃 기본 단계의
+실패로 gate 스크립트가 멈춰, RTL과 통합 단계는 같은 filter·인자로 따로 실행했다.
+레이아웃의 실패 2건은 옮기지 않은 `ImmersiveModeControllerMacInteractiveTest`의
+전체화면 Space 전환 대기 시간 초과다. 같은 조건에서 기존 `interactive_ui_tests`도 똑같이
+실패해 이번 이전과는 무관하며, 2026-11-02에는 통과했던 원인은 확인하지 못했다.
+Windows `.ps1` 전환과 검증은 후속 작업이다.
 
 2단계는 Yee 테스트 26개가 있는 `tab_drag_interactive_uitest.cc`와
 `tab_drag_controller_interactive_uitest.cc`의 drag suite다.
@@ -174,7 +195,8 @@ python3 tools/overlay/check-patch-ratchet.py --update
   `--update`로 잠근다. `chrome/test/BUILD.gn`의 약 40개 deps 추가 hunk가 사라진다.
   선택형 실행 파일과 `interactive_ui_tests`의 링크 시간을 같은 조건에서 측정한다.
   gate의 원본 guard 테스트를 보존하고 이전한 Yee 시나리오를 새 실행 파일에서 실행한다.
-- 기대 효과: 테스트 충돌 범위를 줄인다. 링크 시간 단축 여부는 측정 후 판단한다.
+- 기대 효과: 테스트 충돌 범위를 줄인다. 1단계에서 Chromium 테스트 파일의 추가 줄이
+  14,661에서 5,664로 줄었다. 측정 결과 링크 시간은 줄지 않았다.
 
 ### 3. ProjectNavigationController 생성 이동
 

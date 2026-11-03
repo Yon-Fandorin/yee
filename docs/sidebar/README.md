@@ -33,7 +33,7 @@ Tab Sidebar의 배치와 동작을 주제별로 기록한다.
 | 확인할 내용 | 방법 |
 | --- | --- |
 | 용량, 고정·해제, 크기·위치, 클릭·드래그 판정, 좌우 반전 | `favorites_unittest.cc` 같은 단위 테스트 |
-| 실제 UI 배치, `TabStripModel` 순서, 그룹 소속과 취소 복원 | Chromium `interactive_ui_tests` |
+| 실제 UI 배치, `TabStripModel` 순서, 그룹 소속과 취소 복원 | Yee `yee_interactive_ui_tests` (`.sh` gate) |
 | 색 대비, 화면 잘림과 애니메이션 | 실제 개발 브라우저의 화면 확인 |
 
 입력과 결과만으로 확인할 수 있는 규칙은 단위 테스트로 검사한다.

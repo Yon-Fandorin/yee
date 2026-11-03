@@ -25,14 +25,14 @@ require_chromium_src
 require_yee_output_selection
 
 UNIT_FILTER='BrowserSurfaceColorControllerTest.*:BrowserSurfacePresentationResolverTest.*:YeeRestingTextViewTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
-INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeadersRetainNativeControls:SplitTabLayout/MultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/MultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
+INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeadersRetainNativeControls:SplitTabLayout/YeeMultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
 UNIT_FILTER+=':BrowserSurfaceColorSampleTest.*'
 UNIT_FILTER+=':YeeNativePresentationTest.*:YeeTabIconPresentationTest.*'
 UNIT_FILTER+=':SplitPaneControlsTest.*:SplitPaneControlsTransitTest.*:SidePanelResizeGutterTest.*:SidePanelResizeGutterViewTest.*'
-INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
-INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility/*'
-INTERACTIVE_FILTER+=':SplitTabLayout/MultiContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets/*'
-RTL_FILTER='SplitTabLayout/MultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/MultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility/*'
+INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets/*'
+RTL_FILTER='SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Header regression targets"
@@ -42,7 +42,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
   [[ "$MODE" == "unit" || "$MODE" == "all" ]] && \
     targets+=(chrome/browser/ui/views/tabs/common:yee_header_unittests)
   [[ "$MODE" == "interactive" || "$MODE" == "all" ]] && \
-    targets+=(interactive_ui_tests)
+    targets+=(chrome/browser/ui/views/yee:yee_interactive_ui_tests)
   build_regression_targets "Header" "${targets[@]}"
 fi
 
@@ -59,7 +59,7 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Interactive Header regressions open real Yee windows and may take focus."
   prepare_ui_test_display
   gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
@@ -70,7 +70,7 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Running rendered color/binding regressions in RTL at 125% scale."
   prepare_ui_test_display
   gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/interactive_ui_tests" \
+  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
     --gtest_filter="$RTL_FILTER" \
     --force-ui-direction=rtl \
