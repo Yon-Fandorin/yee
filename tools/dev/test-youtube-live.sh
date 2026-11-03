@@ -12,6 +12,7 @@ if [[ ( "$MODE" != "off" && "$MODE" != "on" ) || "$#" -gt 2 ||
 fi
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 if [[ "${2:-}" != "--no-build" ]]; then
   require_free_gib 10 "the opt-in YouTube playback gate"
   sync_yee_ui_sources

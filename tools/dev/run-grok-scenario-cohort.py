@@ -29,6 +29,7 @@ from browser_trial_handoff import publish, respond
 from recorded_mcp_session import RecordedSession
 from yee_browser_transcript import Transcript
 from ui_test_display import ui_test_window_args
+from yee_build_paths import selected_yee_browser_bin
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -100,9 +101,7 @@ def pinned_app_files(app):
 def yee_executable(app=None):
     if app is not None:
         return pinned_app_files(app)[0]
-    return Path(subprocess.check_output(
-        ['/bin/zsh', '-c', 'source tools/dev/common.zsh\nprint -r -- "$YEE_BROWSER_BIN"'],
-        cwd=REPO, text=True).strip())
+    return selected_yee_browser_bin()
 
 
 def file_sha256(path):
@@ -363,7 +362,9 @@ async def yee_trial(root,case,args,fixture,prompt,run_model=None):
         urls=[ORIGIN+'/']
         if fixture.scenario=='S10':urls=[ORIGIN+d['source'] for d in fixture.data['documents']]+[ORIGIN+'/?unrelated=1']
         if args.yee_app is None:
-            subprocess.run(['/bin/zsh','-c','source tools/dev/common.zsh\nrequire_integrated_yee_app_current'],cwd=REPO,check=True)
+            subprocess.run(['/bin/zsh', '-c', 'source tools/dev/common.zsh\n'
+                            'require_yee_build_root_selection\nrequire_yee_output_selection\n'
+                            'require_integrated_yee_app_current'], cwd=REPO, check=True)
         browser_log = (case/'yee-browser.stderr').open('wb')
         browser_process = subprocess.Popen([str(executable), *window_args, '--user-data-dir='+str(bridge/'profile'),
             '--yee-agent-bridge='+str(bridge), '--no-first-run', '--no-default-browser-check',

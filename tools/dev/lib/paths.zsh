@@ -1,5 +1,11 @@
 # Paths helpers; loaded by common.zsh.
 
+# 빈 값은 기존 :- 기본값 처리와 같이 미지정으로 기록한다.
+YEE_LOCAL_BUILD_ROOT_EXPLICIT=false
+YEE_OUT_NAME_EXPLICIT=false
+[[ -n "${YEE_LOCAL_BUILD_ROOT:-}" ]] && YEE_LOCAL_BUILD_ROOT_EXPLICIT=true
+[[ -n "${YEE_OUT_NAME:-}" ]] && YEE_OUT_NAME_EXPLICIT=true
+
 YEE_ROOT="${COMMON_DIR:h:h}"
 LOCAL_BUILD_ROOT="${YEE_LOCAL_BUILD_ROOT:-$YEE_ROOT/.local-build}"
 DEPOT_TOOLS_DIR="$LOCAL_BUILD_ROOT/depot_tools"

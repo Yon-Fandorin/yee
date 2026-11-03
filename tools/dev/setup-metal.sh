@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
+require_yee_build_root_selection
 
 if ! METAL_TOOLCHAIN_ROOT="$(
   /usr/bin/xcodebuild -showComponent metalToolchain -json 2>/dev/null | \

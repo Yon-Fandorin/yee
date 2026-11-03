@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
+require_yee_build_root_selection
 require_yee_sync_jobs
 
 mkdir -p "$LOCAL_BUILD_ROOT"

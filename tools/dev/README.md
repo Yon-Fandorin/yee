@@ -32,6 +32,7 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 | `sync.*` | 현재 커밋에 필요한 관련 소스 맞추기 |
 | `configure.*` | 제품 코드 적용과 빌드 설정 생성 |
 | `build-ui.*` | `yee_ui`만 컴파일 |
+| `check-compile.sh [--list] [--include-unbuilt]` | macOS에서 패치·owned 컴파일 단위 사전 점검 (명시적으로 실행) |
 | `build.*` | 실제 앱 빌드 |
 | `run.*` | 빌드한 앱 실행 |
 | `smoke-test.*` | 기본 실행과 페이지 열기 확인 |
@@ -63,11 +64,15 @@ python3 tools/dev/chromium-version.py check
    변경과 미추적 파일을 보관하고 복원 가능 여부를 확인한다.
 3. 기존 `0001`·`0002`·`0003` 패치의 충돌과 제품 소스의 API 차이를 해결한다.
    적용된 패치를 다시 생성하고 브랜딩 문구·번역 변경을 별도로 검토한다.
-4. 새 출력 폴더와 격리 프로필로 빌드한다. 컴파일, 영향 범위의 native 회귀 검사,
+4. `configure.*`로 후보 출력의 graph를 준비한다. macOS에서는 긴 `build.sh` 전에
+   `check-compile.sh --list --include-unbuilt`로 대상을 확인하고
+   `check-compile.sh --include-unbuilt`로 미빌드 object까지 사전 컴파일한다.
+   아래 [사전 컴파일 점검](#chromium-이식-사전-컴파일-점검)을 참고한다.
+5. 후보 출력과 격리 프로필로 빌드한다. 컴파일, 영향 범위의 native 회귀 검사,
    탭·그룹·분할·설정·미디어·CLI 연결을 실제 앱에서 확인한다.
-5. 독립 검토 후 Windows와 macOS의 검수 결과를 각각 기록한다. 한 OS의 통과로
+6. 독립 검토 후 Windows와 macOS의 검수 결과를 각각 기록한다. 한 OS의 통과로
    다른 OS를 통과 처리하지 않는다. 해당 OS의 검증이 끝난 후보만 배포 대상으로 삼는다.
-6. 이전 실행 파일·프로필을 보존한 상태로 새 빌드를 사용한다. 새 프로필에서 생긴
+7. 이전 실행 파일·프로필을 보존한 상태로 새 빌드를 사용한다. 새 프로필에서 생긴
    문제가 없다는 이유만으로 실사용 프로필의 이전·복구까지 검증했다고 기록하지 않는다.
 
 메이저 이식과 작은 보안 패치 갱신은 검증 범위를 구분한다. 큰 이식에는 native
@@ -101,6 +106,8 @@ $env:YEE_OUT_NAME = 'YeeStable157'
 
 ```sh
 YEE_OUT_NAME=YeeStable157 ./tools/dev/configure.sh
+# 선택: 새 후보 출력의 이식 점검
+# YEE_OUT_NAME=YeeStable157 ./tools/dev/check-compile.sh --include-unbuilt
 YEE_OUT_NAME=YeeStable157 ./tools/dev/build.sh
 YEE_OUT_NAME=YeeStable157 ./tools/dev/run.sh
 ```
@@ -112,6 +119,8 @@ YEE_OUT_NAME=YeeStable157 ./tools/dev/run.sh
 ./tools/dev/checkout.sh
 ./tools/dev/setup-metal.sh
 ./tools/dev/configure.sh
+# 선택: 첫 출력에서 이식 컴파일을 점검할 때만 실행
+# ./tools/dev/check-compile.sh --include-unbuilt
 ./tools/dev/build.sh
 ./tools/dev/smoke-test.sh
 ```
@@ -139,6 +148,7 @@ Xcode 파일 자체는 수정하지 않는다.
 | 관련 소스 동기화 | 35 GiB |
 | 빌드 설정 생성 | 45 GiB |
 | `yee_ui` 빌드 | 5 GiB |
+| 이식 사전 컴파일 | 15 GiB |
 | 전체 앱 빌드 | 35 GiB |
 
 `build.sh`의 전체 앱 기준은 `YEE_BUILD_MIN_FREE_GIB`로 지정할 수 있으며
@@ -150,6 +160,9 @@ Xcode 파일 자체는 수정하지 않는다.
 ./tools/dev/sync.sh
 ./tools/dev/configure.sh
 ./tools/dev/build-ui.sh
+# 선택: 이미 빌드한 출력에서 컴파일 단위 사전 점검
+# ./tools/dev/check-compile.sh --list
+# ./tools/dev/check-compile.sh
 ./tools/dev/build.sh
 ./tools/dev/smoke-test.sh
 ./tools/dev/run.sh
@@ -175,6 +188,100 @@ YEE_BUILD_JOBS=6 ./tools/dev/build.sh
 `YEE_OUT_NAME`으로 구분한다.
 컴파일러와 도구 캐시는 같은 위치의 `cache/`에 모은다.
 
+macOS에서 루트를 지정하지 않았고 기본 루트의 도구·소스가 없는데
+`.local-build/*/`에 기존 루트가 있으면, checkout을 안내하거나 시작하기 전에 후보를
+출력하고 종료 코드 **17**로 멈춘다. 출력 이름을 지정하지 않았고 기본 출력의
+`build.ninja`가 없는데 같은 원본에 다른 graph가 있으면, 설정·빌드·실행 전에 후보 출력을
+보여 주고 종료 코드 **18**로 멈춘다. 후보를 자동 선택하지 않으며, 명시한 값과
+기존 기본 루트·graph가 있는 경우의 동작은 유지한다. 기존 환경에 맞춰 두 값을 지정한다.
+기본 루트를 쓰려면 `YEE_LOCAL_BUILD_ROOT="$YEE_ROOT/.local-build"`를 명시한다
+(`YEE_ROOT`는 저장소 루트이며, 저장소 루트에서 직접 지정할 때는 `$PWD`를 써도 된다).
+가드 메시지에는 호출자 셸에 `YEE_ROOT`가 없어도 쓸 수 있는 실제 절대 경로의 `export` 예시도 출력한다.
+
+```sh
+export YEE_LOCAL_BUILD_ROOT="$PWD/.local-build/stable157"
+export YEE_OUT_NAME=YeeStable157
+```
+
+앱 실행·프로토타입 실행·패키징(`--skip-build` 포함)과 native 테스트의 `--no-build`도
+부작용 전에 같은 선택 가드를 적용한다. `doctor.sh`는 선택 힌트를 출력하고 진단을 계속한다.
+`observe-youtube-live.mjs`는 앱·실행 파일·종료 helper 모두 공통 경로 선택을 사용하며 선택한 앱이
+없으면 관찰을 시작하지 않는다. 종료 helper는 `runtime.zsh`의 공통 함수로 실행 전에 준비한다.
+Python 콘텐츠 차단 fixture 세 곳과 Grok cohort는 `yee_build_paths.py`로,
+Swift 폼 승인 검사는 같은 zsh 호출로 두 가드와 제품 이름을 재사용한다.
+
+## Chromium 이식 사전 컴파일 점검
+
+macOS에서 이식한 코드의 컴파일 오류를 긴 `build.sh` 전에 확인하는 선택 단계다.
+기존 `YEE_LOCAL_BUILD_ROOT`·`YEE_OUT_NAME`의 `build.ninja`가 필요하며, 출력 폴더나
+graph가 없으면 생성하지 않고 중단한다. 다른 빌드가 실행 중이면 끝난 뒤 실행한다.
+
+```sh
+# 선택: 기존 출력에서 긴 앱 빌드 전에 컴파일 단위 점검
+./tools/dev/check-compile.sh --list
+./tools/dev/check-compile.sh
+./tools/dev/build.sh
+```
+
+`--list`는 기존 graph를 읽어 분류만 출력한다. 소스 동기화·컴파일·GN 재생성을
+수행하지 않으며 컴파일용 디스크 여유 공간 검사도 요구하지 않는다.
+다만 `ninja -t query`는 Ninja로 빌드한 출력(`.ninja_log`·`.ninja_deps`가 있는 경우)에서 내부 로그를 다시 쓸 수 있다.
+컴파일 모드는 기존 소스·도구·버전·작업 수·15 GiB 여유 공간
+검사를 통과한 뒤 owned 소스를 동기화한다. Chromium 패치를 다시 적용하거나
+브랜딩을 생성하지 않으며, graph 갱신이 필요한 변경은 먼저 `configure.sh`로 준비한다.
+
+분류 전에 `build.ninja.d`의 의존 파일 mtime을 `build.ninja.stamp`와 비교한다
+(stamp가 없으면 `build.ninja` 기준). 컴파일 모드는 owned 소스 동기화 직후 검사하므로
+동기화가 바꾼 `BUILD.gn`도 감지한다. 입력이 더 새롭거나 누락되었거나 depfile이 없으면
+종료 코드 **19**로 중단한다. 같은 루트·출력 환경에서 `./tools/dev/configure.sh`로 빌드
+설정을 먼저 갱신한다. 자동 재생성은 수행하지 않는다. `--list`는 경고를 출력하고 기존
+graph로 분류하며, 이때 플랫폼 미컴파일 분류는 확정된 결과로 간주하지 않는다.
+
+대상은 manifest의 shell 패치(`0001`)가 수정하는 `.cc`·`.mm` 중 삭제하지 않은 파일과,
+overlay 소스 복사 규칙으로 계산한 owned `.cc`·`.mm`의 Chromium 목적지다.
+Ninja의 조회 subtool로 소스별 object를 찾고, object가 하나면 `../../path/file.cc^`,
+여러 개면 선택한 각 object 경로를 전달한다. 같은 캐시·낮은 우선순위·`YEE_BUILD_JOBS`로
+autoninja를 한 번 실행하며 `-k 0`으로 가능한 컴파일 오류를 함께 확인한다.
+선택한 object가 요구하는 생성 헤더·모듈 등의 의존 단계도 실행하므로 cold 출력에서의
+작업량은 변경 파일 수보다 많을 수 있다. cold 시간 단축 여부는 아직 확인하지 않았다.
+앱·테스트 바이너리를 빌드 대상으로 지정하지 않는다.
+
+기본 모드는 현재 출력에 물리 파일이 있는 object만 선택한다. 없는 object는
+**현재 출력에서 미빌드** 목록과 `plan.json`의 `unbuilt_objects`에 기록하고 생략한다.
+일부를 생략하면 `N개 미빌드로 생략 — 완전한 통과 아님`을 출력한다. 컴파일 가능한
+object가 모두 미빌드이면 목록 모드와 컴파일 모드 모두 종료 코드 **16**으로 중단하고
+`--include-unbuilt` 사용을 안내한다. 전부 플랫폼 미컴파일인 경우를 포함해 실제 컴파일
+대상이 0개면 옵션이나 이유와 관계없이 **16**으로 끝난다. 알 수 없는 옵션은 **2**다.
+
+버전 이식·빈 출력·새 타깃의 컴파일까지 점검하려면 `--include-unbuilt`를 명시한다.
+이 옵션은 미빌드 object도 포함하므로 해당 타깃의 의존 단계를 처음 빌드할 수 있다.
+미빌드 목록은 포함 모드에서도 남기며 `--list`와 함께 사용할 수 있다.
+
+```sh
+./tools/dev/check-compile.sh --list --include-unbuilt
+./tools/dev/check-compile.sh --include-unbuilt
+```
+
+현재 graph에 object가 없는 파일은 **이 플랫폼에서 미컴파일** 목록으로 출력한다.
+플랫폼 조건뿐 아니라 비활성 기능·테스트 구성도 원인일 수 있으므로, 다른 플랫폼·구성에서
+별도 점검해야 한다. 이 목록과 전체 앱의 링크·실행·native 회귀 검증은 사전 컴파일의
+통과로 대체하지 않는다.
+컴파일 성공 뒤에도 보존한 `plan.json`에서 미빌드 파일·object 수와 플랫폼 미컴파일
+파일 수를 다시 출력한다. 미빌드를 생략했거나 플랫폼 미컴파일이 있으면 완료 요약에도
+**완전한 통과 아님**을 표시한다. `--include-unbuilt`로 포함한 object는 생략으로 세지 않는다.
+
+컴파일 모드의 기록 폴더는 `common.zsh`가 계산한 `$LOCAL_BUILD_ROOT/logs/compile-preflight.*`다.
+`YEE_LOCAL_BUILD_ROOT`를 지정했다면 그 아래이며, 미지정이면 저장소의 `.local-build/logs/`다.
+분류가 끝나면 `plan.json`·`targets.txt`를, 실제 빌드를 호출했을 때만 `build.log`를 남긴다.
+오래된 graph는 기록 폴더를 만들기 전에 **19**로 중단한다. `--list`도 기록 폴더를 만들지 않는다.
+실패하면 0이 아닌 원래 종료 코드를 반환하고 `failed-sources.txt`·`failed-objects.txt`에
+실패 파일을 기록한다. 도구나 생성 단계가 실패해 소스를 식별하지 못하면 그 사실을
+표시하므로 `build.log`도 함께 확인한다. 계약 테스트는 실제 빌드 없이 실행한다.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 tests/tooling/test_compile_preflight.py
+```
+
 ## macOS 앱 실행과 확인
 
 `run.sh`는 설정의 제품 이름으로 `.app` 파일을 찾는다. 인자 없이 실행하면 기존 개발
@@ -196,8 +303,9 @@ YEE_BUILD_JOBS=6 ./tools/dev/build.sh
 외부 네트워크가 필요 없는 기본 실행 테스트이며 실제 화면 배치는 별도로 확인해야 한다.
 macOS 앱 서비스에 접근할 수 있는 일반 터미널에서 실행한다.
 
-새 빌드의 실제 앱 확인 전에는 [`AGENTS.md`](../../AGENTS.md)에 따라 모든 개발 브라우저의
-정상 종료를 확인하고 새 앱을 실행한다.
+새 빌드의 수동 앱 확인 전에는 [`AGENTS.md`](../../AGENTS.md)에 따라 검수 대상 실행 파일이나
+격리 프로필을 쓰는 프로세스만 정상 종료한다. 자동 검사별 종료 요구 범위는 아래 설치 검사와
+콘텐츠 차단 검증의 설명을 따른다.
 
 ## macOS 설치 파일
 
@@ -207,10 +315,18 @@ macOS 앱 서비스에 접근할 수 있는 일반 터미널에서 실행한다.
 node tools/dev/test-macos-installer.mjs PACKAGE_DIRECTORY
 ```
 
-`.local-build/releases/`에 드래그 설치용 DMG·메타데이터·설치 안내를 만든다.
+선택한 `$LOCAL_BUILD_ROOT/releases/`(기본 `.local-build/releases/`)에 드래그 설치용
+DMG·메타데이터·설치 안내를 만든다.
 기본 명령은 전체 앱을 먼저 빌드하며 `--skip-build`도 버전과 번들 구성을 검사한다.
 현재는 ad-hoc 서명한 테스트판이며 Developer ID 서명과 Apple 공증은 포함하지 않는다.
 독립 프로필, 설치·교체와 검수 범위는 [macOS 테스트판](../../docs/macos-test-release.md)을 참고한다.
+
+설치 검사는 임시 폴더에 복사한 앱 경로나 검사 전용 `--user-data-dir`를 쓰는 제품
+프로세스만 종료 확인·종료 대기 대상으로 삼는다. 해당 앱 안의 Helper도 포함한다.
+`/Applications/Yee.app`과 개발 out의 앱은 실행 파일·프로필이 분리되어 있으면
+종료를 요구하지 않으며, 개수·실행 경로만 검사 폴더의 `processes.json`, 최종 `result.json`과
+표준 출력에 남긴다. `open -n`, `--use-mock-keychain`, 격리 프로필로 같은 bundle ID의
+설치판과 검사 앱을 함께 실행한다.
 
 ## Windows 준비 사항
 
@@ -322,6 +438,37 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 `DISABLED_` 스위트·사례를 제외한 뒤 활성 사례가 없는 양수 패턴이 하나라도 있으면
 중단한다. 다른 패턴이 일치해도 누락을 허용하지 않으며 기존 검사 선택 범위는 유지한다.
 JSON의 `pattern_counts`와 `missing_patterns`에서 패턴별 발견 수와 누락을 확인한다.
+
+zsh의 `run_native_test_gate`는 두 선택 가드와 바이너리의 존재·실행 권한을 먼저 확인한다.
+바이너리가 없거나 실행 불가능하면 선택한 out 경로를 출력하고 **20**으로 끝난다.
+검사마다 `$LOCAL_BUILD_ROOT/logs/native-gates/<UTC시각>-<바이너리이름>-<pid>/`에
+`record.json`과 `listing.txt`를 남긴다. UTC 시각에는 마이크로초를 포함해 같은 셸의
+연속 실행도 나누며, 기록에는 다음 항목이 들어간다.
+
+- 시작·종료 UTC, Yee HEAD, `git diff HEAD --binary`의 SHA-256과 NUL로 구분한
+  정렬된 미추적 파일 목록의 SHA-256·경로 목록. 미추적 내용 지문은 각 경로·NUL·내용 SHA-256의
+  원시 바이트를 순서대로 합쳐 SHA-256으로 계산한다. 심볼릭 링크의 내용은 링크 대상 문자열이다.
+- 빌드 루트·out 이름·경로와 두 선택의 명시 여부, 실행 디렉터리·인수·GTest 필터.
+- 바이너리의 절대 경로·크기·ns mtime·SHA-256과 해시 캐시 재사용 여부.
+  같은 경로·크기·mtime이면 `native-gates/.binary-sha256/`의 캐시를 재사용한다.
+- 목록 조회 종료 코드와 발견 수, 실행 종료 코드 `exit_code`, 최종 판정 `gate_exit_code`,
+  인터럽트 여부 `interrupted`, XML 경로·최신 작성 여부·`tests`·`failures`·`errors` 요약.
+
+`--gtest_output`을 생략하면 기록 폴더의 `results.xml`을 지정한다. 호출자가 지정한 XML
+파일·디렉터리 경로는 유지한다. 빈 경로인 `--gtest_output=xml:`은 GTest·Chromium 실행기의
+기본 파일명이 다를 수 있어 실행 전에 **2**로 거부한다. 기록 폴더를 쓰려면 옵션을 생략한다.
+목록 조회도 XML을 쓸 수 있으므로 실제 실행 직전의 파일
+상태와 비교하며, 이전 XML만 남은 경우도 누락으로 처리한다. 종료 코드가 0이어도 새 XML이
+없거나 손상되었거나 `tests == 0` 또는 `failures + errors > 0`이면 불일치를 보고하고
+**21**로 끝난다. JSON 출력만 지정해 XML이 없는 경우도 동일하다. 목록 조회·실제 실행이
+실패하면 원래 종료 코드를 유지하며, 준비·기록 실패는 **22**다. 이 기록은 현재 소스와
+실행 바이너리를 식별하며, 해당 소스로 바이너리를 빌드했다는 증명은 아니다.
+Ctrl-C(SIGINT)는 `interrupted: true`로 기록하고, 같은 프로세스 그룹에서 신호를 받은
+자식 실행기의 정리가 끝날 때까지 기다린다. 실제 자식 종료 코드를 보존하며, 코드가 없으면
+**130**을 기록한다. 자식이 0으로 끝나도 최종 판정은 **130**으로 실패한다.
+
+native browser test는 Chromium 실행기가 만든 임시 프로필을 쓰며 고정 CDP 포트를 추가하지 않는다. Mac 설치 검사·smoke는 이미 `--remote-debugging-port=0`과 전용 프로필의 `DevToolsActivePort`를 사용하고 검사 PID·앱·프로필 범위를 추적한다. OS 리스너 PID까지 대조하는 CDP 소유권 검사는 현재 Windows 전용이다.
+
 레이아웃 검사의 OS 전용 필터는 공통 필터에 해당 플랫폼의 사례만 더한다. Mac에는
 Windows caption·native clip 검사를 요구하지 않으며, Windows에는 Mac glass·immersive
 검사를 요구하지 않는다. 해당 플랫폼에 있어야 할 사례의 누락은 그대로 실패다.
@@ -410,7 +557,7 @@ Windows에서 `node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>
 `YEE_LIVE_YOUTUBE_VIDEO`로 이 중 하나를 선택하고 `YEE_LIVE_YOUTUBE_SECONDS`로
 영상별 상한 90~600초를 지정한다. `YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS`는
 광고·탐색 이동을 제외한 최소 본편 시간이며 기본 60초다. `YEE_LIVE_YOUTUBE_SEEK=1`은
-40초·80초 뒤 중간 탐색을 추가한다. opt-in 결과는 `.local-build/youtube-live/`에 생성한다.
+40초·80초 뒤 중간 탐색을 추가한다. opt-in 결과는 선택한 `$LOCAL_BUILD_ROOT/youtube-live/`에 생성한다.
 
 초기 로딩·스크롤·영상 전환을 비교하려면 저장소 루트에서
 `node tools/dev/observe-youtube-live.mjs perf`를 실행한다.
@@ -419,12 +566,17 @@ Windows에서 `node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>
 이 도구는 macOS의 실제 앱과 격리 프로필을 사용한다. `ads`,
 `perf`, `smoke`로 단계만 선택할 수 있다. `smoke-on`은 차단 켠 앱의 재생·출력
 오디오를 짧게 확인한다. 마지막 인자는 재생·광고 관측 초수다
-(`ads`/`all` 기본 600초, 영상별 상한 1,200초). 실행 전에 `common.zsh`의
-`gracefully_quit_yee`로 개발 Yee를 정상 종료해야 한다. 앱 출력 오디오 helper는
+(`ads`/`all` 기본 600초, 영상별 상한 1,200초).
+`observe-youtube-live.mjs`와 `test-content-blocking.mjs`는 실행 전에
+`browser_bundle_executables.py --running`으로 조회한 bundle ID `org.chromium.Chromium`의
+개발 번들이 실행 중이면 정상 종료를 요구한다. 선택한 out 외의 개발 번들도 포함하며,
+설치판 ID `io.github.yon-fandorin.yee`는 이 조회 대상이 아니다. 설치 검사는 앞서 설명한
+검사 앱·검사 프로필만 종료 대상으로 삼는다.
+앱 출력 오디오 helper는
 Xcode 도구로 자동 빌드하며, 정확한 브라우저 PID의 자식 오디오 프로세스만
 Core Audio tap에 포함한다. 마이크는 사용하지 않는다. 광고 구간의 PCM은 최대
 90초만 보존하고 전체 출력은 초별 RMS로 집계한다. 측정 결과는
-`.local-build/youtube-review/`에 둔다. OS의 오디오 캡처 권한이 없거나 출력이
+저장소의 `.local-build/youtube-review/`에 둔다(빌드 루트·출력 선택과 별도). OS의 오디오 캡처 권한이 없거나 출력이
 잡히지 않은 경우에는 음성 검증 통과로 취급하지 않는다.
 
 차단 끔 대조군은 한 세션·프로필에서 영상을 순서대로 이동한다.

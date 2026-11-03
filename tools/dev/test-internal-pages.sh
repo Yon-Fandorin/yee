@@ -27,6 +27,7 @@ fi
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 if [[ "$build_tests" == true ]]; then
   require_free_gib 10 "the focused Internal Pages browser gate"
   sync_yee_ui_sources

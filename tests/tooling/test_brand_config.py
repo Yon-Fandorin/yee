@@ -180,8 +180,11 @@ class BrandConfigTest(unittest.TestCase):
         common.parent.mkdir(parents=True)
         shutil.copy(ROOT / "tools/dev/common.zsh", common)
         shutil.copytree(ROOT / "tools/dev/lib", common.parent / "lib")
-        output = subprocess.check_output(["zsh", "-c", 'source "$1"; print -rl -- "$YEE_PRODUCT_NAME" "$YEE_BROWSER_BIN"', "brand-test", str(common)], text=True)
         expected_src = self.repo.resolve() / ".local-build/chromium/src"
+        # 실제 개발 출력 환경을 임시 저장소의 경로 계산에 상속하지 않는다.
+        env = {**os.environ, 'YEE_LOCAL_BUILD_ROOT': str(expected_src.parents[1]),
+               'YEE_OUT_NAME': 'YeePilot'}
+        output = subprocess.check_output(["zsh", "-c", 'source "$1"; print -rl -- "$YEE_PRODUCT_NAME" "$YEE_BROWSER_BIN"', "brand-test", str(common)], text=True, env=env)
         self.assertEqual(output.splitlines(), [name, str(expected_src / f"out/YeePilot/{name}.app/Contents/MacOS/{name}")])
 
     def test_name_is_provisional_by_default_and_can_be_marked_final(self):

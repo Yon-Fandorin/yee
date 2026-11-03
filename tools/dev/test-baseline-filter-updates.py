@@ -10,9 +10,10 @@ import threading
 import time
 
 from ui_test_display import ui_test_window_args
+from yee_build_paths import selected_yee_browser_bin
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = ROOT / '.local-build/chromium/src/out/YeePilot/Yee.app/Contents/MacOS/Yee'
+APP = selected_yee_browser_bin()
 FIXTURE = ROOT / 'tests/fixtures/content-blocking/updated-lists.html'
 URLS = ['https://easylist-downloads.adblockplus.org/easylist.txt',
         'https://easylist-downloads.adblockplus.org/easyprivacy.txt']

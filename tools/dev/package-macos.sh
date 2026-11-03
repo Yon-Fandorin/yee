@@ -5,6 +5,9 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
+require_yee_build_root_selection
+require_yee_output_selection
+
 if [[ "${1:-}" == --skip-build && $# == 1 ]]; then
   shift
 elif (( $# == 0 )); then

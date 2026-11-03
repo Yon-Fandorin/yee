@@ -9,6 +9,9 @@
 | `preflight.zsh`, `preflight.ps1` | 필요한 소스·도구·여유 공간 확인 |
 | `build.zsh`, `build.ps1` | 소스·브랜딩 준비와 빌드 실행; zsh의 native 회귀 목록 검사·실행 |
 | `native_test_discovery.py` | GTest 목록의 활성 사례·필터별 발견 수를 확인하는 순수 Python CLI |
+| `native_gate_record.py` | zsh native gate의 소스·바이너리 식별, 목록·실행 기록과 XML 대조 |
+| `macos_installer_processes.mjs` | 설치 검사의 ps 목록을 복사한 앱·전용 프로필과 무관한 제품 프로세스로 분리 |
+| `compile_preflight.py` | GN depfile 최신 여부 검사, overlay 기반 사전 컴파일 대상 분류·실패 파일·완료 범위 보고 |
 | `runtime.zsh` | macOS 앱 실행·종료와 빌드 결과의 최신 여부 확인 |
 | `metal.zsh` | macOS Metal 도구 경로 찾기 |
 | `macos_release.py` | 복사한 Mac 설치판의 식별자·코드 서명·DMG·메타데이터 생성 |

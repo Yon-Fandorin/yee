@@ -6,8 +6,6 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
-"$SCRIPT_DIR/test-run-preflight.sh"
-
 MODE="${1:-unit}"
 SKIP_BUILD=false
 if [[ "$MODE" == "--no-build" ]]; then
@@ -24,6 +22,9 @@ fi
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
+
+"$SCRIPT_DIR/test-run-preflight.sh"
 
 UNIT_FILTER='Favorites*:*GroupMarkSignalsTest.*:SidebarFooter*:*SplitPaneControlsTest.*:YeeSurfaceColorTest.*:YeeSurfaceGeometryTest.*:YeeShellColorTest.*:YeeSidebarItemColorTest.*:TabGroupHeaderViewTest.Yee*:All/TabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation/*:All/TabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity/*:All/TabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock/*'
 # Header의 주소줄·팝업 검사는 test-header.sh가 소유한다. Sidebar 구조와

@@ -53,6 +53,25 @@ guard CommandLine.arguments.count == 2 || CommandLine.arguments.count == 3 ||
   fputs("Usage: test-form-approval-operator PRIVATE_TEST_BRIDGE [RUN_NAME [--batch]] | --self-test\n", stderr)
   exit(2)
 }
+let repoRoot = URL(fileURLWithPath: #filePath)
+  .deletingLastPathComponent()
+  .deletingLastPathComponent()
+  .deletingLastPathComponent()
+let selection = Process()
+let selectedPath = Pipe()
+selection.executableURL = URL(fileURLWithPath: "/bin/zsh")
+selection.arguments = ["-c", "source \"$1\"; require_yee_build_root_selection; require_yee_output_selection; print -r -- \"$YEE_BROWSER_BIN\"",
+                       "yee-form-approval-path", repoRoot.appendingPathComponent("tools/dev/common.zsh").path]
+selection.standardOutput = selectedPath
+do { try selection.run() } catch { fputs("빌드 경로 선택을 실행하지 못했다.\n", stderr); exit(2) }
+let pathData = selectedPath.fileHandleForReading.readDataToEndOfFile()
+selection.waitUntilExit()
+guard selection.terminationStatus == 0 else { exit(selection.terminationStatus) }
+guard let browserPath = String(data: pathData, encoding: .utf8)?.trimmingCharacters(in: .newlines),
+      !browserPath.isEmpty else { exit(2) }
+let expectedExecutable = URL(fileURLWithPath: browserPath).standardizedFileURL.resolvingSymlinksInPath()
+let appURL = expectedExecutable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+
 let bridge = CommandLine.arguments[1]
 var info = stat()
 guard bridge.range(of: #"^/private/tmp/yee-agent\.[A-Za-z0-9]+$"#, options: .regularExpression) != nil,
@@ -80,23 +99,6 @@ func log(_ event: String, _ values: [String: Any] = [:]) {
   }
 }
 
-let repoRoot = URL(fileURLWithPath: #filePath)
-  .deletingLastPathComponent()
-  .deletingLastPathComponent()
-  .deletingLastPathComponent()
-guard let configData = try? Data(contentsOf: repoRoot.appendingPathComponent("branding/brand.json")),
-      let config = (try? JSONSerialization.jsonObject(with: configData)) as? [String: Any],
-      let productName = config["name"] as? String, !productName.isEmpty,
-      !productName.contains("/"), !productName.contains("\\") else {
-  log("refused", ["reason": "missing valid product branding configuration"])
-  exit(2)
-}
-let localBuildRoot = ProcessInfo.processInfo.environment["YEE_LOCAL_BUILD_ROOT"].map {
-  URL(fileURLWithPath: $0)
-} ?? repoRoot.appendingPathComponent(".local-build")
-let appURL = localBuildRoot.appendingPathComponent("chromium/src/out/YeePilot/" + productName + ".app")
-  .standardizedFileURL.resolvingSymlinksInPath()
-let expectedExecutable = appURL.appendingPathComponent("Contents/MacOS/" + productName)
 let candidates = NSRunningApplication.runningApplications(withBundleIdentifier: "org.chromium.Chromium")
   .filter {
     $0.bundleURL?.standardizedFileURL.resolvingSymlinksInPath() == appURL &&

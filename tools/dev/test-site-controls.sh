@@ -12,6 +12,7 @@ fi
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 if [[ "${1:-}" != "--no-build" ]]; then
   require_free_gib 10 "the focused Site Controls browser gate"
   sync_yee_ui_sources

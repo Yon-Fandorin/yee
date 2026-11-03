@@ -6,6 +6,9 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
+require_yee_build_root_selection
+require_yee_output_selection
+
 SMOKE_TIMEOUT_SECONDS="${YEE_SMOKE_TIMEOUT_SECONDS:-30}"
 SMOKE_URL='data:text/html,%3Ctitle%3EYEE_SMOKE_OK%3C%2Ftitle%3E%3Cmain%20id%3D%22yee-smoke%22%3EYEE_SMOKE_OK%3C%2Fmain%3E'
 

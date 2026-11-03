@@ -9,9 +9,10 @@ import tempfile
 import threading
 
 from ui_test_display import ui_test_window_args
+from yee_build_paths import selected_yee_browser_bin
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = ROOT / '.local-build/chromium/src/out/YeePilot/Yee.app/Contents/MacOS/Yee'
+APP = selected_yee_browser_bin()
 FIXTURE = ROOT / 'tests/fixtures/content-blocking/procedural.html'
 subprocess.run(['zsh', '-c', 'set -e; source "$1"; require_integrated_yee_app_current',
                 'yee-procedural-fixture', str(ROOT / 'tools/dev/common.zsh')], check=True)

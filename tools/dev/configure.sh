@@ -7,6 +7,7 @@ source "$SCRIPT_DIR/common.zsh"
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 require_free_gib 45 "GN generation and the compact Chromium build"
 
 "$YEE_ROOT/tools/overlay/apply.sh" "$CHROMIUM_SRC"

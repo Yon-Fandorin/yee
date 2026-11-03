@@ -55,10 +55,18 @@ const output = path.join(root, '.local-build/youtube-review', `${plan}-${Date.no
 const adProfile=path.resolve(root,process.env.YEE_LIVE_YOUTUBE_PROFILE??path.join(output,'profile-ad-cohort'));
 assert.ok(adProfile.startsWith(path.join(root,'.local-build/youtube-review')+path.sep)&&
   path.basename(adProfile).startsWith('profile-'),'Only isolated review profiles may be reused');
-const yeeApp = path.join(root, '.local-build/chromium/src/out/YeePilot/Yee.app');
+const {stdout: yeePaths} = await promisify(execFile)('zsh', ['-c',
+  'source "$1"; require_yee_build_root_selection; require_yee_output_selection; print -rl -- "$YEE_APP_DIR" "$YEE_BROWSER_BIN" "$LOCAL_BUILD_ROOT/yee-shutdown-helper/gracefully-quit-yee"',
+  'yee-live-path', path.join(root, 'tools/dev/common.zsh')]);
+const [yeeApp, yeeBrowserBin, shutdown] = yeePaths.trimEnd().split('\n');
+await fs.access(yeeApp).catch(error => {
+  throw new Error(`Yee 앱 경로가 없다. 빌드 루트·출력 이름을 확인하라: ${yeeApp}`, {cause: error});
+});
+await promisify(execFile)('zsh', ['-c',
+  'source "$1"; require_yee_build_root_selection; require_yee_output_selection; prepare_yee_shutdown_helper',
+  'yee-live-shutdown-helper', path.join(root, 'tools/dev/common.zsh')]);
 const chromeApp = '/Applications/Google Chrome.app';
 const braveApp = '/Applications/Brave Browser.app';
-const shutdown = path.join(root, '.local-build/yee-shutdown-helper/gracefully-quit-yee');
 const audioHelper = path.join(root, '.local-build/youtube-review/audio-helper/capture-browser-output-audio');
 const videos = (process.env.YEE_LIVE_YOUTUBE_VIDEOS ?? '5EzB_2Qcakw,uq14seOjILU,mfmdXPT7nAM').split(',');
 assert.ok(videos.length>=1&&videos.length<=12&&videos.every(v=>/^[A-Za-z0-9_-]{11}$/.test(v)));
@@ -282,7 +290,7 @@ async function launch(label, app, mode, profile, performanceCase=false) {
   let browserCDP, tabCDP, audio, audioDirectory, audioSpawnError, pid;
   const closeBrowser=()=>closeOwnedBrowser(browser,browserCDP,async()=>{
     if(app===yeeApp&&pid) await promisify(execFile)(shutdown,
-      [path.join(app,'Contents/MacOS/Yee'),`--pid=${pid}`]);
+      [yeeBrowserBin,`--pid=${pid}`]);
     else throw new Error('Browser did not close through Browser.close');
   });
   try {

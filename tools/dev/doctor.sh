@@ -6,6 +6,11 @@ SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
 print_paths
+if require_yee_build_root_selection && require_yee_output_selection; then
+  print '빌드 루트·출력 선택: 현재 선택 유지'
+else
+  print '빌드 루트·출력 선택: 위 환경 설정 힌트를 확인하라. 진단은 계속한다.'
+fi
 print "free space:     $(available_gib) GiB"
 print "architecture:   $(uname -m)"
 print "macOS:          $(sw_vers -productVersion) ($(sw_vers -buildVersion))"

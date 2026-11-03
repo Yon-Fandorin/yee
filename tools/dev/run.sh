@@ -5,6 +5,9 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
+require_yee_build_root_selection
+require_yee_output_selection
+
 PROFILE_DIR="$LOCAL_BUILD_ROOT/runtime-profile"
 LAUNCH_IN_BACKGROUND=false
 

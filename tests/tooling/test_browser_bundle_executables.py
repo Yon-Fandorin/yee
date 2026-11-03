@@ -62,8 +62,9 @@ class BundleExecutablesTest(unittest.TestCase):
         old = self.bundle('Yee')
         new = self.bundle('새 이름', parent=self.root)
         other = self.bundle('Other', identity='com.other.browser')
+        installed = self.bundle('Installed Yee', identity='io.github.yon-fandorin.yee')
         helper = self.bundle('Helper', identity=CURRENT_BUNDLE_ID + '.helper')
-        listing = '\n'.join(f'{pid} {binary}' for pid, binary in enumerate([old, new, other, helper], 100))
+        listing = '\n'.join(f'{pid} {binary}' for pid, binary in enumerate([old, new, other, installed, helper], 100))
         listing += f'\n999 /usr/bin/python {old}\n'
         self.assertEqual(browser_processes(listing), [
             {'pid': 100, 'executable': str(old)}, {'pid': 101, 'executable': str(new)}])

@@ -7,6 +7,7 @@ source "$SCRIPT_DIR/common.zsh"
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 # Default remains conservative. An explicitly approved incremental build may
 # lower the threshold, but never below the supported 15 GiB safety floor.
 YEE_BUILD_MIN_FREE_GIB="${YEE_BUILD_MIN_FREE_GIB:-35}"

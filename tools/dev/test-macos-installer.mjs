@@ -10,6 +10,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {closeOwnedBrowser, connectCDP, pause, requireShutdown, uiTestWindowArgs, waitForShutdown}
   from './content_blocking_test_runtime.mjs';
+import {filterInstallerProcesses} from './lib/macos_installer_processes.mjs';
 
 assert.equal(process.platform, 'darwin', '이 실행 검증은 macOS용이다');
 assert.equal(process.argv.length, 3, 'Usage: node tools/dev/test-macos-installer.mjs PACKAGE_DIRECTORY');
@@ -34,20 +35,23 @@ const image = path.join(packageDirectory, metadata.installer);
 assert.equal(await hash(image), metadata.sha256, 'DMG SHA-256');
 const buildRoot = process.env.YEE_LOCAL_BUILD_ROOT || path.join(root, '.local-build');
 await fs.mkdir(buildRoot, {recursive: true});
-const output = await fs.mkdtemp(path.join(buildRoot, 'macos-install-test-'));
+const output = await fs.realpath(await fs.mkdtemp(path.join(buildRoot, 'macos-install-test-')));
 const mount = path.join(output, 'volume');
 const application = path.join(output, 'Applications', brand.name + '.app');
 const executable = path.join(application, 'Contents/MacOS', brand.name);
 const profile = path.join(output, 'profile');
 const extension = path.join(output, 'extension');
-const escapedName = brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const productProcess = new RegExp(`/${escapedName}(?: Helper[^/]*)?\\.app/Contents/`);
-function processes(ownedOnly = false) {
-  return execFileSync('/bin/ps', ['-axo', 'pid=,command='], {encoding: 'utf8'})
-    .split('\n').filter(line => productProcess.test(line)
-      && (!ownedOnly || line.includes(application + '/Contents/')));
+function processes() {
+  return filterInstallerProcesses(
+    execFileSync('/bin/ps', ['-axo', 'pid=,command='], {encoding: 'utf8'}),
+    {productName: brand.name, application, profile});
 }
-requireShutdown(processes());
+const initialProcesses = processes();
+const unrelatedProcesses = {count: initialProcesses.unrelated.length,
+  paths: initialProcesses.unrelated.map(process => process.executable)};
+await fs.writeFile(path.join(output, 'processes.json'), JSON.stringify(unrelatedProcesses, null, 2));
+console.log('검사 범위 밖의 Yee 프로세스:', JSON.stringify(unrelatedProcesses));
+requireShutdown(initialProcesses.owned);
 const server = http.createServer((request, response) => {
   response.setHeader('Content-Type', 'text/html; charset=utf-8');
   response.end(`<!doctype html><meta charset="utf-8"><title>Yee 설치 검사 ${request.url}</title><p>Yee 설치 검사</p>`);
@@ -72,7 +76,7 @@ async function evaluate(expression) {
 }
 
 async function launch() {
-  requireShutdown(processes());
+  requireShutdown(processes().owned);
   await fs.rm(path.join(profile, 'DevToolsActivePort'), {force: true});
   const windowArgs = uiTestWindowArgs();
   child = spawn('/usr/bin/open', ['-n', '-W', application, '--args',
@@ -106,7 +110,7 @@ async function shutdown() {
   if (child) {
     // open -W는 브라우저 종료보다 늦게 반환할 수 있어 기존 추가 대기를 유지한다.
     await closeOwnedBrowser(child, browser, () => {});
-    await waitForShutdown(() => processes(true));
+    await waitForShutdown(() => processes().owned);
   }
   child = undefined; browser = undefined;
 }
@@ -217,7 +221,7 @@ try {
     '앱 제거·재설치 후 그룹·북마크 복원 시간 초과');
   assert.equal(await webStorage('localStorage.getItem("yee-install")'), 'preserved');
   await shutdown();
-  const result = {passed: true, version: metadata.version, output, restored,
+  const result = {passed: true, version: metadata.version, output, restored, unrelatedProcesses,
     checks: ['DMG 해시와 앱 서명', '독립 번들·프로필 메타데이터',
       '설치 앱과 렌더러 실행', '같은 버전 대치',
       '그룹·북마크·웹 저장 데이터', '앱 제거·재설치 후 프로필 보존'],

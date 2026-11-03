@@ -34,41 +34,31 @@ configure_yee_build_cache() {
 build_regression_targets() {
   local suite_name="$1"
   shift
-  configure_yee_build_cache
+  require_yee_output_selection || return $?
+  configure_yee_build_cache || return $?
   print "Building ${suite_name} regression targets."
   (
-    cd "$CHROMIUM_SRC"
+    cd "$CHROMIUM_SRC" || return $?
     caffeinate -dimsu nice -n 10 \
       autoninja -C "out/$YEE_OUT_NAME" -j "$YEE_BUILD_JOBS" "$@"
   )
 }
 
-# 실행과 같은 바이너리·인수로 목록을 확인해 비어 있는 회귀 검사의 성공을 막는다.
+# 선택한 실행 파일의 발견 검사·실행·XML 대조와 소스·바이너리 기록을 함께 남긴다.
 run_native_test_gate() {
   local test_binary="$1"
   shift
-  local argument test_filter='' filter_count=0
-  for argument in "$@"; do
-    if [[ "$argument" == --gtest_filter=* ]]; then
-      test_filter="${argument#--gtest_filter=}"
-      (( filter_count += 1 ))
-    fi
-  done
-  if (( filter_count != 1 )); then
-    print -u2 'Native 검사는 명시한 --gtest_filter= 인수 하나가 필요하다.'
-    return 2
+  require_yee_build_root_selection || return $?
+  require_yee_output_selection || return $?
+  if [[ ! -f "$test_binary" || ! -x "$test_binary" ]]; then
+    print -u2 -r -- "Native 테스트 바이너리가 없거나 실행할 수 없다: $test_binary (선택한 out: $YEE_OUT_DIR)"
+    return 20
   fi
-
-  local test_listing list_result
-  if test_listing="$("$test_binary" "$@" --gtest_list_tests)"; then
-    print -r -- "$test_listing" | \
-      python3 "$COMMON_DIR/lib/native_test_discovery.py" --filter="$test_filter" || return $?
-  else
-    list_result=$?
-    print -u2 "Native 테스트 목록 조회 실패 (${list_result}): $test_binary"
-    return "$list_result"
-  fi
-  "$test_binary" "$@"
+  python3 "$COMMON_DIR/lib/native_gate_record.py" \
+    --repo-root "$YEE_ROOT" --build-root "$LOCAL_BUILD_ROOT" \
+    --out-dir "$YEE_OUT_DIR" --out-name "$YEE_OUT_NAME" \
+    --root-explicit "$YEE_LOCAL_BUILD_ROOT_EXPLICIT" --out-explicit "$YEE_OUT_NAME_EXPLICIT" \
+    --pid "$$" -- "$test_binary" "$@"
 }
 
 # Compatibility for existing focused regression gates.
@@ -85,6 +75,7 @@ require_yee_build_jobs() {
 
 prepare_yee_build_inputs() {
   require_yee_build_jobs
+  require_yee_output_selection || return $?
   sync_yee_branding
   sync_yee_ui_sources
   if [[ ! -f "$YEE_OUT_DIR/build.ninja" ]]; then

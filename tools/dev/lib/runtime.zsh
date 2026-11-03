@@ -3,6 +3,8 @@
 prepare_ui_test_display() {
   typeset -ga YEE_UI_TEST_WINDOW_ARGS=()
   [[ "$(uname -s)" == Darwin ]] || return 0
+  require_yee_build_root_selection || return $?
+  require_yee_output_selection || return $?
 
   local display_args
   mkdir -p "$LOCAL_BUILD_ROOT/swift-module-cache"
@@ -43,6 +45,18 @@ require_integrated_yee_app_current() {
   return 11
 }
 
+prepare_yee_shutdown_helper() {
+  require_yee_build_root_selection || return $?
+  local shutdown_dir="$LOCAL_BUILD_ROOT/yee-shutdown-helper"
+  local shutdown_source="$COMMON_DIR/gracefully-quit-yee.swift"
+  local shutdown_binary="$shutdown_dir/gracefully-quit-yee"
+  mkdir -p "$shutdown_dir/module-cache" || return $?
+  if [[ ! -x "$shutdown_binary" || "$shutdown_source" -nt "$shutdown_binary" ]]; then
+    xcrun swiftc -module-cache-path "$shutdown_dir/module-cache" \
+      "$shutdown_source" -o "$shutdown_binary" || return $?
+  fi
+}
+
 gracefully_quit_yee() {
   local browser_binary process_pattern
   local -a browser_binaries running_binaries
@@ -60,14 +74,8 @@ gracefully_quit_yee() {
   fi
 
   print "Requesting graceful shutdown of browser bundles in $YEE_OUT_DIR."
-  local shutdown_dir="$LOCAL_BUILD_ROOT/yee-shutdown-helper"
-  local shutdown_source="$COMMON_DIR/gracefully-quit-yee.swift"
-  local shutdown_binary="$shutdown_dir/gracefully-quit-yee"
-  mkdir -p "$shutdown_dir/module-cache"
-  if [[ ! -x "$shutdown_binary" || "$shutdown_source" -nt "$shutdown_binary" ]]; then
-    xcrun swiftc -module-cache-path "$shutdown_dir/module-cache" \
-      "$shutdown_source" -o "$shutdown_binary"
-  fi
+  prepare_yee_shutdown_helper || return $?
+  local shutdown_binary="$LOCAL_BUILD_ROOT/yee-shutdown-helper/gracefully-quit-yee"
   for browser_binary in "${running_binaries[@]}"; do
     # The native helper verifies the exact executable, bundle URL, and stable ID.
     "$shutdown_binary" "$browser_binary"

@@ -24,6 +24,7 @@ fi
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 
 FAST_TARGETS=(
   'chrome/browser/ui/views/tabs/common:yee_layout_unittests'

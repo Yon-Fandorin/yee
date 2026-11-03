@@ -7,6 +7,7 @@ source "$SCRIPT_DIR/common.zsh"
 
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 require_free_gib 5 "the isolated $YEE_PRODUCT_NAME UI target"
 
 prepare_yee_build_inputs

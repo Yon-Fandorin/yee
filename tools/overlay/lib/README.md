@@ -11,10 +11,16 @@
 패치의 `---`·`+++` 실제 파일 경로는 `diff --git`의 선언과 일치해야 한다.
 추가·삭제와 권한 변경은 지원하며 binary·rename·copy 형식은 거부한다.
 본문의 `---`·`+++` 소스는 hunk의 줄 수로 구분한다.
+`patch_paths(..., include_deleted=True)`는 기본으로 삭제 경로도 포함해 패치의 소유권을
+계산한다. 사전 컴파일처럼 현재 파일만 필요한 호출은 `include_deleted=False`로
+삭제 파일을 제외한다. 내용이 없는 삭제와 권한 변경도 파일 메타데이터로 구분한다.
 
 `browser/`, `renderer/`, `components/`, `third_party/`의 루트 README는 복사하지 않는다.
 등록된 소스 디렉터리 안의 원본 README는 복사한다.
 등록되지 않은 하위 디렉터리를 README라는 이유로 검사에서 제외하지는 않는다.
+`owned_source_files(src, catalog, repo_root)`는 이 제외·소유권·경로 검사를 공통으로
+적용하고 원본·Chromium 목적지 쌍을 반환한다. `source_plan`은 그 목록에서 내용 변경과
+owned 목적지의 삭제를 계산하며, 사전 컴파일은 같은 목록으로 목적지의 `.cc`·`.mm`를 찾는다.
 
 사용 방법은 [상위 안내](../README.md), 경로와 파일 검사 테스트는
 [도구 테스트](../../../tests/tooling/README.md)를 참고한다.

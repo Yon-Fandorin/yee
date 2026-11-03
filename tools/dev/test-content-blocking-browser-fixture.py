@@ -9,13 +9,14 @@ import subprocess
 import tempfile
 
 from ui_test_display import ui_test_window_args
+from yee_build_paths import selected_yee_browser_bin
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--yee', action='store_true', help='Use the newly built, visible Yee app')
 parser.add_argument('--response-only', action='store_true', help='Focus on body readers, clone and error semantics')
 options = parser.parse_args()
-yee_executable = ROOT / '.local-build/chromium/src/out/YeePilot/Yee.app/Contents/MacOS/Yee'
+yee_executable = selected_yee_browser_bin() if options.yee else None
 window_args = ui_test_window_args() if options.yee else []
 if options.yee:
     subprocess.run(['zsh', '-c', 'set -e; source "$1"; require_integrated_yee_app_current; gracefully_quit_yee',

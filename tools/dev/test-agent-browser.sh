@@ -5,6 +5,7 @@ SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 require_depot_tools
 require_chromium_src
+require_yee_output_selection
 
 if [[ "${1:-}" != "--no-build" ]]; then
   require_free_gib 10 "agent browser contract tests"

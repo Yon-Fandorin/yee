@@ -77,9 +77,23 @@ class DevelopmentToolsTest(unittest.TestCase):
             self.write_tool(self.overlay / name, f'printf "%s\\n" "{label}" >> "$YEE_TEST_LOG"\n')
         self.write_tool(self.dev / 'configure.sh', 'printf "configure\\n" >> "$YEE_TEST_LOG"\ntouch "$YEE_TEST_OUT/build.ninja"\n')
         self.write_tool(self.dev / 'usage.sh', 'printf "usage\\n" >> "$YEE_TEST_LOG"\n')
+        (self.repo / '.gitignore').write_text('local build/\n')
+        for arguments in (('init',), ('add', '.gitignore', 'branding/brand.json'),
+                          ('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                           'commit', '-qm', 'fixture')):
+            subprocess.run(['git', '-C', str(self.repo), *arguments], check=True, capture_output=True)
 
     def write_tool(self, path, text):
         path.parent.mkdir(parents=True, exist_ok=True)
+        if path.parent == self.out:
+            # 가짜 native 실행도 실제 gate와 같이 XML 결과를 남긴다. 목록 조회는 앞서 종료한다.
+            text += '''for argument in "$@"; do
+  if [[ "$argument" == --gtest_output=xml:* ]]; then
+    xml="${argument#--gtest_output=xml:}"
+    print -r -- '<testsuites tests="1" failures="0" errors="0"/>' > "$xml"
+  fi
+done
+'''
         path.write_text('#!/bin/zsh\nset -euo pipefail\n' + text)
         path.chmod(0o755)
 

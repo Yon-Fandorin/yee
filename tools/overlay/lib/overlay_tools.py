@@ -67,8 +67,8 @@ def load_catalog(repo_root=REPO_ROOT):
     return catalog
 
 
-def patch_paths(patch_file):
-    """Git 파일 헤더와 섹션 경로가 일치하는 패치의 경로를 반환한다."""
+def patch_paths(patch_file, include_deleted=True):
+    """Git 파일 헤더와 섹션 경로를 검증하며 필요하면 삭제한 파일은 제외한다."""
     text = Path(patch_file).read_text(encoding='utf-8')
     sections = re.split(r'(?m)(?=^diff --git )', text)
     if len(sections) < 2 or sections[0].strip():
@@ -84,7 +84,7 @@ def patch_paths(patch_file):
             raise ValueError(f'Duplicate patch sections in {patch_file}')
         seen.add(path.casefold())
         file_headers, old_remaining, new_remaining = [], 0, 0
-        has_hunk = has_mode = False
+        has_hunk = has_mode = deleted = False
         for line in lines[1:]:
             # 본문의 ---/+++는 파일 헤더가 아니라 삭제·추가한 소스일 수 있다.
             if old_remaining or new_remaining:
@@ -114,6 +114,7 @@ def patch_paths(patch_file):
                         or file_headers[0] == line[4:] == '/dev/null'):
                     raise ValueError(f'Expected matching patch file headers in {patch_file}')
                 file_headers.append(line[4:])
+                deleted = line[4:] == '/dev/null'
             elif line.startswith('@@'):
                 hunk = re.fullmatch(r'@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@.*', line)
                 if not hunk or len(file_headers) != 2:
@@ -128,13 +129,15 @@ def patch_paths(patch_file):
                 continue
             elif not has_hunk and re.fullmatch(r'(?:old|new|new file|deleted file) mode [0-7]{6}', line):
                 has_mode = True
+                deleted = deleted or line.startswith('deleted file mode ')
             elif not has_hunk and re.fullmatch(r'index [0-9a-f]+\.\.[0-9a-f]+(?: [0-7]{6})?', line):
                 continue
             else:
                 raise ValueError(f'Unsupported patch metadata in {patch_file}')
         if old_remaining or new_remaining or len(file_headers) == 1 or not (has_hunk or has_mode):
             raise ValueError(f'Incomplete patch section in {patch_file}')
-        names.append(path)
+        if include_deleted or not deleted:
+            names.append(path)
     return names
 
 
@@ -216,7 +219,8 @@ def apply_patch_plan(src, plan, check_only=False):
             print(f'Applied: {label}')
 
 
-def source_plan(src, catalog, repo_root=REPO_ROOT):
+def owned_source_files(src, catalog, repo_root=REPO_ROOT):
+    """동기화 여부와 관계없이 제외 규칙을 적용한 원본·목적지 쌍을 반환한다."""
     root = Path(repo_root)
     bindings = catalog['source_roots']
     for binding in bindings:
@@ -226,8 +230,7 @@ def source_plan(src, catalog, repo_root=REPO_ROOT):
         reject_source_links(root, owned)
         reject_source_links(src, src / binding['destination'])
     families = sorted({binding['source'].split('/')[0] for binding in bindings})
-    plan = []
-    expected = set()
+    files = []
     for family in families:
         for source in sorted((root / family).rglob('*')):
             parts = source.relative_to(root).parts
@@ -246,7 +249,6 @@ def source_plan(src, catalog, repo_root=REPO_ROOT):
                 raise ValueError(f'Register the source owner in build/overlay.json: {relative}')
             suffix = source.relative_to(root / binding['source'])
             destination = src / binding['destination'] / suffix
-            expected.add(destination)
             reject_source_links(src, destination)
             if not destination.resolve().is_relative_to(src.resolve()):
                 raise ValueError(f'Source destination escapes the checkout: {destination}')
@@ -257,11 +259,18 @@ def source_plan(src, catalog, repo_root=REPO_ROOT):
                     break
                 if parent.exists() and not parent.is_dir():
                     raise ValueError(f'Source destination parent is not a directory: {parent}')
-            if not destination.is_file() or source.read_bytes() != destination.read_bytes():
-                plan.append((source, destination))
+            files.append((source, destination))
+    return files
+
+
+def source_plan(src, catalog, repo_root=REPO_ROOT):
+    files = owned_source_files(src, catalog, repo_root)
+    expected = {destination for _, destination in files}
+    plan = [(source, destination) for source, destination in files
+            if not destination.is_file() or source.read_bytes() != destination.read_bytes()]
     # Only these catalog roots are owned mirrors. Inspect every deletion before
     # any write; generated roots and Chromium originals are never scanned here.
-    for binding in bindings:
+    for binding in catalog['source_roots']:
         target = src / binding['destination']
         if target.exists() and not target.is_dir():
             raise ValueError(f'Source destination root is not a directory: {target}')

@@ -3,6 +3,10 @@
 set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
+
+require_yee_build_root_selection
+require_yee_output_selection
+
 # Optional outer-window size for matched viewport experiments. This does not
 # claim the page viewport has that size; verify the returned viewport metadata.
 typeset -a launch_window_args
