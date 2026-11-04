@@ -273,7 +273,13 @@ TEST_F(SplitPaneControlsTest, ButtonsKeepDocumentedOrderAndCallbacks) {
   }
 
   Click(0);
+  EXPECT_EQ(toggle_count_, 1);
+  EXPECT_EQ(reverse_count_, 0);
+  EXPECT_EQ(exit_count_, 0);
   Click(1);
+  EXPECT_EQ(toggle_count_, 1);
+  EXPECT_EQ(reverse_count_, 1);
+  EXPECT_EQ(exit_count_, 0);
   Click(2);
   EXPECT_EQ(toggle_count_, 1);
   EXPECT_EQ(reverse_count_, 1);

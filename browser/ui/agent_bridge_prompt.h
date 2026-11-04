@@ -9,11 +9,19 @@
 
 #include "base/functional/callback.h"
 #include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace views {
 
 class View;
 class Widget;
+
+inline constexpr int kAgentBridgePromptMaxScrollHeight = 300;
+inline constexpr gfx::Size kAgentBridgePointerMinimumSize(132, 36);
+inline constexpr int kAgentBridgePointerHorizontalPadding = 48;
+
+// 글자 폭에 좌우 여백을 더하고 최소 크기를 보장한다.
+gfx::Size ResolveAgentBridgePointerSize(int label_width);
 
 // Shows a browser-native request from the Yee agent. The returned Widget is
 // owned by the native widget system; callers may safely call Close() when the

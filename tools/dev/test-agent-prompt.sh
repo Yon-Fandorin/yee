@@ -14,7 +14,7 @@ if [[ "${1:-}" != "--no-build" ]]; then
 fi
 
 TEST_BINARY="$YEE_OUT_DIR/agent_bridge_prompt_unittests"
-FILTER='AgentBridgePromptTest.*'
+FILTER='AgentBridgePromptTest.*:AgentBridgePointerGeometryTest.*'
 TEST_LIST="$("$TEST_BINARY" --gtest_list_tests --gtest_filter="$FILTER")"
 if ! print -r -- "$TEST_LIST" | rg -q '^AgentBridgePromptTest\.'; then
   print -u2 'Missing prompt tests; rebuild before verifying.'

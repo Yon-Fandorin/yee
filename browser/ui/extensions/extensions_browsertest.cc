@@ -1,6 +1,7 @@
 // Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
 #include <string>
 
+#include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/values.h"
 #include "chrome/browser/extensions/api/developer_private/developer_private_api.h"
@@ -12,6 +13,8 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/crx_file/crx_verifier.h"
 #include "components/policy/core/common/mock_configuration_policy_provider.h"
@@ -27,6 +30,7 @@
 #include "extensions/common/extension.h"
 #include "extensions/common/mojom/manifest.mojom.h"
 #include "extensions/test/test_extension_dir.h"
+#include "ui/base/l10n/l10n_util.h"
 
 namespace yee {
 namespace {
@@ -626,10 +630,12 @@ IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest, GuestKeepsNativeRestriction) {
   BrowserWindowInterface* guest = CreateGuestBrowser();
   ASSERT_TRUE(ui_test_utils::NavigateToURL(guest, branding::ExtensionsURL()));
   auto* contents = guest->tab_strip_model()->GetActiveWebContents();
-  EXPECT_EQ(true, content::EvalJs(
-                      contents,
-                      "!!document.querySelector('h1') && "
-                      "document.querySelector('h1').textContent.length > 0"));
+  const auto heading = l10n_util::GetStringFUTF16(
+      IDS_PAGE_NOT_AVAILABLE_FOR_GUEST_HEADING,
+      l10n_util::GetStringUTF16(IDS_YEE_WEBUI_EXTENSIONS_TITLE));
+  EXPECT_EQ(
+      base::UTF16ToUTF8(heading),
+      content::EvalJs(contents, "document.querySelector('h1').textContent"));
   EXPECT_EQ(false,
             content::EvalJs(
                 contents, "!!document.querySelector('[data-extension-list]')"));

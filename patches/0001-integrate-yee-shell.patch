@@ -17858,7 +17858,7 @@ index 38f701cf11..fbf820a7c8 100644
        // Set the request time to now when the popup is first shown. This ensures
        // that latency is measured from the user interaction to show, even if the
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
-index 2d16070cf4..3acaf0a5a2 100644
+index 2d16070cf4..c7b9659b87 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc
 @@ -4,11 +4,17 @@
@@ -17994,7 +17994,7 @@ index 2d16070cf4..3acaf0a5a2 100644
  }
  
 +IN_PROC_BROWSER_TEST_F(OmniboxPopupViewWebUITest,
-+                       YeeAimPopupKeepsStateThroughPresentationRebuild) {
++                       YeeAimPopupOpensAndDismissesAfterClosedThemeChanges) {
 +#if BUILDFLAG(IS_WIN)
 +  auto* const browser_widget =
 +      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
@@ -21028,22 +21028,23 @@ index 039c009046..f458b99fd0 100644
    // skipping animations.
    void ResetViewsToTargetLayout(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc
-index 495a43a648..8c053406c4 100644
+index 495a43a648..18dff5c013 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc
-@@ -11,9 +11,11 @@
+@@ -11,9 +11,12 @@
  #include "base/auto_reset.h"
  #include "base/memory/raw_ptr.h"
  #include "base/strings/strcat.h"
 +#include "base/test/scoped_command_line.h"
  #include "base/time/time.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
  #include "testing/gmock/include/gmock/gmock.h"
  #include "testing/gtest/include/gtest/gtest.h"
 +#include "ui/compositor/layer.h"
  #include "ui/gfx/animation/animation.h"
  #include "ui/gfx/animation/animation_test_api.h"
  #include "ui/gfx/geometry/rect.h"
-@@ -127,7 +129,13 @@ class TabCollectionAnimatingLayoutManagerTest
+@@ -127,7 +130,13 @@ class TabCollectionAnimatingLayoutManagerTest
              ? gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION
              : gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
  
@@ -21058,7 +21059,7 @@ index 495a43a648..8c053406c4 100644
      host_view_ = widget_->SetContentsView(std::make_unique<views::View>());
      animation_coordinator_ = std::make_unique<
          TabCollectionAnimatingLayoutManager::AnimationCoordinator>(*host_view_);
-@@ -142,9 +150,10 @@ class TabCollectionAnimatingLayoutManagerTest
+@@ -142,9 +151,10 @@ class TabCollectionAnimatingLayoutManagerTest
              std::make_unique<TestLayoutManager>(animation_axis()),
              *layout_manager_delegate_.get(), *animation_coordinator_,
              animation_axis()));
@@ -21070,7 +21071,7 @@ index 495a43a648..8c053406c4 100644
      layout_manager_ = nullptr;
      host_view_ = nullptr;
      widget_.reset();
-@@ -470,6 +479,95 @@ TEST_P(TabCollectionAnimatingLayoutManagerTest,
+@@ -470,6 +480,97 @@ TEST_P(TabCollectionAnimatingLayoutManagerTest,
    EXPECT_EQ(is_vertical ? child_a->height() : child_a->width(), 20);
  }
  
@@ -21113,7 +21114,9 @@ index 495a43a648..8c053406c4 100644
 +  auto dock = std::make_unique<views::View>();
 +  dock_clock = std::make_unique<
 +      TabCollectionAnimatingLayoutManager::AnimationCoordinator>(
-+      *dock, base::Milliseconds(420), gfx::Tween::ACCEL_40_DECEL_100_3, 0.0);
++      *dock,
++      base::Milliseconds(yee::kSidebarMetrics.favorites_shift_duration_ms),
++      gfx::Tween::ACCEL_40_DECEL_100_3, 0.0);
 +  dock_clock->SetView(nullptr);
 +  auto* dock_manager = dock->SetLayoutManager(
 +      std::make_unique<TabCollectionAnimatingLayoutManager>(
@@ -21134,7 +21137,7 @@ index 495a43a648..8c053406c4 100644
 +  task_environment()->FastForwardBy(base::Milliseconds(250));
 +  widget()->LayoutRootViewIfNecessary();
 +  views::test::RunScheduledLayout(dock.get());
-+  // 일반 탭의 200ms는 끝나도 Favorites의 420ms 이동은 계속된다.
++  // 일반 탭의 시계가 끝나도 Favorites의 이동은 계속된다.
 +  ASSERT_FALSE(layout_manager()->is_animating());
 +  ASSERT_TRUE(dock_manager->is_animating());
 +  const gfx::Rect before_retarget = first->bounds();
@@ -21166,7 +21169,7 @@ index 495a43a648..8c053406c4 100644
  TEST_P(TabCollectionAnimatingLayoutManagerTest,
         AnimationCoordinatorSurvivesChildManagerDestruction) {
    gfx::ScopedAnimationDurationScaleMode normal_duration_mode(
-@@ -678,6 +776,37 @@ TEST_P(TabCollectionAnimatingLayoutManagerTest,
+@@ -678,6 +779,37 @@ TEST_P(TabCollectionAnimatingLayoutManagerTest,
    EXPECT_EQ(prev_pos_in_host, 20);
  }
  

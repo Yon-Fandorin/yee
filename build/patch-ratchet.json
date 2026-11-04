@@ -373,6 +373,18 @@
           "path": "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm",
           "allowed": 2,
           "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc",
+          "allowed": 134,
+          "reason": "테스트 정리 batch 3: Favorites 애니메이션 테스트의 420ms 복제를 kSidebarMetrics 단일 계약 참조로 대체. 계약 헤더 1줄과 clang-format 줄바꿈 2줄이 필요하며 동작 assertion은 유지한다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc",
+          "allowed": 1,
+          "reason": "테스트 정리 batch 3: Favorites 애니메이션 테스트의 420ms 복제를 kSidebarMetrics 단일 계약 참조로 대체. 계약 헤더 1줄과 clang-format 줄바꿈 2줄이 필요하며 동작 assertion은 유지한다."
         }
       ]
     }

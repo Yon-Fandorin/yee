@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 
 #include <algorithm>
@@ -17,6 +16,7 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
+#include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
@@ -31,6 +31,7 @@
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/favicon_size.h"
 #include "ui/native_theme/native_theme_base.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/label.h"
@@ -418,13 +419,18 @@ TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
             ResolveHorizontalTabGroupHeaderInsets(*detached, 8, 12, true));
   auto* view = widget_->SetContentsView(std::move(detached));
   EXPECT_TRUE(UsesHorizontalTabGroupCapsule(*view));
-  EXPECT_EQ(38, ResolveHorizontalTabMinimumInactiveWidth(*view, 32, 18));
+  EXPECT_EQ(
+      18 + gfx::kFaviconSize + kSidebarMetrics.horizontal_tab_minimum_icon_gap,
+      ResolveHorizontalTabMinimumInactiveWidth(*view, 32, 18));
   EXPECT_EQ(64, ResolveHorizontalTabMinimumInactiveWidth(*view, 64, 18));
-  EXPECT_EQ(gfx::Insets::TLBR(0, 18, 0, 18),
+  const int edge = 12 - kSidebarMetrics.horizontal_group_capsule_padding;
+  EXPECT_EQ(gfx::Insets::TLBR(0, 8 + edge, 0, 8 + edge),
             ResolveHorizontalTabGroupHeaderInsets(*view, 8, 12, true));
-  EXPECT_EQ(gfx::Insets::TLBR(0, 18, 0, 8),
+  EXPECT_EQ(gfx::Insets::TLBR(0, 8 + edge, 0, 8),
             ResolveHorizontalTabGroupHeaderInsets(*view, 8, 12, false));
-  EXPECT_EQ(54, ResolveHorizontalTabGroupMinimumWidth(*view, 38, 20, 12));
+  EXPECT_EQ(20 + gfx::kFaviconSize + edge +
+                kSidebarMetrics.group_header_horizontal_inset,
+            ResolveHorizontalTabGroupMinimumWidth(*view, 38, 20, 12));
   EXPECT_EQ(64, ResolveHorizontalTabGroupMinimumWidth(*view, 64, 20, 12));
 }
 
@@ -482,13 +488,14 @@ TEST_F(YeeRestingTextViewTest,
     gfx::Canvas canvas(view->size(), 1.f, false);
     PaintHorizontalTabGroupCapsule(canvas, *view, SK_ColorGREEN);
     const SkBitmap bitmap = canvas.GetBitmap();
-    const SkAlpha center = SkColorGetA(bitmap.getColor(60, 16));
+    const SkAlpha center =
+        SkColorGetA(bitmap.getColor(bitmap.width() / 2, bitmap.height() / 2));
     EXPECT_GT(center, SK_AlphaTRANSPARENT);
     EXPECT_LT(center, SK_AlphaOPAQUE);
     EXPECT_EQ(collapsed ? SK_AlphaTRANSPARENT : center,
               SkColorGetA(bitmap.getColor(60, 0)));
     EXPECT_EQ(collapsed ? SK_AlphaTRANSPARENT : center,
-              SkColorGetA(bitmap.getColor(60, 31)));
+              SkColorGetA(bitmap.getColor(60, bitmap.height() - 1)));
     EXPECT_EQ(center, SkColorGetA(bitmap.getColor(60, 4)));
     // 탭과 같은 외곽 곡률로 모서리의 사각 채움을 남기지 않는다.
     EXPECT_EQ(SK_AlphaTRANSPARENT,
@@ -622,36 +629,46 @@ TEST(YeeSurfaceGeometryTest, SplitAndSingleSurfacesShareCornerContract) {
 }
 
 TEST(YeeSurfaceGeometryTest, SplitAndSingleHeadersShareMetricsContract) {
-  EXPECT_EQ(158, GetSidebarHeaderMinimumWidth(86));
+  EXPECT_EQ(86 +
+                2 * (kSidebarMetrics.shell_control_size +
+                     2 * kSidebarMetrics.shell_control_horizontal_margin) +
+                kSidebarMetrics.sidebar_header_controls_leading_inset(),
+            GetSidebarHeaderMinimumWidth(86));
   const auto flyout = ResolveSidebarFlyoutGeometry(0.0, 1.0, true);
-  EXPECT_EQ(12, flyout.leading_offset);
-  EXPECT_EQ(54, flyout.top_inset);
-  EXPECT_EQ(6, flyout.header_inset);
-  EXPECT_EQ(6, flyout.hit_test_top_inset);
-  EXPECT_EQ(12, flyout.bottom_inset + kSidebarMetrics.content_gutter);
+  EXPECT_EQ(kSidebarMetrics.sidebar_flyout_inset, flyout.leading_offset);
+  EXPECT_EQ(kSidebarMetrics.titlebar_height + kSidebarMetrics.content_gutter,
+            flyout.top_inset);
+  EXPECT_EQ(kSidebarMetrics.content_gutter, flyout.header_inset);
+  EXPECT_EQ(kSidebarMetrics.content_gutter, flyout.hit_test_top_inset);
+  EXPECT_EQ(kSidebarMetrics.sidebar_flyout_inset,
+            flyout.bottom_inset + kSidebarMetrics.content_gutter);
   const auto hidden = ResolveSidebarFlyoutGeometry(0.0, -1.0, true);
   EXPECT_EQ(0, hidden.leading_offset);
-  EXPECT_EQ(48, hidden.top_inset);
+  EXPECT_EQ(kSidebarMetrics.titlebar_height, hidden.top_inset);
   EXPECT_EQ(0, hidden.hit_test_top_inset);
   EXPECT_EQ(0, hidden.bottom_inset);
   EXPECT_EQ(0, ResolveSidebarFlyoutGeometry(1.0, 0.0, true).top_inset);
-  EXPECT_EQ(12, ResolveSidebarFlyoutGeometry(0.0, 1.0, false).top_inset);
+  EXPECT_EQ(kSidebarMetrics.sidebar_flyout_inset,
+            ResolveSidebarFlyoutGeometry(0.0, 1.0, false).top_inset);
   const auto external = ResolveSidebarFlyoutGeometry(0.0, 1.0, false, true);
   EXPECT_EQ(flyout.top_inset,
             kSidebarMetrics.titlebar_height + external.top_inset);
   EXPECT_EQ(flyout.hit_test_top_inset, external.hit_test_top_inset);
-  EXPECT_EQ(42, kSidebarMetrics.browser_surface_header_height());
+  EXPECT_EQ(kSidebarMetrics.titlebar_height - kSidebarMetrics.content_gutter,
+            kSidebarMetrics.browser_surface_header_height());
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
             kSidebarMetrics.split_pane_header_height);
-  EXPECT_EQ(34, kSidebarMetrics.browser_surface_location_bar_height);
-  EXPECT_EQ(40, kSidebarMetrics.toolbar_height);
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
             kSidebarMetrics.browser_surface_toolbar_top_inset() +
                 kSidebarMetrics.toolbar_height / 2);
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_height(),
             kSidebarMetrics.browser_surface_location_bar_height +
                 2 * kSidebarMetrics.split_pane_address_bar_inset);
-  EXPECT_EQ(8, kSidebarMetrics.browser_surface_header_control_edge_inset);
+  EXPECT_EQ(kSidebarMetrics.toolbar_trailing_gap -
+                kSidebarMetrics.content_gutter +
+                kSidebarMetrics.toolbar_interior_inset +
+                kSidebarMetrics.toolbar_extension_container_margin,
+            kSidebarMetrics.browser_surface_header_control_edge_inset);
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
             kSidebarMetrics.content_gutter +
                 kSidebarMetrics.split_pane_header_height / 2);
@@ -811,8 +828,15 @@ TEST(YeeSurfaceGeometryTest, WindowControlsStayInsideTheRoundedHeader) {
       ResolveBrowserWindowControlsBounds(frame, 138, false);
   const gfx::Rect leading =
       ResolveBrowserWindowControlsBounds(frame, 138, true);
-  EXPECT_EQ(gfx::Rect(948, 7, 138, 40), trailing);
-  EXPECT_EQ(gfx::Rect(14, 7, 138, 40), leading);
+  const int edge = kSidebarMetrics.content_gutter +
+                   kSidebarMetrics.browser_surface_header_control_edge_inset;
+  const int top = kSidebarMetrics.browser_surface_toolbar_top_inset();
+  EXPECT_EQ(gfx::Rect(frame.right() - edge - 138, frame.y() + top, 138,
+                      kSidebarMetrics.toolbar_height),
+            trailing);
+  EXPECT_EQ(gfx::Rect(frame.x() + edge, frame.y() + top, 138,
+                      kSidebarMetrics.toolbar_height),
+            leading);
   EXPECT_EQ(kSidebarMetrics.browser_surface_header_center_y(),
             trailing.CenterPoint().y());
   EXPECT_EQ(kSidebarMetrics.content_gutter +
@@ -917,22 +941,64 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
   };
   const auto active = header_metrics(true);
   const auto inactive = header_metrics(false);
-  EXPECT_EQ(304, MeasureSplitPaneHeaderMinimumWidth(
-                     active, ResolveSplitPaneHeaderSpacing(true, false)));
-  EXPECT_EQ(146, MeasureSplitPaneHeaderMinimumWidth(
-                     inactive, ResolveSplitPaneHeaderSpacing(false, false)));
-  EXPECT_EQ(303, MeasureSplitPaneHeaderMinimumWidth(
-                     active, ResolveSplitPaneHeaderSpacing(true, true)));
-  EXPECT_EQ(133, MeasureSplitPaneHeaderMinimumWidth(
-                     inactive, ResolveSplitPaneHeaderSpacing(false, true)));
-  EXPECT_EQ(324, MeasureSplitPaneHeaderMinimumWidth(
-                     header_metrics(true, 150),
-                     ResolveSplitPaneHeaderSpacing(true, false)));
+  const int edge = kSidebarMetrics.browser_surface_header_control_edge_inset;
+  const SplitPaneHeaderSpacing expected_active_spacing{
+      std::max(edge, kSidebarMetrics.split_pane_address_bar_inset +
+                         kSidebarMetrics.split_pane_address_bar_active_padding),
+      kSidebarMetrics.split_pane_address_bar_item_spacing};
+  const SplitPaneHeaderSpacing expected_inactive_spacing{
+      std::max(edge,
+               kSidebarMetrics.split_pane_address_bar_inset +
+                   kSidebarMetrics.split_pane_address_bar_horizontal_padding),
+      kSidebarMetrics.split_pane_address_bar_item_spacing};
+  const SplitPaneHeaderSpacing expected_compact_spacing{
+      edge, std::min(kSidebarMetrics.split_pane_address_bar_item_spacing,
+                     kSidebarMetrics.shell_control_horizontal_margin)};
+  for (bool is_active : {false, true}) {
+    for (bool compact : {false, true}) {
+      SCOPED_TRACE(testing::Message()
+                   << "active=" << is_active << ", compact=" << compact);
+      const auto& expected_spacing =
+          compact ? expected_compact_spacing
+                  : (is_active ? expected_active_spacing
+                               : expected_inactive_spacing);
+      const auto spacing = ResolveSplitPaneHeaderSpacing(is_active, compact);
+      EXPECT_EQ(expected_spacing.edge_padding, spacing.edge_padding);
+      EXPECT_EQ(expected_spacing.item_spacing, spacing.item_spacing);
+    }
+  }
+  const auto active_spacing = ResolveSplitPaneHeaderSpacing(true, false);
+  const auto inactive_spacing = ResolveSplitPaneHeaderSpacing(false, false);
+  const auto compact_spacing = ResolveSplitPaneHeaderSpacing(true, true);
+  const int active_width = 4 * 30 + 3 * 1 + 130 + 5 + 24 +
+                           2 * expected_active_spacing.edge_padding +
+                           std::max(5, expected_active_spacing.item_spacing);
+  const int inactive_width =
+      3 * 30 + 2 * 1 + 24 + 2 * expected_inactive_spacing.edge_padding +
+      std::max(1, expected_inactive_spacing.item_spacing);
+  const int compact_active_width =
+      4 * 30 + 3 * 1 + 130 + 5 + 24 +
+      2 * expected_compact_spacing.edge_padding +
+      std::max(5, expected_compact_spacing.item_spacing);
+  const int compact_inactive_width =
+      3 * 30 + 2 * 1 + 24 + 2 * expected_compact_spacing.edge_padding +
+      std::max(1, expected_compact_spacing.item_spacing);
+  EXPECT_EQ(active_width,
+            MeasureSplitPaneHeaderMinimumWidth(active, active_spacing));
+  EXPECT_EQ(inactive_width,
+            MeasureSplitPaneHeaderMinimumWidth(inactive, inactive_spacing));
+  EXPECT_EQ(compact_active_width,
+            MeasureSplitPaneHeaderMinimumWidth(active, compact_spacing));
+  EXPECT_EQ(compact_inactive_width,
+            MeasureSplitPaneHeaderMinimumWidth(
+                inactive, ResolveSplitPaneHeaderSpacing(false, true)));
+  EXPECT_EQ(active_width + 20, MeasureSplitPaneHeaderMinimumWidth(
+                                   header_metrics(true, 150), active_spacing));
   auto explicit_zero = inactive;
   explicit_zero.controls[5].margins = gfx::Insets();
-  EXPECT_EQ(141,
-            MeasureSplitPaneHeaderMinimumWidth(
-                explicit_zero, ResolveSplitPaneHeaderSpacing(false, false)));
+  EXPECT_EQ(
+      inactive_width - std::max(1, expected_inactive_spacing.item_spacing) + 1,
+      MeasureSplitPaneHeaderMinimumWidth(explicit_zero, inactive_spacing));
   SplitPaneHeaderMetrics padded;
   padded.controls[0] = {10, std::nullopt, gfx::Insets::TLBR(0, 1, 0, 2)};
   padded.controls[1] = {10, std::nullopt, gfx::Insets::TLBR(0, 3, 0, 4)};
@@ -952,11 +1018,23 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
       const auto plan = ResolveSplitPaneHeaderLayout(input);
       EXPECT_TRUE(plan.supported);
       EXPECT_TRUE(plan.compact);
-      EXPECT_EQ(575, plan.pane_minimums.start + plan.pane_minimums.end + 12);
+      const int stroke = kSidebarMetrics.split_pane_content_stroke_inset;
+      const int reservation = 132 - stroke;
+      const int compact_floor = compact_active_width + compact_inactive_width +
+                                reservation -
+                                expected_compact_spacing.edge_padding +
+                                4 * stroke + input.divider_size;
+      EXPECT_EQ(compact_floor, plan.pane_minimums.start +
+                                   plan.pane_minimums.end + input.divider_size);
       for (const auto& row : plan.rows) {
-        EXPECT_GE(row.interior_margin.left(), 8);
-        EXPECT_GE(row.interior_margin.right(), 8);
-        EXPECT_EQ(1, row.spacing.item_spacing);
+        EXPECT_GE(row.interior_margin.left(),
+                  expected_compact_spacing.edge_padding);
+        EXPECT_GE(row.interior_margin.right(),
+                  expected_compact_spacing.edge_padding);
+        EXPECT_EQ(expected_compact_spacing.edge_padding,
+                  row.spacing.edge_padding);
+        EXPECT_EQ(expected_compact_spacing.item_spacing,
+                  row.spacing.item_spacing);
       }
       const auto current = ComputeCurrentPaneGeometry(CurrentPaneGeometryInput{
           input.canvas_bounds, true, PaneSplitAxis::kHorizontal,
@@ -968,7 +1046,6 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
       EXPECT_EQ(current.divider.right(), current.end.x());
       EXPECT_EQ(current.start.x() + 1, current.start_body.x());
       EXPECT_EQ(current.start.y() + 42, current.start_body.y());
-      EXPECT_DOUBLE_EQ(0.5, input.start_ratio);
       auto target_input = input;
       target_input.canvas_bounds = gfx::Rect(100, 6, 1100, 600);
       target_input.window_controls_bounds = leading_controls
@@ -988,20 +1065,27 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
       input.window_controls_bounds.Offset(0, 200);
       const auto separate_row = ResolveSplitPaneHeaderLayout(input);
       EXPECT_FALSE(separate_row.compact);
-      EXPECT_EQ(304 + 146 + 4, separate_row.pane_minimums.start +
-                                   separate_row.pane_minimums.end);
+      EXPECT_EQ(
+          active_width + inactive_width + 4 * stroke,
+          separate_row.pane_minimums.start + separate_row.pane_minimums.end);
       input.axis = PaneSplitAxis::kVertical;
       input.window_controls_bounds.Offset(0, -200);
       const auto stacked = ResolveSplitPaneHeaderLayout(input);
       EXPECT_TRUE(stacked.supported);
       EXPECT_EQ(input.body_minimums, stacked.pane_minimums);
-      EXPECT_EQ(ResolveSplitPaneHeaderSpacing(input.headers[1].active, false)
-                    .edge_padding,
+      EXPECT_EQ(input.headers[1].active
+                    ? expected_active_spacing.edge_padding
+                    : expected_inactive_spacing.edge_padding,
                 leading_controls ? stacked.rows[1].interior_margin.left()
                                  : stacked.rows[1].interior_margin.right());
     }
   }
-  for (int width : {575, 574}) {
+  const int compact_floor =
+      compact_active_width + compact_inactive_width + 132 -
+      kSidebarMetrics.split_pane_content_stroke_inset -
+      expected_compact_spacing.edge_padding +
+      4 * kSidebarMetrics.split_pane_content_stroke_inset + 12;
+  for (int width : {compact_floor, compact_floor - 1}) {
     SplitPaneHeaderLayoutInput input;
     input.canvas_bounds = gfx::Rect(250, 6, width, 600);
     input.window_controls_bounds = gfx::Rect(250 + width - 132, 7, 138, 40);
@@ -1009,7 +1093,7 @@ TEST(YeeSurfaceGeometryTest, WindowControlsReserveOnlyTheOverlappingHeaderRow) {
     input.body_minimums = {58, 58};
     input.divider_size = 12;
     const auto plan = ResolveSplitPaneHeaderLayout(input);
-    EXPECT_EQ(width == 575, plan.supported);
+    EXPECT_EQ(width == compact_floor, plan.supported);
     const auto current = ComputeCurrentPaneGeometry(
         CurrentPaneGeometryInput{input.canvas_bounds,
                                  true,

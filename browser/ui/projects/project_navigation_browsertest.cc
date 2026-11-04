@@ -32,6 +32,7 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/immersive/immersive_mode_controller.h"
 #include "chrome/browser/ui/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
@@ -130,6 +131,7 @@
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_controller.h"
+#include "ui/views/controls/menu/menu_delegate.h"
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/submenu_view.h"
 #include "ui/views/controls/scroll_view.h"
@@ -1796,14 +1798,24 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                        ProjectPageMenuUsesNativeTabSourceInBothLayouts) {
   auto project = service()->CreateProject(u"메뉴 검수");
   ASSERT_TRUE(project);
-  auto* tab = browser()->tab_strip_model()->GetActiveTab();
-  ASSERT_TRUE(
-      content::ExecJs(tab->GetContents(), "document.title='메뉴 페이지';"));
-  ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
+  auto* model = browser()->tab_strip_model();
+  auto* decoy = model->GetActiveTab();
   auto* controller = ProjectNavigationController::From(browser());
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* orientation = tabs::VerticalTabStripStateController::From(browser());
   for (bool vertical : {false, true}) {
+    chrome::AddTabAt(browser(), embedded_test_server()->GetURL("/title1.html"),
+                     -1, false);
+    auto* tab = model->GetTabAtIndex(model->count() - 1);
+    ASSERT_TRUE(content::WaitForLoadStop(tab->GetContents()));
+    const std::u16string title =
+        vertical ? u"세로 메뉴 페이지" : u"수평 메뉴 페이지";
+    ASSERT_TRUE(content::ExecJs(
+        tab->GetContents(), content::JsReplace("document.title=$1;", title)));
+    ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
+    const auto page_id = coordinator()->PageId(tab);
+    ASSERT_EQ(decoy, model->GetActiveTab());
+    const int count_before = model->count();
     orientation->SetVerticalTabsEnabled(vertical);
     base::RunLoop().RunUntilIdle();
     view->DeprecatedLayoutImmediately();
@@ -1811,7 +1823,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     view->DeprecatedLayoutImmediately();
     auto* hub = view->GetViewByID(ProjectNavigationController::kHubViewId);
     ASSERT_TRUE(hub);
-    auto* page = FindButton(hub, u"메뉴 페이지");
+    auto* page = FindButton(hub, title);
     ASSERT_TRUE(page && page->context_menu_controller());
     auto show_menu = base::BindOnce(
         [](views::View* page) {
@@ -1821,18 +1833,29 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
         },
         base::Unretained(page));
 #if BUILDFLAG(IS_MAC)
-    // Cocoa의 동기 tracking loop 안에서 메뉴가 열린 뒤 닫는다.
-    EXPECT_TRUE(
-        RunWithNativeContextMenuAutoCloseForTesting(std::move(show_menu)));
+    ASSERT_TRUE(RunWithNativeContextMenuForTesting(
+        std::move(show_menu), TabStripModel::CommandCloseTab));
 #else
     std::move(show_menu).Run();
+    auto* menu = views::MenuController::GetActiveInstance();
+    ASSERT_TRUE(menu);
+    ASSERT_TRUE(menu->GetSelectedMenuItem());
+    auto* close =
+        menu->GetSelectedMenuItem()->GetRootMenuItem()->GetMenuItemByID(
+            TabStripModel::CommandCloseTab);
+    ASSERT_TRUE(close);
+    ASSERT_TRUE(close->GetEnabled());
+    close->GetDelegate()->ExecuteCommand(close->GetCommand(), 0);
+    if (auto* remaining = views::MenuController::GetActiveInstance()) {
+      remaining->Cancel(views::MenuController::ExitType::kAll);
+    }
 #endif
-    // macOS는 Cocoa native 메뉴를 사용하므로 Views controller가 없을 수 있다.
-    if (auto* menu = views::MenuController::GetActiveInstance())
-      menu->Cancel(views::MenuController::ExitType::kAll);
-    base::RunLoop().RunUntilIdle();
+    ASSERT_TRUE(base::test::RunUntil(
+        [&] { return model->count() == count_before - 1; }));
+    EXPECT_FALSE(coordinator()->FindLiveTab(page_id, browser()));
+    EXPECT_GE(model->GetIndexOfTab(decoy), 0);
     EXPECT_TRUE(controller->showing_hub());
-    EXPECT_EQ(tab, browser()->tab_strip_model()->GetActiveTab());
+    EXPECT_EQ(decoy, model->GetActiveTab());
     controller->ExitHub();
     if (!vertical &&
         base::FeatureList::IsEnabled(features::kNewTabButtonContextMenu)) {
@@ -1850,15 +1873,17 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
           },
           base::Unretained(button));
 #if BUILDFLAG(IS_MAC)
-      EXPECT_TRUE(RunWithNativeContextMenuAutoCloseForTesting(
-          std::move(show_new_tab_menu)));
+      EXPECT_TRUE(
+          RunWithNativeContextMenuForTesting(std::move(show_new_tab_menu)));
 #else
       std::move(show_new_tab_menu).Run();
 #endif
-      if (auto* menu = views::MenuController::GetActiveInstance()) {
-        menu->Cancel(views::MenuController::ExitType::kAll);
-      }
-      EXPECT_EQ(tab, browser()->tab_strip_model()->GetActiveTab());
+#if !BUILDFLAG(IS_MAC)
+      auto* new_tab_menu = views::MenuController::GetActiveInstance();
+      ASSERT_TRUE(new_tab_menu);
+      new_tab_menu->Cancel(views::MenuController::ExitType::kAll);
+#endif
+      EXPECT_EQ(decoy, model->GetActiveTab());
     }
   }
 }
@@ -2263,18 +2288,51 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* contents = browser()->tab_strip_model()->GetActiveWebContents();
   ASSERT_TRUE(content::ExecJs(
       contents, "document.body.innerHTML='<input id=note value=preserved>';"));
+  const auto expect_hub_layout = [&] {
+    auto* hub = view->GetViewByID(ProjectNavigationController::kHubViewId);
+    auto* toolbar = view->toolbar();
+    auto* header = toolbar->parent()->GetViewByID(
+        ProjectNavigationController::kHubHeaderViewId);
+    ASSERT_TRUE(hub);
+    ASSERT_TRUE(header);
+    EXPECT_EQ(view, hub->parent());
+    EXPECT_EQ(toolbar->parent(), header->parent());
+    EXPECT_TRUE(hub->IsDrawn());
+    EXPECT_TRUE(header->IsDrawn());
+    EXPECT_FALSE(hub->bounds().IsEmpty());
+    EXPECT_FALSE(header->bounds().IsEmpty());
+    EXPECT_EQ(view->multi_contents_view()->GetBoundsInScreen(),
+              hub->GetBoundsInScreen());
+    const auto& resolved = toolbar->GetCompactShellHeaderBoundsForLayout();
+    ASSERT_TRUE(resolved);
+    gfx::Rect expected = view->GetMirroredRect(*resolved);
+    views::View::ConvertRectToScreen(view, &expected);
+    EXPECT_EQ(expected, header->GetBoundsInScreen());
+    EXPECT_TRUE(header->GetWidget()->GetWindowBoundsInScreen().Contains(
+        header->GetBoundsInScreen()));
+  };
   browser()->GetWindow()->Activate();
   for (bool vertical : {false, true}) {
     orientation->SetVerticalTabsEnabled(vertical);
     view->DeprecatedLayoutImmediately();
     controller->ShowHub(*project);
     ui_test_utils::ToggleFullscreenModeAndWait(browser());
+    auto* immersive = ImmersiveModeController::From(browser());
+    auto reveal = immersive ? immersive->GetRevealedLock(
+                                  ImmersiveModeController::ANIMATE_REVEAL_NO)
+                            : nullptr;
+    base::RunLoop().RunUntilIdle();
     view->DeprecatedLayoutImmediately();
     EXPECT_TRUE(controller->showing_hub());
+    expect_hub_layout();
     EXPECT_EQ(contents, browser()->tab_strip_model()->GetActiveWebContents());
     ui_test_utils::ToggleFullscreenModeAndWait(browser());
+    reveal.reset();
+    base::RunLoop().RunUntilIdle();
     view->DeprecatedLayoutImmediately();
     EXPECT_TRUE(controller->showing_hub());
+    expect_hub_layout();
+    EXPECT_EQ(contents, browser()->tab_strip_model()->GetActiveWebContents());
     controller->ExitHub();
     EXPECT_EQ(
         "preserved",
@@ -2687,13 +2745,15 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
 // 다른 창에 열린 항목은 이 창에서는 보관 상태이며, 닫아도 이 창 허브를
 // 유지한다.
 IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
-                       ClosingTabRefreshesOtherWindowHub) {
+                       ClosingTabPreservesOtherWindowSavedPageAndHub) {
   auto project = service()->CreateProject(u"자료");
   ASSERT_TRUE(project);
   auto* model = browser()->tab_strip_model();
   auto* tab = model->GetActiveTab();
   ASSERT_TRUE(coordinator()->Attach(*tab, *project, {}));
   const std::string id = coordinator()->PageId(tab);
+  const auto saved_title = service()->FindPage(id)->title;
+  const auto saved_url = service()->FindPage(id)->url;
   BrowserWindowInterface* other = CreateBrowser(browser()->GetProfile());
   auto* other_controller = ProjectNavigationController::From(other);
   auto* other_view = BrowserView::GetBrowserViewForBrowser(other);
@@ -2713,6 +2773,17 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
                                                     IDS_YEE_PROJECT_SAVED));
   }));
   EXPECT_TRUE(other_controller->showing_hub());
+  const auto* saved = service()->FindPage(id);
+  ASSERT_TRUE(saved);
+  EXPECT_EQ(saved_title, saved->title);
+  EXPECT_EQ(saved_url, saved->url);
+  EXPECT_EQ((std::vector<std::string>{id}),
+            service()->FindProject(*project)->page_ids);
+  EXPECT_FALSE(coordinator()->FindLiveTab(id, other));
+  auto* current_hub =
+      other_view->GetViewByID(ProjectNavigationController::kHubViewId);
+  ASSERT_TRUE(current_hub);
+  EXPECT_TRUE(FindButton(current_hub, saved_title));
 }
 
 // 같은 자료를 각 창에서 열어도 native 탭·폼·탐색·닫기는 다른 창에 전파하지

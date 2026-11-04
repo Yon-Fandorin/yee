@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <set>
@@ -265,6 +266,8 @@ TEST_F(YeeNativePresentationTest, SidebarControlsReserveLocalHeaderAndFooter) {
       gfx::Insets::TLBR(kSidebarMetrics.sidebar_footer_top_spacing,
                         kSidebarMetrics.section_horizontal_inset, 0,
                         kSidebarMetrics.section_horizontal_inset));
+  const int footer_spacing =
+      std::max(0, kSidebarMetrics.sidebar_footer_top_spacing - 8);
   views::ProposedLayout layout;
   layout.host_size = gfx::Size(244, 480);
   const gfx::Rect content = AllocateSidebarControls(
@@ -273,8 +276,10 @@ TEST_F(YeeNativePresentationTest, SidebarControlsReserveLocalHeaderAndFooter) {
   ASSERT_TRUE(layout.GetLayoutFor(header));
   ASSERT_TRUE(layout.GetLayoutFor(footer));
   EXPECT_EQ(gfx::Rect(0, 0, 244, 48), layout.GetLayoutFor(header)->bounds);
-  EXPECT_EQ(gfx::Rect(8, 436, 228, 38), layout.GetLayoutFor(footer)->bounds);
-  EXPECT_EQ(gfx::Rect(0, 48, 244, 388), content);
+  EXPECT_EQ(gfx::Rect(kSidebarMetrics.section_horizontal_inset, 474 - 38,
+                      244 - 2 * kSidebarMetrics.section_horizontal_inset, 38),
+            layout.GetLayoutFor(footer)->bounds);
+  EXPECT_EQ(gfx::Rect(0, 48, 244, 474 - 48 - 38 - footer_spacing), content);
   EXPECT_FALSE(content.Intersects(layout.GetLayoutFor(header)->bounds));
   EXPECT_FALSE(content.Intersects(layout.GetLayoutFor(footer)->bounds));
 
@@ -285,15 +290,19 @@ TEST_F(YeeNativePresentationTest, SidebarControlsReserveLocalHeaderAndFooter) {
             AllocateSidebarControls(sidebar, header, footer, layout,
                                     gfx::Rect(0, 0, 244, 194), false, 8)
                 .size());
-  EXPECT_EQ(gfx::Size(244, 286), layout.host_size);
+  EXPECT_EQ(gfx::Size(244, 200 + 48 + 38 + footer_spacing), layout.host_size);
 
   // 본문 쪽 여백이 없을 때는 Footer가 소유한 상단 간격을 예약한다.
   layout = {};
   layout.host_size = gfx::Size(244, 480);
-  EXPECT_EQ(gfx::Rect(0, 48, 244, 382),
-            AllocateSidebarControls(sidebar, header, footer, layout,
-                                    gfx::Rect(0, 0, 244, 474), true, 0));
-  EXPECT_EQ(gfx::Rect(8, 436, 228, 38), layout.GetLayoutFor(footer)->bounds);
+  EXPECT_EQ(
+      gfx::Rect(0, 48, 244,
+                474 - 48 - 38 - kSidebarMetrics.sidebar_footer_top_spacing),
+      AllocateSidebarControls(sidebar, header, footer, layout,
+                              gfx::Rect(0, 0, 244, 474), true, 0));
+  EXPECT_EQ(gfx::Rect(kSidebarMetrics.section_horizontal_inset, 474 - 38,
+                      244 - 2 * kSidebarMetrics.section_horizontal_inset, 38),
+            layout.GetLayoutFor(footer)->bounds);
 }
 
 TEST_F(YeeNativePresentationTest,

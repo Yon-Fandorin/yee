@@ -201,7 +201,7 @@ TEST_F(AgentBridgePromptTest, LongApprovalKeepsFullTextInBoundedScrollArea) {
   auto* label = FindDescendant<Label>(scroll->contents());
   ASSERT_TRUE(label);
   EXPECT_EQ(label->GetText(), question);
-  EXPECT_LE(scroll->height(), 300);
+  EXPECT_LE(scroll->height(), kAgentBridgePromptMaxScrollHeight);
   EXPECT_GT(scroll->height(), 0);
   EXPECT_GT(scroll->contents()->height(), scroll->height());
   EXPECT_FALSE(label->IsDisplayTextTruncated());
@@ -267,6 +267,18 @@ TEST_F(AgentBridgePromptTest, QuestionUsesPlainSecurityGuidance) {
   base::RunLoop().RunUntilIdle();
 }
 
+TEST(AgentBridgePointerGeometryTest, LabelWidthCanExceedTheMinimum) {
+  const int threshold = kAgentBridgePointerMinimumSize.width() -
+                        kAgentBridgePointerHorizontalPadding;
+  EXPECT_EQ(kAgentBridgePointerMinimumSize,
+            ResolveAgentBridgePointerSize(threshold - 1));
+  EXPECT_EQ(kAgentBridgePointerMinimumSize,
+            ResolveAgentBridgePointerSize(threshold));
+  EXPECT_EQ(gfx::Size(kAgentBridgePointerMinimumSize.width() + 40,
+                      kAgentBridgePointerMinimumSize.height()),
+            ResolveAgentBridgePointerSize(threshold + 40));
+}
+
 TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
   const gfx::Point screen_point(140, 140);
   Widget* pointer = ShowAgentBridgePointer(owner_view(), screen_point);
@@ -277,12 +289,14 @@ TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
   EXPECT_FALSE(pointer->IsActive());
   EXPECT_FALSE(pointer->widget_delegate()->CanActivate());
   EXPECT_EQ(pointer->parent(), owner_widget());
-  EXPECT_EQ(pointer->GetWindowBoundsInScreen(),
-            gfx::Rect(screen_point, gfx::Size(132, 36)));
+  EXPECT_EQ(
+      pointer->GetWindowBoundsInScreen(),
+      gfx::Rect(screen_point, pointer->GetContentsView()->GetPreferredSize()));
   auto* contents = pointer->widget_delegate()->GetContentsView();
   ASSERT_TRUE(contents);
   EXPECT_TRUE(contents->IsDrawn());
-  EXPECT_EQ(contents->size(), gfx::Size(132, 36));
+  EXPECT_EQ(contents->size(), contents->GetPreferredSize());
+  EXPECT_EQ(contents->size(), pointer->GetWindowBoundsInScreen().size());
 
   pointer->CloseNow();
   base::RunLoop().RunUntilIdle();

@@ -85,7 +85,8 @@ TEST(MultiContentsGeometryTest, SupportedFloorClampsWithoutChangingRatio) {
   EXPECT_EQ(392, below_floor.start.width() + below_floor.end.width());
   EXPECT_GE(below_floor.start.width(), 0);
   EXPECT_GE(below_floor.end.width(), 0);
-  EXPECT_DOUBLE_EQ(0.95, input.start_ratio);
+  EXPECT_NEAR(0.95, static_cast<double>(below_floor.start.width()) / 392,
+              0.5 / 392);
 
   input.axis = PaneSplitAxis::kVertical;
   input.available_space = gfx::Rect(0, 0, 900, 500);

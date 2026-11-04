@@ -1242,10 +1242,14 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     ASSERT_TRUE(contents);
     ASSERT_TRUE(content::WaitForLoadStop(contents));
     ASSERT_TRUE(base::test::RunUntil([&] {
-      return content::EvalJs(contents, R"(
+      return content::EvalJs(
+                 contents,
+                 content::JsReplace(
+                     R"(
         document.documentElement?.style.getPropertyValue(
-            '--omnibox-popup-results-padding-top') === '8px'
-      )")
+            '--omnibox-popup-results-padding-top') === $1 + 'px'
+      )",
+                     yee::kSidebarMetrics.omnibox_popup_results_padding))
           .ExtractBool();
     }));
   }
@@ -1286,27 +1290,39 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
         };
       )"));
       ASSERT_TRUE(base::test::RunUntil([&] {
-        return content::EvalJs(contents, R"(
+        return content::EvalJs(
+                   contents,
+                   content::JsReplace(
+                       R"(
           yeePopupRowsForTesting().length >= 2 &&
           getComputedStyle(document.querySelector('omnibox-popup-app')
-              .shadowRoot.querySelector('.dropdownContainer')).paddingTop === '8px'
-        )")
+              .shadowRoot.querySelector('.dropdownContainer')).paddingTop === $1 + 'px'
+        )",
+                       yee::kSidebarMetrics.omnibox_popup_results_padding))
             .ExtractBool();
       }));
-      EXPECT_EQ(true, content::EvalJs(contents, R"(
+      EXPECT_EQ(true,
+                content::EvalJs(
+                    contents,
+                    content::JsReplace(
+                        R"(
         (() => {
           const wrapper = document.querySelector('omnibox-popup-app')
               .shadowRoot.querySelector('.dropdownContainer');
           const style = getComputedStyle(wrapper);
-          return style.paddingTop === '8px' && style.paddingBottom === '8px' &&
-              style.borderTopWidth === '1px' && yeePopupRowsForTesting().every(row => {
+          return style.paddingTop === $1 + 'px' && style.paddingBottom === $1 + 'px' &&
+              style.borderTopWidth === $2 + 'px' && yeePopupRowsForTesting().every(row => {
                 const s = getComputedStyle(row);
-                return s.marginInlineStart === '8px' && s.marginInlineEnd === '8px' &&
-                    s.borderTopLeftRadius === '8px' && s.borderTopRightRadius === '8px' &&
-                    s.borderBottomLeftRadius === '8px' && s.borderBottomRightRadius === '8px';
+                return s.marginInlineStart === $3 + 'px' && s.marginInlineEnd === $3 + 'px' &&
+                    s.borderTopLeftRadius === $4 + 'px' && s.borderTopRightRadius === $4 + 'px' &&
+                    s.borderBottomLeftRadius === $4 + 'px' && s.borderBottomRightRadius === $4 + 'px';
               });
         })()
-      )"));
+      )",
+                        yee::kSidebarMetrics.omnibox_popup_results_padding,
+                        yee::kSidebarMetrics.omnibox_popup_separator_height,
+                        yee::kSidebarMetrics.omnibox_popup_row_inset,
+                        yee::kSidebarMetrics.omnibox_popup_row_corner_radius)));
       capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
               prefix + "-selected-window.png");
       capture(popup_widget, prefix + "-selected-popup.png");
@@ -1440,12 +1456,17 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
       }
     }
     ASSERT_GE(rows.size(), 2u);
-    // 1 DIP 구분선을 포함해 실제 배치된 행의 여백을 측정한다.
-    EXPECT_EQ(8, rows.front()->y() - 1);
-    EXPECT_EQ(8, popup->height() - rows.back()->bounds().bottom());
+    // 구분선을 포함해 실제 배치된 행의 여백을 측정한다.
+    EXPECT_EQ(yee::kSidebarMetrics.omnibox_popup_results_padding,
+              rows.front()->y() -
+                  yee::kSidebarMetrics.omnibox_popup_separator_height);
+    EXPECT_EQ(yee::kSidebarMetrics.omnibox_popup_results_padding,
+              popup->height() - rows.back()->bounds().bottom());
     for (OmniboxRowView* row : rows) {
-      EXPECT_EQ(8, row->result_view()->x());
-      EXPECT_EQ(8, row->width() - row->result_view()->bounds().right());
+      EXPECT_EQ(yee::kSidebarMetrics.omnibox_popup_row_inset,
+                row->result_view()->x());
+      EXPECT_EQ(yee::kSidebarMetrics.omnibox_popup_row_inset,
+                row->width() - row->result_view()->bounds().right());
     }
     capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
             prefix + "-selected-window.png");

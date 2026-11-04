@@ -31,7 +31,8 @@ TEST(FavoritesPolicyTest, LayoutTimingAppliesOnlyToTheYeeVerticalDock) {
   EXPECT_FALSE(GetFavoritesLayoutAnimationSettings(/*vertical=*/false));
   const auto settings = GetFavoritesLayoutAnimationSettings(/*vertical=*/true);
   ASSERT_TRUE(settings);
-  EXPECT_EQ(settings->duration, base::Milliseconds(420));
+  EXPECT_EQ(settings->duration,
+            base::Milliseconds(kSidebarMetrics.favorites_shift_duration_ms));
   EXPECT_EQ(settings->tween, gfx::Tween::ACCEL_40_DECEL_100_3);
   EXPECT_EQ(settings->retarget_reset_threshold, 0.0);
   command_line.GetProcessCommandLine()->AppendSwitch(
@@ -97,28 +98,31 @@ TEST(FavoritesPolicyTest, LoneTabGetsSidebarFirstRefusalOnly) {
       /*is_group_drag=*/false, /*uses_vertical_tab_strip=*/false));
 }
 
-TEST(FavoritesDockLayoutTest, UsesFourColumnsAndWrapsWithoutTopInset) {
-  views::View first;
-  views::View second;
-  views::View third;
-  views::View fourth;
-  views::View fifth;
-  const std::vector<FavoritesDockItem> items = {
-      {.view = &first},  {.view = &second}, {.view = &third},
-      {.view = &fourth}, {.view = &fifth},
-  };
+TEST(FavoritesDockLayoutTest, UsesContractColumnsAndWrapsWithoutTopInset) {
+  std::vector<views::View> children(kSidebarMetrics.favorites_max_columns + 1);
+  std::vector<FavoritesDockItem> items;
+  for (auto& child : children) {
+    items.push_back({.view = &child});
+  }
 
   const views::ProposedLayout layout = CalculateFavoritesDockLayout(
       items, views::SizeBounds(/*width=*/244, /*height=*/600),
       /*contains_split=*/false);
 
-  ASSERT_EQ(layout.child_layouts.size(), 5u);
-  EXPECT_EQ(layout.host_size, gfx::Size(244, 72));
-  EXPECT_EQ(layout.child_layouts[0].bounds, gfx::Rect(8, 0, 51, 32));
-  EXPECT_EQ(layout.child_layouts[1].bounds, gfx::Rect(67, 0, 51, 32));
-  EXPECT_EQ(layout.child_layouts[2].bounds, gfx::Rect(126, 0, 51, 32));
-  EXPECT_EQ(layout.child_layouts[3].bounds, gfx::Rect(185, 0, 51, 32));
-  EXPECT_EQ(layout.child_layouts[4].bounds, gfx::Rect(8, 40, 51, 32));
+  ASSERT_EQ(layout.child_layouts.size(), items.size());
+  const int columns = kSidebarMetrics.favorites_max_columns;
+  const int inset = kSidebarMetrics.tab_strip_horizontal_padding;
+  const int gap = kSidebarMetrics.favorites_cell_gap;
+  const int height = kSidebarMetrics.tab_icon_design_width +
+                     2 * kSidebarMetrics.favorites_cell_vertical_padding;
+  const int cell_width = (244 - 2 * inset - (columns - 1) * gap) / columns;
+  const int rows = (items.size() + columns - 1) / columns;
+  EXPECT_EQ(layout.host_size, gfx::Size(244, rows * height + (rows - 1) * gap));
+  for (size_t i = 0; i < items.size(); ++i) {
+    EXPECT_EQ(layout.child_layouts[i].bounds,
+              gfx::Rect(inset + (i % columns) * (cell_width + gap),
+                        (i / columns) * (height + gap), cell_width, height));
+  }
 }
 
 TEST(FavoritesDockLayoutTest, IncomingSlotCanLandOnEitherSideOfOneFavorite) {
@@ -134,8 +138,14 @@ TEST(FavoritesDockLayoutTest, IncomingSlotCanLandOnEitherSideOfOneFavorite) {
 
   ASSERT_EQ(before.child_layouts.size(), 1u);
   ASSERT_EQ(after.child_layouts.size(), 1u);
-  EXPECT_EQ(before.child_layouts[0].bounds, gfx::Rect(126, 0, 110, 32));
-  EXPECT_EQ(after.child_layouts[0].bounds, gfx::Rect(8, 0, 110, 32));
+  const int inset = kSidebarMetrics.tab_strip_horizontal_padding;
+  const int gap = kSidebarMetrics.favorites_cell_gap;
+  const int height = kSidebarMetrics.tab_icon_design_width +
+                     2 * kSidebarMetrics.favorites_cell_vertical_padding;
+  const int width = (244 - 2 * inset - gap) / 2;
+  EXPECT_EQ(before.child_layouts[0].bounds,
+            gfx::Rect(inset + width + gap, 0, width, height));
+  EXPECT_EQ(after.child_layouts[0].bounds, gfx::Rect(inset, 0, width, height));
 }
 
 TEST(FavoritesDockLayoutTest, HiddenSourceKeepsOnlySameDockLandingHole) {
@@ -155,11 +165,18 @@ TEST(FavoritesDockLayoutTest, HiddenSourceKeepsOnlySameDockLandingHole) {
 
   ASSERT_EQ(same_dock.child_layouts.size(), 2u);
   EXPECT_FALSE(same_dock.child_layouts[0].visible);
-  EXPECT_EQ(same_dock.child_layouts[1].bounds, gfx::Rect(126, 0, 110, 32));
+  const int inset = kSidebarMetrics.tab_strip_horizontal_padding;
+  const int gap = kSidebarMetrics.favorites_cell_gap;
+  const int height = kSidebarMetrics.tab_icon_design_width +
+                     2 * kSidebarMetrics.favorites_cell_vertical_padding;
+  const int width = (244 - 2 * inset - gap) / 2;
+  EXPECT_EQ(same_dock.child_layouts[1].bounds,
+            gfx::Rect(inset + width + gap, 0, width, height));
 
   ASSERT_EQ(cross_region.child_layouts.size(), 2u);
   EXPECT_FALSE(cross_region.child_layouts[0].visible);
-  EXPECT_EQ(cross_region.child_layouts[1].bounds, gfx::Rect(8, 0, 228, 32));
+  EXPECT_EQ(cross_region.child_layouts[1].bounds,
+            gfx::Rect(inset, 0, 244 - 2 * inset, height));
 }
 
 class FavoritesDragGeometryTest : public views::ViewsTestBase {
@@ -241,16 +258,28 @@ TEST_F(FavoritesDragGeometryTest, DockPreviewScalesTheGrabPointWithTheTile) {
       /*source_tile_size=*/gfx::Size(80, 64),
       /*target_item_count=*/2);
 
-  // At 320 DIP, two cells are 148x32. The grabbed quarter-point remains the
-  // quarter-point after the shape transition.
-  EXPECT_EQ(tile.size(), gfx::Size(148, 32));
-  EXPECT_EQ(pointer_in_screen - tile.origin(), gfx::Vector2d(37, 8));
+  // 모양 전환 뒤에도 잡은 지점은 각 축의 1/4 위치를 유지한다.
+  const int height = kSidebarMetrics.tab_icon_design_width +
+                     2 * kSidebarMetrics.favorites_cell_vertical_padding;
+  const int width =
+      (tab_strip().width() - 2 * kSidebarMetrics.tab_strip_horizontal_padding -
+       kSidebarMetrics.favorites_cell_gap) /
+      2;
+  EXPECT_EQ(tile.size(), gfx::Size(width, height));
+  EXPECT_EQ(pointer_in_screen - tile.origin(),
+            gfx::Vector2d(width / 4, height / 4));
 }
 
 TEST_F(FavoritesDragGeometryTest, IncomingTileSelectsBothSidesOfOneFavorite) {
   const gfx::Rect dock = tab_strip().GetBoundsInScreen();
-  const gfx::Rect left(dock.x() + 8, dock.y(), 148, 32);
-  const gfx::Rect right(dock.x() + 164, dock.y(), 148, 32);
+  const int inset = kSidebarMetrics.tab_strip_horizontal_padding;
+  const int gap = kSidebarMetrics.favorites_cell_gap;
+  const int height = kSidebarMetrics.tab_icon_design_width +
+                     2 * kSidebarMetrics.favorites_cell_vertical_padding;
+  const int width = (dock.width() - 2 * inset - gap) / 2;
+  const gfx::Rect left(dock.x() + inset, dock.y(), width, height);
+  const gfx::Rect right(dock.x() + inset + width + gap, dock.y(), width,
+                        height);
 
   EXPECT_EQ(FavoritesInsertIndexForTile(tab_strip(), left,
                                         /*item_count=*/1,
@@ -303,7 +332,7 @@ TEST_F(FavoritesDragGeometryTest, DropZoneSnapsToDocumentedOpenHeight) {
   EXPECT_TRUE(drop_zone->GetVisible());
   EXPECT_EQ(drop_zone->GetPreferredSize(
                 views::SizeBounds(/*width=*/244, /*height=*/600)),
-            gfx::Size(244, 76));
+            gfx::Size(244, kSidebarMetrics.favorites_drop_zone_height));
 
   SetFavoritesDropZoneOpen(*drop_zone, /*open=*/false, /*animate=*/false);
   EXPECT_FALSE(drop_zone->GetVisible());
@@ -409,7 +438,7 @@ TEST_F(FavoritesDragGeometryTest, ReducedMotionDropZoneLifecycleIsAtomic) {
   EXPECT_TRUE(drop_zone->GetVisible());
   EXPECT_EQ(drop_zone->GetPreferredSize(
                 views::SizeBounds(/*width=*/244, /*height=*/600)),
-            gfx::Size(244, 76));
+            gfx::Size(244, kSidebarMetrics.favorites_drop_zone_height));
 
   SetFavoritesDropZoneOpen(*drop_zone, /*open=*/false, /*animate=*/true);
   EXPECT_FALSE(drop_zone->GetVisible());

@@ -408,8 +408,8 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 보류하고, 설정된 팝업의 현재 primary 문서가 준비됐을 때 다시 적용한다. 같은 문서의
 재표시는 기존 경로로 적용하며, 기존 행 여백·곡률·접근성·입력 판정은 유지한다.
 
-`YeeAimPopupKeepsStateThroughPresentationRebuild`는 예열 창 교체와 테마 갱신 후
-AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바깥 클릭으로 닫히는지
+`YeeAimPopupOpensAndDismissesAfterClosedThemeChanges`는 팝업이 닫힌 동안 테마를
+갱신한 뒤 AI 팝업의 논리 상태·실제 표시 상태가 일치하고 ×·Escape·바깥 클릭으로 닫히는지
 확인한다. `YeeTabLayoutSelectPopupFollowsItsHost`는 맞춤설정 창을 움직이기 전
 패널 열기 애니메이션이 자연스럽게 끝난 뒤 첫 번째·두 번째 열기와 창 이동 후
 반복 열기에서 HTML select와 실제 popup의 화면 좌표를 함께 확인한다. Windows Aura의

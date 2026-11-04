@@ -61,9 +61,8 @@ gfx::FontList AgentPointerFont() {
 }
 
 gfx::Size AgentPointerSize() {
-  return gfx::Size(
-      std::max(132, gfx::GetStringWidth(AgentPointerLabel(), AgentPointerFont()) + 48),
-      36);
+  return ResolveAgentBridgePointerSize(
+      gfx::GetStringWidth(AgentPointerLabel(), AgentPointerFont()));
 }
 
 constexpr int kAgentGlyphSize = 40;
@@ -269,7 +268,7 @@ class AgentPromptContents final : public View {
     question_scroll->SetHorizontalScrollBarMode(
         ScrollView::ScrollBarMode::kDisabled);
     question_scroll->SetBackgroundColor(std::nullopt);
-    question_scroll->ClipHeightTo(0, 300);
+    question_scroll->ClipHeightTo(0, kAgentBridgePromptMaxScrollHeight);
     question_scroll->SetContents(std::move(request_card));
     AddChildView(std::move(question_scroll));
 
@@ -494,6 +493,12 @@ class AgentWidgetLifetime final : public WidgetObserver {
 };
 
 }  // namespace
+
+gfx::Size ResolveAgentBridgePointerSize(int label_width) {
+  return gfx::Size(std::max(kAgentBridgePointerMinimumSize.width(),
+                            label_width + kAgentBridgePointerHorizontalPadding),
+                   kAgentBridgePointerMinimumSize.height());
+}
 
 Widget* ShowAgentBridgePrompt(
     View* owner,

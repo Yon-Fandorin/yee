@@ -449,8 +449,7 @@ TEST_F(BrowserSurfaceColorControllerTest,
   StopSamplingForTesting(*source);
 }
 
-TEST_F(BrowserSurfaceColorControllerTest,
-       HiddenTabSamplesWhenItBecomesVisibleAsASplitPane) {
+TEST_F(BrowserSurfaceColorControllerTest, HiddenTabSchedulesSamplingWhenShown) {
   web_contents()->WasHidden();
   BrowserSurfaceColorController* source = SourceFor(web_contents());
   source->SetThemeFallbackColor(SK_ColorWHITE);
