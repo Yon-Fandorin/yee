@@ -1167,7 +1167,10 @@
     "reason": "L131: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.ApprovalSeparatesRequestSiteActionsAndSafety": {
     "os": [
@@ -1180,7 +1183,10 @@
     "reason": "L213: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.CloseNowRepliesDeniedOnce": {
     "os": [
@@ -1193,7 +1199,10 @@
     "reason": "L91: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.EscapeRepliesDeniedOnce": {
     "os": [
@@ -1206,7 +1215,10 @@
     "reason": "L112: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.InputAnswerIsReturnedAndInitiallyFocused": {
     "os": [
@@ -1219,7 +1231,10 @@
     "reason": "L159: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.LongApprovalKeepsFullTextInBoundedScrollArea": {
     "os": [
@@ -1232,7 +1247,10 @@
     "reason": "L188: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.PointerHasVisibleContentAtRequestedBounds": {
     "os": [
@@ -1245,7 +1263,10 @@
     "reason": "L282: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.PointerHidesAndClosesWithOwner": {
     "os": [
@@ -1258,7 +1279,10 @@
     "reason": "L311: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_bridge_prompt_unittest.cc::AgentBridgePromptTest.QuestionUsesPlainSecurityGuidance": {
     "os": [
@@ -1271,7 +1295,10 @@
     "reason": "L243: ViewsTestBase owner/prompt Widget을 만들며 입력은 EventGenerator·dialog callback 또는 논리 focus다.",
     "binaries": [
       "agent_bridge_prompt_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/agent_browser_contract_unittest.cc::AgentBrowserContractTest.ContentWaitIgnoresOnlyRefsAndKeepsDeltaIdentity": {
     "os": [
@@ -3121,7 +3148,10 @@
     "reason": "L294: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.DockPreviewScalesTheGrabPointWithTheTile": {
     "os": [
@@ -3134,7 +3164,10 @@
     "reason": "L253: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.DropZoneSnapsToDocumentedOpenHeight": {
     "os": [
@@ -3147,7 +3180,10 @@
     "reason": "L328: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.EmptyDockFallbackLeavesTabBodyAvailable": {
     "os": [
@@ -3160,7 +3196,10 @@
     "reason": "L318: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.IncomingTileSelectsBothSidesOfOneFavorite": {
     "os": [
@@ -3173,7 +3212,10 @@
     "reason": "L273: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.PreviewScreenBoundsMatchRowsInLtrAndRtl": {
     "os": [
@@ -3186,7 +3228,10 @@
     "reason": "L369: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.RealPreviewUsesTheSharedTabGeometry": {
     "os": [
@@ -3199,7 +3244,10 @@
     "reason": "L344: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.ReducedMotionDropZoneLifecycleIsAtomic": {
     "os": [
@@ -3212,7 +3260,10 @@
     "reason": "L432: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.ReducedMotionRetargetsPreviewImmediatelyInLtrAndRtl": {
     "os": [
@@ -3225,7 +3276,10 @@
     "reason": "L399: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.TabPreviewMirrorsLogicalLeadingInset": {
     "os": [
@@ -3238,7 +3292,10 @@
     "reason": "L207: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragGeometryTest.TabPreviewWithoutInsetIsSymmetric": {
     "os": [
@@ -3251,7 +3308,10 @@
     "reason": "L231: ViewsTestBase Widget의 preview 좌표·레이아웃을 검사하며 native drag를 주입하지 않는다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/favorites_unittest.cc::FavoritesDragIntentTest.ResolvesEveryCrossRegionState": {
     "os": [
@@ -3407,7 +3467,12 @@
     "reason": "L78: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "site_controls_browsertests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "headless의 --allow-chrome-scheme-url은 외부 version URL을 허용해 표시형 launch policy assertion과 다르다.",
+      "Linux": "headless의 --allow-chrome-scheme-url은 외부 version URL을 허용해 표시형 launch policy assertion과 다르다.",
+      "Windows": "headless의 --allow-chrome-scheme-url은 외부 version URL을 허용해 표시형 launch policy assertion과 다르다."
+    }
   },
   "browser/ui/internal_urls_browsertest.cc::InternalURLsBrowserTest.InputNavigationAndNativeAddress": {
     "os": [
@@ -3590,7 +3655,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.NativeActionAccentUsesActualHeaderSurface": {
     "os": [
@@ -3604,7 +3672,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.NoticeLinkSharesMessageBaseline": {
     "os": [
@@ -3618,7 +3689,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.ProductNoticeHasTwoColorMarkInBothThemes": {
     "os": [
@@ -3660,7 +3734,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.SidePanelWebTextAndThemeControlsStayReadable": {
     "os": [
@@ -3716,7 +3793,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.SurfaceDecorationSurvivesIndependentWidgetsAndColorUpdates": {
     "os": [
@@ -3730,7 +3810,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/native_presentation_unittest.cc::YeeTabIconPresentationTest.SameFaviconReappliesChangedThemePolicy": {
     "os": [
@@ -3744,7 +3827,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/omnibox_accessibility_browsertest.cc::OmniboxAccessibilityBrowserTest.EditableDraftDoesNotChangeDocumentUrl": {
     "os": [
@@ -4580,7 +4666,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.ArrowNavigationPreservesPopupWidth": {
     "os": [
@@ -4594,7 +4683,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.BrowserToolsDispatchOnlyCuratedActions": {
     "os": [
@@ -4608,7 +4700,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.BubbleUsesContentWidthAndTracksAnchorPosition": {
     "os": [
@@ -4622,7 +4717,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.CompactMenuKeepsActionTitlesVisible": {
     "os": [
@@ -4636,7 +4734,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.ContextSwitchPreservesOptionalAccountLabel": {
     "os": [
@@ -4650,7 +4751,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.EscapeDismissRestoresKeyboardTraversalFocus": {
     "os": [
@@ -4664,7 +4768,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.EscapeRestoreDoesNotRevealHiddenOwner": {
     "os": [
@@ -4676,7 +4783,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.EscapeRestoreIsCancelledWhenTriggerLeavesWidget": {
     "os": [
@@ -4689,7 +4799,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.InteractionStatesUseOnlyTheYeeSurface": {
     "os": [
@@ -4703,7 +4816,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.LocalProfileRenameUpdatesIdentityAndMenu": {
     "os": [
@@ -4717,7 +4833,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.LongNamesKeepThePopupBoundedAndAccessible": {
     "os": [
@@ -4731,7 +4850,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.MemoryChangeLeavesTheViewThroughCallback": {
     "os": [
@@ -4745,7 +4867,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.PointerDismissDoesNotRestoreFocusOrOutlinedSurface": {
     "os": [
@@ -4759,7 +4884,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.PointerExitAndReentryKeepNativePopupFocus": {
     "os": [
@@ -4785,7 +4913,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.SelectionRequestsDoNotChangeSourceIdentity": {
     "os": [
@@ -4799,7 +4930,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.ThemeChangeAfterNativeTeardownHasNoDanglingBubble": {
     "os": [
@@ -4813,7 +4947,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.TriggerReclickClosesTheSameBubble": {
     "os": [
@@ -4827,7 +4964,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.WorkspaceMarkAppearsOnlyInFooter": {
     "os": [
@@ -4841,7 +4981,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/sidebar_footer_unittest.cc::SidebarFooterViewTest.WorkspaceMarkHasContrastInLightAndDarkThemes": {
     "os": [
@@ -4867,7 +5010,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.BackForwardCacheRestoresDocument": {
     "os": [
@@ -5181,7 +5327,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/split_pane_controls_unittest.cc::SplitPaneControlsTest.AnchoredBoundsStayInsideSplitCanvas": {
     "os": [
@@ -5195,7 +5344,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/split_pane_controls_unittest.cc::SplitPaneControlsTest.ButtonsKeepDocumentedOrderAndCallbacks": {
     "os": [
@@ -5209,7 +5361,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/split_pane_controls_unittest.cc::SplitPaneControlsTest.LayoutTooltipTracksCurrentOrientation": {
     "os": [
@@ -5223,7 +5378,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/split_pane_controls_unittest.cc::SplitPaneControlsTest.ReducedMotionRevealAndDismissAreAtomic": {
     "os": [
@@ -5237,7 +5395,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/split_pane_controls_unittest.cc::SplitPaneControlsTransitTest.DiagonalPathsAcrossAllFourEdges": {
     "os": [
@@ -5603,7 +5764,10 @@
     "reason": "L67: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::BrowserSurfacePresentationResolverTest.ExhaustiveGrayAndChromaticContrastContract": {
     "os": [
@@ -5659,7 +5823,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.HorizontalCapsuleRestoresCompactWithoutHidingGlass": {
     "os": [
@@ -5673,7 +5840,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.HorizontalGroupBoundaryHasOneOutsideSeparator": {
     "os": [
@@ -5687,7 +5857,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.HorizontalGroupHoverStaysInsideCapsule": {
     "os": [
@@ -5701,7 +5874,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.HorizontalMinimumKeepsFaviconGap": {
     "os": [
@@ -5715,7 +5891,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.RestingTextSharesHoveredControlSurface": {
     "os": [
@@ -5729,7 +5908,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeRestingTextViewTest.WidgetAttachedLabelsUseExactSurfaceAndPhysicalForeground": {
     "os": [
@@ -5743,7 +5925,10 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "browser/ui/yee_ui_unittest.cc::YeeShellColorTest.DarkSchemeTonesBrightFrameWithoutLosingHue": {
     "os": [
@@ -6190,7 +6375,12 @@
     "reason": "L39: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "site_controls_browsertests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "opt-in 실재생·광고 관찰의 headless 오디오·전달 동등성을 검증하기 전까지 표시형 runner를 유지한다.",
+      "Linux": "opt-in 실재생·광고 관찰의 headless 오디오·전달 동등성을 검증하기 전까지 표시형 runner를 유지한다.",
+      "Windows": "opt-in 실재생·광고 관찰의 headless 오디오·전달 동등성을 검증하기 전까지 표시형 runner를 유지한다."
+    }
   },
   "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ApplicationExitReleasesClientReferences": {
     "os": [
@@ -6236,7 +6426,10 @@
     "reason": "L1360: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/glic/selection/selection_overlay_browsertest.cc::SelectionOverlayBrowserTest.SelectionUsedFromController": {
     "os": [
@@ -6249,7 +6442,10 @@
     "reason": "L68: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/mac/install_test.cc::DiskImageInstallTest.EjectsAndTrashesOwnedImage": {
     "os": [
@@ -6954,7 +7150,10 @@
     "reason": "L5414: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/lens/lens_overlay_controller_browsertest.cc::LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab": {
     "os": [
@@ -6967,7 +7166,10 @@
     "reason": "L9387: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/read_anything/read_anything_controller_browsertest.cc::ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm": {
     "os": [
@@ -6980,7 +7182,10 @@
     "reason": "L2509: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/read_anything/read_anything_controller_browsertest.cc::ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab": {
     "os": [
@@ -6993,7 +7198,10 @@
     "reason": "L2559: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/read_anything/read_anything_controller_browsertest.cc::ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash": {
     "os": [
@@ -7006,7 +7214,10 @@
     "reason": "L1386: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/tabs/tab_data_browsertest.cc::TabDataObserverBrowserTest.FaviconAndIconFlags": {
     "os": [
@@ -7052,7 +7263,10 @@
     "reason": "L397: glass view의 geometry를 검사하며 BringToFront는 setup이다.",
     "binaries": [
       "yee_interactive_ui_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다."
+    }
   },
   "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.MultipleProfilesTintOpacity": {
     "os": [
@@ -7098,7 +7312,10 @@
     "reason": "L2356: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm::ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren": {
     "os": [
@@ -7320,7 +7537,12 @@
     ],
     "binaries": [
       "yee_interactive_ui_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다.",
+      "Linux": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다.",
+      "Windows": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다."
+    }
   },
   "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc::OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState": {
     "os": [
@@ -7370,7 +7592,10 @@
     "reason": "L32: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc::SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView": {
     "os": [
@@ -7383,7 +7608,10 @@
     "reason": "L2573: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "browser_tests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation": {
     "os": [
@@ -7402,7 +7630,10 @@
     ],
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity": {
     "os": [
@@ -7421,7 +7652,10 @@
     ],
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock": {
     "os": [
@@ -7440,7 +7674,10 @@
     ],
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.CancelDragWithinUnpinnedContainer": {
     "os": [
@@ -7960,7 +8197,10 @@
     "reason": "L205: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeDisabledShellKeepsNativeVerticalHeaderOnHover": {
     "os": [
@@ -7973,7 +8213,10 @@
     "reason": "L482: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeEphemeralGroupKeepsNativeColorsDuringHoverAndPress": {
     "os": [
@@ -7986,7 +8229,10 @@
     "reason": "L350: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeHorizontalNativeThemeKeepsNativeChipOnHover": {
     "os": [
@@ -7999,7 +8245,10 @@
     "reason": "L424: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed": {
     "os": [
@@ -8012,7 +8261,10 @@
     "reason": "L280: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether": {
     "os": [
@@ -8025,7 +8277,10 @@
     "reason": "L237: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
     "binaries": [
       "yee_layout_unittests"
-    ]
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
   },
   "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc::TabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames": {
     "os": [

@@ -468,7 +468,8 @@ import native_gate_record as gate
 root, build, binary = map(Path, sys.argv[2:])
 args = SimpleNamespace(arguments=['--gtest_filter=Suite.*'], binary=binary,
     build_root=build, repo_root=root, out_dir=binary.parent, out_name='Candidate',
-    root_explicit='true', out_explicit='true', pid=os.getpid())
+    root_explicit='true', out_explicit='true', pid=os.getpid(),
+    tier='foreground', observe_background=False)
 def interrupt(root):
     os.kill(os.getpid(), signal.SIGINT)
     return {}

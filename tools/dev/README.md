@@ -485,54 +485,154 @@ Windows `.ps1` gate의 실행 파일·필터 전환은 후속 작업이다.
 
 ### Background와 foreground tier
 
-Header·Sidebar·Browser Surface layout·Projects·Site Controls·Omnibox 접근성의
-`.sh` gate는 `--tier=background|foreground|all`을 지원한다. 기존
-`unit|fast|horizontal|interactive|browser|all`은 검사 범위를 선택한다.
+native `.sh` gate는 `--tier=background|foreground|all`, `--print-filters`,
+`--observe-background`를 지원한다. 기존 `unit|fast|horizontal|interactive|browser|all`은
+검사 범위다. YouTube는 `off|on`을 명시하는 opt-in이며 Internal Pages의 `--ui=on`은
+기존 표시형 실행인 `--tier=all`로 연결한다. 명시한 tier가 있으면 그 선택을 따른다.
 
-- 기본 `background`: manifest의 A(최상위 창 없음)·B(Widget/브라우저, 실제 입력 불필요)만 선택한다.
-- `foreground`: 실제 입력·native 메뉴·OS 활성화·fullscreen이 필요한 C만 선택한다.
-- `--tier=all`: 해당 범위의 A/B/C를 모두 선택한다.
+- 기본 `background`: A와 해당 OS에 `needs_display`가 없는 B를 선택한다.
+- `foreground`: C와 해당 OS에 `needs_display`가 있는 B를 선택한다.
+- `--tier=all`: 해당 범위의 A/B/C를 기존 표시형 실행기로 실행한다.
 
-`all`을 포함한 모든 범위는 tier를 생략하면 `background`다.
-C는 `--tier=foreground` 또는 `--tier=all`을 명시해야 실행한다.
+macOS background의 브라우저·interactive 실행에는 Chromium의 `--headless`와
+`--yee-test-tier=background`를 전달한다. headless 화면은 `--screen-info={1920x1080}`,
+초기 창은 `--window-size=1280,900`으로 고정해 Side Panel과 헤더에 필요한 폭을 확보한다.
+`site_controls_browsertests`와 `yee_interactive_ui_tests`의 Yee 소유 main은 NSApp 생성 전에
+background 전용 활성화 차단을 설치한다. native 창 생성과 논리 focus를 유지하면서
+`NSApplication`의 `activateIgnoringOtherApps:`와 `activate` 요청을 막는다.
+foreground는 upstream main의 초기화·활성화 동작을 유지한다.
+interactive main은 Kombucha의 UIControls 초기화를 유지하고 background에서
+전면화 등록·modifier key-up 주입·always-on-top 창 종료를 제외한다.
+background는 개발 Yee 종료와 물리 display 배치 helper를 호출하지 않는다.
+목록 조회도 같은 옵션으로 관찰하며, 실행별 임시 프로필과 프로세스 세션을 만든다.
+macOS의 `TMPDIR`와 `MAC_CHROMIUM_TMPDIR`는 모두 그 실행의 임시 경로로 지정한다.
+정리는 전용 process group·세션과 기록한 PID·시작 시각·실행 파일로 소유권을 확인한 자식에만 적용한다.
+프로필을 명시한 자식은 경계도 검사하며, 프로필 인수가 없는 renderer·GPU helper도 정리한다.
+Chromium 자식이 별도의 process group을 만들어도 같은 세션이나 기록한 자손으로 추적한다.
+열거와 argv 조회 사이에 끝난 자식의 `EINVAL`·`ESRCH`와 좀비는 종료한 것으로 처리한다.
+같은 신원으로 살아 있는 자식은 `EINVAL`·`ESRCH`가 나도 정리한다. 그 밖의 살아 있는
+자식의 argv 조회 오류·프로필 경계 침범과 정리 후 남은 자식은 실패한다.
+무관한 앱·설치판·기존 개발 창에는 종료 신호를 보내지 않는다. 실패를 foreground에서
+자동 재실행하지 않는다.
 
-현재 B는 기존 실행기를 사용하므로 창을 표시하거나 포커스를 가져갈 수 있다.
-B의 Yee 소유 headless main 전환은 다음 배치에서 수행한다. `background`라는 이름만으로
-현재 B의 무창·입력 격리를 보장하지 않는다. A만 선택한 실행은 개발 Yee 종료나 물리
-display 배치 helper를 호출하지 않는다. B/C의 기존 display·정상 종료 준비는 유지한다.
-Omnibox 접근성은 모두 C이므로 기본 실행은 환경 확인·빌드·바이너리 조회 없이
-`cases=none`을 출력하고 끝난다.
+`needs_display`는 OS별 사유를 담은 manifest 필드다. macOS에서는 세 Views unit 바이너리의
+B를 기존 runner에 남긴다. fixture마다 활성화 정책을 Regular로 바꾸며 기존 fake-focus와
+headless의 swizzle 수명·paint 동등성을 확인하지 못했기 때문이다. 강제 전면화를 호출하는
+upstream glass geometry·Omnibox shadow 두 사례도 같은 예외다. YouTube opt-in은 표시형
+재생·광고 관찰을 유지한다. 이 사례들은 `--tier=foreground`에서 빠짐없이 실행한다.
+`InternalURLsBrowserTest.ExternalLaunchUsesCanonicalPolicy`도 foreground에서 실행한다.
+background의 `--headless --allow-chrome-scheme-url`은 외부 `version` URL을 허용하므로
+표시형 launch policy를 검증하는 기존 assertion과 실행 조건이 다르다.
+macOS의 upstream `browser_tests`에 남아 있는 B 10개도 foreground에서 실행한다.
+그 main에는 Yee의 활성화 차단이 없고 headless의 Widget 표시도 NSApp 활성화를 요청한다.
+`test-browser-surface-layout.sh all --tier=background`에서도 이 바이너리는 `cases=none`이다.
+Omnibox 접근성은 전부 C이므로 기본값은 `cases=none`이다.
 
 ```sh
-./tools/dev/test-header.sh interactive --tier=background --no-build
-./tools/dev/test-header.sh interactive --tier=foreground --no-build
-./tools/dev/test-sidebar.sh interactive --tier=foreground --no-build
-./tools/dev/test-browser-surface-layout.sh horizontal --tier=foreground --no-build
-./tools/dev/test-browser-surface-layout.sh interactive --tier=foreground --no-build
-./tools/dev/test-projects.sh browser --tier=foreground --no-build
+export YEE_LOCAL_BUILD_ROOT="$PWD/.local-build/stable157"
+export YEE_OUT_NAME=YeeStable157
+export YEE_BUILD_JOBS=3
+export PATH="$YEE_LOCAL_BUILD_ROOT/depot_tools:$PATH"
+
+# 화면을 점유하지 않는 범위와 관찰 기록
+./tools/dev/test-header.sh all --tier=background --observe-background --no-build
+./tools/dev/test-sidebar.sh all --tier=background --observe-background --no-build
+./tools/dev/test-browser-surface-layout.sh all --tier=background --observe-background --no-build
+./tools/dev/test-projects.sh all --tier=background --observe-background --no-build
+./tools/dev/test-site-controls.sh --tier=background --observe-background --no-build
+./tools/dev/test-internal-pages.sh --tier=background --observe-background --no-build
+./tools/dev/test-agent-browser.sh --tier=background --observe-background --no-build
+./tools/dev/test-agent-prompt.sh --tier=background --observe-background --no-build
+./tools/dev/test-content-blocking-native.sh --tier=background --observe-background --no-build
+./tools/dev/test-macos-install.sh --tier=background --observe-background --no-build
+
+# 실제 입력·표시와 needs_display 예외: 전용 화면에서 직렬 실행
+./tools/dev/test-header.sh all --tier=foreground --no-build
+./tools/dev/test-sidebar.sh all --tier=foreground --no-build
+./tools/dev/test-browser-surface-layout.sh all --tier=foreground --no-build
+./tools/dev/test-projects.sh all --tier=foreground --no-build
 ./tools/dev/test-site-controls.sh --tier=foreground --no-build
+./tools/dev/test-agent-prompt.sh --tier=foreground --no-build
 ./tools/dev/test-omnibox-accessibility.sh --tier=foreground --no-build
+# 선택적인 실재생 관찰
+./tools/dev/test-youtube-live.sh off --tier=foreground --no-build
+./tools/dev/test-youtube-live.sh on --tier=foreground --no-build
 ```
 
-`--tier=foreground`와 `--tier=all`은 전용 모니터에서 직렬로 실행한다. 실행하는 터미널/IDE에
-손쉬운 사용 권한을 미리 부여하고 테스트 창을 가리지 않는다. 완료할 때까지 마우스·키보드에서
-손을 떼고 원격 데스크톱·Computer Use 등 화면 제어도 중단한다. 전용 모니터는 앱 활성화나
-입력을 격리하지 않는다. B도 현재 실행기에서는 별도의 화면 사용 구간이 필요할 수 있다.
-
-`--print-filters`는 선택한 tier·A/B/C·바이너리·실제 필터와 실행 옵션만 출력한다.
-환경 검사·소스 동기화·빌드·목록 조회·창 조작은 수행하지 않는다.
+`--no-build`는 이미 빌드한 바이너리를 사용한다. `all` 범위도 tier를 생략하면 background다.
+`--print-filters`는 환경 검사·동기화·빌드·목록 조회·창 조작 없이 실제 필터와 옵션을 출력한다.
 
 ```sh
-./tools/dev/test-browser-surface-layout.sh interactive --tier=background --print-filters
+./tools/dev/test-browser-surface-layout.sh interactive --tier=background --observe-background --print-filters
 ./tools/dev/test-browser-surface-layout.sh interactive --tier=foreground --print-filters
-./tools/dev/test-browser-surface-layout.sh interactive --tier=all --print-filters
 ```
 
-분류와 매개변수 인스턴스는 [`test_tiers.json`](../../tests/tooling/test_tiers.json)에서
-관리한다. tier를 지원하는 gate의 실행 필터는 해당 OS·바이너리의 manifest와 기존 범위 필터의 교집합이다.
-`run_native_test_gate` 출력에는 선택한 tier가 포함된다.
+macOS의 `--observe-background`는 Swift helper를 캐시에 빌드하고 약 100ms마다
+`lsappinfo front`와 `lsappinfo info -only pid <ASN>`으로 LaunchServices의 전면 앱 PID를
+직접 읽는다. 표시 창은 CGWindowList에서 읽는다. `NSWorkspace`의 전면 앱 캐시는 사용하지 않는다.
+조회마다 500ms 제한을 두며 timeout·실패·잘못된 출력은 읽기 공백으로 기록한다.
+`frontmost_source`는 `launchservices`다. 읽기 공백 사이에도 마지막 유효 PID를 유지해
+실제 PID 전환을 센다.
+실행기는 `setsid`를 마친 자식의 root PID·pgid를 `observer-sessions.json`에 명시한다.
+관찰기가 `sysctl(KERN_PROC_PGRP)`로 그 root를 확인하고 준비 파일을 쓴 뒤에만 테스트를
+exec하므로 짧은 목록 조회에도 같은 순서를 적용한다. 매 표본에서 전용 그룹을 열거하고,
+전체 프로세스 목록의 root 자손과 이미 확인한 자식을 함께 추적한다.
+창 소유 PID가 그 집합에 있을 때만 검사 창으로 센다. 무관한 PID의 그룹·세션은 개별 조회하지 않는다.
+검사 창의 가시성은 모든 활성 display의 온스크린 목록으로 확인하고, 무관한 창의 생존은
+최소화·다른 Space 창을 포함한 전체 목록으로 비교하며 나중에 확인한 자체 helper도 제외한다.
+AX focused window 소유 PID는 참고 정보이며 변화나 읽기 실패가 합격을 막지 않는다.
+AX·event tap을 읽지 못하면 `notes`에 남기며 권한을 자동 요청하지 않는다.
+필수 관측은 fail-closed다. 유효 표본이 2개 미만이거나 창 목록 조회에 실패하거나,
+전면 앱을 2회 이상 읽지 못하거나 읽기 공백이 있거나, 실행별 root를 확인하지 못하면
+`observation_complete: false`다. 전체 프로세스 목록 또는 실행별 process group 조회가
+한 번이라도 실패해도 미완료이며, 성공한 빈 목록은 조회 공백으로 세지 않는다.
+`ownership_read_gaps`는 소유권 열거가 실패한 표본 수, `process_list_read_gaps`와
+`process_group_read_gaps`는 각각 실패한 조회 수다. 후속 조회가 성공해도 이 공백과
+미완료 사유는 유지한다. `frontmost_read_gaps`와 `max_sample_gap_ms`도 기록한다.
+최종 기록의 `observed_test_root_pids`·`observed_test_process_groups`도 전달한 모든 실행과 대조한다.
+실제 UI에서의 합격 여부는 검수자의 실행으로 확인한다.
 
-이 세 게이트는 각 바이너리 실행 직전에 같은 필터·특성·창 인수에
+각 native 기록 폴더의 `observation.json`과 `record.json`의 `observation`에 요약을 남긴다.
+조용한 관찰 구간의 합격은 `observation_complete: true`, `sample_count >= 2`이며 다음 값이 모두 0이다.
+`record.json`의 `observation.passed: true`와 `gate_exit_code: 0`도 확인한다.
+
+- `max_visible_test_windows`: 동시에 관찰한 검사 소유 표시 창의 최댓값
+- `frontmost_changes`: 읽기 공백을 제외한 전면 앱 PID 전환 수
+- `cursor_changes`, `modifier_changes`: 연속한 유효 커서·modifier 표본 사이의 변화 수
+- `input_injections`, `modifier_injections`: 검사 프로세스가 출처인 입력·modifier 이벤트 수
+- `unrelated_apps_lost`: 시작 시 있던 무관한 앱 identity 중 종료 시 없는 수. bundle ID,
+  없으면 실행 파일 경로·이름 순으로 시작 시 캡처한다. 같은 프로세스의 후속 identity를
+  읽지 못해도 저장한 값을 사용하며 같은 identity의 재실행은 손실이 아니다.
+- `unrelated_windows_lost`: 무관한 앱 identity별 일반 창(layer 0) 수의 감소분.
+  메뉴바·상태 창 등 다른 layer는 제외한다.
+
+`unrelated_apps_lost_details`·`unrelated_windows_lost_details`에는 손실 identity와
+전후 개수(`before`, `after`), 감소분(`lost`)을 기록한다.
+앱 identity를 요구하기 전에 검사 소유권과 종료 상태를 확인한다. 시작 후 나타난 무관한 앱은
+identity를 읽지 못하거나 곧 종료해도 앱 손실·관측 미완료로 세지 않는다. PID와 읽을 수 있는
+identity를 `notes`에 남기며, 읽지 못한 PID는 `application_identity_unreadable_pids`에 기록한다.
+시작 시 손실 비교 대상인 앱의 identity를 캡처하지 못하면 관측 미완료다.
+
+`key_window_changes`는 AX focused window 소유 PID 전환 수이며 참고값이다.
+
+사용자가 앱·창을 바꾸거나 커서·modifier를 움직여도 변화가 기록되므로, 위 합격 판정에는
+입력 없는 관찰 구간을 쓴다. 사용자 활동 중의 변화만으로 검사 주입이라고 판정하지 않는다.
+100ms 사이의 짧은 창·focus 변화나 출처 PID가 없는 입력은 이 관찰만으로 배제할 수 없다.
+headless의 논리 가시성·bounds·paint·popup 검사는 실제 화면의 픽셀·occlusion·Space·native
+활성화 검증을 대체하지 않는다. 실제 입력을 확인하는 C는 기존 foreground 동작을 유지한다.
+관찰이 불완전하거나 간섭이 있으면 native 검사가 통과해도 gate는 **23**으로 실패한다.
+native 검사 자체의 실패 코드는 유지한다.
+보조 정보가 없으면 `background observation note: ...`를 출력한다.
+손쉬운 사용 권한이 없어도 필수 관측과 간섭 지표가 통과하면 gate는 성공한다.
+
+`--tier=foreground`와 `--tier=all`은 손쉬운 사용 권한을 갖춘 전용 화면에서 직렬 실행한다.
+실행 중 마우스·키보드 입력과 원격 데스크톱·Computer Use 같은 화면 제어를 멈춘다.
+전용 모니터만으로 앱 활성화나 입력이 격리되지는 않는다.
+
+분류와 매개변수는 [`test_tiers.json`](../../tests/tooling/test_tiers.json)에서 관리한다.
+실행 필터는 해당 OS·바이너리의 manifest와 기존 범위 필터의 교집합이다.
+
+각 native gate는 바이너리 실행 직전에 같은 필터·특성·창 인수에
 `--gtest_list_tests`를 추가해 목록을 조회한다. 조회 실패, 빈 목록, 또는 음수 필터와
 `DISABLED_` 스위트·사례를 제외한 뒤 활성 사례가 없는 양수 패턴이 하나라도 있으면
 중단한다. 다른 패턴이 일치해도 누락을 허용하지 않으며 기존 검사 선택 범위는 유지한다.
@@ -562,8 +662,8 @@ zsh의 `run_native_test_gate`는 두 선택 가드와 바이너리의 존재·�
 **21**로 끝난다. JSON 출력만 지정해 XML이 없는 경우도 동일하다. 목록 조회·실제 실행이
 실패하면 원래 종료 코드를 유지하며, 준비·기록 실패는 **22**다. 이 기록은 현재 소스와
 실행 바이너리를 식별하며, 해당 소스로 바이너리를 빌드했다는 증명은 아니다.
-Ctrl-C(SIGINT)는 `interrupted: true`로 기록하고, 같은 프로세스 그룹에서 신호를 받은
-자식 실행기의 정리가 끝날 때까지 기다린다. 실제 자식 종료 코드를 보존하며, 코드가 없으면
+Ctrl-C(SIGINT)는 `interrupted: true`로 기록하고, background 전용 세션의
+자식 정리가 끝날 때까지 기다린다. 실제 자식 종료 코드를 보존하며, 코드가 없으면
 **130**을 기록한다. 자식이 0으로 끝나도 최종 판정은 **130**으로 실패한다.
 
 native browser test는 Chromium 실행기가 만든 임시 프로필을 쓰며 고정 CDP 포트를 추가하지 않는다. Mac 설치 검사·smoke는 이미 `--remote-debugging-port=0`과 전용 프로필의 `DevToolsActivePort`를 사용하고 검사 PID·앱·프로필 범위를 추적한다. OS 리스너 PID까지 대조하는 CDP 소유권 검사는 현재 Windows 전용이다.
@@ -590,8 +690,8 @@ Windows는 실제 앱 종료 때 UI 스레드가 살아 있는 동안 외부 UIA
 외부 접근성 클라이언트를 연결한 `UiaApplicationExitBrowserTest.*`도 실행해
 일반 창 닫기·앱 종료·마지막 창이 먼저 닫힌 종료를 확인한다.
 
-계산·색상·직접 callback 검사는 창 활성화를 피한다. native popup·focus 단위 검사와
-B/C 브라우저 검사는 현재 실행기의 창 활성화를 유지한다. Sidebar는 Header의 주소줄
+계산·색상·직접 callback 검사는 background에서 실행한다. native popup·focus 단위 검사의
+needs_display 예외와 C 브라우저 검사는 기존 실행기의 창 활성화를 유지한다. Sidebar는 Header의 주소줄
 검사를 중복 실행하지 않으므로 두 영역을 바꿨을 때 각각의 gate를 선택한다. 실제
 hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 대체하지 않는다.
 수평 탭 수정 중에는 `fast`와 `horizontal`을 사용하고, 전체 레이아웃 checkpoint에서
@@ -599,7 +699,7 @@ hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 �
 같은 수평 시나리오를 기본·RTL 125%·통합 탭바 경로에서 실행하며 그룹의 접기/펴기와
 탭 추가/제거 후 favicon 요약 갱신, 전환 전후의 pin·group·활성 탭 보존을 확인한다.
 회전 모니터 지정은 창 위치를 정하며 macOS 앱 포커스를 격리하지는 않는다.
-실행 중에는 다른 앱의 오버레이 창이 테스트 모니터를 덮지 않게 하고, 마우스·키보드 입력과
+foreground 실행 중에는 다른 앱의 오버레이 창이 테스트 모니터를 덮지 않게 하고, 마우스·키보드 입력과
 원격 데스크톱·Computer Use 같은 화면 제어 도구를 멈춘다. 창이 가려지면 전체화면 Space 전환
 대기가 시간 초과될 수 있고, 실행 중 입력이 들어오면 hover·drag 사례가 실패할 수 있다.
 탭 그룹 색상·mock clock 레이아웃 애니메이션·Footer 표식 검사는 `ShowInactive()`를

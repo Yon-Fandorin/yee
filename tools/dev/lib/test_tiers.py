@@ -27,6 +27,12 @@ def load_manifest(path):
             raise ValueError('OS·owner·근거가 필요하다: ' + key)
         if not entry['binaries'] or not all(re.fullmatch(r'\w+', binary) for binary in entry['binaries']):
             raise ValueError('실행 바이너리 이름이 필요하다: ' + key)
+        needs_display = entry.get('needs_display', {})
+        if (not isinstance(needs_display, dict) or not set(needs_display) <= set(entry['os'])
+                or any(not isinstance(reason, str) or not reason.strip()
+                       for reason in needs_display.values())
+                or (needs_display and entry['tier'] != 'B')):
+            raise ValueError('B의 OS별 needs_display 근거가 필요하다: ' + key)
     return manifest
 
 
@@ -51,9 +57,10 @@ def resolve_filter(manifest, pattern, platform, tier, binary):
             matches = {part for part in positives if fnmatch.fnmatchcase(name, part)}
             if matches and not any(fnmatch.fnmatchcase(name, part) for part in negatives):
                 matched_patterns.update(matches)
-                if tier == 'background' and entry['tier'] == 'C':
+                foreground = entry['tier'] == 'C' or platform in entry.get('needs_display', {})
+                if tier == 'background' and foreground:
                     continue
-                if tier == 'foreground' and entry['tier'] != 'C':
+                if tier == 'foreground' and not foreground:
                     continue
                 names.add(name)
                 tiers.add(entry['tier'])

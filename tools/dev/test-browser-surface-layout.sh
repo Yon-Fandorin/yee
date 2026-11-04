@@ -119,7 +119,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
     default_filter="$HORIZONTAL_FILTER:$HORIZONTAL_GROUP_UX_FILTER"
     rtl_filter="$HORIZONTAL_FILTER:$HORIZONTAL_GROUP_UX_FILTER"
   fi
-  print "Running applied ${MODE} UI tests; native input requires window focus."
+  print "Running applied ${MODE} UI tests: tier=$YEE_TEST_TIER."
   run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$default_filter" \
     --test-launcher-jobs=1 \

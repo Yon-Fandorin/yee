@@ -75,6 +75,7 @@ class DevelopmentToolsTest(unittest.TestCase):
         self.write_tool(self.bin / 'autoninja', 'printf "target:%s\\ncwd:%s\\n" "$*" "$PWD" >> "$YEE_TEST_LOG"\n')
         self.write_tool(self.bin / 'metal', 'exit 0\n')
         self.env['YEE_METAL_BIN'] = str(self.bin / 'metal')
+        self.write_tool(self.bin / 'ps', 'exit 0\n')
         for name, label in [('install-branding.sh', 'branding'),
                             ('install-brand-assets.sh', 'assets'),
                             ('install-yee-ui-sources.sh', 'sources'), ('apply.sh', 'apply')]:

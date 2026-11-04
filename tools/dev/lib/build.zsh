@@ -48,14 +48,16 @@ build_regression_targets() {
 run_native_test_gate() {
   local test_binary="$1"
   shift
-  print -u2 -r -- "Native test gate: tier=${YEE_TEST_TIER:-background} binary=${test_binary:t}"
+  print -u2 -r -- "Native test gate: tier=${YEE_TEST_TIER:-foreground} binary=${test_binary:t}"
   require_yee_build_root_selection || return $?
   require_yee_output_selection || return $?
   if [[ ! -f "$test_binary" || ! -x "$test_binary" ]]; then
     print -u2 -r -- "Native 테스트 바이너리가 없거나 실행할 수 없다: $test_binary (선택한 out: $YEE_OUT_DIR)"
     return 20
   fi
-  python3 "$COMMON_DIR/lib/native_gate_record.py" \
+  local -a recording_arguments=(--tier "${YEE_TEST_TIER:-foreground}")
+  [[ "${YEE_OBSERVE_BACKGROUND:-false}" == true ]] && recording_arguments+=(--observe-background)
+  python3 "$COMMON_DIR/lib/native_gate_record.py" "${recording_arguments[@]}" \
     --repo-root "$YEE_ROOT" --build-root "$LOCAL_BUILD_ROOT" \
     --out-dir "$YEE_OUT_DIR" --out-name "$YEE_OUT_NAME" \
     --root-explicit "$YEE_LOCAL_BUILD_ROOT_EXPLICIT" --out-explicit "$YEE_OUT_NAME_EXPLICIT" \

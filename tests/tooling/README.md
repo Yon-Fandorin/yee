@@ -36,6 +36,12 @@ SIGINT 계약 검사는 가짜 실행기의 500ms 자식 정리와 후속 handle
 실제 종료 코드·인터럽트 기록과 코드가 없는 경우의 130을 검사한다.
 실제 네이티브 바이너리나 GUI는 실행하지 않으며 zsh가 없으면 셸 검사는 건너뛴다.
 
+`test_background_test.py`는 고정 headless 화면·창 옵션, layout 사례의 background 유지와
+표시형 launch policy 사례의 foreground 분리를 검사한다. Swift fixture는 가짜
+LaunchServices 응답으로 ASN·PID 해석과 전면 앱 전환을 확인한다. 조회 실패·읽기 공백·
+전면 앱 표본 부족은 관측 미완료 또는 실패로 판정한다. 실제 LaunchServices나 GUI를
+호출하지 않는다.
+
 `test_macos_installer_processes.py`는 Node.js에서 순수 필터 함수만 호출한다.
 가짜 ps 목록의 설치판·개발판·검사 앱·Helper·검사 프로필을 섞고 정확한 경로 경계와
 제품명의 공백·정규식 문자를 검사한다. 실제 ps 조회·브라우저 실행·종료는 수행하지 않는다.
@@ -128,13 +134,17 @@ A/B/C, 소유 gate, 실행 바이너리와 짧은 근거를 둔다. `binaries`�
 매개변수 선언은 `parameters`에 실제
 `INSTANTIATE_*`의 prefix·suffix를 기록하며 coverage 파서와 대조한다.
 wildcard tier 기본값은 없다. allowlist 항목에도 tier가 필요하며 manifest와 같아야 한다.
+`needs_display`는 B를 기존 foreground 실행기에 남길 OS별 사유를 담는다.
+예를 들어 `{"Darwin": "기존 Widget runner를 유지하는 근거"}`이며, B 외의 tier나
+선언의 OS 범위를 벗어난 키·빈 근거는 허용하지 않는다.
 
 `test_gate_coverage.py`는 Yee 선언 외에도 gate가 선택한 upstream 선언을 수집한다.
 분류 누락·삭제되거나 선택에서 빠진 manifest 항목·background의 C 선택·C의
 OS별 소유 gate foreground/all 연결 누락을 실패로 처리한다. Header·Sidebar·layout·Projects의
 기존 모드와 `all`, layout의 `horizontal`, 세 실행 tier를 Darwin·Linux·Windows
 가짜 환경에서 평가한다. tier별 필터의 교집합이 비고 합집합이 전체 필터의 선택과
-같은지 확인하며 A 전용 실행의 display/종료 helper 호출도 막는다.
+같은지 확인한다. background 전체의 display/종료 helper 호출과 `needs_display` 선택을 막고,
+예외가 OS별 소유 gate의 foreground/all에 남아 있는지도 검사한다.
 
 필터 출력은 실제 개발 환경이나 native 실행 파일 없이 확인할 수 있다.
 
@@ -145,5 +155,12 @@ OS별 소유 gate foreground/all 연결 누락을 실패로 처리한다. Header
 ```
 
 이 검사는 실제 창·포커스·입력 격리나 native 테스트 통과를 증명하지 않는다.
-B는 현재 실행기를 유지하며 Yee 소유 headless main 전환과 검수는 다음 배치의 범위다.
+`test_background_test.py`는 실제 GUI 대신 가짜 자식·JSON으로 격리 프로필·PID 재사용,
+macOS 임시 경로 환경 변수, 프로필 인수가 없는 자식 정리, 관찰 옵션, 목록 조회와 실행의
+관찰 범위, 불완전한 관찰의 실패 판정을 검사한다. macOS에서는 Swift 판정 코드를 별도로
+컴파일해 고아 자식의 세션 소유권과 최소화·다른 Space 창의 생존 비교를 확인한다.
+일시적인 무관 앱의 identity 누락과 종료 중인 자체 helper는 실패로 세지 않는지,
+시작 앱의 실제 종료는 캡처한 identity로 손실을 보고하는지 검사한다. 전체 프로세스·그룹
+조회의 실패와 빈 목록을 구분하고, 이후 조회가 성공해도 실패 사유와 공백 횟수가 남는지 확인한다.
+이 fixture는 AppKit 관찰이나 실제 창·입력을 시작하지 않는다.
 Foreground 실행 조건은 [개발 도구 안내](../../tools/dev/README.md#background와-foreground-tier)를 따른다.

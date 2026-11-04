@@ -37,8 +37,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
 fi
 
 if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
-  print "Running Header unit regressions without opening a browser window."
-  print "Native View tests still require access to the active GUI session."
+  print "Running Header unit regressions: tier=$YEE_TEST_TIER."
   run_tiered_native_test_gate "$YEE_OUT_DIR/yee_header_unittests" \
     --gtest_filter="$UNIT_FILTER" \
     --test-launcher-jobs=1 \
@@ -46,7 +45,7 @@ if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
 fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
-  print "Interactive Header regressions open real Yee windows and may take focus."
+  print "Running interactive Header regressions: tier=$YEE_TEST_TIER."
   run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \

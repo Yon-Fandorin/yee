@@ -5,30 +5,30 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
-build_tests=true
 test_ui="${YEE_TEST_UI:-off}"
 test_filter='ExtensionsBrowserTest.*:HistoryBrowserTest.*:BookmarksBrowserTest.*:DownloadsBrowserTest.*:InternalURLsBrowserTest.*'
+typeset -a tier_arguments=()
 for argument in "$@"; do
   case "$argument" in
-    --no-build) build_tests=false ;;
     --ui=on) test_ui=on ;;
     --ui=off) test_ui=off ;;
     --filter=*) test_filter="${argument#--filter=}" ;;
-    *)
-      print -u2 "Usage: $0 [--no-build] [--ui=off|on] [--filter=PATTERN]"
-      exit 2
-      ;;
+    *) tier_arguments+=("$argument") ;;
   esac
 done
 if [[ "$test_ui" != on && "$test_ui" != off ]]; then
-  print -u2 "YEE_TEST_UI must be off or on."
+  print -u2 'YEE_TEST_UI must be off or on.'
   exit 2
 fi
-
-require_depot_tools
-require_chromium_src
-require_yee_output_selection
-if [[ "$build_tests" == true ]]; then
+# --ui=on은 기존 표시형 실행을 유지한다. 명시한 tier가 있으면 그 선택을 따른다.
+[[ "$test_ui" == on ]] && tier_arguments=(--tier=all "${tier_arguments[@]}")
+configure_test_tiers "" "" "${tier_arguments[@]}"
+if [[ "$PRINT_FILTERS" == false ]]; then
+  require_depot_tools
+  require_chromium_src
+  require_yee_output_selection
+fi
+if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the focused Internal Pages browser gate"
   sync_yee_ui_sources
   sync_yee_branding
@@ -39,23 +39,14 @@ if [[ "$build_tests" == true ]]; then
     components/yee_branding:internal_urls_unittests "${mac_targets[@]}"
 fi
 
-typeset -a browser_test_args=()
-if [[ "$test_ui" == off ]]; then
-  print "Running Internal Pages without visible windows."
-  browser_test_args=(--headless --allow-chrome-scheme-url --disable-gpu)
-else
-  print "Running Internal Pages with visible windows; tests may take focus."
-  prepare_ui_test_display
-  browser_test_args=("${YEE_UI_TEST_WINDOW_ARGS[@]}")
-  gracefully_quit_yee
-fi
-
-run_native_test_gate "$YEE_OUT_DIR/internal_urls_unittests" --gtest_filter='*' --test-launcher-jobs=1
+run_tiered_native_test_gate "$YEE_OUT_DIR/internal_urls_unittests" --gtest_filter='*' --test-launcher-jobs=1
 if [[ "$(uname -s)" == Darwin ]]; then
-  run_native_test_gate "$YEE_OUT_DIR/mac_identity_unittests" --gtest_filter='*' --test-launcher-jobs=1
+  run_tiered_native_test_gate "$YEE_OUT_DIR/mac_identity_unittests" --gtest_filter='*' --test-launcher-jobs=1
 fi
-run_native_test_gate "$YEE_OUT_DIR/site_controls_browsertests" \
-  "${browser_test_args[@]}" \
+typeset -a browser_arguments=()
+[[ "$YEE_TEST_TIER" == background ]] && browser_arguments+=(--allow-chrome-scheme-url)
+run_tiered_native_test_gate --display "$YEE_OUT_DIR/site_controls_browsertests" \
+  "${browser_arguments[@]}" \
   "--gtest_filter=$test_filter" \
   --test-launcher-jobs=1 \
   --test-launcher-retry-limit=0

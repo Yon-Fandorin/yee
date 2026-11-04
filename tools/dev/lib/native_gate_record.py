@@ -9,16 +9,20 @@ import os
 from pathlib import Path
 import re
 import signal
+import shutil
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
 from native_test_discovery import check_test_listing
+from background_test import BackgroundObserver, run_background_command
 
 
 XML_MISMATCH = 21
 RECORD_ERROR = 22
+OBSERVATION_FAILED = 23
 
 
 def utc_now():
@@ -179,24 +183,46 @@ def run_gate(args):
               'gtest_filter': filters[0], 'discovery': None,
               'exit_code': None, 'gate_exit_code': RECORD_ERROR, 'xml': None, 'phase': 'prepare',
               'interrupted': False}
+    background = args.tier == 'background'
+    runtime = None
+    record.update(tier=args.tier, backend='headless' if '--headless' in arguments else 'native',
+                  isolated_runtime=None,
+                  observation=None)
+    observer = None
     result = RECORD_ERROR
 
     def record_interrupt(signum, frame):
-        # 같은 프로세스 그룹의 자식도 SIGINT를 받는다. 정리가 끝날 때까지 종료를 기다린다.
+        # background 전용 세션도 정리한 뒤 종료 코드와 관찰 결과를 기록한다.
         record['interrupted'] = True
 
     previous_handler = signal.signal(signal.SIGINT, record_interrupt)
+    previous_terminate_handler = signal.signal(signal.SIGTERM, record_interrupt) if background else None
     try:
         record['source'] = source_identity(args.repo_root)
         record['binary'] = binary_identity(binary, parent)
         save_json(directory / 'record.json', record)
         if record['interrupted']:
             return 130
+        if background:
+            # 긴 로그 경로를 TMPDIR로 쓰면 macOS의 Unix socket 경로 한도를 넘을 수 있다.
+            runtime = Path(tempfile.mkdtemp(prefix='yee-bg-', dir='/private/tmp' if sys.platform == 'darwin' else None))
+            record['isolated_runtime'] = str(runtime)
+        if args.observe_background:
+            observer = BackgroundObserver(args.repo_root / 'tools/dev/observe-background.swift',
+                                          args.build_root.resolve(), directory)
+        if record['interrupted']:
+            return 130
         record['phase'] = 'discovery'
-        listing = subprocess.Popen([str(binary), *arguments, '--gtest_list_tests'],
-                                   stdout=subprocess.PIPE, text=True, encoding='utf-8-sig', errors='replace')
-        listing_stdout, _ = listing.communicate()
-        record['listing_exit_code'] = shell_exit_code(listing.returncode)
+        if background:
+            code, listing_stdout = run_background_command(
+                [str(binary), *arguments, '--gtest_list_tests'], runtime / 'discovery',
+                lambda: record['interrupted'], capture=True, observer=observer)
+        else:
+            listing = subprocess.Popen([str(binary), *arguments, '--gtest_list_tests'],
+                                       stdout=subprocess.PIPE, text=True, encoding='utf-8-sig', errors='replace')
+            listing_stdout, _ = listing.communicate()
+            code = listing.returncode
+        record['listing_exit_code'] = shell_exit_code(code)
         (directory / 'listing.txt').write_text(listing_stdout, encoding='utf-8')
         if record['interrupted']:
             record['exit_code'] = record['listing_exit_code']
@@ -216,8 +242,13 @@ def run_gate(args):
             save_json(directory / 'record.json', record)
             if record['interrupted']:
                 return 130
-            execution = subprocess.Popen([str(binary), *arguments])
-            result = record['exit_code'] = shell_exit_code(execution.wait())
+            if background:
+                code, _ = run_background_command([str(binary), *arguments], runtime / 'execution',
+                                                  lambda: record['interrupted'], observer=observer)
+            else:
+                execution = subprocess.Popen([str(binary), *arguments])
+                code = execution.wait()
+            result = record['exit_code'] = shell_exit_code(code)
             record['xml'] = summarize_xml(location, is_directory, binary, before)
             xml = record['xml']
             if result == 0 and (xml.get('error') or not xml.get('tests')
@@ -231,6 +262,24 @@ def run_gate(args):
         if not record['exit_code']:
             result = RECORD_ERROR
     finally:
+        if runtime and not any(runtime.iterdir()):
+            shutil.rmtree(runtime)
+        if observer:
+            try:
+                record['observation'] = observer.finish()
+                for note in record['observation'].get('notes', []):
+                    print(f'background observation note: {note}', file=sys.stderr)
+                if not record['observation']['passed']:
+                    status = 'tests passed' if result == 0 else f'native gate failed ({result})'
+                    print(f'{status}; {observation_failure(record["observation"])}', file=sys.stderr)
+                if not record['observation']['passed'] and result == 0:
+                    result = OBSERVATION_FAILED
+            except (OSError, ValueError) as error:
+                record['observation'] = {'error': str(error), 'passed': False}
+                status = 'tests passed' if result == 0 else f'native gate failed ({result})'
+                print(f'{status}; observation incomplete: {error}', file=sys.stderr)
+                if result == 0:
+                    result = OBSERVATION_FAILED
         if record['interrupted']:
             if record['exit_code'] is None:
                 record['exit_code'] = 130
@@ -245,7 +294,16 @@ def run_gate(args):
                 result = RECORD_ERROR
         finally:
             signal.signal(signal.SIGINT, previous_handler)
+            if background:
+                signal.signal(signal.SIGTERM, previous_terminate_handler)
     return result
+
+
+def observation_failure(summary):
+    if not summary.get('observation_complete'):
+        reasons = list(summary.get('incomplete_reasons', []))
+        return 'observation incomplete: ' + '; '.join(reasons or ['observer coverage unavailable'])
+    return 'background interference observed'
 
 
 def shell_exit_code(returncode):
@@ -260,9 +318,13 @@ def main():
     parser.add_argument('--root-explicit', choices=('true', 'false'), required=True)
     parser.add_argument('--out-explicit', choices=('true', 'false'), required=True)
     parser.add_argument('--pid', type=int, required=True)
+    parser.add_argument('--tier', choices=('background', 'foreground', 'all'), default='foreground')
+    parser.add_argument('--observe-background', action='store_true')
     parser.add_argument('binary', type=Path)
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.observe_background and args.tier != 'background':
+        parser.error('--observe-background는 --tier=background에서만 사용할 수 있다.')
     try:
         return run_gate(args)
     except (OSError, ValueError) as error:

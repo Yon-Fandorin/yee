@@ -79,7 +79,12 @@ clip root는 필요한 최소 구조를 유지하고, View 연결의 `CHECK`는 
 ## 테스트와 패치 유지 방식
 
 Yee 소유의 선택형 interactive 테스트 실행 파일을 두고
-`chrome/test/base/interactive_ui_tests_main.cc`를 재사용한다.
+Yee 소유 `browser/ui/interactive_ui_tests_main.cc`를 컴파일한다.
+foreground는 upstream 초기화·전면화 동작을 유지하고, background는 headless를 사용하며
+전면화 등록·modifier 정리·always-on-top 창 종료를 제외한다.
+`site_controls_browsertests`도 Yee 소유 `browser/ui/browser_tests_main.cc`를 사용한다.
+두 main은 macOS background에서만 테스트 전용 target의 NSApplication 활성화 차단을
+설치한다. Chromium 원본 main과 Widget의 창 표시 경로는 수정하지 않는다.
 `chrome/test/BUILD.gn`의 `captured_sites_interactive_tests`와
 `accessibility_live_site_tests`가 같은 main을 쓰는 선례다. 오버레이에는 이미
 [`browser/ui/BUILD.gn`](../browser/ui/BUILD.gn)의 `site_controls_browsertests`처럼

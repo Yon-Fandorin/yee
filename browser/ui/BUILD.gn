@@ -380,6 +380,24 @@ source_set("yee_ui") {
   ]
 }
 
+# 두 Yee browser test main의 macOS background 활성화 차단만
+# 공유한다.
+if (is_mac) {
+  source_set("background_browser_test_support") {
+    testonly = true
+    visibility = [
+      ":site_controls_browsertests",
+      ":yee_interactive_ui_tests",
+    ]
+    sources = [
+      "background_browser_test_support.h",
+      "background_browser_test_support_mac.mm",
+    ]
+    deps = [ "//base" ]
+    frameworks = [ "AppKit.framework" ]
+  }
+}
+
 # Keep Site Controls, internal URL and renderer-policy checks independent of the
 # full browser_tests/interactive_ui_tests source lists.
 test("site_controls_browsertests") {
@@ -389,6 +407,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc",
     "//chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc",
     "bookmarks/bookmarks_browsertest.cc",
+    "browser_tests_main.cc",
     "disclosure_arrow_unittest.cc",
     "downloads/downloads_browsertest.cc",
     "extensions/extensions_browsertest.cc",
@@ -457,7 +476,8 @@ test("site_controls_browsertests") {
     "//chrome/renderer",
     "//chrome/test:test_support",
     "//chrome/test:test_support_ui",
-    "//chrome/test/base:browser_tests_runner",
+    "//chrome/test/base:chrome_test_launcher",
+    "//chrome/test/base:chrome_test_suite",
     "//components/bookmarks/browser",
     "//components/bookmarks/common",
     "//components/bookmarks/managed",
@@ -497,11 +517,16 @@ test("site_controls_browsertests") {
     "//chrome:packed_resources",
     "//ui/resources:ui_test_pak_data",
   ]
+  if (is_chromeos) {
+    sources -= [ "browser_tests_main.cc" ]
+    deps += [ "//chrome/test/base:browser_tests_runner" ]
+  }
   if (is_mac) {
     sources += [
       "projects/project_navigation_browsertest_mac.mm",
       "projects/project_navigation_test_util.h",
     ]
+    deps += [ ":background_browser_test_support" ]
   }
   if (is_win) {
     sources += [
@@ -510,6 +535,7 @@ test("site_controls_browsertests") {
     deps += [
       "//chrome/browser/accessibility:test_support",
       "//chrome/browser/lifetime",
+      "//chrome/installer/util:strings",
       "//ui/aura:test_support",
     ]
   }
@@ -529,8 +555,8 @@ if (!is_chromeos_device) {
       "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.h",
-      "//chrome/test/base/interactive_ui_tests_main.cc",
       "browser_surface_interactive_uitest.cc",
+      "interactive_ui_tests_main.cc",
       "split_pane_interactive_uitest.cc",
     ]
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -635,6 +661,7 @@ if (!is_chromeos_device) {
         "//chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm",
       ]
       deps += [
+        ":background_browser_test_support",
         "//chrome/browser/ui:browser_commands_mac",
         "//chrome/browser/ui/views/frame:browser_native_widget_mac",
         "//chrome/browser/ui/views/frame:immersive_mode_controller_mac",
@@ -678,7 +705,8 @@ if (!is_chromeos_device) {
   }
 }
 
-# 선택할 원본 guard가 IS_WIN 안에 있으므로 Windows에서만 컴파일한다.
+# 선택할 원본 guard가 IS_WIN 안에 있으므로 Windows에서만
+# 컴파일한다.
 if (is_win && use_aura) {
   test("yee_aura_unittests") {
     use_xvfb = use_xvfb_in_this_config

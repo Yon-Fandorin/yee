@@ -39,8 +39,7 @@ GATE_MODES = {
     'test-sidebar.sh': [('unit',), ('interactive',), ('all',)],
     'test-site-controls.sh': [()],
 }
-TIERED_GATES = {'test-header.sh', 'test-sidebar.sh', 'test-browser-surface-layout.sh',
-               'test-projects.sh', 'test-site-controls.sh', 'test-omnibox-accessibility.sh'}
+TIERED_GATES = set(GATE_MODES)
 
 
 @dataclass
@@ -397,6 +396,22 @@ def tier_violations(inventory, manifest, targets, catalog, runs, allowlist=()):
                                and (key in allowlist or run.script == entry['owner'])
                                for run in matching):
                         errors.append(f'{tier}에 C가 없다 ({platform}): ' + key)
+        for platform in entry.get('needs_display', {}):
+            platform_runs = [run for run in matching
+                             if ('Windows' if run.platform.startswith(('MINGW', 'MSYS', 'CYGWIN'))
+                                 else run.platform) == platform]
+            if any(run.tier == 'background' for run in platform_runs):
+                errors.append(f'background가 needs_display를 선택한다 ({platform}): ' + key)
+            for tier in ('foreground', 'all'):
+                if key not in allowlist and not any(run.tier == tier and run.script == entry['owner']
+                                                   for run in platform_runs):
+                    errors.append(f'{tier}에 needs_display가 없다 ({platform}): ' + key)
+        if entry['tier'] in ('A', 'B') and key not in allowlist:
+            for platform in set(entry['os']) - entry.get('needs_display', {}).keys():
+                if not any(run.tier == 'background' and run.script == entry['owner']
+                           and ('Windows' if run.platform.startswith(('MINGW', 'MSYS', 'CYGWIN'))
+                                else run.platform) == platform for run in matching):
+                    errors.append(f'background에 {entry["tier"]}가 없다 ({platform}): ' + key)
     return sorted(errors)
 
 
@@ -612,16 +627,39 @@ class GateCoverageTest(unittest.TestCase):
             if run.tier != 'all':
                 continue
             partitions = []
+            def execution_arguments(arguments):
+                return [arg for arg in arguments if not arg.startswith('--gtest_filter=')
+                        and arg not in ('--headless', '--yee-test-tier=background', '--allow-chrome-scheme-url',
+                                        '--screen-info={1920x1080}', '--window-size=1280,900')]
             for tier in ('background', 'foreground'):
-                arguments = [arg for arg in run.arguments if not arg.startswith('--gtest_filter=')]
+                arguments = execution_arguments(run.arguments)
                 candidates = [other for other in self.runs
                               if (other.script, other.platform, other.mode, other.binary, other.tier) ==
                               (run.script, run.platform, run.mode, run.binary, tier)
-                              and [arg for arg in other.arguments if not arg.startswith('--gtest_filter=')] == arguments]
+                              and execution_arguments(other.arguments) == arguments]
                 partitions.append({name for name in expected
                                    if any(selected(name, False, other.arguments) for other in candidates)})
             self.assertFalse(partitions[0] & partitions[1], (run.script, run.mode, pattern))
             self.assertEqual(partitions[0] | partitions[1], expected, (run.script, run.mode, pattern))
+
+    def test_display_exception_requires_foreground_ownership_and_blocks_background(self):
+        """B 예외의 근거가 있어도 background 혼입·foreground 누락은 실패한다."""
+        key = 'area/test.cc::Fixture.Case'
+        inventory = {key: False}
+        manifest = {key: {'tier': 'B', 'os': ['Darwin'], 'owner': 'test-area.sh',
+                          'needs_display': {'Darwin': '기존 Widget runner'}}}
+        targets, catalog = {'area:small': ['area/test.cc']}, {'source_roots': []}
+        run = GateRun('test-area.sh', 'Darwin', 'small', ['--gtest_filter=Fixture.Case'], {'area:small'})
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, [run]), sorted([
+            'background가 needs_display를 선택한다 (Darwin): ' + key,
+            'foreground에 needs_display가 없다 (Darwin): ' + key,
+            'all에 needs_display가 없다 (Darwin): ' + key]))
+        runs = [GateRun(run.script, run.platform, run.binary, run.arguments, run.built, tier=tier)
+                for tier in ('foreground', 'all')]
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, runs), [])
+        manifest[key].pop('needs_display')
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, runs),
+                         ['background에 B가 없다 (Darwin): ' + key])
 
     def test_tier_resolution_preserves_os_parameters_and_negative_filters(self):
         manifest = {
@@ -670,6 +708,20 @@ class GateCoverageTest(unittest.TestCase):
                 checked += 1
                 self.assertFalse(run.display or run.shutdown, (run.script, run.mode, run.tier))
         self.assertGreater(checked, 0)
+
+    def test_background_runs_never_prepare_the_physical_display_or_quit_yee(self):
+        """목록·실행 인수는 background 정책을 전달하고 C의 기존 준비는 유지한다."""
+        if self.runs is None:
+            self.skipTest('gate 평가에 zsh가 필요하다')
+        for run in self.runs:
+            if run.tier == 'background':
+                self.assertFalse(run.display or run.shutdown, (run.script, run.mode))
+                self.assertIn('--yee-test-tier=background', run.arguments)
+                if run.binary in ('yee_interactive_ui_tests', 'site_controls_browsertests', 'browser_tests'):
+                    self.assertIn('--headless', run.arguments)
+            else:
+                self.assertNotIn('--yee-test-tier=background', run.arguments)
+                self.assertNotIn('--headless', run.arguments)
 
     def test_aura_guard_is_built_and_run_only_on_windows(self):
         if self.runs is None:

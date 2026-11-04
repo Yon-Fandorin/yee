@@ -48,7 +48,6 @@ fi
 
 if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
   print "Running Sidebar policy, geometry, and native View unit regressions."
-  print "Native popup/focus tests may activate test widgets in the GUI session."
   run_tiered_native_test_gate "$YEE_OUT_DIR/yee_layout_unittests" \
     --gtest_filter="$UNIT_FILTER" \
     --test-launcher-jobs=1 \
@@ -56,7 +55,7 @@ if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
 fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
-  print "Interactive Sidebar regressions open real Yee windows and may take focus."
+  print "Running interactive Sidebar regressions: tier=$YEE_TEST_TIER."
   run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
