@@ -422,15 +422,38 @@ struct AppliedWaitEvent {
   uint64_t sample_id = 0;
 };
 
+enum class AppliedConditionBlocker {
+  kNotEvaluated,
+  kUnsupported,
+  kOwnerDestroyed,
+  kDestroyedBeforeDispatch,
+  kNoCurrentSnapshot,
+  kOwnerMismatch,
+  kKindMismatch,
+  kValueMismatch,
+  kCoordinatesMismatch,
+  kRequestEpochMismatch,
+  kSerialRegression,
+  kApplyNotNew,
+  kObservationNotNew,
+  kNoSampleIdentity,
+  kNoObservedSample,
+  kObservationGroupNotLatched,
+};
+
 struct AppliedConditionDiagnostics {
   AppliedCondition condition;
   AppliedSerials baseline;
   AppliedSerials dispatch_fence;
+  AppliedSerials high_water;
+  AppliedSerials event_high_water;
   std::optional<AppliedSnapshot> last;
   std::optional<AppliedSnapshot> observed;
   bool satisfied = false;
   bool supported = true;
   bool owner_destroyed = false;
+  std::vector<AppliedConditionBlocker> blockers{
+      AppliedConditionBlocker::kNotEvaluated};
 };
 
 struct AppliedWaitDiagnostics {
@@ -440,6 +463,10 @@ struct AppliedWaitDiagnostics {
   base::TimeTicks captured_at;
   bool dispatched = false;
   bool dispatch_acknowledged = false;
+  bool deadline_expired = false;
+  base::TimeTicks evaluation_queued_at;
+  base::TimeTicks evaluated_at;
+  base::TimeDelta max_evaluation_delay;
   uint64_t evaluation_count = 0;
   uint64_t wake_count = 0;
   std::vector<AppliedConditionDiagnostics> conditions;

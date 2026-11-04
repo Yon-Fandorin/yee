@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -71,6 +72,7 @@ void Write(std::ostream& out, const std::vector<T>& values) {
 
 class Fields {
  public:
+  Fields() { out_.precision(std::numeric_limits<double>::max_digits10); }
   template <typename T>
   Fields& Add(const char* name, const T& value) {
     out_ << name << '=';
@@ -186,6 +188,7 @@ class Request {
       diagnostics_.conditions.push_back(std::move(diagnostic));
     }
     high_water_.resize(conditions_.size());
+    event_high_water_.resize(conditions_.size());
     Record(AppliedEventKind::kBegin);
   }
 
@@ -206,6 +209,9 @@ class Request {
     std::vector<AppliedSignalKey> keys;
     for (auto& diagnostic : diagnostics_.conditions) {
       diagnostic.supported = source_->Supports(diagnostic.condition);
+      if (!diagnostic.supported) {
+        diagnostic.blockers = {AppliedConditionBlocker::kUnsupported};
+      }
       supported &= diagnostic.supported;
       keys.push_back(KeyFor(diagnostic.condition));
     }
@@ -224,12 +230,24 @@ class Request {
         diagnostics_.conditions[i].baseline = snapshot->serials;
         diagnostics_.conditions[i].last = snapshot;
         high_water_[i] = snapshot->serials;
+        event_high_water_[i] = snapshot->serials;
+        diagnostics_.conditions[i].high_water = snapshot->serials;
+        diagnostics_.conditions[i].event_high_water = snapshot->serials;
       }
       diagnostics_.ticket.baselines.push_back(
           {key, diagnostics_.conditions[i].baseline});
     }
     for (const auto& owner : ticket().owner_tokens) {
       if (!source_->IsOwnerAlive(owner)) {
+        for (auto& diagnostic : diagnostics_.conditions) {
+          if (diagnostic.condition.owner == owner) {
+            diagnostic.owner_destroyed = true;
+            diagnostic.blockers = {
+                ExpectsDestruction(diagnostic.condition)
+                    ? AppliedConditionBlocker::kDestroyedBeforeDispatch
+                    : AppliedConditionBlocker::kOwnerDestroyed};
+          }
+        }
         Finish(AppliedResultKind::kOwnerDestroyed);
         return;
       }
@@ -265,6 +283,8 @@ class Request {
         Accept(i, *snapshot, true);
       }
       diagnostics_.conditions[i].dispatch_fence = high_water_[i];
+      event_high_water_[i] = high_water_[i];
+      diagnostics_.conditions[i].event_high_water = high_water_[i];
     }
     pending_samples_.clear();
     diagnostics_.dispatched = true;
@@ -312,6 +332,7 @@ class Request {
       return;
     }
     Record(AppliedEventKind::kTerminal);
+    diagnostics_.deadline_expired = kind == AppliedResultKind::kTimedOut;
     StopWork();
     result_ = AppliedWaitResult{kind, Diagnostics()};
     ScheduleDelivery();
@@ -383,19 +404,31 @@ class Request {
 
   bool Accept(size_t index, const AppliedSnapshot& snapshot, bool from_read) {
     auto& diagnostic = diagnostics_.conditions[index];
+    diagnostic.last = snapshot;
     if (!HasKey(snapshot, KeyFor(conditions_[index]))) {
       return false;
     }
-    diagnostic.last = snapshot;
-    if (!SerialsAtLeast(snapshot.serials, high_water_[index]) ||
+    // 비동기로 전달한 적용 당시 표본은 현재값 재조회보다 늦게 도착할 수 있다.
+    // 이벤트끼리의 역행만 거부하고 Current의 watermark와 구분한다.
+    auto& watermark = from_read ? high_water_[index] : event_high_water_[index];
+    if (!SerialsAtLeast(snapshot.serials, watermark) ||
         (!from_read && snapshot.serials.observation_sequence ==
-                           high_water_[index].observation_sequence)) {
+                           watermark.observation_sequence)) {
       Record(AppliedEventKind::kStaleSignal, snapshot.owner,
              GetAppliedConditionKind(snapshot.value), snapshot.serials,
              snapshot.sample_id);
       return false;
     }
-    high_water_[index] = snapshot.serials;
+    watermark = snapshot.serials;
+    auto& current = high_water_[index];
+    current.apply_serial =
+        std::max(current.apply_serial, snapshot.serials.apply_serial);
+    current.native_generation =
+        std::max(current.native_generation, snapshot.serials.native_generation);
+    current.observation_sequence = std::max(
+        current.observation_sequence, snapshot.serials.observation_sequence);
+    diagnostic.high_water = high_water_[index];
+    diagnostic.event_high_water = event_high_water_[index];
     return true;
   }
 
@@ -451,39 +484,63 @@ class Request {
       return;
     }
     evaluation_queued_ = true;
+    diagnostics_.evaluation_queued_at = base::TimeTicks::Now();
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&Request::Evaluate, work_weak_.GetWeakPtr()));
   }
 
-  bool Matches(size_t index, const AppliedSnapshot& snapshot) const {
+  std::vector<AppliedConditionBlocker> MatchBlockers(
+      size_t index,
+      const AppliedSnapshot& snapshot) const {
+    using Blocker = AppliedConditionBlocker;
+    std::vector<Blocker> blockers;
     const auto& condition = conditions_[index];
     const auto& fence = diagnostics_.conditions[index].dispatch_fence;
-    if (!ValueMatches(condition.expected, snapshot.value) ||
-        condition.coordinates != snapshot.coordinates ||
-        (ticket().intent.request_epoch &&
-         ticket().intent.request_epoch != snapshot.request_epoch)) {
-      return false;
+    if (condition.owner != snapshot.owner) {
+      blockers.push_back(Blocker::kOwnerMismatch);
     }
-    if (condition.mode == AppliedEvaluationMode::kObservedSinceDispatch &&
-        (snapshot.sample_id == 0 ||
-         snapshot.serials.observation_sequence <= fence.observation_sequence)) {
-      return false;
+    if (GetAppliedConditionKind(condition.expected) !=
+        GetAppliedConditionKind(snapshot.value)) {
+      blockers.push_back(Blocker::kKindMismatch);
+    } else if (!ValueMatches(condition.expected, snapshot.value)) {
+      blockers.push_back(Blocker::kValueMismatch);
+    }
+    if (condition.coordinates != snapshot.coordinates) {
+      blockers.push_back(Blocker::kCoordinatesMismatch);
+    }
+    if (ticket().intent.request_epoch && snapshot.request_epoch &&
+        ticket().intent.request_epoch != snapshot.request_epoch) {
+      blockers.push_back(Blocker::kRequestEpochMismatch);
+    }
+    if (condition.mode == AppliedEvaluationMode::kObservedSinceDispatch) {
+      if (snapshot.sample_id == 0) {
+        blockers.push_back(Blocker::kNoSampleIdentity);
+      }
+      if (snapshot.serials.observation_sequence <= fence.observation_sequence) {
+        blockers.push_back(Blocker::kObservationNotNew);
+      }
     }
     if (diagnostics_.options.already_applied ==
         WaitOptions::AlreadyApplied::kAllowAlreadyApplied) {
-      return true;
+      return blockers;
     }
     switch (condition.freshness) {
       case AppliedFreshness::kNewApply:
-        return snapshot.serials.apply_serial > fence.apply_serial &&
-               snapshot.serials.observation_sequence >
-                   fence.observation_sequence;
+        if (snapshot.serials.apply_serial <= fence.apply_serial) {
+          blockers.push_back(Blocker::kApplyNotNew);
+        }
+        [[fallthrough]];
       case AppliedFreshness::kNewObservation:
-        return snapshot.serials.observation_sequence >
-               fence.observation_sequence;
+        if (snapshot.serials.observation_sequence <=
+                fence.observation_sequence &&
+            !std::ranges::contains(blockers, Blocker::kObservationNotNew)) {
+          blockers.push_back(Blocker::kObservationNotNew);
+        }
+        break;
       case AppliedFreshness::kCurrentAfterDispatch:
-        return true;
+        break;
     }
+    return blockers;
   }
 
   void LatchObservedSamples() {
@@ -502,7 +559,7 @@ class Request {
         const auto& first = sample[indices.front()];
         if (!first || !std::ranges::all_of(indices, [&](size_t i) {
               return sample[i] && sample[i]->sample_id == first->sample_id &&
-                     Matches(i, *sample[i]);
+                     MatchBlockers(i, *sample[i]).empty();
             })) {
           continue;
         }
@@ -517,9 +574,15 @@ class Request {
   void Evaluate() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     evaluation_queued_ = false;
+    diagnostics_.evaluated_at = base::TimeTicks::Now();
+    if (!diagnostics_.evaluation_queued_at.is_null()) {
+      diagnostics_.max_evaluation_delay = std::max(
+          diagnostics_.max_evaluation_delay,
+          diagnostics_.evaluated_at - diagnostics_.evaluation_queued_at);
+      diagnostics_.evaluation_queued_at = {};
+    }
     ++diagnostics_.evaluation_count;
     Record(AppliedEventKind::kEvaluate);
-    std::vector<std::optional<AppliedSnapshot>> current(conditions_.size());
     for (size_t i = 0; i < conditions_.size(); ++i) {
       const auto& condition = conditions_[i];
       if (!source_->IsOwnerAlive(condition.owner)) {
@@ -532,8 +595,15 @@ class Request {
       diagnostic.owner_destroyed = destroyed_.contains(condition.owner);
       if (!diagnostic.owner_destroyed) {
         const auto snapshot = source_->Read(KeyFor(condition));
-        if (snapshot && Accept(i, *snapshot, true)) {
-          current[i] = snapshot;
+        if (snapshot) {
+          const bool accepted = Accept(i, *snapshot, true);
+          diagnostic.blockers = MatchBlockers(i, *snapshot);
+          if (!accepted && HasKey(*snapshot, KeyFor(condition))) {
+            diagnostic.blockers.push_back(
+                AppliedConditionBlocker::kSerialRegression);
+          }
+        } else {
+          diagnostic.blockers = {AppliedConditionBlocker::kNoCurrentSnapshot};
         }
       }
     }
@@ -545,11 +615,28 @@ class Request {
         diagnostic.satisfied =
             ExpectsDestruction(conditions_[i]) &&
             destroyed_after_dispatch_.contains(conditions_[i].owner);
+        diagnostic.blockers.clear();
+        if (!diagnostic.satisfied) {
+          diagnostic.blockers.push_back(
+              ExpectsDestruction(conditions_[i])
+                  ? AppliedConditionBlocker::kDestroyedBeforeDispatch
+                  : AppliedConditionBlocker::kOwnerDestroyed);
+        }
       } else if (conditions_[i].mode ==
                  AppliedEvaluationMode::kObservedSinceDispatch) {
         diagnostic.satisfied = diagnostic.observed.has_value();
+        if (diagnostic.satisfied) {
+          diagnostic.blockers.clear();
+        } else {
+          if (diagnostic.blockers.empty()) {
+            diagnostic.blockers.push_back(
+                AppliedConditionBlocker::kObservationGroupNotLatched);
+          }
+          diagnostic.blockers.push_back(
+              AppliedConditionBlocker::kNoObservedSample);
+        }
       } else {
-        diagnostic.satisfied = current[i] && Matches(i, *current[i]);
+        diagnostic.satisfied = diagnostic.blockers.empty();
       }
       all_satisfied &= diagnostic.satisfied;
     }
@@ -614,6 +701,7 @@ class Request {
   const AppliedConditions conditions_;
   AppliedWaitDiagnostics diagnostics_;
   std::vector<AppliedSerials> high_water_;
+  std::vector<AppliedSerials> event_high_water_;
   std::vector<std::vector<std::optional<AppliedSnapshot>>> pending_samples_;
   std::set<AppliedOwnerToken> destroyed_;
   std::set<AppliedOwnerToken> destroyed_after_dispatch_;
@@ -770,6 +858,27 @@ std::string AppliedWaitDiagnostics::ToString() const {
                                                     "native"};
   constexpr std::array<const char*, 3> kPlatforms = {"macOS", "Linux",
                                                      "Windows"};
+  constexpr std::array<const char*, 3> kFreshness = {
+      "NewApply", "NewObservation", "CurrentAfterDispatch"};
+  constexpr std::array<const char*, 2> kModes = {"Current",
+                                                 "ObservedSinceDispatch"};
+  constexpr std::array<const char*, 16> kBlockers = {
+      "not-evaluated",
+      "unsupported",
+      "owner-destroyed",
+      "owner-destroyed-before-dispatch",
+      "no-current-snapshot",
+      "owner-mismatch",
+      "kind-mismatch",
+      "value-mismatch",
+      "coordinates-mismatch",
+      "request-epoch-mismatch",
+      "serial-regression",
+      "freshness:apply-not-new",
+      "freshness:observation-not-new",
+      "mode:no-sample-identity",
+      "mode:no-observed-sample",
+      "mode:observation-group-not-latched"};
   std::ostringstream out;
   out << "test=" << options.test_name << " parameter=" << options.parameter
       << " tier=" << kTiers[static_cast<int>(options.tier)]
@@ -782,7 +891,28 @@ std::string AppliedWaitDiagnostics::ToString() const {
       << " elapsed_ms=" << (captured_at - began_at).InMillisecondsF()
       << " budget_ms=" << (options.deadline - began_at).InMillisecondsF()
       << " dispatched=" << dispatched << " ACK=" << dispatch_acknowledged
-      << " evaluations=" << evaluation_count << " wakes=" << wake_count << '\n';
+      << " evaluations=" << evaluation_count << " wakes=" << wake_count
+      << " evaluated_ms="
+      << (evaluated_at.is_null() ? -1
+                                 : (evaluated_at - began_at).InMillisecondsF())
+      << " queued_ms="
+      << (evaluation_queued_at.is_null()
+              ? -1
+              : (captured_at - evaluation_queued_at).InMillisecondsF())
+      << " max_evaluation_delay_ms=" << max_evaluation_delay.InMillisecondsF()
+      << '\n';
+  out << "completion_blockers=[";
+  if (!dispatched)
+    out << "not-dispatched,";
+  if (!dispatch_acknowledged)
+    out << "ACK-pending,";
+  if (deadline_expired)
+    out << "deadline-exceeded,";
+  if (std::ranges::any_of(conditions, [](const auto& diagnostic) {
+        return !diagnostic.satisfied;
+      }))
+    out << "conditions-unmet,";
+  out << "]\n";
   if (ticket.intent.request_epoch) {
     out << "request_epoch=" << *ticket.intent.request_epoch << '\n';
   }
@@ -791,22 +921,30 @@ std::string AppliedWaitDiagnostics::ToString() const {
     out << kConditionNames[static_cast<int>(
                GetAppliedConditionKind(condition.expected))]
         << " owner=" << condition.owner.ToString()
-        << " freshness=" << static_cast<int>(condition.freshness)
-        << " mode=" << static_cast<int>(condition.mode)
+        << " freshness=" << kFreshness[static_cast<int>(condition.freshness)]
+        << " mode=" << kModes[static_cast<int>(condition.mode)]
         << " group=" << condition.observation_group
         << " supported=" << diagnostic.supported
         << " satisfied=" << diagnostic.satisfied
-        << " destroyed=" << diagnostic.owner_destroyed << '\n'
-        << " expected: " << FormatAppliedValue(condition.expected)
+        << " destroyed=" << diagnostic.owner_destroyed << " blockers=[";
+    for (auto blocker : diagnostic.blockers)
+      out << kBlockers[static_cast<int>(blocker)] << ',';
+    out << "]\n expected: " << FormatAppliedValue(condition.expected)
         << FormatCoordinates(condition.coordinates) << '\n'
         << " baseline: " << FormatSerials(diagnostic.baseline) << '\n'
         << " dispatch_fence: " << FormatSerials(diagnostic.dispatch_fence)
+        << '\n'
+        << " high_water: " << FormatSerials(diagnostic.high_water) << '\n'
+        << " event_high_water: " << FormatSerials(diagnostic.event_high_water)
         << '\n';
     const auto write_snapshot = [&](const char* label,
                                     const std::optional<AppliedSnapshot>& s) {
       out << label << ": ";
       if (s) {
-        out << FormatAppliedValue(s->value) << FormatSerials(s->serials)
+        out << "owner=" << s->owner.ToString() << " kind="
+            << kConditionNames[static_cast<int>(
+                   GetAppliedConditionKind(s->value))]
+            << ' ' << FormatAppliedValue(s->value) << FormatSerials(s->serials)
             << "sample=" << s->sample_id << ' '
             << FormatCoordinates(s->coordinates);
         if (s->request_epoch) {
@@ -998,7 +1136,8 @@ AppliedWaitResult AppliedWaitSession::WaitForApplied(
     return InvalidResult(ticket, nullptr);
   }
   std::optional<AppliedWaitResult> result;
-  base::RunLoop loop;
+  // 테스트 본문이 task에서 실행되어도 평가·배달 task를 처리해야 한다.
+  base::RunLoop loop(base::RunLoop::Type::kNestableTasksAllowed);
   if (!request->Observe(base::BindOnce(
           [](std::optional<AppliedWaitResult>* result, base::OnceClosure quit,
              AppliedWaitResult outcome) {

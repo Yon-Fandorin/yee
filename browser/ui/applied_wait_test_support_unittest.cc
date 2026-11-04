@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/views/yee/applied_wait_test_support.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <set>
 #include <type_traits>
@@ -12,6 +13,9 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/location.h"
+#include "base/run_loop.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
@@ -34,6 +38,8 @@ class FakeSignalSource : public AppliedSignalSource {
   std::optional<AppliedSnapshot> Read(
       const AppliedSignalKey& key) const override {
     ++read_count;
+    if (read_override)
+      return read_override;
     const auto it = states_.find({key.owner, key.kind});
     return it == states_.end() ? std::nullopt : std::make_optional(it->second);
   }
@@ -71,6 +77,10 @@ class FakeSignalSource : public AppliedSignalSource {
         std::move(snapshot);
   }
 
+  void Erase(const AppliedSignalKey& key) {
+    states_.erase({key.owner, key.kind});
+  }
+
   void Emit(std::vector<AppliedSnapshot> snapshots) {
     for (const auto& snapshot : snapshots) {
       Set(snapshot);
@@ -87,6 +97,7 @@ class FakeSignalSource : public AppliedSignalSource {
   mutable size_t read_count = 0;
   std::set<AppliedConditionKind> unsupported;
   base::OnceClosure on_subscribe;
+  std::optional<AppliedSnapshot> read_override;
 
  private:
   std::set<AppliedOwnerToken> alive_;
@@ -321,8 +332,13 @@ TEST_F(AppliedWaitTest, UnexpectedOwnerDestructionIsTerminal) {
   const auto ticket = Begin(conditions);
   Dispatch(ticket,
            base::BindLambdaForTesting([&] { source_.Destroy(owner_); }));
-  EXPECT_EQ(AppliedResultKind::kOwnerDestroyed,
-            session_.WaitForApplied(ticket, conditions).kind);
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kOwnerDestroyed, result.kind);
+  EXPECT_EQ(
+      std::vector<AppliedConditionBlocker>{
+          AppliedConditionBlocker::kOwnerDestroyed},
+      result.diagnostics.conditions[0].blockers);
+  EXPECT_NE(std::string::npos, result.ToString().find("owner-destroyed,"));
 }
 
 TEST_F(AppliedWaitTest, ExpectedViewDestructionAndWidgetCloseLatchSuccess) {
@@ -375,8 +391,14 @@ TEST_F(AppliedWaitTest, DestructionBeforeDispatchIsNotExpectedDestruction) {
   const auto ticket = Begin(conditions);
   source_.Destroy(owner_);
   Dispatch(ticket, base::DoNothing());
-  EXPECT_EQ(AppliedResultKind::kOwnerDestroyed,
-            session_.WaitForApplied(ticket, conditions).kind);
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kOwnerDestroyed, result.kind);
+  EXPECT_EQ(
+      std::vector<AppliedConditionBlocker>{
+          AppliedConditionBlocker::kDestroyedBeforeDispatch},
+      result.diagnostics.conditions[0].blockers);
+  EXPECT_NE(std::string::npos,
+            result.ToString().find("owner-destroyed-before-dispatch"));
 }
 
 TEST_F(AppliedWaitTest,
@@ -559,6 +581,34 @@ TEST_F(AppliedWaitTest,
             session_.WaitForApplied(current, current_conditions).kind);
 }
 
+TEST_F(AppliedWaitTest, DeferredObservedSampleSurvivesNewerCurrentRead) {
+  auto condition = Condition(AnimationMatches{19, true, 0, 1});
+  condition.mode = AppliedEvaluationMode::kObservedSinceDispatch;
+  source_.Set(Snapshot(owner_, AnimationMatches{19, false, 0, 0}));
+  const AppliedConditions conditions{condition};
+  const auto ticket = Begin(conditions, AppliedDomain::kAnimation);
+  Dispatch(
+      ticket, base::BindLambdaForTesting([&] {
+        // 현재값은 이미 idle이어도 뒤따르는 callback은 실제 running 표본이다.
+        source_.Set(Snapshot(owner_, AnimationMatches{19, false, 1, 1}, 3));
+        tasks_.GetMainThreadTaskRunner()->PostTask(
+            FROM_HERE, base::BindLambdaForTesting([&] {
+              source_.Emit(
+                  {Snapshot(owner_, AnimationMatches{19, true, 0.5, 0.5}, 2)});
+              source_.Set(
+                  Snapshot(owner_, AnimationMatches{19, false, 1, 1}, 3));
+            }));
+      }));
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+  ASSERT_TRUE(result.diagnostics.conditions[0].observed);
+  EXPECT_EQ(2u,
+            result.diagnostics.conditions[0].observed->serials.apply_serial);
+  EXPECT_FALSE(
+      std::get<AnimationMatches>(result.diagnostics.conditions[0].last->value)
+          .running);
+}
+
 TEST_F(AppliedWaitTest, ObservedGroupRequiresAllValuesInOneSample) {
   auto animation = Condition(AnimationMatches{9, true, 0.2, 0.8});
   auto page = Condition(Page(200));
@@ -721,6 +771,12 @@ TEST_F(AppliedWaitTest,
   const auto result = session_.WaitForApplied(ticket, conditions);
   EXPECT_EQ(AppliedResultKind::kUnsupportedCondition, result.kind);
   EXPECT_EQ(0u, result.diagnostics.evaluation_count);
+  EXPECT_EQ(
+      std::vector<AppliedConditionBlocker>{
+          AppliedConditionBlocker::kUnsupported},
+      result.diagnostics.conditions[0].blockers);
+  EXPECT_NE(std::string::npos,
+            result.ToString().find("blockers=[unsupported,"));
   EXPECT_NE(std::string::npos, result.ToString().find("last: unsupported"));
 }
 
@@ -743,6 +799,24 @@ TEST_F(AppliedWaitTest, RequestEpochMustMatchWhenProductProvidesCorrelation) {
   snapshot.request_epoch = 77;
   source_.Emit({snapshot});
   EXPECT_EQ(AppliedResultKind::kApplied, future.Get().kind);
+}
+
+TEST_F(AppliedWaitTest, SurfaceEpochCombinesWithIndependentlySerialedPageHost) {
+  const SurfaceEpochCommitted epoch{
+      77, SurfaceEpochCommitted::Phase::kStable, 77,
+      SurfaceEpochCommitted::Destination::kFullscreen};
+  const AppliedConditions conditions{Condition(epoch),
+                                     Condition(Page(), other_)};
+  auto intent = Intent(conditions, AppliedDomain::kSurface);
+  intent.request_epoch = 77;
+  const auto ticket = session_.BeginRequest(intent, conditions, Options());
+  Dispatch(ticket, base::BindLambdaForTesting([&] {
+             auto surface = Snapshot(owner_, epoch, 2);
+             surface.request_epoch = 77;
+             source_.Emit({surface, Snapshot(other_, Page(), 2)});
+           }));
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
 }
 
 TEST_F(AppliedWaitTest, InvalidForeignAndMutatedTicketsCannotDispatchOrWait) {
@@ -959,10 +1033,212 @@ TEST_F(AppliedWaitTest, TimeoutDiagnosticsRecomputeSatisfactionFromFinalRead) {
     const auto result = session_.WaitForApplied(ticket, conditions);
     EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
     EXPECT_EQ(!initially_matches, result.diagnostics.conditions[0].satisfied);
+    EXPECT_NE(std::string::npos,
+              result.ToString().find("ACK-pending,deadline-exceeded,"));
     EXPECT_EQ(Page(initially_matches ? 100 : 200),
               std::get<PageHostsApplied>(
                   result.diagnostics.conditions[0].last->value));
   }
+}
+
+TEST_F(AppliedWaitTest, UnmetDiagnosticsExplainValueCoordinatesAndEpoch) {
+  using Blocker = AppliedConditionBlocker;
+  const auto blockers = std::to_array<Blocker>(
+      {Blocker::kValueMismatch, Blocker::kCoordinatesMismatch,
+       Blocker::kRequestEpochMismatch});
+  const auto labels = std::to_array<const char*>(
+      {"value-mismatch", "coordinates-mismatch", "request-epoch-mismatch"});
+  for (size_t i = 0; i < std::size(blockers); ++i) {
+    SCOPED_TRACE(labels[i]);
+    source_.Set(Snapshot(owner_, Page(), 1));
+    auto condition = Condition();
+    condition.freshness = AppliedFreshness::kCurrentAfterDispatch;
+    auto intent = Intent({condition});
+    intent.request_epoch = 42;
+    const auto ticket = session_.BeginRequest(intent, {condition}, Options());
+    Dispatch(ticket, base::DoNothing());
+    auto snapshot = Snapshot(owner_, Page(), 2);
+    snapshot.request_epoch = 42;
+    switch (i) {
+      case 0:
+        snapshot.value = Page(200);
+        break;
+      case 1:
+        snapshot.coordinates.units = AppliedCoordinates::Units::kPixel;
+        break;
+      case 2:
+        snapshot.request_epoch = 41;
+        break;
+    }
+    source_.Set(snapshot);
+    const auto result = session_.WaitForApplied(ticket, {condition});
+    EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+    EXPECT_EQ(std::vector<Blocker>{blockers[i]},
+              result.diagnostics.conditions[0].blockers);
+    EXPECT_NE(std::string::npos, result.ToString().find(labels[i]));
+    EXPECT_NE(std::string::npos, result.ToString().find("high_water: apply="));
+    EXPECT_NE(std::string::npos, result.ToString().find("event_high_water:"));
+  }
+}
+
+TEST_F(AppliedWaitTest, IdenticalValuesExplainFreshnessAndSerialRejection) {
+  using Blocker = AppliedConditionBlocker;
+  const auto freshness = std::to_array<AppliedFreshness>(
+      {AppliedFreshness::kNewApply, AppliedFreshness::kNewObservation,
+       AppliedFreshness::kCurrentAfterDispatch});
+  const auto blockers = std::to_array<Blocker>({Blocker::kApplyNotNew,
+                                                Blocker::kObservationNotNew,
+                                                Blocker::kSerialRegression});
+  const auto labels = std::to_array<const char*>(
+      {"freshness:apply-not-new", "freshness:observation-not-new",
+       "serial-regression"});
+  for (size_t i = 0; i < std::size(freshness); ++i) {
+    SCOPED_TRACE(labels[i]);
+    source_.Set(Snapshot(owner_, Page(), 1));
+    auto condition = Condition();
+    condition.freshness = freshness[i];
+    const auto ticket = Begin({condition});
+    Dispatch(ticket, base::DoNothing());
+    auto snapshot = Snapshot(owner_, Page(), i == 2 ? 0 : 1);
+    if (i == 0)
+      snapshot.serials.observation_sequence = 2;
+    source_.Set(snapshot);
+    const auto result = session_.WaitForApplied(ticket, {condition});
+    EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+    const auto& diagnostic = result.diagnostics.conditions[0];
+    ASSERT_TRUE(diagnostic.last);
+    EXPECT_EQ(diagnostic.condition.expected, diagnostic.last->value);
+    EXPECT_EQ(std::vector<Blocker>{blockers[i]}, diagnostic.blockers);
+    EXPECT_NE(std::string::npos, result.ToString().find(labels[i]));
+  }
+}
+
+TEST_F(AppliedWaitTest, ObservedDiagnosticsExplainMissingSamplesAndGroup) {
+  using Blocker = AppliedConditionBlocker;
+  for (bool grouped : {false, true}) {
+    SCOPED_TRACE(grouped);
+    source_.Set(Snapshot(owner_, Page(), 1));
+    source_.Set(Snapshot(other_, Page(), 1));
+    auto first = Condition(Page(200));
+    first.mode = AppliedEvaluationMode::kObservedSinceDispatch;
+    AppliedConditions conditions{first};
+    if (grouped) {
+      auto second = first;
+      second.owner = other_;
+      conditions.push_back(second);
+    }
+    const auto ticket = Begin(conditions);
+    Dispatch(ticket, base::DoNothing());
+    source_.Set(Snapshot(other_, Page(200), 2));
+    auto event = Snapshot(owner_, Page(200), 2);
+    if (!grouped)
+      event.sample_id = 0;
+    source_.Emit({event});
+    const auto result = session_.WaitForApplied(ticket, conditions);
+    EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+    for (const auto& diagnostic : result.diagnostics.conditions) {
+      EXPECT_FALSE(diagnostic.satisfied);
+      EXPECT_EQ(diagnostic.condition.expected, diagnostic.last->value);
+      EXPECT_TRUE(std::ranges::contains(diagnostic.blockers,
+                                        Blocker::kNoObservedSample));
+      EXPECT_TRUE(std::ranges::contains(
+          diagnostic.blockers, grouped ? Blocker::kObservationGroupNotLatched
+                                       : Blocker::kNoSampleIdentity));
+    }
+    EXPECT_NE(std::string::npos,
+              result.ToString().find("mode=ObservedSinceDispatch"));
+    EXPECT_NE(std::string::npos,
+              result.ToString().find("mode:no-observed-sample"));
+  }
+}
+
+TEST_F(AppliedWaitTest, UnmetDiagnosticsExplainMissingAndMismatchedOwners) {
+  using Blocker = AppliedConditionBlocker;
+  const auto blockers =
+      std::to_array<Blocker>({Blocker::kNoCurrentSnapshot,
+                              Blocker::kOwnerMismatch, Blocker::kKindMismatch});
+  const auto labels = std::to_array<const char*>(
+      {"no-current-snapshot", "owner-mismatch", "kind-mismatch"});
+  for (size_t i = 0; i < std::size(blockers); ++i) {
+    SCOPED_TRACE(labels[i]);
+    source_.read_override.reset();
+    source_.Set(Snapshot(owner_, Page(), 1));
+    auto condition = Condition();
+    condition.freshness = AppliedFreshness::kCurrentAfterDispatch;
+    const auto ticket = Begin({condition});
+    Dispatch(ticket, base::DoNothing());
+    switch (i) {
+      case 0:
+        source_.Erase({owner_, AppliedConditionKind::kPageHostsApplied});
+        break;
+      case 1:
+        source_.read_override = Snapshot(other_, Page(), 2);
+        break;
+      case 2:
+        source_.read_override = Snapshot(owner_, FocusMatches{}, 2);
+        break;
+    }
+    const auto result = session_.WaitForApplied(ticket, {condition});
+    EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+    EXPECT_EQ(std::vector<Blocker>{blockers[i]},
+              result.diagnostics.conditions[0].blockers);
+    EXPECT_NE(std::string::npos, result.ToString().find(labels[i]));
+  }
+  source_.read_override.reset();
+}
+
+TEST_F(AppliedWaitTest, WaitFromTestTaskPumpsFinalApplyAndDelivery) {
+  base::RunLoop test_body;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindLambdaForTesting([&] {
+        const AppliedConditions conditions{Condition(Page(200))};
+        const auto ticket = Begin(conditions);
+        Dispatch(ticket, base::DoNothing());
+        base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE, base::BindLambdaForTesting([&] { Apply(Page(200)); }));
+        const auto result = session_.WaitForApplied(ticket, conditions);
+        EXPECT_EQ(AppliedResultKind::kApplied, result.kind)
+            << result.ToString();
+        EXPECT_LT(result.diagnostics.captured_at,
+                  result.diagnostics.options.deadline);
+        test_body.Quit();
+      }));
+  test_body.Run();
+}
+
+TEST_F(AppliedWaitTest, DeadlineReadCannotTurnLateMatchingStateIntoApplied) {
+  const AppliedConditions conditions{Condition(Page(200))};
+  const auto ticket = Begin(conditions);
+  Dispatch(ticket, base::DoNothing());
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(session_.GetDiagnostics(ticket)->conditions[0].satisfied);
+  // 신호가 없는 새 값은 deadline 재조회에서 처음 보이므로 성공이 아니다.
+  source_.Set(Snapshot(owner_, Page(200), 2));
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+  EXPECT_TRUE(result.diagnostics.conditions[0].satisfied);
+  EXPECT_TRUE(result.diagnostics.conditions[0].blockers.empty());
+  EXPECT_NE(std::string::npos,
+            result.ToString().find("completion_blockers=[deadline-exceeded,"));
+  EXPECT_EQ(result.diagnostics.options.deadline,
+            result.diagnostics.evaluated_at);
+}
+
+TEST_F(AppliedWaitTest, EvaluationQueueDelayIsReported) {
+  const AppliedConditions conditions{Condition(Page(200))};
+  const auto ticket = Begin(conditions);
+  Dispatch(ticket, base::DoNothing());
+  tasks_.AdvanceClock(base::Seconds(3));
+  const auto pending = session_.GetDiagnostics(ticket);
+  EXPECT_FALSE(pending->evaluation_queued_at.is_null());
+  EXPECT_NE(std::string::npos, pending->ToString().find("queued_ms=3000"));
+  tasks_.RunUntilIdle();
+  Apply(Page(200));
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kApplied, result.kind);
+  EXPECT_EQ(base::Seconds(3), result.diagnostics.max_evaluation_delay);
+  EXPECT_NE(std::string::npos,
+            result.ToString().find("max_evaluation_delay_ms=3000"));
 }
 
 std::vector<AppliedConditionValue> AllValues(AppliedOwnerToken token) {
@@ -1072,8 +1348,13 @@ TEST_F(AppliedWaitTest,
     const AppliedConditions conditions{condition};
     const auto ticket = Begin(conditions);
     Dispatch(ticket, base::DoNothing());
-    EXPECT_EQ(AppliedResultKind::kTimedOut,
-              session_.WaitForApplied(ticket, conditions).kind);
+    const auto result = session_.WaitForApplied(ticket, conditions);
+    EXPECT_EQ(AppliedResultKind::kTimedOut, result.kind);
+    EXPECT_EQ(
+        std::vector<AppliedConditionBlocker>{
+            AppliedConditionBlocker::kValueMismatch},
+        result.diagnostics.conditions[0].blockers);
+    EXPECT_NE(std::string::npos, result.ToString().find("value-mismatch"));
   }
 }
 

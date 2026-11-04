@@ -250,6 +250,80 @@ source_set("applied_wait_core") {
   ]
 }
 
+source_set("native_window_test_support") {
+  testonly = true
+  public = [ "native_window_test_support.h" ]
+  sources = [ "native_window_test_support.cc" ]
+  public_deps = [ ":applied_wait_core" ]
+  deps = [ "//ui/views" ]
+  if (is_mac) {
+    sources += [ "native_window_test_support_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  }
+}
+
+source_set("applied_wait_views_test_support") {
+  testonly = true
+  public = [ "applied_wait_views_observers.h" ]
+  sources = [ "applied_wait_views_observers.cc" ]
+  public_deps = [ ":applied_wait_core" ]
+  deps = [
+    ":native_window_test_support",
+    ":yee_ui",
+    "//components/viz/common",
+    "//ui/base",
+    "//ui/compositor",
+    "//ui/views",
+  ]
+}
+
+source_set("applied_wait_browser_test_support") {
+  testonly = true
+  public = [ "applied_wait_browser_observers.h" ]
+  sources = [ "applied_wait_browser_observers.cc" ]
+  public_deps = [ ":applied_wait_views_test_support" ]
+  deps = [
+    ":yee_ui",
+    "//chrome/browser/ui/animation",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/tabs:tab_strip_model_observer",
+    "//chrome/browser/ui/views/frame:contents_container_view",
+    "//chrome/browser/ui/views/frame:contents_web_view",
+    "//chrome/browser/ui/views/frame:multi_contents_resize_area",
+    "//chrome/browser/ui/views/frame:multi_contents_view",
+    "//chrome/browser/ui/views/tabs/common",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//ui/views",
+  ]
+}
+
+source_set("applied_wait_kombucha") {
+  testonly = true
+  public = [ "applied_wait_kombucha.h" ]
+  sources = [ "applied_wait_kombucha.cc" ]
+  public_deps = [
+    ":applied_wait_core",
+    "//ui/base/interaction:test_support",
+  ]
+  deps = [ "//testing/gmock" ]
+}
+
+source_set("drag_interactive_test_support") {
+  testonly = true
+  public = [ "drag_interactive_test_support.h" ]
+  sources = [ "drag_interactive_test_support.cc" ]
+  public_deps = [ ":applied_wait_browser_test_support" ]
+  deps = [
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/views/tabs/dragging",
+    "//components/tabs:public",
+    "//ui/views",
+  ]
+}
+
 test("multi_contents_geometry_unittests") {
   sources = [
     "agent_browser_contract_unittest.cc",
@@ -419,6 +493,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/tabs/tab_data_browsertest.cc",
     "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc",
     "//chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc",
+    "applied_wait_browsertest.cc",
     "bookmarks/bookmarks_browsertest.cc",
     "browser_tests_main.cc",
     "disclosure_arrow_unittest.cc",
@@ -434,6 +509,7 @@ test("site_controls_browsertests") {
   ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   deps = [
+    ":applied_wait_browser_test_support",
     ":page_viewport_geometry",
     ":project_navigation",
     ":yee_ui",
@@ -568,6 +644,7 @@ if (!is_chromeos_device) {
       "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.h",
+      "applied_wait_interactive_uitest.cc",
       "browser_surface_interactive_uitest.cc",
       "interactive_ui_tests_main.cc",
       "split_pane_interactive_uitest.cc",
@@ -578,6 +655,9 @@ if (!is_chromeos_device) {
       configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
     }
     deps = [
+      ":applied_wait_browser_test_support",
+      ":applied_wait_kombucha",
+      ":drag_interactive_test_support",
       ":page_viewport_geometry",
       ":page_viewport_migration",
       ":yee_ui",

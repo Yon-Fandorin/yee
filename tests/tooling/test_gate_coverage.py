@@ -29,6 +29,7 @@ TEST = re.compile(r'^[ \t]*((?:IN_PROC_BROWSER_)?TEST(?:_F|_P)?|TYPED_TEST(?:_P)
 GATE_MODES = {
     'test-agent-browser.sh': [()],
     'test-agent-prompt.sh': [()],
+    'test-applied-wait.sh': [('core',), ('interactive',), ('browser',), ('all',)],
     'test-browser-surface-layout.sh': [('fast',), ('horizontal',), ('interactive',), ('browser',), ('all',)],
     'test-content-blocking-native.sh': [()],
     'test-header.sh': [('unit',), ('interactive',), ('all',)],

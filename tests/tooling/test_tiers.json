@@ -1846,6 +1846,526 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.BrowserAnimationStartAndResetUseOneObserver": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.BrowserCollectionReportsCreateAndCloseIdentities": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.FutureBrowserBindsByMovedTabHandle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.FutureRendererSurfaceBindsResizeAndReload": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.MembershipChangeWithoutTabMoveIsObserved": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.MissingIntermediateShadowHostRejectsInstallation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.NewPaneBindsOnlyTheExpectedTab": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.PresentationSourcePublishesRealRevision": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.RendererMetadataAndDocumentLifetime": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.SurfaceEpochRejectsStaleAndReverseDestination": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.TabModelUsesNativeHandlesAndPinnedState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.WebUiShadowDomAckAndMutationShareDocument": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitDragInteractiveTest.ObservedStartedSurvivesReleaseBeforeInputAck": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-applied-wait.sh",
+    "reason": "실제 mouse 입력과 ACK·해제를 통해 세로 drag의 현재·순간 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitDragInteractiveTest.VerticalEmptyCreationCallbackUsesRealInputAck": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-applied-wait.sh",
+    "reason": "실제 mouse 입력과 ACK·해제를 통해 세로 drag의 현재·순간 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.CaptureReleaseAfterAckWakesCurrentState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ChildAddedDuringObservationHasStableIdentity": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer의 동적 child identity와 sequence abort 수명을 실제 신호로 검사하며 headless background에서 실행한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.CompositorSwapInvalidatesOldFeedback": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.DragLoopCompletionSurvivesContextDestruction": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.DragLoopEndDoesNotCarryAcrossSteps": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ExpectedDeletionAndReleasedObservation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ExplicitNoOpAndWidgetCurrentState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ExternalKombuchaAbortReleasesRequestAndIdentifier": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer의 동적 child identity와 sequence abort 수명을 실제 신호로 검사하며 headless background에서 실행한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.FrameGeometryBounceAndAnimationRangeRearm": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.HeadlessNativeCapabilityIsExplicit": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.KombuchaFailureBeforeArmAbortsAtArm": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.KombuchaTerminalFailureAbortsImmediately": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LayoutManagerRemovalAndReplacementRetireOwner": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LegacyAnimationSameTaskTransitionIsObserved": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LayoutManagerRemovalAfterEvaluationWakesWait": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ClosingWidgetReportsOwnerDestroyed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.OwnerDestructionRejectsAddressReuse": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.PresentedFrameAndSameGeometryReapply": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.PreviewRequiresItsOwnApplySerial": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.RealAnimationObservedSurvivesCurrentIdle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.RealApplyCallbackBeforeWaitAndSameValueReapply": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ReentrantViewSignalRetainsLastTransition": {
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "Views 관측 범위와 재진입 알림의 수명·표본을 실제 fixture에서 확인하며 OS 입력을 주입하지 않는다.",
+    "tier": "B"
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.TwoHostsRequireBothApplies": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.UnifiedAndLegacyAnimationSourcesUseNativeManagers": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ViewHierarchyScrollAndLogicalFocus": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ViewObservationDoesNotVisitSiblingDescendants": {
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "Views 관측 범위와 재진입 알림의 수명·표본을 실제 fixture에서 확인하며 OS 입력을 주입하지 않는다.",
+    "tier": "B"
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.AlreadyAppliedIsOnlyAllowedForExplicitNoOp": {
     "os": [
       "Darwin",
@@ -1976,6 +2496,32 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DeadlineReadCannotTurnLateMatchingStateIntoApplied": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DeferredObservedSampleSurvivesNewerCurrentRead": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-applied-wait.sh",
+    "reason": "mock time과 값 조건으로 epoch·지연 표본을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DestructionBeforeDispatchIsNotExpectedDestruction": {
     "os": [
       "Darwin",
@@ -2054,6 +2600,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.EvaluationQueueDelayIsReported": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.EveryWakeRereadsAllCurrentConditions": {
     "os": [
       "Darwin",
@@ -2105,6 +2664,19 @@
     "binaries": [
       "multi_contents_geometry_unittests"
     ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.IdenticalValuesExplainFreshnessAndSerialRejection": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
   },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.InvalidBeginInputsAndNullDispatchAreRejected": {
     "os": [
@@ -2170,6 +2742,19 @@
     "binaries": [
       "multi_contents_geometry_unittests"
     ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ObservedDiagnosticsExplainMissingSamplesAndGroup": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
   },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ObservedGroupRequiresAllValuesInOneSample": {
     "os": [
@@ -2366,6 +2951,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.SurfaceEpochCombinesWithIndependentlySerialedPageHost": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-applied-wait.sh",
+    "reason": "mock time과 값 조건으로 epoch·지연 표본을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TerminalCallbackMayDestroySession": {
     "os": [
       "Darwin",
@@ -2418,6 +3016,32 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.UnmetDiagnosticsExplainMissingAndMismatchedOwners": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.UnmetDiagnosticsExplainValueCoordinatesAndEpoch": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.UnsupportedNativeCapabilityFailsAtBeginWithoutSubscription": {
     "os": [
       "Darwin",
@@ -2443,6 +3067,19 @@
     "binaries": [
       "multi_contents_geometry_unittests"
     ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.WaitFromTestTaskPumpsFinalApplyAndDelivery": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
+    "tier": "A"
   },
   "browser/ui/bookmarks/bookmarks_browsertest.cc::BookmarksBrowserTest.EditPolicyAppliesToRendererAPIs": {
     "os": [
