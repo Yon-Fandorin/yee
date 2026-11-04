@@ -19640,7 +19640,7 @@ index c726fbc277..752dda078f 100644
  
  bool BrowserTabStripController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 7571027287..543c4a84cf 100644
+index 7571027287..13336b2a8a 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
 @@ -4,6 +4,7 @@
@@ -19677,7 +19677,7 @@ index 7571027287..543c4a84cf 100644
  }
  
  source_set("browser_tests") {
-@@ -226,9 +232,79 @@ source_set("browser_tests") {
+@@ -226,9 +232,80 @@ source_set("browser_tests") {
    }
  }
  
@@ -19754,10 +19754,11 @@ index 7571027287..543c4a84cf 100644
    sources = [
 +    "../../yee/favorites_unittest.cc",
 +    "../../yee/group_mark_signals_unittest.cc",
++    "../../yee/yee_tab_group_header_view_unittest.cc",
      "tab_collection_animating_layout_manager_unittest.cc",
      "tab_collection_z_order_manager_unittest.cc",
      "tab_group_header_view_unittest.cc",
-@@ -237,16 +313,20 @@ source_set("unit_tests") {
+@@ -237,16 +314,20 @@ source_set("unit_tests") {
    deps = [
      ":common",
      ":impl",
@@ -19778,7 +19779,7 @@ index 7571027287..543c4a84cf 100644
    ]
  }
  
-@@ -268,7 +348,9 @@ source_set("interactive_ui_tests") {
+@@ -268,7 +349,9 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui:browser_commands",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui/browser_window",
@@ -19788,7 +19789,7 @@ index 7571027287..543c4a84cf 100644
      "//chrome/browser/ui/views/frame:base_tab_strip_region_view",
      "//chrome/browser/ui/views/frame:browser_view_header",
      "//chrome/browser/ui/views/frame:browser_widget",
-@@ -276,9 +358,12 @@ source_set("interactive_ui_tests") {
+@@ -276,9 +359,12 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui/views/tabs/hovercard",
      "//chrome/browser/ui/views/tabs/shared",
      "//chrome/browser/ui/views/tabs/tab",
@@ -24262,7 +24263,7 @@ index a7784a0305..15a1137859 100644
  };
  
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
-index 4cca85eb84..7cb27fdeed 100644
+index 4cca85eb84..d0c23b8a68 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc
 @@ -6,16 +6,25 @@
@@ -24608,52 +24609,6 @@ index 4cca85eb84..7cb27fdeed 100644
  TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
    MockDelegate delegate;
    ON_CALL(delegate, IsGroupFocused()).WillByDefault(testing::Return(true));
-@@ -228,6 +526,27 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
-       delegate, TabStripOrientation::kVertical, nullptr, &visual_data));
-   widget->Show();
- 
-+  // 그룹 집중 모드에서는 hover/focus도 접기 조작을 표시하지 않는다.
-+  yee::VerticalGroupColorMark* mark = nullptr;
-+  for (const auto& child : header->children()) {
-+    if (auto* item = views::AsViewClass<yee::VerticalGroupColorMark>(child))
-+      mark = item;
-+  }
-+  ASSERT_TRUE(mark);
-+  ASSERT_FALSE(mark->size().IsEmpty());
-+  auto raster = [&]() {
-+    gfx::Canvas canvas(mark->size(), 1, false);
-+    mark->OnPaint(&canvas);
-+    const auto bitmap = canvas.GetBitmap();
-+    std::vector<SkColor> pixels;
-+    for (int y = 0; y < bitmap.height(); ++y) {
-+      for (int x = 0; x < bitmap.width(); ++x)
-+        pixels.push_back(bitmap.getColor(x, y));
-+    }
-+    return pixels;
-+  };
-+  const auto resting = raster();
-+
-   // In focus mode, the 3-dot menu should always be visible and collapse button
-   // hidden.
-   EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
-@@ -238,11 +557,17 @@ TEST_F(TabGroupHeaderViewTest, FocusModeVisibility) {
-   // Even when hovering over the header, 3-dot button is visible and collapse
-   // button is hidden.
-   MoveMouseTo(generator, header, true);
-+  EXPECT_EQ(resting, raster());
-   EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
-   EXPECT_FALSE(header->collapse_icon_for_testing()->GetVisible());
- 
-   // Move mouse outside the header.
-   MoveMouseTo(generator, header, false);
-+  EXPECT_EQ(resting, raster());
-+  widget->GetFocusManager()->SetKeyboardAccessible(true);
-+  header->RequestFocus();
-+  ASSERT_EQ(header, widget->GetFocusManager()->GetFocusedView());
-+  EXPECT_EQ(resting, raster());
-   EXPECT_TRUE(header->editor_bubble_button()->GetVisible());
-   EXPECT_FALSE(header->collapse_icon_for_testing()->GetVisible());
- 
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_line_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_line_view.cc
 index 96375f95bf..7e73834203 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_line_view.cc

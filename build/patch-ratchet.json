@@ -17,7 +17,7 @@
           "chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc": 15,
           "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc": 131,
           "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc": 1485,
-          "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc": 325,
+          "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc": 299,
           "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc": 60,
           "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc": 371,
           "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc": 414,
@@ -217,12 +217,6 @@
           "path": "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h",
           "allowed": 1,
           "reason": "approved composition root per docs/chromium-upgrade-structure.md step 3"
-        },
-        {
-          "metric": "upstream_test_lines",
-          "path": "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc",
-          "allowed": 326,
-          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
         },
         {
           "metric": "yee_includes",

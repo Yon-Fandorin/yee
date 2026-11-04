@@ -83,3 +83,39 @@ Grok cohort의 경로·최신성 검사도 선택 가드 뒤에 실행되는지 
 [`tools/dev/`](../../tools/dev/README.md)의 기존 브랜딩·앱 번들 테스트 명령도
 이곳의 테스트를 실행한다. C++ 테스트는 구현 옆에 두며 실제 UI 테스트 절차는
 [`AGENTS.md`](../../AGENTS.md)를 따른다.
+
+## Yee 테스트 gate 누락 검사
+
+`test_gate_coverage.py`는 `browser/`, `renderer/`, `components/`의 C++ GTest 선언을
+항상 검사한다. upstream 부분은 `YEE_LOCAL_BUILD_ROOT/chromium/src`, 환경 변수 미지정 시
+`.local-build/*/chromium/src`와 `.local-build/chromium/src`에서 checkout을 찾는다.
+checkout이 없으면 upstream 사례·GN 검사만 skip하고 이유를 출력한다. overlay 검사는
+계속 실행하며, checkout 없이 확인할 수 없는 기존 native Header·Sidebar GN 연결에는
+현재 소유한 overlay 소스 8개의 명시적 대응을 쓴다. checkout이 있으면 실제 GN 파일로
+그 연결도 확인한다.
+
+`0001`의 기본 3줄 문맥을 유지한 채 hunk의 변경 줄 범위와 checkout의 `TEST` 선언부터
+닫는 괄호까지의 범위를 대조한다. 주석·문자열의 괄호는 가리고 포맷·주석만 바뀐 블록은
+제외한다. C++ 문법을 해석하거나 본문 토큰을 비교하지 않는다. helper만 바꾼 경우
+기존 suite 전체를 Yee 시나리오로 취급하지 않는다. patch 줄과 checkout이 다르면
+적용 상태를 확인하도록 실패한다. `test_overlay_tools.py`는 긴 테스트 함수의 한 줄을
+수정해 재생성 결과가 `git diff --unified=3`과 같은지 확인하여 함수 문맥 확장을 막는다.
+
+복사한 `.sh` gate를 가짜 공통 함수·실행 파일로 평가해 Darwin·Linux·Windows 셸의
+모드별 빌드 타깃과 실제 실행 인수를 수집한다. 원본 스크립트의 필터 변수·배열·OS 분기를
+그대로 사용하며 앱·컴파일러는 실행하지 않는다. 새 native gate는 `GATE_MODES`에
+모드를 등록해야 한다. GN의 `sources`, `deps`, `public_deps`를 따라 실행 바이너리에
+소스가 포함되고 GTest 양수·음수 필터가 선언을 선택하는지 함께 확인한다. GN 조건은
+플랫폼의 합집합으로 읽는다. 기존 heavy layout browser gate의 두 원본 소스만 명시적 연결 표로 보완한다.
+
+매개변수 테스트는 overlay·checkout의 `INSTANTIATE_*TEST_SUITE_P`에서 실제 prefix를
+읽는다. 기본 `Bool`·`Values`·`Combine`의 숫자 suffix와 단순 switch의 반환 이름도
+대조한다. 그 밖의 C++ 이름 함수는 평가하지 않으며 suffix 전체를 고르는 필터만
+인정한다. 필터의 prefix·suffix를 가상 이름에 복사하지 않는다.
+
+이 검사는 선언 단위다. 매개변수의 모든 인스턴스, 기능 플래그에 따른 `GTEST_SKIP`,
+실제 OS의 컴파일 여부는 native `--gtest_list_tests`·실행으로 검증한다. zsh가 없으면
+셸 연결 검사는 건너뛰므로 Windows 검증은 별도로 기록한다.
+`gate_coverage_allowlist.json`은 정확한 `소스::Suite.Case`별로 소유 gate와 이유를 둔다.
+현재 예외는 opt-in YouTube 1개와 Windows 세션 소유 18개(Aura 포함)다. 삭제된 사례의
+stale 항목이나 빈 이유는 실패한다. 일반 누락을 예외에 추가하는 대신 gate에 연결한다.

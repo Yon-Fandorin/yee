@@ -457,6 +457,22 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh horizontal`: 수평 탭 전환·그룹 요약·색상·분할·전체화면 확인
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
+- `test-projects.sh [unit|browser|all]`: 기본은 `project_service_unittests`의 7개 검사.
+  `browser`는 `site_controls_browsertests`의 프로젝트 전체와 TabStripUnification 전용 사례를 순서대로 실행
+- `test-macos-install.sh`: macOS의 `install_sh_test`에서 임시 DMG 4개·가짜 updater 1개만 선택
+- `test-content-blocking-native.sh`: 기존 두 단위 바이너리와 소형
+  `yee_service_worker_unittests`의 `WrapSubresourceLoaderFactory_*` 3개 실행
+
+새 gate도 `--no-build`를 지원한다. `test-internal-pages.sh` 기본 필터는
+`InternalURLsBrowserTest.*` 전체를 선택하고 macOS에서는 `mac_identity_unittests`도 실행한다.
+`test-site-controls.sh`는 Footer·DisclosureArrow·SessionStartupPref 전체와 favicon·그룹 이름
+접근성·Tab Search split guard를 같은 소형 브라우저 실행 파일에서 선택한다.
+Sidebar unit은 Group Header의 hover·focus guard를, interactive는 gesture double-tap을
+추가한다. layout interactive는 native Toolbar·최소 Side Panel 창 크기와 Mac glass의 Yee guard 6개를
+포함한다. Windows의 layout fast는 `yee_aura_unittests`도 선택한다.
+
+[gate coverage 검사](../../tests/tooling/README.md#yee-테스트-gate-누락-검사)는 소스·타깃·필터의
+누락을 tooling unittest에서 차단한다. 목록 발견은 실행 통과와 구분한다.
 
 세 `.sh` gate의 `interactive`와 `horizontal` 모드는
 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`만 빌드하고

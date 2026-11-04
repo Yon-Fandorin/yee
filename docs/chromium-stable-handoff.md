@@ -288,6 +288,13 @@ Mac 결과를 Windows 통과로 기록하지 않는다.
    Windows 전용 소스는 아직 Windows에서 빌드하지 않았다.
    [구조 문서](chromium-upgrade-structure.md)의 테스트 이전 절을 따른다.
 
+6. **테스트 정리 batch 2의 Windows gate 소유.**
+   `tests/tooling/gate_coverage_allowlist.json`에 TaskbarPinning 7개와 Windows 전용
+   caption·clip·popup·UIA 사례, Aura guard의 소유 gate·미검증 이유를 기록했다.
+   `setup_unittests --gtest_filter=TaskbarPinningTest.*` 연결과 실행을 Windows에서 마치고,
+   `yee_aura_unittests`를 layout fast에서 빌드·발견·실행한다. 기존 Windows UI 필터도
+   해당 플랫폼의 새 실행 파일에서 확인한다. macOS에서는 이 항목들을 빌드하지 않았다.
+
 ## Windows 후속 검증 결과 (2026-11-04)
 
 이 절의 8개 gate는 아래 전체 URL 표시 수정 전의 Windows 도구·Footer 체크포인트다.

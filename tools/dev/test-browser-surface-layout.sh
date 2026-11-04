@@ -30,11 +30,17 @@ FAST_TARGETS=(
   'chrome/browser/ui/views/tabs/common:yee_layout_unittests'
   'chrome/browser/ui/views/yee:multi_contents_geometry_unittests'
 )
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    FAST_TARGETS+=(chrome/browser/ui/views/yee:yee_aura_unittests)
+    ;;
+esac
 NATIVE_FAST_FILTER='BrowserAnimationControllerTest.*:BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
 YEE_FAST_FILTER='BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
 # 원본 TopContainerBackground는 Yee 셸에서 실패하므로 필수 목록에서 빼고,
 # 같은 시나리오를 Yee 셸 기준으로 고친 Yee 복사본만 선택한다.
 INTERACTIVE_FILTER='YeeBrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout:YeeBrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans:YeeBrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout:YeeBrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows:YeeBrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets:YeeBrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges:YeeBrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen:YeeBrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse:YeeBrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity:YeeBrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame:YeeBrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar:YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal:YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth:YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane:YeeBrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane:YeeBrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip:YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane:OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState:All/YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest.TopContainerBackground/*'
+INTERACTIVE_FILTER+=':YeeBrowserViewTabbedLayoutImplFeatureOffUiTest.YeeShellWithoutVerticalTabsUsesNativeToolbar:YeeBrowserViewTabbedLayoutImplUiTest.TestMinimumWindowSizeWhenSidePanelIsOpen'
 FLYOUT_FILTER='YeeBrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds:YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation'
 HORIZONTAL_FILTER='YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity:YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear:YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader'
 HORIZONTAL_GROUP_UX_FILTER='TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0:TabDragging/DetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0:TabDragging/DetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0'
@@ -50,7 +56,7 @@ case "$(uname -s)" in
     INTERACTIVE_FILTER+=':YeeBrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth'
     INTERACTIVE_FILTER+=':OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState'
     INTERACTIVE_FILTER+=':ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip:ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren:ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction'
-    INTERACTIVE_FILTER+=':BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy:BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque'
+    INTERACTIVE_FILTER+=':BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy:BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque:BrowserNativeWidgetMacGlassTest.ActiveInactiveTintOpacity:BrowserNativeWidgetMacGlassTest.PaintAsActiveLockMaintainsActiveTint:BrowserNativeWidgetMacGlassTest.TabFullscreenWindowIsOpaque:BrowserNativeWidgetMacGlassTest.MultipleProfilesTintOpacity'
     ;;
   MINGW*|MSYS*|CYGWIN*)
     POPUP_UX_FILTER+=':CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost'
@@ -109,6 +115,13 @@ if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
     --gtest_filter="$YEE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      run_native_test_gate "$YEE_OUT_DIR/yee_aura_unittests" \
+        --gtest_filter='WindowObserverTest.UnmanagedLayerKeepsScreenOriginAfterAncestorMoves' \
+        --test-launcher-jobs=1 --test-launcher-retry-limit=0
+      ;;
+  esac
 fi
 
 if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]; then

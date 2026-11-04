@@ -25,6 +25,7 @@ class DevelopmentToolsTest(unittest.TestCase):
         shutil.copytree(ROOT / 'tools/dev/lib', self.dev / 'lib')
         for name in ('common.zsh', 'build.sh', 'build-ui.sh',
                      'test-header.sh', 'test-sidebar.sh', 'test-browser-surface-layout.sh',
+                     'test-projects.sh', 'test-macos-install.sh',
                      'browser_bundle_executables.py', 'ui-test-display.swift'):
             shutil.copy(ROOT / 'tools/dev' / name, self.dev / name)
         self.overlay = self.repo / 'tools/overlay'
@@ -103,6 +104,22 @@ done
 
     def events(self):
         return self.log.read_text().splitlines() if self.log.exists() else []
+
+    def test_new_gates_reject_extra_or_misplaced_arguments(self):
+        """잘못된 인수는 준비·빌드·실행 전에 사용법 오류로 중단한다."""
+        for name, argument_lists in (
+                ('test-projects.sh', [('browser', '--unknown'), ('--no-build', 'browser'),
+                                      ('unit', 'extra'), ('all', '--no-build', 'extra'),
+                                      ('--no-build', '--no-build'), ('',)]),
+                ('test-macos-install.sh', [('--unknown',), ('--no-build', 'extra'),
+                                          ('--no-build', '--no-build'), ('',)])):
+            for arguments in argument_lists:
+                with self.subTest(script=name, arguments=arguments):
+                    self.log.unlink(missing_ok=True)
+                    result = self.run_script(name, *arguments)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn('Usage:', result.stderr)
+                    self.assertEqual(self.events(), [])
 
     def test_ui_build_prepares_once_and_uses_shared_cache(self):
         result = self.run_script('build-ui.sh')
@@ -243,7 +260,7 @@ done
         self.write_tool(self.bin / 'xcrun', 'exit 0\n')
         self.write_tool(self.bin / 'pgrep', 'exit 1\n')
         for binary in ('yee_layout_unittests', 'multi_contents_geometry_unittests',
-                       'yee_interactive_ui_tests', 'browser_tests'):
+                       'yee_interactive_ui_tests', 'browser_tests', 'yee_aura_unittests'):
             self.write_tool(self.out / binary, '''listing=false
 filter=""
 for argument in "$@"; do
@@ -296,7 +313,9 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
                     filters = [event.removeprefix('arg:--gtest_filter=')
                                for event in self.events()
                                if event.startswith('arg:--gtest_filter=')]
-                    self.assertEqual(len(filters), expected_runs)
+                    aura_runs = int(platform != 'Darwin' and name == 'test-browser-surface-layout.sh'
+                                    and mode == 'all')
+                    self.assertEqual(len(filters), expected_runs + aura_runs)
                     combined = ':'.join(filters)
                     if platform == 'Darwin':
                         self.assertNotIn('YeeWindows', combined)

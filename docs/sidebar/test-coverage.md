@@ -14,7 +14,7 @@
 각 정상 종료 뒤 새 프로필의 Crashpad 기록도 검사한다. 그룹 생성·복원이 성공해도
 충돌 또는 비치명적 진단 덤프가 생기면 파일 이름·크기·지문을 남기고 실패한다.
 그룹의 테마 판정은 실제 창에 붙은 뒤 수행하고, 부착 시 헤더 여백을 다시 계산한다.
-`site_controls_browsertests --gtest_filter=SessionStartupPrefTest.*`는 기본값,
+`test-site-controls.sh`의 `SessionStartupPrefTest.*`는 기본값,
 사용자 시작 설정·관리자 정책의 우선순위와 Yee 비활성화 시 native 기본값을 검사한다.
 
 `test-sidebar.sh`의 기본값은 `unit`이며 `--no-build`만 줘도 단위 검사만 실행한다.
@@ -554,3 +554,19 @@ Protection 검사는 두 방향에서 각 네 번의 실제 클릭과 true·fals
 hit target·active·drawn·focus·배경·focus 이유를 각각 기록한다. 순회 전의 행
 중앙과 bounds도 남겨 좌표 변화와 상태 전달 지연을 구분한다. 포인터 재입력이나
 직접 focus 변경 없이 기존 행 focus·배경·직접 입력 이유 판정을 모두 유지한다.
+
+## gate 연결 보완
+
+`test-sidebar.sh unit`은 기존 `EditorBubbleButtonVisibilityOnHover`와 overlay의
+`YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons`를 선택한다. Yee 테스트는
+확장 헤더의 focus mode에서 hover 진입·이탈과 키보드 focus 동안 mark raster가
+변하지 않고 editor 버튼은 표시되며 collapse 버튼은 숨겨지는지 확인한다.
+원본 `FocusModeVisibility` 본문은 pristine으로 복원하고 필터에서 제외한다.
+원본 끝부분은 Yee가 숨기는 compact rail의 최소 너비를 강제하므로 Yee 셸에서 실패한다.
+새 테스트는 같은 `yee_layout_unittests`에 컴파일하며 독립된 최소 Views fixture를 쓴다.
+`interactive`는 `ResizeGestureDoubleTapEqualizesSplitViews`의 양쪽 split 배치도 선택한다.
+`test-site-controls.sh`는 `SidebarFooterBrowserTest.*`, `DisclosureArrowTest.*`,
+`SessionStartupPrefTest.*`와 그룹 rename 뒤 비활성 탭 접근성 이름 갱신을 실행한다.
+프로젝트 저장·탐색은 `test-projects.sh unit`과 `test-projects.sh browser`가 소유하며,
+후자는 기본 프로젝트 전체 검사 뒤 TabStripUnification을 켠 전용 사례를 별도 실행한다.
+이 연결 검사는 [tooling coverage](../../tests/tooling/README.md#yee-테스트-gate-누락-검사)가 지킨다.

@@ -13,8 +13,8 @@ Windows 검증과 나머지 구조 변경은 후속 작업이다.
 
 | 구분 | 파일 | 추가 줄 | 삭제 줄 |
 | --- | ---: | ---: | ---: |
-| 수정한 제품 파일 | 296 | 12,376 | 1,655 |
-| 수정한 Chromium 테스트 파일 | 31 | 5,666 | 134 |
+| 수정한 제품 파일(GN 연결 포함) | 296 | 12,377 | 1,655 |
+| 수정한 Chromium 테스트 파일 | 31 | 5,631 | 120 |
 | 새 파일 | 5 | 1,152 | 0 |
 
 줄 수는 결합 정도의 근사치다. 실제 이식 비용은 충돌과 빌드·gate 소요 시간을
@@ -101,9 +101,31 @@ Yee 셸 기준으로 고친 Yee 복사본을 실행한다. 예를 들어 원본
 `BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`는 제외하고
 `YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`를 실행한다.
 
+Sidebar의 원본 `TabGroupHeaderViewTest.FocusModeVisibility` 본문도 pristine으로
+복원했다. Yee 셸에서 쓰지 않는 compact rail 너비를 강제하는 원본은 필터에서
+제외하고, 확장 헤더의 focus mode 검사는 overlay의
+`YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons`로 실행한다.
+
 `0001`은 단일 패치 파일로 유지한다. 별도 유지보수 checkout에서 관심사별 commit
 series로 관리한 뒤 `0001`로 export한다. 콘텐츠 차단 배포 코드의 패치 분리는 첫 범위
 이후로 미루며, 그전에는 유지보수 커밋만 관심사별로 나눈다.
+
+## 테스트 gate 누락 방지
+
+`tests/tooling/test_gate_coverage.py`는 overlay의 GTest 선언과 `0001`의 추가·수정
+테스트를 gate의 빌드 타깃·필터에 대조한다. patch의 기본 3줄 문맥을 유지하며
+checkout의 테스트 선언 범위와 hunk 변경 줄을 대조한다. checkout이 없으면 upstream
+검사만 이유를 출력하고 건너뛴다. overlay 검사는 계속 수행한다.
+원본 fixture는 그대로 두며 새 Yee 시나리오는 계속 overlay에 작성한다.
+
+브라우저 수준 favicon·그룹 rename 접근성·Tab Search split 사례는 기존
+`site_controls_browsertests`에 원본 소스 세 개를 더해 실행한다. Service Worker의
+factory wrapping 사례는 `yee_service_worker_unittests`, Aura의 layer 위치 guard는
+`is_win && use_aura`에서만 만드는 `yee_aura_unittests`로 실행한다.
+선택하는 원본 Aura 사례의 선언은 `IS_WIN` 안에 있다. 대형 upstream 바이너리를
+새로 요구하지 않는다. 기존 명시적 layout `browser` tier는 유지한다.
+전체 gate와 Windows 소유 예외는 [개발 도구](../tools/dev/README.md#변경-후-테스트)와
+[tooling 안내](../tests/tooling/README.md#yee-테스트-gate-누락-검사)를 따른다.
 
 ## 패치 래칫
 
@@ -126,7 +148,7 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 | 지표 | 세는 내용 | 현재 합계 |
 | --- | --- | ---: |
-| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,666 |
+| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,631 |
 | `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 61 |
 | `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 30 |
 | `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 240 |

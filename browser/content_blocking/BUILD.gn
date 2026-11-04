@@ -64,3 +64,20 @@ test("yee_filtering_factory_unittests") {
     "//third_party/blink/public/mojom:mojom_platform_shared",
   ]
 }
+
+# content_unittests 전체 목록 없이 원본 Service Worker fixture를
+# 실행한다.
+test("yee_service_worker_unittests") {
+  sources = [ "//content/browser/service_worker/service_worker_container_host_unittest.cc" ]
+  deps = [
+    "//base/test:test_support",
+    "//content/public/browser",
+    "//content/test:run_all_unittests",
+    "//content/test:test_support",
+    "//mojo/public/cpp/bindings",
+    "//net:test_support",
+    "//services/network:test_support",
+    "//testing/gtest",
+  ]
+  data_deps = [ "//content:content_resources" ]
+}

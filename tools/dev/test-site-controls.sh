@@ -20,10 +20,15 @@ if [[ "${1:-}" != "--no-build" ]]; then
     chrome/browser/ui/views/yee:site_controls_browsertests
 fi
 
+FILTER='SiteControlsBrowserTest.*:SidebarFooterBrowserTest.*:DisclosureArrowTest.*:SessionStartupPrefTest.*:TabDataObserverBrowserTest.FaviconAndIconFlags:All/TabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*:All/TabSearchPageHandlerTest.RemoveSplit_NTP/*'
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) FILTER+=':UiaApplicationExitBrowserTest.*' ;;
+esac
+
 prepare_ui_test_display
 gracefully_quit_yee
-"$YEE_OUT_DIR/site_controls_browsertests" \
+run_native_test_gate "$YEE_OUT_DIR/site_controls_browsertests" \
   "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
-  --gtest_filter='SiteControlsBrowserTest.*:UiaApplicationExitBrowserTest.*' \
+  --gtest_filter="$FILTER" \
   --test-launcher-jobs=1 \
   --test-launcher-retry-limit=0

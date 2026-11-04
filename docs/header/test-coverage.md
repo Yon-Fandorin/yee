@@ -353,3 +353,13 @@ Site Controls의 숫자 칩은 같은 Header snapshot을 받으며, 실제 칩 �
 
 예약 Sidebar 슬롯 Pins·Bookmarks·Chat·Agent의 활성화는 제품 결정이며 검수를 위해
 임의로 켜지 않는다. 구조 검토의 `built`는 전체 플랫폼 독립 검증을 의미하지 않는다.
+
+## layout gate 연결 보완
+
+`test-browser-surface-layout.sh interactive`는
+`YeeShellWithoutVerticalTabsUsesNativeToolbar`, `TestMinimumWindowSizeWhenSidePanelIsOpen`과
+macOS의 `BrowserNativeWidgetMacGlassTest`의 Yee guard 6개를 선택한다. Header gate의 기존 선택은
+유지하며, 실제 실행·시각 검증은 목록 발견과 구분한다.
+`test-site-controls.sh`는 `TabDataObserverBrowserTest.FaviconAndIconFlags`와
+`All/TabSearchPageHandlerTest.RemoveSplit_NTP/*`를 `site_controls_browsertests`에 포함해
+전체 `browser_tests` 빌드 없이 실행한다.

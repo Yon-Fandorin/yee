@@ -150,6 +150,28 @@ class OverlayToolsTest(unittest.TestCase):
         git(self.src, 'apply', '--reverse', '--check', str(patch))
         self.assertEqual(index_before, git(self.src, 'diff', '--cached', '--binary'))
 
+    def test_regenerate_keeps_three_line_context_for_test_sources(self):
+        """테스트 patch도 함수 전체 문맥 없이 기본 3줄 git diff와 같아야 한다."""
+        tool = self.overlay / 'tools/overlay'
+        tool.mkdir(parents=True)
+        shutil.copy(ROOT/'tools/overlay/regenerate-shell-patch.py', tool)
+        shutil.copytree(ROOT/'tools/overlay/lib', tool/'lib',
+                        ignore=shutil.ignore_patterns('__pycache__'))
+        source = self.src / 'context_unittest.cc'
+        lines = ['TEST_F(Fixture, LongBody) {\n'] + [f'  Step({number});\n' for number in range(30)] + ['}\n']
+        source.write_text(''.join(lines))
+        git(self.src, 'add', source.name)
+        git(self.src, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+            'commit', '-qm', 'test source')
+        git(self.src, 'config', 'diff.context', '3')
+        source.write_text(''.join(lines).replace('Step(15)', 'Changed(15)'))
+        result = subprocess.run([sys.executable, str(tool/'regenerate-shell-patch.py'),
+                                 '--chromium-src', str(self.src)],
+                                cwd=self.base, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        patch = self.overlay / 'patches/0001-integrate-yee-shell.patch'
+        self.assertEqual(patch.read_bytes(), git(self.src, 'diff', 'HEAD', '--unified=3', '--', source.name))
+
     def test_regenerate_saves_patch_then_fails_when_ratchet_grows(self):
         """0001을 먼저 저장하고, 래칫 기준선보다 늘어난 분기는 실패 코드로 알린다."""
         tool = self.overlay / 'tools/overlay'

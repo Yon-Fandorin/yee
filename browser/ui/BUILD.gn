@@ -385,6 +385,9 @@ source_set("yee_ui") {
 test("site_controls_browsertests") {
   sources = [
     "//chrome/browser/prefs/session_startup_pref_unittest.cc",
+    "//chrome/browser/ui/tabs/tab_data_browsertest.cc",
+    "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc",
+    "//chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc",
     "bookmarks/bookmarks_browsertest.cc",
     "disclosure_arrow_unittest.cc",
     "downloads/downloads_browsertest.cc",
@@ -415,11 +418,14 @@ test("site_controls_browsertests") {
     "//chrome/browser/download:impl",
     "//chrome/browser/extensions:test_support",
     "//chrome/browser/history",
+    "//chrome/browser/media/webrtc",
+    "//chrome/browser/performance_manager",
     "//chrome/browser/policy",
     "//chrome/browser/policy:test_support",
     "//chrome/browser/prefs:util",
     "//chrome/browser/profiles:profile_io_data",
     "//chrome/browser/sessions:test_support",
+    "//chrome/browser/tab_group_sync:factories",
     "//chrome/browser/ui:browser_commands",
     "//chrome/browser/ui:browser_tabstrip",
     "//chrome/browser/ui:chrome_pages",
@@ -431,6 +437,8 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/startup",
     "//chrome/browser/ui/tabs",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/tabs/saved_tab_groups:test_support",
+    "//chrome/browser/ui/thumbnails",
     "//chrome/browser/ui/views/animations",
     "//chrome/browser/ui/views/frame:browser_view_header",
     "//chrome/browser/ui/views/infobars",
@@ -438,7 +446,12 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/views/page_info",
     "//chrome/browser/ui/views/tabs:new_tab_button",
     "//chrome/browser/ui/views/tabs:tab_style_views",
+    "//chrome/browser/ui/views/tabs/common:impl",
+    "//chrome/browser/ui/views/tabs/hovercard",
     "//chrome/browser/ui/views/tabs/tab",
+    "//chrome/browser/ui/views/test:test_support",
+    "//chrome/browser/ui/webui/metrics_reporter:test_support",
+    "//chrome/browser/ui/webui/tab_search",
     "//chrome/browser/yee_content_blocking:browser",
     "//chrome/browser/yee_projects:browser",
     "//chrome/renderer",
@@ -459,6 +472,7 @@ test("site_controls_browsertests") {
     "//components/infobars/core",
     "//components/javascript_dialogs",
     "//components/omnibox/browser",
+    "//components/os_crypt/async/browser:test_support",
     "//components/policy/core/common:test_support",
     "//components/prefs",
     "//components/sessions",
@@ -661,5 +675,47 @@ if (!is_chromeos_device) {
         deps += [ "//chrome/browser/ui/views/frame:browser_native_widget_aura" ]
       }
     }
+  }
+}
+
+# 선택할 원본 guard가 IS_WIN 안에 있으므로 Windows에서만 컴파일한다.
+if (is_win && use_aura) {
+  test("yee_aura_unittests") {
+    use_xvfb = use_xvfb_in_this_config
+    sources = [
+      "//ui/aura/test/run_all_unittests.cc",
+      "//ui/aura/window_unittest.cc",
+    ]
+    deps = [
+      "//base/test:test_support",
+      "//cc/mojo_embedder",
+      "//components/viz/client",
+      "//mojo/core/embedder",
+      "//skia",
+      "//testing/gtest",
+      "//ui/aura:test_support",
+      "//ui/aura_extra",
+      "//ui/base:test_support",
+      "//ui/base/clipboard:clipboard_types",
+      "//ui/compositor:test_support",
+      "//ui/decoration",
+      "//ui/display:test_support",
+      "//ui/events:gesture_detection",
+      "//ui/events:test_support",
+      "//ui/gfx",
+      "//ui/gfx/geometry",
+      "//ui/gl:test_support",
+      "//ui/platform_window",
+      "//ui/platform_window/stub",
+      "//ui/resources:ui_test_pak",
+      "//ui/wm",
+    ]
+    if (use_ozone) {
+      deps += [ "//ui/ozone" ]
+    }
+    data_deps = [
+      "//third_party/angle:includes",
+      "//ui/resources:ui_test_pak_data",
+    ]
   }
 }
