@@ -9,6 +9,7 @@
 #include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "base/test/scoped_command_line.h"
 #include "build/build_config.h"
+#include "chrome/browser/ui/views/yee/shell_policy.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"

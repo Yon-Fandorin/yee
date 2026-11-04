@@ -15,6 +15,7 @@
 #include "base/test/scoped_run_loop_timeout.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/test/views/chrome_views_test_base.h"

@@ -285,7 +285,9 @@ source_set("yee_ui_headers") {
     "omnibox_popup_style.h",
     "page_viewport_hosts.h",
     "page_viewport_migration.h",
+    "shell_policy.h",
     "sidebar_footer.h",
+    "sidebar_metrics.h",
     "sidebar_presentation.h",
     "sidebar_sections.h",
     "site_controls.h",
@@ -293,6 +295,7 @@ source_set("yee_ui_headers") {
     "tab_group_presentation.h",
     "vertical_group_color_mark.h",
     "vertical_tab_text_view.h",
+    "yee_colors.h",
     "yee_ui.h",
   ]
   public_deps = [
@@ -326,6 +329,7 @@ source_set("yee_ui") {
     "immersive_header.cc",
     "omnibox_popup_style.cc",
     "page_viewport_hosts.cc",
+    "shell_policy.cc",
     "sidebar_footer.cc",
     "sidebar_presentation.cc",
     "sidebar_sections.cc",
@@ -334,6 +338,7 @@ source_set("yee_ui") {
     "tab_group_presentation.cc",
     "vertical_group_color_mark.cc",
     "vertical_tab_text_view.cc",
+    "yee_colors.cc",
     "yee_ui.cc",
   ]
 

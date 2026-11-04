@@ -31,7 +31,7 @@
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"

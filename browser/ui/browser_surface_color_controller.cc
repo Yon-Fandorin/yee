@@ -15,7 +15,7 @@
 #include "base/functional/bind.h"
 #include "base/task/bind_post_task.h"
 #include "base/time/time.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "chrome/browser/ui/views/yee/theme_tint.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_handle.h"

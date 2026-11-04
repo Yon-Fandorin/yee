@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/views/yee/projects/project_controls.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_presentation.h"
 #include "chrome/browser/ui/views/yee/projects/project_row_view.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/vector_icons/vector_icons.h"

@@ -23,6 +23,7 @@
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/product_logo.h"
 #include "chrome/browser/ui/views/yee/side_panel_colors.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/test/views/chrome_views_test_base.h"

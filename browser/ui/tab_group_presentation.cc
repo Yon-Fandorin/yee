@@ -1,4 +1,5 @@
 // Copyright 2026 The Yee Authors. BSD-style license in LICENSE.
+#include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
 
 #include <algorithm>
@@ -19,6 +20,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_group_theme.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"

@@ -9,6 +9,7 @@
 #include "base/check.h"
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/ui/views/yee/sidebar_footer.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"

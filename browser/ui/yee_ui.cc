@@ -28,6 +28,7 @@
 #include "chrome/browser/ui/views/yee/agent_bridge.h"
 #include "chrome/browser/ui/views/yee/agent_bridge_state.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -82,27 +83,12 @@ class BrowserSurfaceControlColor : public views::CascadingProperty<SkColor> {
   const SkColor color_;
 };
 
-// Restore the pilot's original material strength while keeping both layers
-// theme-derived. Native tint at 38%/72% plus Yee's 22/255 surface tint yields
-// approximately 43% light and 74% dark effective opacity.
-constexpr double kNativeGlassTintOpacityLight = 0.38;
-constexpr double kNativeGlassTintOpacityDark = 0.72;
 constexpr int kGlassSurfaceTintAlpha = 22;
 constexpr int kShellMenuIconSize = 16;
-constexpr float kRestingSeparatorOpacity = 0.34f;
 constexpr int kRestingOriginMaximumWidth = 180;
-constexpr float kHeaderPrimaryPreferredOpacity = 0.78f;
-constexpr float kHeaderPrimaryMinimumContrast = 7.0f;
-constexpr float kHeaderSecondaryPreferredOpacity = 0.56f;
-constexpr float kHeaderDisabledOpacity = 0.28f;
-constexpr float kHeaderFocusStrokePreferredOpacity = 0.44f;
-constexpr float kOmniboxPopupHoverOpacity = 0.06f;
-constexpr float kOmniboxPopupSelectedOpacity = 0.14f;
-constexpr float kOmniboxPopupOutlineOpacity = 0.18f;
 constexpr int kBrowserSurfaceShadowElevation = 3;
 constexpr int kBrowserSurfaceOutlineAlpha = 0x18;
 constexpr int kBrowserSurfaceActiveOutlineAlpha = 0x30;
-constexpr int kSurfaceSeparatorAlpha = 0x14;
 constexpr int kBrowserSurfaceShadowKeyAlphaLight = 0x14;
 constexpr int kBrowserSurfaceShadowAmbientAlphaLight = 0x09;
 constexpr int kBrowserSurfaceShadowKeyAlphaDark = 0x20;
@@ -175,11 +161,6 @@ void PaintBrowserSurfaceOutline(gfx::Canvas* canvas,
   canvas->DrawRoundRect(stroke_bounds,
                         std::max(0.0f, outer_radius - stroke_width / 2.0f),
                         stroke);
-}
-
-SkColor ResolveSurfaceSeparatorColor(SkColor surface_color) {
-  return color_utils::BlendTowardMaxContrast(surface_color,
-                                             kSurfaceSeparatorAlpha);
 }
 
 SkColor ResolveShellPaintColor(const views::View& view) {
@@ -1138,18 +1119,6 @@ SidebarItemColors ResolveSidebarItemColors(
   };
 }
 
-bool UsesExpandedSidebarPresentation() {
-  return IsShellEnabled();
-}
-
-bool ShouldPrioritizeSidebarTabDrag(int dragged_tab_count,
-                                    int source_tab_count,
-                                    bool is_group_drag,
-                                    bool uses_vertical_tab_strip) {
-  return UsesExpandedSidebarPresentation() && uses_vertical_tab_strip &&
-         !is_group_drag && dragged_tab_count == 1 && source_tab_count == 1;
-}
-
 SkColor ResolveBrowserSurfaceHeaderColor(
     const ui::ColorProvider& color_provider,
     std::optional<SkColor> page_surface_color) {
@@ -1175,48 +1144,6 @@ ui::ColorId ResolveBrowserSurfaceFocusColorId(
                  contrast(ui::kColorSysInverseOnSurface)
              ? ui::kColorSysOnSurface
              : ui::kColorSysInverseOnSurface;
-}
-
-BrowserSurfaceHeaderColors ResolveBrowserSurfaceHeaderColors(
-    SkColor surface_color) {
-  surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  // 작은 주요 문자·아이콘은 가능하면 7:1까지 대비를 확보한다.
-  // 중간 밝기 면에서 부족하면 물리적 검정·흰색 끝점까지 사용한다.
-  const SkColor endpoint = color_utils::PickContrastingColor(
-      SK_ColorBLACK, SK_ColorWHITE, surface_color);
-  const SkColor preferred_primary = color_utils::AlphaBlend(
-      endpoint, surface_color, kHeaderPrimaryPreferredOpacity);
-  const SkColor preferred_secondary = color_utils::AlphaBlend(
-      endpoint, surface_color, kHeaderSecondaryPreferredOpacity);
-  return {
-      .primary = color_utils::BlendForMinContrast(preferred_primary,
-                                                  surface_color, endpoint,
-                                                  kHeaderPrimaryMinimumContrast)
-                     .color,
-      .secondary = color_utils::BlendForMinContrast(
-                       preferred_secondary, surface_color, endpoint,
-                       color_utils::kMinimumReadableContrastRatio)
-                       .color,
-      .disabled = color_utils::AlphaBlend(endpoint, surface_color,
-                                          kHeaderDisabledOpacity),
-  };
-}
-
-SkColor ResolveBrowserSurfaceFocusStrokeColor(
-    SkColor surface_color,
-    std::optional<SkColor> theme_accent) {
-  surface_color = SkColorSetA(surface_color, SK_AlphaOPAQUE);
-  const SkColor endpoint = color_utils::PickContrastingColor(
-      SK_ColorBLACK, SK_ColorWHITE, surface_color);
-  SkColor preferred = color_utils::AlphaBlend(
-      endpoint, surface_color, kHeaderFocusStrokePreferredOpacity);
-  if (theme_accent) {
-    preferred = color_utils::AlphaBlend(*theme_accent, preferred, 0.18f);
-  }
-  return color_utils::BlendForMinContrast(
-             preferred, surface_color, endpoint,
-             color_utils::kMinimumVisibleContrastRatio)
-      .color;
 }
 
 std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
@@ -1252,130 +1179,10 @@ void SetBrowserSurfaceControlBackground(views::View& view,
   }
 }
 
-SkColor ResolveBrowserSurfaceSemanticColor(SkColor surface, SkColor semantic) {
-  return color_utils::BlendForMinContrast(
-             semantic, surface,
-             color_utils::PickContrastingColor(SK_ColorBLACK, SK_ColorWHITE,
-                                               surface),
-             color_utils::kMinimumReadableContrastRatio)
-      .color;
-}
-
 bool ShouldUseNativeBrowserSurfaceColors(const ui::NativeTheme& theme) {
   return theme.preferred_contrast() ==
              ui::NativeTheme::PreferredContrast::kMore ||
          theme.forced_colors() != ui::ColorProviderKey::ForcedColors::kNone;
-}
-
-BrowserSurfacePresentation ResolveBrowserSurfacePresentation(
-    SkColor surface,
-    uint64_t source_id,
-    uint64_t revision,
-    uint64_t popup_revision,
-    std::optional<SkColor> theme_accent) {
-  surface = SkColorSetA(surface, SK_AlphaOPAQUE);
-  const BrowserSurfaceHeaderColors colors =
-      ResolveBrowserSurfaceHeaderColors(surface);
-  const SkColor endpoint = color_utils::GetColorWithMaxContrast(surface);
-  const SkColor text_endpoint =
-      color_utils::PickContrastingColor(SK_ColorBLACK, SK_ColorWHITE, surface);
-  SkColor tint_endpoint = endpoint;
-  if (color_utils::GetContrastRatio(
-          text_endpoint,
-          color_utils::AlphaBlend(tint_endpoint, surface,
-                                  kOmniboxPopupSelectedOpacity)) <
-      color_utils::kMinimumReadableContrastRatio) {
-    tint_endpoint =
-        text_endpoint == SK_ColorBLACK ? SK_ColorWHITE : SK_ColorBLACK;
-  }
-  SkColor popup_hover = color_utils::AlphaBlend(tint_endpoint, surface,
-                                                kOmniboxPopupHoverOpacity);
-  SkColor popup_selected = color_utils::AlphaBlend(
-      tint_endpoint, surface, kOmniboxPopupSelectedOpacity);
-  SkColor location_hover = color_utils::AlphaBlend(endpoint, surface, 0.02f);
-  if (theme_accent) {
-    const SkColor neutral_hover = popup_hover;
-    const SkColor neutral_selected = popup_selected;
-    location_hover =
-        color_utils::AlphaBlend(*theme_accent, location_hover, 0.06f);
-    popup_hover = color_utils::AlphaBlend(*theme_accent, popup_hover, 0.06f);
-    popup_selected =
-        color_utils::AlphaBlend(*theme_accent, popup_selected, 0.10f);
-    popup_hover = color_utils::BlendForMinContrast(
-                      popup_hover, text_endpoint, neutral_hover,
-                      color_utils::kMinimumReadableContrastRatio)
-                      .color;
-    popup_selected = color_utils::BlendForMinContrast(
-                         popup_selected, text_endpoint, neutral_selected,
-                         color_utils::kMinimumReadableContrastRatio)
-                         .color;
-  }
-  for (SkColor ink : {colors.primary, colors.secondary}) {
-    location_hover = color_utils::BlendForMinContrast(
-                         location_hover, ink, surface,
-                         color_utils::kMinimumReadableContrastRatio)
-                         .color;
-  }
-  // 편집 중에도 페이지 바탕을 유지하므로 focus 선과 선택 텍스트도 같은 바탕의
-  // 대비 계약을 따른다.
-  SkColor focus_stroke =
-      ResolveBrowserSurfaceFocusStrokeColor(surface, theme_accent);
-  for (SkColor background :
-       {surface, location_hover, popup_hover, popup_selected}) {
-    focus_stroke = color_utils::BlendForMinContrast(
-                       focus_stroke, background, text_endpoint,
-                       color_utils::kMinimumVisibleContrastRatio)
-                       .color;
-  }
-  const SkColor editor_selection_background = focus_stroke;
-  const SkColor editor_selection_foreground =
-      ResolveBrowserSurfaceHeaderColors(editor_selection_background).primary;
-  // Protect the strongest state by adjusting popup ink, not by washing the
-  // state fills out to white/black. Share this ink across popup rows and native
-  // answer/chip children so moving selection never changes text polarity.
-  auto selected_colors = colors;
-  for (SkColor background : {popup_hover, popup_selected}) {
-    selected_colors.primary =
-        color_utils::BlendForMinContrast(
-            selected_colors.primary, background, text_endpoint,
-            color_utils::kMinimumReadableContrastRatio)
-            .color;
-    selected_colors.secondary =
-        color_utils::BlendForMinContrast(
-            selected_colors.secondary, background, text_endpoint,
-            color_utils::kMinimumReadableContrastRatio)
-            .color;
-  }
-  return {
-      .palette_mode = BrowserSurfacePresentation::PaletteMode::kCustomSurface,
-      .source_id = source_id,
-      .revision = revision,
-      .popup_revision = popup_revision,
-      .surface = surface,
-      .primary = colors.primary,
-      .secondary = colors.secondary,
-      .disabled = colors.disabled,
-      .location_hover = location_hover,
-      .focus_stroke = focus_stroke,
-      .editor_selection_background = editor_selection_background,
-      .editor_selection_foreground = editor_selection_foreground,
-      .header_separator = ResolveSurfaceSeparatorColor(surface),
-      .resting_divider =
-          color_utils::AlphaBlend(endpoint, surface, kRestingSeparatorOpacity),
-      .popup_hover = popup_hover,
-      .popup_selected = popup_selected,
-      .popup_selected_primary = selected_colors.primary,
-      .popup_selected_secondary = selected_colors.secondary,
-      .popup_outline = color_utils::AlphaBlend(endpoint, surface,
-                                               kOmniboxPopupOutlineOpacity),
-  };
-}
-
-BrowserSurfacePresentation UseNativeBrowserSurfaceColors(
-    const BrowserSurfacePresentation& presentation) {
-  BrowserSurfacePresentation native = presentation;
-  native.palette_mode = BrowserSurfacePresentation::PaletteMode::kNativeColors;
-  return native;
 }
 
 void AddBrowserSurfaceOmniboxPopupColorMixer(
@@ -1486,15 +1293,6 @@ SkColor ResolveShellContrastBackground(
 
 SkColor ResolveSplitCanvasColor(const ui::ColorProvider& color_provider) {
   return ResolveShellContrastBackground(color_provider);
-}
-
-SkColor ResolveBrowserSurfaceSeparatorColor(SkColor surface_color) {
-  return ResolveSurfaceSeparatorColor(surface_color);
-}
-
-double GetNativeGlassTintOpacity(bool is_dark_mode) {
-  return is_dark_mode ? kNativeGlassTintOpacityDark
-                      : kNativeGlassTintOpacityLight;
 }
 
 std::unique_ptr<views::View> CreateCombinedSurfaceOutlineView(

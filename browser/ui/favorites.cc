@@ -18,6 +18,7 @@
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/path_effect.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/shell_policy.h"
 #include "chrome/browser/ui/views/yee/vertical_tab_text_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"

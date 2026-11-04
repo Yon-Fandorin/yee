@@ -239,7 +239,7 @@ Computer Use의 URL 인식 문제는 별도 미해결 사항이며 native 검사
 | [Sidebar 소유권](sidebar/ownership.md), [배치](sidebar/layout.md) | 탭·그룹은 Chromium 소유, Yee는 표현을 소유한다. Chat/Agent History는 예약 범위다. |
 | [Browser Surface 배치](../browser/ui/browser_surface_layout.h) | 수평·세로 모드, 실제 본문과 Side Panel의 배치 기반이 있다. |
 | [수평 탭 표현](../browser/ui/horizontal_tab_presentation.h), [그룹 표현](../browser/ui/tab_group_presentation.h) | 기존 native 탭·그룹의 표시를 확장할 진입점이다. |
-| [공통 UI 치수](../browser/ui/yee_ui.h) | `yee::kSidebarMetrics`가 시각 계약이다. 시안 CSS 숫자를 별도로 복사하지 않는다. |
+| [공통 UI 치수](../browser/ui/sidebar_metrics.h) | `yee::kSidebarMetrics`가 시각 계약이다. 시안 CSS 숫자를 별도로 복사하지 않는다. |
 | [Agent 탭 상태](../browser/ui/agent_tab_activity.h) | 탭의 working/needs-input 표시는 Agent Task 자체나 사용자 그룹과 구분되어 있다. |
 | [Agent 구조](agent-browser-architecture.md) | 현재 외부 MCP adapter와 Native bridge를 사용한다. 앱 내부 MCP transport나 완전한 작업 이력이 구현되었다고 가정하지 않는다. |
 | [Footer](sidebar/footer.md) | Account/Tenant/Workspace의 맥락은 프로젝트와 자동으로 같은 개념이 되지 않는다. |

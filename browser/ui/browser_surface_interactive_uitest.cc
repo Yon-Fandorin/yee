@@ -115,6 +115,7 @@
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/page_viewport_migration.h"
 #include "chrome/browser/ui/views/yee/sidebar_footer.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/split_pane_controls.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"

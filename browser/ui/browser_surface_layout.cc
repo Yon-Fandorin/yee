@@ -6,7 +6,8 @@
 
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/shell_features.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "ui/gfx/geometry/outsets.h"
 
 namespace yee {

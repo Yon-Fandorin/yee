@@ -68,6 +68,7 @@
 #include "chrome/browser/ui/views/yee/projects/project_hub_view.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 #include "chrome/browser/ui/views/yee/projects/project_row_view.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/vertical_group_color_mark.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"

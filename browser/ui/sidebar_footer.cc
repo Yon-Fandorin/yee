@@ -22,6 +22,7 @@
 #include "build/build_config.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_reopen_suppressor.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "components/vector_icons/vector_icons.h"

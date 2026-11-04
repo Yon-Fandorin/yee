@@ -10,7 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/gfx/animation/animation.h"

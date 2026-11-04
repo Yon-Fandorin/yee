@@ -7,7 +7,8 @@
 
 #include <array>
 
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+
 
 namespace yee {
 

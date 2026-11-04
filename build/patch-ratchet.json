@@ -100,7 +100,6 @@
           "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm": 1,
           "chrome/browser/ui/views/frame/browser_view.cc": 11,
           "chrome/browser/ui/views/frame/browser_view.h": 1,
-          "chrome/browser/ui/views/frame/contents_container_outline.cc": 1,
           "chrome/browser/ui/views/frame/contents_container_view.cc": 6,
           "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc": 2,
           "chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm": 3,
@@ -218,6 +217,168 @@
           "path": "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h",
           "allowed": 1,
           "reason": "approved composition root per docs/chromium-upgrade-structure.md step 3"
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc",
+          "allowed": 326,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/browser_frame_view_mac.mm",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/browser_frame_view_win.cc",
+          "allowed": 6,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/browser_native_widget_mac.mm",
+          "allowed": 4,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/browser_view.cc",
+          "allowed": 12,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/contents_container_view.cc",
+          "allowed": 7,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc",
+          "allowed": 3,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc",
+          "allowed": 8,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/multi_contents_view.cc",
+          "allowed": 4,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc",
+          "allowed": 5,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc",
+          "allowed": 8,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/location_bar/location_bar_view.cc",
+          "allowed": 5,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/horizontal_tab_style_views.cc",
+          "allowed": 4,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/split_tab_view.cc",
+          "allowed": 3,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_drag_handler.cc",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_group_header_view.cc",
+          "allowed": 6,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc",
+          "allowed": 3,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc",
+          "allowed": 4,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/tab_view.cc",
+          "allowed": 11,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/new_tab_button.cc",
+          "allowed": 3,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/shared/new_tab_button.cc",
+          "allowed": 4,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/toolbar/toolbar_view.cc",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm",
+          "allowed": 153,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm",
+          "allowed": 2,
+          "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
         }
       ]
     }

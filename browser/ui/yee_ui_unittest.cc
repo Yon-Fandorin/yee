@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 
 #include <algorithm>
@@ -16,8 +17,10 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
+#include "chrome/browser/ui/views/yee/yee_colors.h"
 #include "chrome/grit/theme_resources.h"
 #include "chrome/test/base/test_theme_provider.h"
 #include "chrome/test/views/chrome_views_test_base.h"

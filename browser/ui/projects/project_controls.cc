@@ -6,8 +6,8 @@
 #include <utility>
 
 #include "base/task/single_thread_task_runner.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/menu_source_utils.h"
 #include "ui/base/models/image_model.h"

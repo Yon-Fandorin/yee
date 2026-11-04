@@ -18,6 +18,7 @@
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/grit/generated_resources.h"
 #include "ui/base/class_property.h"

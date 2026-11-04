@@ -8,12 +8,13 @@ Windows 검증과 나머지 구조 변경은 후속 작업이다.
 
 ## 현재 패치 구성
 
-테스트 이전 1단계와 PNC 생성 이동 뒤 `0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
+테스트 이전 1단계, PNC 생성 이동과 `yee_ui.h` 분리 뒤
+`0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
 
 | 구분 | 파일 | 추가 줄 | 삭제 줄 |
 | --- | ---: | ---: | ---: |
-| 수정한 제품 파일 | 296 | 12,344 | 1,655 |
-| 수정한 Chromium 테스트 파일 | 31 | 5,664 | 134 |
+| 수정한 제품 파일 | 296 | 12,376 | 1,655 |
+| 수정한 Chromium 테스트 파일 | 31 | 5,666 | 134 |
 | 새 파일 | 5 | 1,152 | 0 |
 
 줄 수는 결합 정도의 근사치다. 실제 이식 비용은 충돌과 빌드·gate 소요 시간을
@@ -125,10 +126,10 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 | 지표 | 세는 내용 | 현재 합계 |
 | --- | --- | ---: |
-| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,664 |
+| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,666 |
 | `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 61 |
 | `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 30 |
-| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 206 |
+| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 240 |
 | `yee_members` | 수정한 헤더의 Yee 이름·타입 멤버 선언(여러 줄 선언은 하나로 합침) | 55 |
 
 [`build/patch-ratchet.json`](../build/patch-ratchet.json)은 `schema_version: 1`과
@@ -215,12 +216,24 @@ embedder 경로의 증가 세 건은 승인한 조립 지점 예외로 기록하
 
 ### 4. yee_ui.h 분리
 
-Chromium 파일 47개가 include하는 `yee_ui.h`를 metrics·policy·순수 color 계약으로
-나눈다. `yee::kSidebarMetrics`는 계속 하나의 시각 계약으로 유지한다.
+분리를 완료했다. `sidebar_metrics.h`는 `SidebarMetrics`·`kSidebarMetrics`·
+검증식·View ID를, `shell_policy.h`는 Sidebar·Favorites 정책을,
+`yee_colors.h`는 SkColor 기반 순수 색상 계약을 맡고, `yee_ui.h`에는 Views·테마
+helper만 남겼다. `yee_ui.h`는 분리한 헤더를 재노출하지 않는다.
 
-- 완료 기준: 각 호출자가 필요한 헤더만 참조하고, metrics 중복 없이 기존 빌드·gate가
-  통과한다.
-- 기대 효과: 헤더 변경 시 재빌드 전파를 줄인다. 충돌 감소를 주된 효과로 보지 않는다.
+헤더 변경 시 재컴파일 단위는 다음처럼 줄었다(macOS 의존 기록 기준).
+
+| 변경 계약 | 분리 전 | 분리 후 헤더 | 분리 후 |
+| --- | ---: | --- | ---: |
+| metrics·View ID | 84 | `sidebar_metrics.h` | 68 |
+| 정책 | 84 | `shell_policy.h` | 18 |
+| 순수 색상 | 84 | `yee_colors.h` | 7 |
+| Views·테마 | 84 | `yee_ui.h` | 51 |
+
+기존 includer 76곳 중 41곳은 여러 계약을 함께 쓰므로 헤더가 2개 이상 필요하다.
+이 증가는 검토한 래칫 예외 27건으로 받아들였고 합계는 `5666 / 61 / 30 / 240 / 55`다.
+2026-11-04 macOS에서 앱 빌드와 header·sidebar·레이아웃 interactive gate, 프로젝트
+browser test가 통과했다. Windows 컴파일 확인은 후속 작업이다.
 
 ### 5. 대기 API 기반
 

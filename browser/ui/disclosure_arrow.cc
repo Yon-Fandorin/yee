@@ -7,7 +7,7 @@
 
 #include "base/i18n/rtl.h"
 #include "base/time/time.h"
-#include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "ui/gfx/animation/animation.h"
