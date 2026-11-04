@@ -253,7 +253,8 @@ Mac에서 확인할 소스·패치·정식 검사 코드는 커밋에 포함한�
 
 Mac에서 아래 도구 개선을 zsh 쪽에만 적용했다. Windows 작업은 이 목록을 기준으로 Windows PC에서
 구현·검증하도록 인계했다. 항목 1·2는 Windows에서 구현·검증했고 항목 3의 출처 규약은 유지했다.
-항목 4는 제어 도구 중단으로 계속 미검증이다. Mac 결과를 Windows 통과로 기록하지 않는다.
+항목 4는 제어 도구 중단으로 계속 미검증이다. 항목 5는 2026-11-04 Mac에서 추가한 미착수 작업이다.
+Mac 결과를 Windows 통과로 기록하지 않는다.
 
 1. **빌드 루트·출력 선택 가드의 `.ps1` 대응.** `tools/dev/lib/paths.ps1`은 `YEE_OUT_NAME`이 없으면
    `YeePilot`, `YEE_CHROMIUM_ROOT`가 없으면 `LocalBuildRoot\chromium`으로 조용히 정한다. Mac의
@@ -277,6 +278,15 @@ Mac에서 아래 도구 개선을 zsh 쪽에만 적용했다. Windows 작업은 
    Windows는 기존 `run-windows-native-gates.py`의 출처 검증을 유지한다.
 4. **Windows 실제 앱 검수 항목 18개.** 위 [URL 제어 중단과 남은 실제 앱 검수 항목 18개](#url-제어-중단과-남은-실제-앱-검수-항목-18개)의
    미검증 상태 그대로다.
+5. **테스트 이전 1단계의 Windows gate 전환 (2026-11-04 Mac에서 넘김).** Yee 레이아웃·분할 시나리오
+   58개를 `browser/ui/browser_surface_interactive_uitest.cc`와 `split_pane_interactive_uitest.cc`로
+   옮겼다. 이 시나리오는 새 실행 파일 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`에서만
+   실행되고 fixture 이름은 `Yee`로 시작한다(예: `YeeBrowserViewTabbedLayoutImplUiTest`).
+   Yee 셸에서 실패하는 원본 `TopContainerBackground`는 필수 목록에서 뺐다.
+   PC 로컬 `run-windows-native-gates.py`의 layout 목록이 `interactive_ui_tests`의 이전 이름을 쓰면
+   해당 사례를 찾지 못하므로, `.sh` gate의 대상과 filter를 기준으로 바꾼다. 새 target의
+   Windows 전용 소스는 아직 Windows에서 빌드하지 않았다.
+   [구조 문서](chromium-upgrade-structure.md)의 테스트 이전 절을 따른다.
 
 ## Windows 후속 검증 결과 (2026-11-04)
 

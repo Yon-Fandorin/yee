@@ -175,13 +175,8 @@ python3 tools/overlay/check-patch-ratchet.py --update
 두 원본 파일과 `chrome/test/BUILD.gn`은 pristine으로 복원했다.
 `.sh` gate는 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`를 빌드·실행한다.
 래칫 합계는 `5664 / 61 / 30 / 206 / 55`로 낮췄다.
-2026-11-04 macOS에서 새 실행 파일과 기존 `interactive_ui_tests`가 모두 빌드됐고,
-interactive gate는 header 기본 15/15·RTL 125% 4/4, sidebar 60/60,
-레이아웃 기본 70/72·RTL 125% 43/43·통합 탭 스트립 4/4가 통과했다. 레이아웃 기본 단계의
-실패로 gate 스크립트가 멈춰, RTL과 통합 단계는 같은 filter·인자로 따로 실행했다.
-레이아웃의 실패 2건은 옮기지 않은 `ImmersiveModeControllerMacInteractiveTest`의
-전체화면 Space 전환 대기 시간 초과다. 같은 조건에서 기존 `interactive_ui_tests`도 똑같이
-실패해 이번 이전과는 무관하며, 2026-11-02에는 통과했던 원인은 확인하지 못했다.
+2026-11-04 macOS에서 새 실행 파일을 빌드했고 header·레이아웃 interactive gate의 모든 단계가
+통과했다.
 Windows `.ps1` 전환과 검증은 후속 작업이다.
 
 2단계는 Yee 테스트 26개가 있는 `tab_drag_interactive_uitest.cc`와
