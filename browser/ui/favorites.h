@@ -5,13 +5,17 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_FAVORITES_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_FAVORITES_H_
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/animation/tween.h"
@@ -146,6 +150,48 @@ bool PointHitsFavoritesDropTarget(const views::View& tab_strip,
 // Drag preview that is a child of the tab strip (not the clipped scroll
 // views). Over Favorites it is a 32px icon cell; over the tab list it is a
 // title row. Both follow the pointer.
+struct FavoritesDragPreviewAppliedSnapshot {
+  base::UnguessableToken owner;
+  uint64_t apply_serial = 0;
+  // bounds는 부모의 논리 DIP 좌표다. screen_bounds는 화면 DIP 좌표다.
+  gfx::Rect bounds;
+  gfx::Rect screen_bounds;
+  bool visible = false;
+  bool running = false;
+
+  bool operator==(const FavoritesDragPreviewAppliedSnapshot&) const = default;
+};
+
+// preview View가 소유한다. tab/session identity는 소비자가 결합한다.
+class FavoritesDragPreviewAppliedState {
+ public:
+  using Callback =
+      base::RepeatingCallback<void(const FavoritesDragPreviewAppliedSnapshot&)>;
+
+  FavoritesDragPreviewAppliedState(const FavoritesDragPreviewAppliedState&) =
+      delete;
+  FavoritesDragPreviewAppliedState& operator=(
+      const FavoritesDragPreviewAppliedState&) = delete;
+  ~FavoritesDragPreviewAppliedState();
+
+  static FavoritesDragPreviewAppliedState* From(views::View& preview);
+  FavoritesDragPreviewAppliedSnapshot GetSnapshot() const;
+  // Update/Hide/애니메이션 적용 당시 값의 복사본을 다음 task에서 전달한다.
+  // 초기 알림은 없으며 owner 파괴 시 대기 중 알림도 무효화한다.
+  base::CallbackListSubscription Subscribe(Callback callback);
+  base::WeakPtr<FavoritesDragPreviewAppliedState> GetWeakPtr();
+
+ private:
+  friend class FavoritesDragPreview;
+  FavoritesDragPreviewAppliedState();
+  void Publish(const views::View& preview, bool running);
+  void NotifySubscribers(FavoritesDragPreviewAppliedSnapshot snapshot);
+  void Invalidate();
+
+  class Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
 void ShowFavoritesDragPreview(views::View& tab_strip,
                               const gfx::Point& point_in_screen,
                               bool over_favorites,

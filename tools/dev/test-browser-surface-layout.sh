@@ -24,6 +24,7 @@ case "$(uname -s)" in
     ;;
 esac
 NATIVE_FAST_FILTER='BrowserAnimationControllerTest.*:BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
+NATIVE_FAST_FILTER+=':PageViewportAppliedStateTest.*:FavoritesPreviewAppliedStateTest.*:HorizontalTabGroupCapsuleStateTest.*'
 YEE_FAST_FILTER='AppliedWaitTest.*:BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
 # 원본 TopContainerBackground는 Yee 셸에서 실패하므로 필수 목록에서 빼고,
 # 같은 시나리오를 Yee 셸 기준으로 고친 Yee 복사본만 선택한다.

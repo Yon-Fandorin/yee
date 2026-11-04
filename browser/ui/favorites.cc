@@ -792,6 +792,73 @@ bool PointHitsFavoritesDropTarget(const views::View& tab_strip,
   return magnet.Contains(point_in_screen);
 }
 
+class FavoritesDragPreviewAppliedState::Impl {
+ public:
+  explicit Impl(FavoritesDragPreviewAppliedState& state)
+      : weak_factory(&state) {
+    snapshot.owner = base::UnguessableToken::Create();
+  }
+
+  FavoritesDragPreviewAppliedSnapshot snapshot;
+  using CallbackList = base::RepeatingCallbackList<void(
+      const FavoritesDragPreviewAppliedSnapshot&)>;
+  std::shared_ptr<CallbackList> callbacks = std::make_shared<CallbackList>();
+  base::WeakPtrFactory<FavoritesDragPreviewAppliedState> weak_factory;
+};
+
+FavoritesDragPreviewAppliedState::FavoritesDragPreviewAppliedState()
+    : impl_(std::make_unique<Impl>(*this)) {}
+
+FavoritesDragPreviewAppliedState::~FavoritesDragPreviewAppliedState() = default;
+
+FavoritesDragPreviewAppliedSnapshot
+FavoritesDragPreviewAppliedState::GetSnapshot() const {
+  return impl_->snapshot;
+}
+
+base::CallbackListSubscription FavoritesDragPreviewAppliedState::Subscribe(
+    Callback callback) {
+  return impl_->callbacks->Add(base::BindRepeating(
+      [](base::WeakPtr<FavoritesDragPreviewAppliedState> owner,
+         uint64_t after_serial, Callback callback,
+         const FavoritesDragPreviewAppliedSnapshot& snapshot) {
+        if (owner && snapshot.apply_serial > after_serial) {
+          callback.Run(snapshot);
+        }
+      },
+      GetWeakPtr(), impl_->snapshot.apply_serial, std::move(callback)));
+}
+
+base::WeakPtr<FavoritesDragPreviewAppliedState>
+FavoritesDragPreviewAppliedState::GetWeakPtr() {
+  return impl_->weak_factory.GetWeakPtr();
+}
+
+void FavoritesDragPreviewAppliedState::Publish(const views::View& preview,
+                                               bool running) {
+  ++impl_->snapshot.apply_serial;
+  impl_->snapshot.bounds = preview.bounds();
+  impl_->snapshot.screen_bounds = preview.GetBoundsInScreen();
+  impl_->snapshot.visible = preview.GetVisible();
+  impl_->snapshot.running = running;
+  if (!impl_->callbacks->empty()) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&FavoritesDragPreviewAppliedState::NotifySubscribers,
+                       GetWeakPtr(), impl_->snapshot));
+  }
+}
+
+void FavoritesDragPreviewAppliedState::NotifySubscribers(
+    FavoritesDragPreviewAppliedSnapshot snapshot) {
+  const auto callbacks = impl_->callbacks;
+  callbacks->Notify(snapshot);
+}
+
+void FavoritesDragPreviewAppliedState::Invalidate() {
+  impl_->weak_factory.InvalidateWeakPtrs();
+}
+
 class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(FavoritesDragPreview, views::View)
 
@@ -821,10 +888,13 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   FavoritesDragPreview(const FavoritesDragPreview&) = delete;
   FavoritesDragPreview& operator=(const FavoritesDragPreview&) = delete;
   ~FavoritesDragPreview() override {
+    applied_state_.Invalidate();
     suppress_animation_callback_ = true;
     group_indent_animation_.Stop();
     region_transition_animation_.Stop();
   }
+
+  FavoritesDragPreviewAppliedState& applied_state() { return applied_state_; }
 
   void Update(const gfx::Point& point_in_screen,
               bool over_favorites,
@@ -845,6 +915,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
 
     views::View* const strip = parent();
     if (!strip) {
+      PublishAppliedState();
       return;
     }
 
@@ -867,6 +938,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
         has_preview_bounds_ = true;
         SetVisible(true);
         strip->ReorderChildView(this, strip->children().size() - 1);
+        PublishAppliedState();
         return;
       }
     } else {
@@ -903,6 +975,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
     has_preview_bounds_ = true;
     SetVisible(true);
     strip->ReorderChildView(this, strip->children().size() - 1);
+    PublishAppliedState();
   }
 
   void HidePreview() {
@@ -918,6 +991,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
     region_target_bounds_.reset();
     over_favorites_ = false;
     SetVisible(false);
+    PublishAppliedState();
   }
 
   void AnimationProgressed(const gfx::Animation* animation) override {
@@ -929,6 +1003,7 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
     } else if (animation == &region_transition_animation_) {
       ApplyAnimatedRegionTransition();
     }
+    PublishAppliedState();
   }
 
   void AnimationEnded(const gfx::Animation* animation) override {
@@ -989,6 +1064,12 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   }
 
  private:
+  void PublishAppliedState() {
+    applied_state_.Publish(*this,
+                           group_indent_animation_.is_animating() ||
+                               region_transition_animation_.is_animating());
+  }
+
   gfx::Rect BoundsInTabStrip() const {
     return parent() ? parent()->GetMirroredRect(bounds()) : bounds();
   }
@@ -1135,10 +1216,17 @@ class FavoritesDragPreview : public views::View, public gfx::AnimationDelegate {
   SkColor fill_color_ = SkColorSetARGB(210, 255, 255, 255);
   raw_ptr<views::ImageView> icon_ = nullptr;
   raw_ptr<VerticalTabTextView> title_ = nullptr;
+  FavoritesDragPreviewAppliedState applied_state_;
 };
 
 BEGIN_METADATA(FavoritesDragPreview)
 END_METADATA
+
+FavoritesDragPreviewAppliedState* FavoritesDragPreviewAppliedState::From(
+    views::View& preview) {
+  auto* view = views::AsViewClass<FavoritesDragPreview>(&preview);
+  return view ? &view->applied_state() : nullptr;
+}
 
 void ShowFavoritesDragPreview(views::View& tab_strip,
                               const gfx::Point& point_in_screen,

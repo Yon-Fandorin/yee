@@ -3963,6 +3963,71 @@
       "yee_layout_unittests"
     ]
   },
+  "browser/ui/favorites_unittest.cc::FavoritesPreviewAppliedStateTest.HideCancelsMotionBeforePublishing": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/favorites_unittest.cc::FavoritesPreviewAppliedStateTest.OwnerDeletionFromProgressNotificationIsSafe": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/favorites_unittest.cc::FavoritesPreviewAppliedStateTest.PublishesBothOwnedAnimations": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/favorites_unittest.cc::FavoritesPreviewAppliedStateTest.SameUpdateAndHidePublishAppliedValues": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/favorites_unittest.cc::FavoritesPreviewAppliedStateTest.SubscriptionAndWeakPtrFollowPreview": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
   "browser/ui/group_mark_signals_unittest.cc::GroupMarkSignalsTest.FileFixtureCanAddEveryBrowserDemoSignal": {
     "os": [
       "Darwin",
@@ -6404,6 +6469,174 @@
     "tier": "A",
     "owner": "test-header.sh",
     "reason": "L381: 색상·surface·shell geometry의 순수 계산이다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.DestructionInvalidatesBeforeViewObserversRunTasks": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 decoration의 파괴 observer에서 대기 task를 실행해 알림과 WeakPtr 무효화를 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.OwnerDeletionFromCancelNotificationDropsQueuedReset": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.OwnerDeletionFromProgressNotificationIsSafe": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.PublishesStartProgressAndEnd": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.QueuedSnapshotsPreserveMotionAndSubscriptionBoundary": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.ReducedMotionPublishesCancelAndReset": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.ReversalPublishesTheCurrentExpansion": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::HorizontalTabGroupCapsuleStateTest.SubscriptionEndsOnRemovalAndDecorationDestruction": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 View와 owned 애니메이션의 값·serial·구독 수명을 mock 시간으로 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::PageViewportAppliedStateTest.OwnerDeletionStopsRemainingNotifications": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 clip host의 값·재적용 serial·구독 수명을 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::PageViewportAppliedStateTest.PublishesCompleteSameGeometryReapplications": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 clip host의 값·재적용 serial·구독 수명을 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::PageViewportAppliedStateTest.QueuedDeliveryHonorsSubscriptionBoundary": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 clip host의 값·재적용 serial·구독 수명을 검사한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::PageViewportAppliedStateTest.SubscriptionAndWeakPtrFollowTheClipHost": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "Widget 없는 실제 clip host의 값·재적용 serial·구독 수명을 검사한다.",
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"

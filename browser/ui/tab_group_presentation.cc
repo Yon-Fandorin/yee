@@ -9,9 +9,12 @@
 #include "base/callback_list.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
+#include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
@@ -43,6 +46,7 @@
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_observer.h"
 #include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
 
@@ -52,16 +56,30 @@ struct HorizontalTabGroupClosingHeader {
   views::ViewTracker header;
 };
 
-class HorizontalTabGroupCapsuleAnimation : public gfx::AnimationDelegate {
+class HorizontalTabGroupCapsuleState::Impl : public gfx::AnimationDelegate,
+                                             public views::ViewObserver {
  public:
-  HorizontalTabGroupCapsuleAnimation(views::View& decoration, bool collapsed)
-      : decoration_(&decoration), collapsed_(collapsed), animation_(this) {
+  Impl(HorizontalTabGroupCapsuleState& state,
+       views::View& decoration,
+       bool collapsed)
+      : decoration_(&decoration),
+        collapsed_(collapsed),
+        animation_(this),
+        weak_factory_(&state) {
     animation_.Reset(collapsed ? 0.0 : 1.0);
     animation_.SetSlideDuration(base::Milliseconds(200));
     animation_.SetTweenType(gfx::Tween::EASE_IN_OUT);
+    snapshot.owner = base::UnguessableToken::Create();
+    decoration_observation_.Observe(&decoration);
+    Publish();
   }
 
+  ~Impl() override { Shutdown(); }
+
   void SetCollapsed(bool collapsed) {
+    if (shutting_down_) {
+      return;
+    }
     const bool animate = gfx::Animation::ShouldRenderRichAnimation() &&
                          !gfx::Animation::PrefersReducedMotion();
     if (collapsed_ == collapsed && (animate || !animation_.is_animating())) {
@@ -76,32 +94,119 @@ class HorizontalTabGroupCapsuleAnimation : public gfx::AnimationDelegate {
       animation_.Show();
     }
     decoration_->SchedulePaint();
+    Publish();
   }
 
-  double expansion() const { return animation_.GetCurrentValue(); }
+  HorizontalTabGroupCapsuleSnapshot snapshot;
+  using CallbackList = base::RepeatingCallbackList<void(
+      const HorizontalTabGroupCapsuleSnapshot&)>;
+  std::shared_ptr<CallbackList> callbacks = std::make_shared<CallbackList>();
+
+  base::WeakPtr<HorizontalTabGroupCapsuleState> GetWeakPtr() {
+    if (shutting_down_) {
+      return {};
+    }
+    return weak_factory_.GetWeakPtr();
+  }
 
  private:
+  void OnViewHierarchyWillBeDeleted(views::View*) override { Shutdown(); }
+
+  void Shutdown() {
+    if (shutting_down_) {
+      return;
+    }
+    shutting_down_ = true;
+    weak_factory_.InvalidateWeakPtrs();
+    animation_.set_delegate(nullptr);
+    animation_.Stop();
+    decoration_observation_.Reset();
+  }
+
   void AnimationProgressed(const gfx::Animation*) override {
     decoration_->SchedulePaint();
+    Publish();
+  }
+
+  void AnimationEnded(const gfx::Animation*) override { Publish(); }
+
+  void AnimationCanceled(const gfx::Animation*) override { Publish(); }
+
+  // 상태 값과 알림만 갱신한다. 다시 그리기 요청은 기존 호출 지점이 맡는다.
+  void Publish() {
+    ++snapshot.apply_serial;
+    snapshot.expansion = animation_.GetCurrentValue();
+    snapshot.running = animation_.is_animating();
+    if (!callbacks->empty()) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&HorizontalTabGroupCapsuleState::NotifySubscribers,
+                         GetWeakPtr(), snapshot));
+    }
   }
 
   raw_ptr<views::View> decoration_;
   bool collapsed_;
   gfx::SlideAnimation animation_;
+  bool shutting_down_ = false;
+  base::ScopedObservation<views::View, views::ViewObserver>
+      decoration_observation_{this};
+
+  base::WeakPtrFactory<HorizontalTabGroupCapsuleState> weak_factory_;
 };
+
+HorizontalTabGroupCapsuleState::HorizontalTabGroupCapsuleState(
+    views::View& decoration,
+    bool collapsed)
+    : impl_(std::make_unique<Impl>(*this, decoration, collapsed)) {}
+
+HorizontalTabGroupCapsuleState::~HorizontalTabGroupCapsuleState() = default;
+
+HorizontalTabGroupCapsuleSnapshot HorizontalTabGroupCapsuleState::GetSnapshot()
+    const {
+  return impl_->snapshot;
+}
+
+base::CallbackListSubscription HorizontalTabGroupCapsuleState::Subscribe(
+    Callback callback) {
+  return impl_->callbacks->Add(base::BindRepeating(
+      [](base::WeakPtr<HorizontalTabGroupCapsuleState> owner,
+         uint64_t after_serial, Callback callback,
+         const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        if (owner && snapshot.apply_serial > after_serial) {
+          callback.Run(snapshot);
+        }
+      },
+      GetWeakPtr(), impl_->snapshot.apply_serial, std::move(callback)));
+}
+
+void HorizontalTabGroupCapsuleState::NotifySubscribers(
+    HorizontalTabGroupCapsuleSnapshot snapshot) {
+  const auto callbacks = impl_->callbacks;
+  callbacks->Notify(snapshot);
+}
+
+base::WeakPtr<HorizontalTabGroupCapsuleState>
+HorizontalTabGroupCapsuleState::GetWeakPtr() {
+  return impl_->GetWeakPtr();
+}
+
+void HorizontalTabGroupCapsuleState::SetCollapsed(bool collapsed) {
+  impl_->SetCollapsed(collapsed);
+}
 }  // namespace yee
 
 DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
 DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupClosingHeader*)
-DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleAnimation*)
-DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleAnimation*)
+DECLARE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleState*)
+DEFINE_UI_CLASS_PROPERTY_TYPE(yee::HorizontalTabGroupCapsuleState*)
 
 namespace yee {
 namespace {
 DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupClosingHeader,
                                    kHorizontalTabGroupClosingHeaderKey)
-DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupCapsuleAnimation,
-                                   kHorizontalTabGroupCapsuleAnimationKey)
+DEFINE_OWNED_UI_CLASS_PROPERTY_KEY(HorizontalTabGroupCapsuleState,
+                                   kHorizontalTabGroupCapsuleStateKey)
 constexpr int kMaxIcons = 3;
 constexpr int kIconSize = 16;
 constexpr int kIconBox = 20;
@@ -329,30 +434,40 @@ gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds) {
 void SetHorizontalTabGroupCapsuleCollapsed(views::View& decoration,
                                            bool collapsed) {
   if (!UsesHorizontalTabGroupCapsule(decoration)) {
-    decoration.ClearProperty(kHorizontalTabGroupCapsuleAnimationKey);
+    decoration.ClearProperty(kHorizontalTabGroupCapsuleStateKey);
     return;
   }
-  if (auto* animation =
-          decoration.GetProperty(kHorizontalTabGroupCapsuleAnimationKey)) {
-    animation->SetCollapsed(collapsed);
-  } else {
-    decoration.SetProperty(kHorizontalTabGroupCapsuleAnimationKey,
-                           std::make_unique<HorizontalTabGroupCapsuleAnimation>(
-                               decoration, collapsed));
+  HorizontalTabGroupCapsuleState::GetOrCreate(decoration, collapsed)
+      .SetCollapsed(collapsed);
+}
+
+HorizontalTabGroupCapsuleState* HorizontalTabGroupCapsuleState::From(
+    views::View& decoration) {
+  return decoration.GetProperty(kHorizontalTabGroupCapsuleStateKey);
+}
+
+HorizontalTabGroupCapsuleState& HorizontalTabGroupCapsuleState::GetOrCreate(
+    views::View& decoration,
+    bool collapsed) {
+  if (!From(decoration)) {
+    decoration.SetProperty(kHorizontalTabGroupCapsuleStateKey,
+                           base::WrapUnique(new HorizontalTabGroupCapsuleState(
+                               decoration, collapsed)));
   }
+  return *From(decoration);
 }
 
 void PaintHorizontalTabGroupCapsule(gfx::Canvas& canvas,
                                     const views::View& decoration,
                                     SkColor group_color) {
   gfx::Rect bounds = decoration.GetLocalBounds();
-  if (const auto* animation =
-          decoration.GetProperty(kHorizontalTabGroupCapsuleAnimationKey)) {
+  if (const auto* state =
+          decoration.GetProperty(kHorizontalTabGroupCapsuleStateKey)) {
     const int collapsed_height =
         std::min(bounds.height(),
                  kSidebarMetrics.horizontal_group_collapsed_capsule_height);
     const int height = gfx::Tween::IntValueBetween(
-        animation->expansion(), collapsed_height, bounds.height());
+        state->GetSnapshot().expansion, collapsed_height, bounds.height());
     bounds.ClampToCenteredSize(gfx::Size(bounds.width(), height));
   }
   cc::PaintFlags flags;

@@ -9,13 +9,18 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/i18n/test/scoped_rtl_for_testing.h"
+#include "base/scoped_observation.h"
+#include "base/test/bind.h"
+#include "base/test/task_environment.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
+#include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
@@ -28,20 +33,429 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_manager.h"
+#include "ui/compositor/layer.h"
 #include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/favicon_size.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/native_theme/native_theme_base.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/test/views_test_utils.h"
+#include "ui/views/view_observer.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
+
+// Widget 없이 decoration이 소유하는 실제 애니메이션을 구동한다.
+class HorizontalTabGroupCapsuleStateTest : public testing::Test {
+ protected:
+  HorizontalTabGroupCapsuleState& Attach(views::View& decoration,
+                                         bool collapsed) {
+    return HorizontalTabGroupCapsuleState::GetOrCreate(decoration, collapsed);
+  }
+
+  void SetCollapsed(HorizontalTabGroupCapsuleState& state, bool collapsed) {
+    state.SetCollapsed(collapsed);
+  }
+
+  base::test::SingleThreadTaskEnvironment task_environment_{
+      base::test::SingleThreadTaskEnvironment::MainThreadType::UI,
+      base::test::SingleThreadTaskEnvironment::TimeSource::MOCK_TIME};
+  gfx::AnimationTestApi::RenderModeResetter rich_animation_ =
+      gfx::AnimationTestApi::SetRichAnimationRenderMode(
+          gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  gfx::AnimationTestApi::PrefersReducedMotionResetter reduced_motion_ =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
+  gfx::ScopedAnimationDurationScaleMode duration_scale_{
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION};
+};
+
 namespace {
+
+class PageViewportAppliedStateTest : public testing::Test {
+ protected:
+  base::test::SingleThreadTaskEnvironment task_environment_;
+};
+
+class ViewDeletionTaskObserver : public views::ViewObserver {
+ public:
+  ViewDeletionTaskObserver(views::View& view,
+                           base::OnceCallback<void(views::View&)> on_deletion)
+      : on_deletion_(std::move(on_deletion)) {
+    observation_.Observe(&view);
+  }
+
+ private:
+  void OnViewIsDeleting(views::View* view) override {
+    observation_.Reset();
+    std::move(on_deletion_).Run(*view);
+  }
+
+  base::OnceCallback<void(views::View&)> on_deletion_;
+  base::ScopedObservation<views::View, views::ViewObserver> observation_{this};
+};
+
+TEST_F(PageViewportAppliedStateTest,
+       PublishesCompleteSameGeometryReapplications) {
+  auto host = CreatePageViewportHostTree();
+  auto& target = GetPageTargetHost(*host);
+  auto* child = target.AddChildView(std::make_unique<views::View>());
+  const PageViewportGeometry geometry{
+      .page_environment_in_container = gfx::Rect(10, 20, 500, 400),
+      .content_and_footer_in_container = gfx::Rect(10, 20, 480, 390),
+      .current_viewport_in_container = gfx::Rect(10, 20, 480, 360),
+      .target_stack_in_container = gfx::Rect(-30, 15, 520, 380),
+      .current_clip_in_target = gfx::Rect(40, 5, 480, 360),
+      .current_viewport_in_screen = gfx::Rect(100, 200, 480, 360),
+      .viewport_radii = gfx::RoundedCornersF(1, 2, 3, 4),
+      .generation = 42};
+  host->SetBoundsRect(geometry.current_viewport_in_container);
+  auto* state = PageViewportAppliedState::From(*host);
+  ASSERT_TRUE(state);
+  EXPECT_FALSE(state->GetSnapshot().owner.is_empty());
+  EXPECT_EQ(0u, state->GetSnapshot().apply_serial);
+
+  std::vector<PageViewportAppliedSnapshot> snapshots;
+  auto subscription = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot& snapshot) {
+        snapshots.push_back(snapshot);
+        EXPECT_EQ(child->bounds(), target.GetLocalBounds());
+        EXPECT_EQ(GetViewportOverlayHost(*host).bounds(),
+                  host->GetLocalBounds());
+      }));
+  EXPECT_TRUE(snapshots.empty());
+  ApplyPageViewportHostGeometry(*host, geometry);
+  ApplyPageViewportHostGeometry(*host, geometry);
+  task_environment_.RunUntilIdle();
+  ASSERT_EQ(2u, snapshots.size());
+  EXPECT_EQ(1u, snapshots[0].apply_serial);
+  EXPECT_EQ(2u, snapshots[1].apply_serial);
+  EXPECT_EQ(snapshots[0].owner, snapshots[1].owner);
+  EXPECT_EQ(geometry, snapshots[1].geometry);
+  EXPECT_EQ(geometry.current_viewport_in_container,
+            snapshots[1].clip_host_bounds_in_container);
+  EXPECT_EQ(gfx::Rect(-40, -5, 520, 380),
+            snapshots[1].target_host_bounds_in_clip);
+  EXPECT_EQ(gfx::Rect(480, 360), snapshots[1].overlay_host_bounds_in_clip);
+  EXPECT_EQ(geometry.viewport_radii, snapshots[1].clip_host_radii);
+  EXPECT_TRUE(snapshots[1].masks_to_bounds);
+
+  auto next_geometry = geometry;
+  next_geometry.target_stack_in_container.Offset(7, 9);
+  next_geometry.viewport_radii = gfx::RoundedCornersF(8);
+  ApplyPageViewportHostGeometry(*host, next_geometry);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(3u, state->GetSnapshot().apply_serial);
+  EXPECT_EQ(next_geometry, state->GetSnapshot().geometry);
+  EXPECT_EQ(geometry, snapshots[0].geometry);
+}
+
+TEST_F(PageViewportAppliedStateTest, SubscriptionAndWeakPtrFollowTheClipHost) {
+  views::View unrelated;
+  unrelated.SetID(kPageViewportClipHostViewId);
+  EXPECT_FALSE(PageViewportAppliedState::From(unrelated));
+  auto host = CreatePageViewportHostTree();
+  auto* state = PageViewportAppliedState::From(*host);
+  EXPECT_FALSE(PageViewportAppliedState::From(GetPageTargetHost(*host)));
+  const auto owner = state->GetSnapshot().owner;
+  auto weak = state->GetWeakPtr();
+  int calls = 0;
+  auto subscription = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot&) { ++calls; }));
+  ApplyPageViewportHostGeometry(*host, {});
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, calls);
+  subscription = {};
+  ApplyPageViewportHostGeometry(*host, {});
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, calls);
+
+  subscription = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot&) { ++calls; }));
+  ApplyPageViewportHostGeometry(*host, {});
+  host.reset();
+  task_environment_.RunUntilIdle();
+  EXPECT_FALSE(weak);
+  EXPECT_EQ(1, calls);
+  host = CreatePageViewportHostTree();
+  EXPECT_NE(owner, PageViewportAppliedState::From(*host)->GetSnapshot().owner);
+  ApplyPageViewportHostGeometry(*host, {});
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, calls);
+  subscription = {};
+}
+
+TEST_F(PageViewportAppliedStateTest, OwnerDeletionStopsRemainingNotifications) {
+  auto host = CreatePageViewportHostTree();
+  auto* state = PageViewportAppliedState::From(*host);
+  auto weak = state->GetWeakPtr();
+  auto deletion = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot&) { host.reset(); }));
+  int later_calls = 0;
+  auto later = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot&) { ++later_calls; }));
+  ApplyPageViewportHostGeometry(*host, {});
+  task_environment_.RunUntilIdle();
+  EXPECT_FALSE(weak);
+  EXPECT_EQ(0, later_calls);
+}
+
+TEST_F(PageViewportAppliedStateTest, QueuedDeliveryHonorsSubscriptionBoundary) {
+  auto host = CreatePageViewportHostTree();
+  auto* state = PageViewportAppliedState::From(*host);
+  int canceled_calls = 0;
+  auto canceled = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot&) { ++canceled_calls; }));
+  ApplyPageViewportHostGeometry(*host, {});
+  std::vector<uint64_t> serials;
+  auto late = state->Subscribe(base::BindLambdaForTesting(
+      [&](const PageViewportAppliedSnapshot& snapshot) {
+        serials.push_back(snapshot.apply_serial);
+      }));
+  canceled = {};
+  ApplyPageViewportHostGeometry(*host, {});
+  EXPECT_TRUE(serials.empty());
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(0, canceled_calls);
+  EXPECT_EQ((std::vector<uint64_t>{2}), serials);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest, PublishesStartProgressAndEnd) {
+  views::View decoration;
+  EXPECT_FALSE(HorizontalTabGroupCapsuleState::From(decoration));
+  auto& state = Attach(decoration, /*collapsed=*/true);
+  EXPECT_EQ(&state, HorizontalTabGroupCapsuleState::From(decoration));
+  const auto initial = state.GetSnapshot();
+  EXPECT_FALSE(initial.owner.is_empty());
+  EXPECT_EQ(1u, initial.apply_serial);
+  EXPECT_EQ(0, initial.expansion);
+  EXPECT_FALSE(initial.running);
+
+  std::vector<HorizontalTabGroupCapsuleSnapshot> snapshots;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        snapshots.push_back(snapshot);
+      }));
+  EXPECT_TRUE(snapshots.empty());
+  SetCollapsed(state, false);
+  task_environment_.RunUntilIdle();
+  ASSERT_EQ(1u, snapshots.size());
+  EXPECT_TRUE(snapshots.back().running);
+  EXPECT_EQ(0, snapshots.back().expansion);
+  task_environment_.FastForwardBy(base::Milliseconds(80));
+  EXPECT_TRUE(state.GetSnapshot().running);
+  EXPECT_GT(state.GetSnapshot().expansion, 0);
+  EXPECT_LT(state.GetSnapshot().expansion, 1);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(snapshots.back().running);
+  EXPECT_EQ(1, snapshots.back().expansion);
+  for (size_t i = 1; i < snapshots.size(); ++i) {
+    EXPECT_EQ(initial.owner, snapshots[i].owner);
+    EXPECT_GT(snapshots[i].apply_serial, snapshots[i - 1].apply_serial);
+  }
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       ReversalPublishesTheCurrentExpansion) {
+  views::View decoration;
+  auto& state = Attach(decoration, /*collapsed=*/false);
+  SetCollapsed(state, true);
+  task_environment_.RunUntilIdle();
+  task_environment_.FastForwardBy(base::Milliseconds(80));
+  const auto shrinking = state.GetSnapshot();
+  ASSERT_TRUE(shrinking.running);
+  ASSERT_GT(shrinking.expansion, 0);
+  ASSERT_LT(shrinking.expansion, 1);
+  SetCollapsed(state, false);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(shrinking.expansion, state.GetSnapshot().expansion);
+  EXPECT_GT(state.GetSnapshot().apply_serial, shrinking.apply_serial);
+  EXPECT_TRUE(state.GetSnapshot().running);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(1, state.GetSnapshot().expansion);
+  EXPECT_FALSE(state.GetSnapshot().running);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       ReducedMotionPublishesCancelAndReset) {
+  views::View decoration;
+  auto& state = Attach(decoration, /*collapsed=*/false);
+  SetCollapsed(state, true);
+  task_environment_.RunUntilIdle();
+  task_environment_.FastForwardBy(base::Milliseconds(80));
+  const auto running = state.GetSnapshot();
+  ASSERT_TRUE(running.running);
+  std::vector<HorizontalTabGroupCapsuleSnapshot> snapshots;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        snapshots.push_back(snapshot);
+      }));
+  auto reduced = gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  SetCollapsed(state, true);
+  task_environment_.RunUntilIdle();
+  // Reset의 cancel 알림과 최종 적용 알림이 모두 idle 값을 발행한다.
+  ASSERT_EQ(2u, snapshots.size());
+  EXPECT_GT(snapshots[0].apply_serial, running.apply_serial);
+  EXPECT_EQ(snapshots[0].apply_serial + 1, snapshots[1].apply_serial);
+  for (const auto& snapshot : snapshots) {
+    EXPECT_EQ(0, snapshot.expansion);
+    EXPECT_FALSE(snapshot.running);
+  }
+  SetCollapsed(state, false);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, state.GetSnapshot().expansion);
+  EXPECT_FALSE(state.GetSnapshot().running);
+  const auto reset = state.GetSnapshot();
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(reset, state.GetSnapshot());
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       SubscriptionEndsOnRemovalAndDecorationDestruction) {
+  auto decoration = std::make_unique<views::View>();
+  auto& state = Attach(*decoration, /*collapsed=*/true);
+  const auto owner = state.GetSnapshot().owner;
+  auto weak = state.GetWeakPtr();
+  int calls = 0;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
+  SetCollapsed(state, false);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, calls);
+  subscription = {};
+  task_environment_.FastForwardBy(base::Milliseconds(80));
+  EXPECT_EQ(1, calls);
+  subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
+  // Widget 없는 native 경로는 기존 owned property를 제거한다.
+  SetHorizontalTabGroupCapsuleCollapsed(*decoration, true);
+  EXPECT_FALSE(weak);
+  EXPECT_FALSE(HorizontalTabGroupCapsuleState::From(*decoration));
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(1, calls);
+
+  auto& replacement = Attach(*decoration, /*collapsed=*/true);
+  EXPECT_NE(owner, replacement.GetSnapshot().owner);
+  auto replacement_weak = replacement.GetWeakPtr();
+  auto replacement_subscription =
+      replacement.Subscribe(base::BindLambdaForTesting(
+          [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
+  SetCollapsed(replacement, false);
+  task_environment_.RunUntilIdle();
+  const int before_destruction = calls;
+  decoration.reset();
+  EXPECT_FALSE(replacement_weak);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(before_destruction, calls);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       QueuedSnapshotsPreserveMotionAndSubscriptionBoundary) {
+  views::View decoration;
+  auto& state = Attach(decoration, /*collapsed=*/true);
+  std::vector<HorizontalTabGroupCapsuleSnapshot> early;
+  auto early_subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        early.push_back(snapshot);
+      }));
+  SetCollapsed(state, false);
+  std::vector<HorizontalTabGroupCapsuleSnapshot> late;
+  auto late_subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        late.push_back(snapshot);
+      }));
+  auto reduced = gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  SetCollapsed(state, true);
+  EXPECT_FALSE(state.GetSnapshot().running);
+  EXPECT_TRUE(early.empty());
+  task_environment_.RunUntilIdle();
+  ASSERT_EQ(3u, early.size());
+  ASSERT_EQ(2u, late.size());
+  EXPECT_TRUE(early[0].running);
+  EXPECT_FALSE(early[1].running);
+  EXPECT_FALSE(early[2].running);
+  EXPECT_EQ(early[1], late[0]);
+  EXPECT_EQ(early[2], late[1]);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       OwnerDeletionFromProgressNotificationIsSafe) {
+  auto decoration = std::make_unique<views::View>();
+  auto& state = Attach(*decoration, /*collapsed=*/true);
+  auto weak = state.GetWeakPtr();
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        if (snapshot.running && snapshot.expansion > 0) {
+          decoration.reset();
+        }
+      }));
+  int calls_after_deletion = 0;
+  auto later = state.Subscribe(
+      base::BindLambdaForTesting([&](const HorizontalTabGroupCapsuleSnapshot&) {
+        if (!weak) {
+          ++calls_after_deletion;
+        }
+      }));
+  SetCollapsed(state, false);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(decoration);
+  EXPECT_FALSE(weak);
+  EXPECT_EQ(0, calls_after_deletion);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       OwnerDeletionFromCancelNotificationDropsQueuedReset) {
+  auto decoration = std::make_unique<views::View>();
+  auto& state = Attach(*decoration, /*collapsed=*/false);
+  SetCollapsed(state, true);
+  task_environment_.FastForwardBy(base::Milliseconds(80));
+  ASSERT_TRUE(state.GetSnapshot().running);
+  auto weak = state.GetWeakPtr();
+  int idle_calls = 0;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot& snapshot) {
+        if (!snapshot.running) {
+          ++idle_calls;
+          decoration.reset();
+        }
+      }));
+  auto reduced = gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  SetCollapsed(state, true);
+  EXPECT_TRUE(decoration);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(decoration);
+  EXPECT_FALSE(weak);
+  EXPECT_EQ(1, idle_calls);
+}
+
+TEST_F(HorizontalTabGroupCapsuleStateTest,
+       DestructionInvalidatesBeforeViewObserversRunTasks) {
+  auto decoration = std::make_unique<views::View>();
+  auto& state = Attach(*decoration, /*collapsed=*/true);
+  auto weak = state.GetWeakPtr();
+  int calls = 0;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
+  SetCollapsed(state, false);
+  ViewDeletionTaskObserver observer(
+      *decoration, base::BindLambdaForTesting([&](views::View& view) {
+        EXPECT_FALSE(weak);
+        auto* dying_state = HorizontalTabGroupCapsuleState::From(view);
+        ASSERT_TRUE(dying_state);
+        EXPECT_FALSE(dying_state->GetWeakPtr());
+        task_environment_.RunUntilIdle();
+        EXPECT_EQ(0, calls);
+      }));
+  decoration.reset();
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(weak);
+  EXPECT_EQ(0, calls);
+}
 
 class SurfaceTestNativeTheme final : public ui::NativeThemeBase {
  public:

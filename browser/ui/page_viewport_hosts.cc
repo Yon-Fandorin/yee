@@ -5,7 +5,9 @@
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 
 #include "base/check.h"
-#include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
+#include "base/functional/bind.h"
+#include "base/task/single_thread_task_runner.h"
+#include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
@@ -13,8 +15,92 @@
 #include "ui/views/view.h"
 #include "ui/views/view_targeter.h"
 #include "ui/views/view_targeter_delegate.h"
+#include "ui/views/view_utils.h"
 
 namespace yee {
+
+class PageViewportAppliedState::Impl {
+ public:
+  explicit Impl(PageViewportAppliedState& state) : weak_factory(&state) {
+    snapshot.owner = base::UnguessableToken::Create();
+  }
+
+  PageViewportAppliedSnapshot snapshot;
+  using CallbackList =
+      base::RepeatingCallbackList<void(const PageViewportAppliedSnapshot&)>;
+  // 알림 중 owner가 삭제되어도 순회를 마친다. 각 구독은 WeakPtr로 막는다.
+  std::shared_ptr<CallbackList> callbacks = std::make_shared<CallbackList>();
+  base::WeakPtrFactory<PageViewportAppliedState> weak_factory;
+};
+
+class PageViewportClipHost : public views::View {
+  METADATA_HEADER(PageViewportClipHost, views::View)
+
+ public:
+  PageViewportAppliedState& applied_state() { return applied_state_; }
+
+ private:
+  PageViewportAppliedState applied_state_;
+};
+
+BEGIN_METADATA(PageViewportClipHost)
+END_METADATA
+
+PageViewportAppliedState::PageViewportAppliedState()
+    : impl_(std::make_unique<Impl>(*this)) {}
+
+PageViewportAppliedState::~PageViewportAppliedState() = default;
+
+PageViewportAppliedState* PageViewportAppliedState::From(
+    views::View& clip_host) {
+  auto* host = views::AsViewClass<PageViewportClipHost>(&clip_host);
+  return host ? &host->applied_state() : nullptr;
+}
+
+PageViewportAppliedSnapshot PageViewportAppliedState::GetSnapshot() const {
+  return impl_->snapshot;
+}
+
+base::CallbackListSubscription PageViewportAppliedState::Subscribe(
+    Callback callback) {
+  return impl_->callbacks->Add(base::BindRepeating(
+      [](base::WeakPtr<PageViewportAppliedState> owner, uint64_t after_serial,
+         Callback callback, const PageViewportAppliedSnapshot& snapshot) {
+        if (owner && snapshot.apply_serial > after_serial) {
+          callback.Run(snapshot);
+        }
+      },
+      GetWeakPtr(), impl_->snapshot.apply_serial, std::move(callback)));
+}
+
+base::WeakPtr<PageViewportAppliedState> PageViewportAppliedState::GetWeakPtr() {
+  return impl_->weak_factory.GetWeakPtr();
+}
+
+void PageViewportAppliedState::Publish(views::View& clip_host,
+                                       const PageViewportGeometry& geometry) {
+  auto& snapshot = impl_->snapshot;
+  ++snapshot.apply_serial;
+  snapshot.geometry = geometry;
+  snapshot.clip_host_bounds_in_container = clip_host.bounds();
+  snapshot.target_host_bounds_in_clip = GetPageTargetHost(clip_host).bounds();
+  snapshot.overlay_host_bounds_in_clip =
+      GetViewportOverlayHost(clip_host).bounds();
+  snapshot.clip_host_radii = clip_host.layer()->rounded_corner_radii();
+  snapshot.masks_to_bounds = clip_host.layer()->GetMasksToBounds();
+  if (!impl_->callbacks->empty()) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&PageViewportAppliedState::NotifySubscribers,
+                                  GetWeakPtr(), snapshot));
+  }
+}
+
+void PageViewportAppliedState::NotifySubscribers(
+    PageViewportAppliedSnapshot snapshot) {
+  const auto callbacks = impl_->callbacks;
+  callbacks->Notify(snapshot);
+}
+
 namespace {
 
 // A full-viewport overlay host must not become an event target just because
@@ -46,7 +132,9 @@ class ChildOnlyTargeterDelegate : public views::ViewTargeterDelegate {
 };
 
 std::unique_ptr<views::View> CreateTransparentHost(int id, bool clips_page) {
-  auto host = std::make_unique<views::View>();
+  std::unique_ptr<views::View> host =
+      clips_page ? std::make_unique<PageViewportClipHost>()
+                 : std::make_unique<views::View>();
   host->SetID(id);
   host->SetFocusBehavior(views::View::FocusBehavior::NEVER);
   host->GetViewAccessibility().SetIsIgnored(true);
@@ -114,6 +202,8 @@ void ApplyPageViewportHostGeometry(views::View& page_viewport_clip_host,
   }
   GetViewportOverlayHost(page_viewport_clip_host)
       .SetBoundsRect(page_viewport_clip_host.GetLocalBounds());
+  PageViewportAppliedState::From(page_viewport_clip_host)
+      ->Publish(page_viewport_clip_host, geometry);
 }
 
 }  // namespace yee

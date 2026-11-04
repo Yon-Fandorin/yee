@@ -2,9 +2,13 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_TAB_GROUP_PRESENTATION_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_TAB_GROUP_PRESENTATION_H_
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
+#include "base/callback_list.h"
+#include "base/memory/weak_ptr.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "ui/gfx/geometry/insets.h"
@@ -58,6 +62,47 @@ gfx::Rect ResolveHorizontalTabGroupCapsuleBounds(gfx::Rect group_bounds);
 // native 행·클릭 범위는 유지하고 장식의 높이만 접힘 상태에 맞춰 전환한다.
 void SetHorizontalTabGroupCapsuleCollapsed(views::View& decoration,
                                            bool collapsed);
+
+struct HorizontalTabGroupCapsuleSnapshot {
+  base::UnguessableToken owner;
+  uint64_t apply_serial = 0;
+  double expansion = 0;
+  bool running = false;
+
+  bool operator==(const HorizontalTabGroupCapsuleSnapshot&) const = default;
+};
+
+// decoration에 이미 귀속된 애니메이션의 값만 공개한다.
+class HorizontalTabGroupCapsuleState {
+ public:
+  using Callback =
+      base::RepeatingCallback<void(const HorizontalTabGroupCapsuleSnapshot&)>;
+
+  HorizontalTabGroupCapsuleState(const HorizontalTabGroupCapsuleState&) =
+      delete;
+  HorizontalTabGroupCapsuleState& operator=(
+      const HorizontalTabGroupCapsuleState&) = delete;
+  ~HorizontalTabGroupCapsuleState();
+
+  static HorizontalTabGroupCapsuleState* From(views::View& decoration);
+  HorizontalTabGroupCapsuleSnapshot GetSnapshot() const;
+  // 시작·진행·종료·취소·reset 당시 값의 복사본을 다음 task에서 전달한다.
+  // 초기 알림은 없으며 owner 파괴 시 대기 중 알림도 무효화한다.
+  base::CallbackListSubscription Subscribe(Callback callback);
+  base::WeakPtr<HorizontalTabGroupCapsuleState> GetWeakPtr();
+
+ private:
+  friend class HorizontalTabGroupCapsuleStateTest;
+  friend void SetHorizontalTabGroupCapsuleCollapsed(views::View&, bool);
+  HorizontalTabGroupCapsuleState(views::View& decoration, bool collapsed);
+  static HorizontalTabGroupCapsuleState& GetOrCreate(views::View& decoration,
+                                                     bool collapsed);
+  void SetCollapsed(bool collapsed);
+  void NotifySubscribers(HorizontalTabGroupCapsuleSnapshot snapshot);
+
+  class Impl;
+  std::unique_ptr<Impl> impl_;
+};
 
 // 닫히는 첫 멤버가 그룹 이름을 가로지르지 않게 Header 뒤에서 수축한다.
 gfx::Rect ResolveHorizontalTabGroupClosingBounds(gfx::Rect closing_bounds,

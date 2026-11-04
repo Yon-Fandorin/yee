@@ -5,9 +5,13 @@
 #include "chrome/browser/ui/views/yee/favorites.h"
 
 #include <memory>
+#include <vector>
 
+#include "base/functional/bind.h"
 #include "base/i18n/test/scoped_rtl_for_testing.h"
+#include "base/test/bind.h"
 #include "base/test/scoped_command_line.h"
+#include "base/test/task_environment.h"
 #include "build/build_config.h"
 #include "chrome/browser/ui/views/yee/shell_policy.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -17,12 +21,191 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/vector2d.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
+#include "ui/views/layout/layout_provider.h"
 #include "ui/views/test/views_test_base.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
 namespace {
+
+class FavoritesPreviewAppliedStateTest : public testing::Test {
+ protected:
+  FavoritesPreviewAppliedStateTest() {
+    tab_strip_.SetBoundsRect(gfx::Rect(244, 600));
+  }
+
+  FavoritesDragPreviewAppliedState& Show(int leading_inset = 0,
+                                         bool over_favorites = false) {
+    ShowFavoritesDragPreview(tab_strip_, gfx::Point(60, 120), over_favorites,
+                             leading_inset, /*favorites_target_item_count=*/0,
+                             ui::ImageModel(), u"Preview", gfx::Vector2d(16, 8),
+                             gfx::Size(60, 32));
+    return *FavoritesDragPreviewAppliedState::From(preview());
+  }
+
+  views::View& preview() {
+    return *tab_strip_.GetViewByID(kSidebarFavoritesDragPreviewViewId);
+  }
+
+  base::test::SingleThreadTaskEnvironment task_environment_{
+      base::test::SingleThreadTaskEnvironment::MainThreadType::UI,
+      base::test::SingleThreadTaskEnvironment::TimeSource::MOCK_TIME};
+  gfx::AnimationTestApi::RenderModeResetter rich_animation_ =
+      gfx::AnimationTestApi::SetRichAnimationRenderMode(
+          gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  gfx::AnimationTestApi::PrefersReducedMotionResetter reduced_motion_ =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
+  gfx::ScopedAnimationDurationScaleMode duration_scale_{
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION};
+  views::LayoutProvider layout_provider_;
+  views::View tab_strip_;
+};
+
+TEST_F(FavoritesPreviewAppliedStateTest,
+       SameUpdateAndHidePublishAppliedValues) {
+  EXPECT_FALSE(FavoritesDragPreviewAppliedState::From(tab_strip_));
+  auto& state = Show();
+  const auto first = state.GetSnapshot();
+  EXPECT_FALSE(first.owner.is_empty());
+  EXPECT_EQ(1u, first.apply_serial);
+  EXPECT_EQ(preview().bounds(), first.bounds);
+  EXPECT_EQ(
+      TabDragPreviewBoundsInTabStrip(tab_strip_, gfx::Point(60, 120), 0,
+                                     gfx::Vector2d(16, 8), gfx::Size(60, 32)),
+      first.bounds);
+  EXPECT_EQ(preview().GetBoundsInScreen(), first.screen_bounds);
+  EXPECT_TRUE(first.visible);
+  EXPECT_FALSE(first.running);
+  std::vector<FavoritesDragPreviewAppliedSnapshot> snapshots;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot& snapshot) {
+        snapshots.push_back(snapshot);
+      }));
+  EXPECT_TRUE(snapshots.empty());
+  Show();
+  HideFavoritesDragPreview(tab_strip_);
+  HideFavoritesDragPreview(tab_strip_);
+  task_environment_.RunUntilIdle();
+  ASSERT_EQ(3u, snapshots.size());
+  for (size_t i = 0; i < snapshots.size(); ++i) {
+    EXPECT_EQ(first.owner, snapshots[i].owner);
+    EXPECT_EQ(i + 2, snapshots[i].apply_serial);
+    EXPECT_EQ(first.bounds, snapshots[i].bounds);
+    EXPECT_FALSE(snapshots[i].running);
+  }
+  EXPECT_TRUE(snapshots[0].visible);
+  EXPECT_FALSE(snapshots[1].visible);
+  EXPECT_FALSE(snapshots[2].visible);
+  EXPECT_FALSE(preview().GetVisible());
+}
+
+TEST_F(FavoritesPreviewAppliedStateTest, PublishesBothOwnedAnimations) {
+  auto& state = Show();
+  std::vector<FavoritesDragPreviewAppliedSnapshot> snapshots;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot& snapshot) {
+        snapshots.push_back(snapshot);
+      }));
+  Show(/*leading_inset=*/24);
+  EXPECT_TRUE(state.GetSnapshot().running);
+  const auto start = state.GetSnapshot();
+  task_environment_.FastForwardBy(base::Milliseconds(32));
+  EXPECT_GT(state.GetSnapshot().apply_serial, start.apply_serial);
+  EXPECT_NE(start.bounds, state.GetSnapshot().bounds);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(state.GetSnapshot().running);
+  EXPECT_EQ(
+      TabDragPreviewBoundsInTabStrip(tab_strip_, gfx::Point(60, 120), 24,
+                                     gfx::Vector2d(16, 8), gfx::Size(60, 32)),
+      state.GetSnapshot().bounds);
+
+  Show(/*leading_inset=*/0, /*over_favorites=*/true);
+  Show();
+  EXPECT_TRUE(state.GetSnapshot().running);
+  const auto region_start = state.GetSnapshot();
+  task_environment_.FastForwardBy(base::Milliseconds(32));
+  EXPECT_GT(state.GetSnapshot().apply_serial, region_start.apply_serial);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(state.GetSnapshot().running);
+  EXPECT_EQ(preview().bounds(), state.GetSnapshot().bounds);
+  for (size_t i = 1; i < snapshots.size(); ++i) {
+    EXPECT_GT(snapshots[i].apply_serial, snapshots[i - 1].apply_serial);
+  }
+}
+
+TEST_F(FavoritesPreviewAppliedStateTest, HideCancelsMotionBeforePublishing) {
+  auto& state = Show();
+  Show(/*leading_inset=*/24);
+  ASSERT_TRUE(state.GetSnapshot().running);
+  int calls = 0;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot& snapshot) {
+        ++calls;
+        EXPECT_FALSE(snapshot.visible);
+        EXPECT_FALSE(snapshot.running);
+      }));
+  HideFavoritesDragPreview(tab_strip_);
+  task_environment_.RunUntilIdle();
+  EXPECT_EQ(1, calls);
+  const auto hidden = state.GetSnapshot();
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(hidden, state.GetSnapshot());
+  EXPECT_EQ(1, calls);
+}
+
+TEST_F(FavoritesPreviewAppliedStateTest, SubscriptionAndWeakPtrFollowPreview) {
+  auto& state = Show();
+  const auto owner = state.GetSnapshot().owner;
+  auto weak = state.GetWeakPtr();
+  int calls = 0;
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot&) { ++calls; }));
+  Show(/*leading_inset=*/24);
+  task_environment_.RunUntilIdle();
+  EXPECT_GT(calls, 0);
+  subscription = {};
+  const int before_unsubscribe = calls;
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(before_unsubscribe, calls);
+
+  subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot&) { ++calls; }));
+  Show(/*leading_inset=*/0);
+  ASSERT_TRUE(state.GetSnapshot().running);
+  const int before_destruction = calls;
+  tab_strip_.RemoveChildViewT(&preview()).reset();
+  EXPECT_FALSE(weak);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_EQ(before_destruction, calls);
+  EXPECT_NE(owner, Show().GetSnapshot().owner);
+}
+
+TEST_F(FavoritesPreviewAppliedStateTest,
+       OwnerDeletionFromProgressNotificationIsSafe) {
+  auto& state = Show();
+  const auto initial_bounds = state.GetSnapshot().bounds;
+  auto weak = state.GetWeakPtr();
+  auto subscription = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot& snapshot) {
+        if (snapshot.running && snapshot.bounds != initial_bounds) {
+          tab_strip_.RemoveChildViewT(&preview()).reset();
+        }
+      }));
+  int calls_after_deletion = 0;
+  auto later = state.Subscribe(base::BindLambdaForTesting(
+      [&](const FavoritesDragPreviewAppliedSnapshot&) {
+        if (!weak) {
+          ++calls_after_deletion;
+        }
+      }));
+  Show(/*leading_inset=*/24);
+  task_environment_.FastForwardBy(base::Seconds(1));
+  EXPECT_FALSE(weak);
+  EXPECT_FALSE(tab_strip_.GetViewByID(kSidebarFavoritesDragPreviewViewId));
+  EXPECT_EQ(0, calls_after_deletion);
+}
 
 TEST(FavoritesPolicyTest, LayoutTimingAppliesOnlyToTheYeeVerticalDock) {
   base::test::ScopedCommandLine command_line;
