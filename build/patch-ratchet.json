@@ -39,7 +39,6 @@
         "shell_branches": {
           "chrome/browser/prefs/session_startup_pref.cc": 1,
           "chrome/browser/prefs/session_startup_pref_unittest.cc": 1,
-          "chrome/browser/ui/browser_window/internal/browser_window_features.cc": 1,
           "chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc": 3,
           "chrome/browser/ui/views/frame/browser_frame_view_mac.mm": 1,
           "chrome/browser/ui/views/frame/browser_frame_view_win.cc": 2,
@@ -85,7 +84,6 @@
           "chrome/browser/ui/browser_commands.cc": 1,
           "chrome/browser/ui/browser_live_tab_context.cc": 1,
           "chrome/browser/ui/browser_tabrestore.cc": 1,
-          "chrome/browser/ui/browser_window/internal/browser_window_features.cc": 2,
           "chrome/browser/ui/chrome_pages.cc": 1,
           "chrome/browser/ui/color/chrome_color_mixers.cc": 1,
           "chrome/browser/ui/incognito_allowed_url.cc": 1,
@@ -183,7 +181,6 @@
           "content/browser/websockets/websocket_connector_impl.cc": 1
         },
         "yee_members": {
-          "chrome/browser/ui/browser_window/public/browser_window_features.h": 1,
           "chrome/browser/ui/views/frame/browser_frame_view_win.h": 1,
           "chrome/browser/ui/views/frame/browser_view.h": 9,
           "chrome/browser/ui/views/frame/contents_container_outline.h": 1,
@@ -203,7 +200,26 @@
           "components/content_settings/core/common/content_settings.h": 1
         }
       },
-      "exceptions": []
+      "exceptions": [
+        {
+          "metric": "shell_branches",
+          "path": "chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc",
+          "allowed": 1,
+          "reason": "approved composition root per docs/chromium-upgrade-structure.md step 3"
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc",
+          "allowed": 2,
+          "reason": "approved composition root per docs/chromium-upgrade-structure.md step 3"
+        },
+        {
+          "metric": "yee_members",
+          "path": "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h",
+          "allowed": 1,
+          "reason": "approved composition root per docs/chromium-upgrade-structure.md step 3"
+        }
+      ]
     }
   }
 }

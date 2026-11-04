@@ -8,11 +8,11 @@ Windows 검증과 나머지 구조 변경은 후속 작업이다.
 
 ## 현재 패치 구성
 
-테스트 이전 1단계 뒤 `0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
+테스트 이전 1단계와 PNC 생성 이동 뒤 `0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
 
 | 구분 | 파일 | 추가 줄 | 삭제 줄 |
 | --- | ---: | ---: | ---: |
-| 수정한 제품 파일 | 296 | 12,335 | 1,652 |
+| 수정한 제품 파일 | 296 | 12,344 | 1,655 |
 | 수정한 Chromium 테스트 파일 | 31 | 5,664 | 134 |
 | 새 파일 | 5 | 1,152 | 0 |
 
@@ -25,7 +25,7 @@ Windows 검증과 나머지 구조 변경은 후속 작업이다.
 
 Chromium 157의 `EmbedderBrowserWindowFeatures`를 Yee의 composition root로 쓴다.
 `chrome/browser/ui/browser_window/public/embedder_browser_window_features.h`와
-`internal/embedder_browser_window_features.cc`는 현재 비어 있는 embedder 확장 지점이다.
+`internal/embedder_browser_window_features.cc`는 embedder 확장 지점이다.
 이곳은 Yee 객체를 조립하고 수명 단계를 연결하며, 제품 정책과 상태 구현은 각 소유자에 둔다.
 
 | 진입점 | Chromium 호출 지점과 역할 |
@@ -195,25 +195,21 @@ Windows `.ps1` 전환과 검증은 후속 작업이다.
 
 ### 3. ProjectNavigationController 생성 이동
 
-생성·소유·정리를 embedder root로 옮기고 BrowserView 연결은
-`InitPostBrowserViewConstruction`에서 수행한다. 제거 대상은
-`browser_window_features.{h,cc}`의 해당 hunk와 `browser_view.cc` 약 1185행의 attach
-hunk뿐이다. 157 원본 기준으로 이동 뒤에도 Chromium 파일 11개에
+코드 이전을 완료했다. 생성·소유·정리를 embedder root로 옮기고 BrowserView 연결은
+`InitPostBrowserViewConstruction`에서 수행한다. `browser_window_features.{h,cc}`는
+pristine으로 복원했고 `browser_view.cc`의 attach hunk를 제거했다.
+157 원본 기준으로 이동 뒤에도 Chromium 파일 11개에
 `ProjectNavigationController::` 참조 21개(`From()`, `IsHubShowing*()`,
 `ShouldShowNativeTab()`, `kSidebarViewId`)가 남는다.
 이 이동은 조립 패턴을 먼저 적용하는 단계이며 충돌 감소 범위는 작다.
 
-초기화 순서에 따른 동작 차이를 검증해야 한다.
+생성은 `BrowserWindowFeatures::Init` 마지막으로 이동해 `TabStripModel` observer
+등록 순서가 바뀌었다. 초기에는 허브가 닫혀 있어 명령 override가 없으므로 생성 뒤
+명령 상태 갱신은 필요 없다. 래칫 합계는 `5664 / 61 / 30 / 206 / 55`로 같으며,
+embedder 경로의 증가 세 건은 승인한 조립 지점 예외로 기록하고 기존 경로의 감소를 잠갔다.
+2026-11-04 macOS에서 header·sidebar·레이아웃 interactive gate와 프로젝트 browser test가
+통과했고, 실제 앱에서 프로젝트 hub·명령·세션 복원을 확인했다.
 
-- 생성이 `BrowserWindowFeatures::Init` 시작부(현재 약 261행)에서 마지막 embedder
-  `Init`(약 681행)으로 이동한다. 생성자가 `TabStripModel` observer를 등록하므로
-  observer 등록 순서가 바뀐다.
-- 다른 기능이 초기화되는 동안에는 `browser_command_controller.cc` 약 657행의
-  `IsCommandEnabled` override가 존재하지 않고 native 경로를 따른다.
-- reset은 embedder의 `TearDownPreBrowserWindowDestruction`에 유지한다.
-
-- 완료 기준: interactive gate 통과와 실제 앱의 프로젝트 hub·command·session restore
-  확인. observer 순서 변경의 영향을 이 검증에서 확인한다.
 - 기대 효과: Chromium 공통 feature 소유자에서 Yee 조립을 분리한다. 남은 호출 지점은
   이 단계에서 정리하지 않는다.
 
@@ -249,5 +245,4 @@ drag suite 전체 재작성은 이 단계의 완료 조건에 넣지 않는다.
 새 Beta/Stable마다 유지보수 checkout에서 rebase를 예행해 네 milestone을 한 번에
 넘기는 일을 피할지는 아직 결정하지 않았다.
 
-구조 변경 단계의 빌드·링크·시간 검증은 수행하지 않았다. observer 순서 변경의 실제
-영향도 미확인이다. 위 기대 효과는 검증 결과가 아니며 후속 구현에서 측정한다.
+각 단계의 기대 효과는 검증 결과가 아니며 다음 업그레이드에서 측정한다.
