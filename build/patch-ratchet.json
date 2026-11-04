@@ -33,7 +33,7 @@
           "content/browser/service_worker/service_worker_container_host_unittest.cc": 114,
           "content/renderer/service_worker/service_worker_provider_context_unittest.cc": 9,
           "content/renderer/service_worker/service_worker_subresource_loader_unittest.cc": 9,
-          "ui/aura/window_unittest.cc": 62,
+          "ui/aura/window_unittest.cc": 54,
           "ui/base/test/ui_controls_internal_win.cc": 6
         },
         "shell_branches": {

@@ -238,13 +238,13 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | 계약 | 자동 검증 |
 | --- | --- |
 | native LocationBar 하나가 단일 Toolbar와 active Pane Header 사이를 이동해도 높이·중심축을 유지하고 분할 해제 시 원래 parent로 복귀 | `YeeSingleAndSplitHeadersShareLocationBarGeometry` |
-| 미디어 버튼이 흰색·검정·빨강 Header의 일반/disabled 색과 크기를 따르고, 표시 여부에 따라 구분선이 함께 사라지며 실제 Omnibox hover에서 origin·title 배경이 일치 | `YeeMediaButtonTracksHeaderAndVisibility` |
+| 미디어 버튼이 흰색·검정·빨강 Header의 일반/disabled 색과 크기를 따르고, 표시 여부에 따라 구분선이 함께 사라지며 실제 Omnibox hover에서 origin·title 배경이 일치 | `YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility` |
 | 단일 A → 분할 active A/inactive B → active B → popup B → 분할 해제 B 전환에서 주소 배경, 일반·disabled 버튼, IME inline·rich autocomplete·AI hint label, Pane Header 텍스트, location/security icon이 같은 source snapshot을 사용하고, 열린 popup은 animation의 최종 `popup_revision`에서만 한 번 갱신되며 native 모드에서 모든 물리색 override를 제거 | `YeePresentationFollowsSingleAndSplitSources` |
 | active pane 전환과 분할 해제에서 native LocationBar가 최종 parent로 이동하고 실제 host 변경 generation마다 layout/bounds 동기화를 정확히 한 번 수행 | `YeePresentationFollowsSingleAndSplitSources` |
 | 분할 생성·제거 중 Chromium의 focus 정책이 popup을 닫는 동작은 우회하지 않고, popup 색·anchor는 단일과 안정화된 각 분할 상태에서 별도로 검증 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
-| 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
+| 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
 | WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 실제 팝업의 renderer에 media emulation을 적용하고 실제 media query와 선택 행의 계산된 표시를 검사. Windows 대비 설정 전파 검증과는 별도 |
 | 선행 일반 탭 유무와 관계없이 수평 그룹의 첫 두 멤버를 연속으로 닫아도 실제 파비콘이 이름을 침범하지 않음. 접기·펼치기 모두 알약 배경을 유지하며 양 끝 사이의 중간 폭을 거치고 마지막 멤버도 정상적으로 닫힘 | `YeeHorizontalGroupTransitionsKeepHeaderClear` |
 | 맞춤설정 패널이 세로·수평 모두 창 Header 아래 행에 도킹해 닫기 버튼을 분리 | `YeeCustomizationPanelStaysBelowWindowHeader` |

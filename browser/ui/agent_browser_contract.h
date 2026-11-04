@@ -69,22 +69,6 @@ struct AgentSemanticSnapshot {
   std::vector<AgentSemanticNode> nodes;
 };
 
-// A small set of effects with explicit user-approval boundaries. Credentials
-// are filled by browser-owned infrastructure and are never an agent argument.
-enum class AgentBrowserEffect {
-  kRead,
-  kNavigate,
-  kFillNonSensitiveField,
-  kDownload,
-  kUpload,
-  kSendMessage,
-  kPublish,
-  kPurchase,
-  kUseCredential,
-};
-
-bool AgentBrowserEffectRequiresApproval(AgentBrowserEffect effect);
-
 // Ignores revision and redacted secret values; compares all observable nodes
 // before output truncation, including identity and order. Explicit content-only
 // waiting may ignore node refs; document identity and all content remain checked.

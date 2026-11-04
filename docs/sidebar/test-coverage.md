@@ -403,7 +403,7 @@ Windows 개발 PC에서는 각 입력 사례를 개별 프로세스의 `--single
 상태의 판정과 OS 마우스 입력은 유지한다. 대기 중 미완료 배치를 관찰했는지와
 각 드래그의 출발·도착 bounds를 실제 GTest XML에 남긴다.
 
-`YeeOmniboxSuggestionsHaveBalancedInsets`는 첫 표시 전에 준비한 WebUI 문서의
+`YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets`는 첫 표시 전에 준비한 WebUI 문서의
 제안 목록 여백도 확인한다. 표시·renderer 복구가 문서 준비보다 앞서면 스타일 적용을
 보류하고, 설정된 팝업의 현재 primary 문서가 준비됐을 때 다시 적용한다. 같은 문서의
 재표시는 기존 경로로 적용하며, 기존 행 여백·곡률·접근성·입력 판정은 유지한다.

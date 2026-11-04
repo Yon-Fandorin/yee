@@ -176,12 +176,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kSecondTab);
 
 namespace {
 
-class YeeMultiContentsViewUiTest
+class YeeContentsViewUiTest
     : public SplitViewInteractiveTestMixin<
-          TabStripInteractiveTestMixin<InteractiveBrowserTest>>,
-      public ::testing::WithParamInterface<split_tabs::SplitTabLayout> {
+          TabStripInteractiveTestMixin<InteractiveBrowserTest>> {
  public:
-  YeeMultiContentsViewUiTest() = default;
+  YeeContentsViewUiTest() = default;
 
   void SetUpOnMainThread() override {
     SplitViewInteractiveTestMixin::SetUpOnMainThread();
@@ -198,185 +197,6 @@ class YeeMultiContentsViewUiTest
   }
 
  protected:
-  GURL GetTestUrl() { return embedded_test_server()->GetURL("/title1.html"); }
-
-  auto EnterSplitView(int active_tab,
-                      std::optional<int> other_tab = std::nullopt,
-                      double ratio = 0.5) {
-    return SplitViewInteractiveTestMixin::EnterSplitView(active_tab, other_tab,
-                                                         GetParam(), ratio);
-  }
-
-  auto CreateTabsAndEnterSplitView() {
-    auto result = Steps(
-        AddInstrumentedTab(kNewTab, GURL(chrome::kChromeUISettingsURL), 0),
-        CheckResult([=, this]() { return tab_strip_model()->count(); }, 2u),
-        EnterSplitView(0, 1));
-    AddDescriptionPrefix(result, "CreateTabsAndEnterSplitView()");
-    return result;
-  }
-
-  // MultiContentsView의 Layout 재정의로 크기 변경이 다음 레이아웃까지 지연될 수
-  // 있다. PollView와 WaitForState로 해당 레이아웃 적용을 기다린다.
-  using MultiContentsViewLayoutObserver =
-      views::test::PollingViewObserver<bool, MultiContentsView>;
-
-  auto CheckResizeValues(
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(
-        PollView(observer_id, kMultiContentsViewElementId,
-                 [check](const MultiContentsView* multi_contents_view) -> bool {
-                   const gfx::Size& start_size =
-                       multi_contents_view->start_contents_view_for_testing()
-                           ->parent()
-                           ->size();
-                   const gfx::Size& end_size =
-                       multi_contents_view->end_contents_view_for_testing()
-                           ->parent()
-                           ->size();
-                   switch (multi_contents_view->GetSplitLayout()) {
-                     case split_tabs::SplitTabLayout::kSideBySide:
-                       return check.Run(start_size.width(), end_size.width());
-                     case split_tabs::SplitTabLayout::kStacked:
-                       return check.Run(start_size.height(), end_size.height());
-                     default:
-                       NOTREACHED();
-                   }
-                 }),
-        WaitForState(observer_id, true), StopObservingState(observer_id));
-    AddDescriptionPrefix(result, "CheckResizeValues()");
-    return result;
-  }
-
-  // 직접 resize를 호출한 뒤 contents view 크기를 확인한다.
-  auto CheckResize(int resize_amount,
-                   base::RepeatingCallback<bool(double, double)> check) {
-    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewLayoutObserver,
-                                        kMultiContentsViewLayoutObserver);
-    auto result =
-        Steps(Do([resize_amount, this]() {
-                multi_contents_view()->OnResize(resize_amount, true);
-              }),
-              CheckResizeValues(check, kMultiContentsViewLayoutObserver));
-    AddDescriptionPrefix(result, "CheckResize()");
-    return result;
-  }
-
-  auto CheckResizeWithId(
-      int resize_amount,
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(Do([resize_amount, this]() {
-                          multi_contents_view()->OnResize(resize_amount, true);
-                        }),
-                        CheckResizeValues(check, observer_id));
-    AddDescriptionPrefix(result, "CheckResizeWithId()");
-    return result;
-  }
-
-  // 키보드로 크기를 바꾼 뒤 contents view 크기를 확인한다.
-  auto CheckResizeKey(
-      ui::KeyboardCode key_code,
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(
-        WithView(MultiContentsResizeHandle::kMultiContentsResizeHandleElementId,
-                 [key_code](MultiContentsResizeHandle* handle) {
-                   ui::KeyEvent press(ui::EventType::kKeyPressed, key_code,
-                                      ui::EF_NONE);
-                   handle->GetWidget()->OnKeyEvent(&press);
-                   ui::KeyEvent release(ui::EventType::kKeyReleased, key_code,
-                                        ui::EF_NONE);
-                   handle->GetWidget()->OnKeyEvent(&release);
-                 }),
-        CheckResizeValues(check, observer_id));
-    AddDescriptionPrefix(result, "CheckResizeKey()");
-    return result;
-  }
-
-  // 분할 축을 따라 창 크기를 바꾼다.
-  auto ResizeWindow(int size) {
-    auto result = Steps(Do([size, this]() {
-      auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
-      auto bounds = browser_view->bounds();
-      if (GetParam() == split_tabs::SplitTabLayout::kSideBySide) {
-        bounds.set_width(size);
-        bounds.set_height(1000);
-      } else {
-        bounds.set_width(1000);
-        bounds.set_height(size);
-      }
-      browser_view->SetBounds(bounds);
-    }));
-    AddDescriptionPrefix(result, "ResizeWindow()");
-    return result;
-  }
-
-  // 분할 축을 따라 contents 크기를 바꾼다.
-  auto ResizeContents(int size) {
-    auto result = Steps(Do([size, this]() {
-      BrowserView::GetBrowserViewForBrowser(browser())->SetContentsSize(
-          GetParam() == split_tabs::SplitTabLayout::kSideBySide
-              ? gfx::Size(size, 1000)
-              : gfx::Size(1000, size));
-    }));
-    AddDescriptionPrefix(result, "ResizeContents()");
-    return result;
-  }
-
-  auto SetMinSize(int size) {
-    auto result = Steps(Do([size, this]() {
-      multi_contents_view()->set_min_contents_size_for_testing(size);
-    }));
-    AddDescriptionPrefix(result, "SetMinSize()");
-    return result;
-  }
-
-  // gfx::Rect에서 분할 축의 길이를 읽는다.
-  auto GetSize(gfx::Rect rect) {
-    return GetParam() == split_tabs::SplitTabLayout::kSideBySide
-               ? rect.width()
-               : rect.height();
-  }
-
-  // gfx::Size에서 분할 축의 길이를 읽는다.
-  auto GetSize(gfx::Size size) {
-    return GetParam() == split_tabs::SplitTabLayout::kSideBySide
-               ? size.width()
-               : size.height();
-  }
-
-  auto CheckActiveContentsHasFocus() {
-    return CheckView(
-        kMultiContentsViewElementId,
-        [](MultiContentsView* multi_contents_view) -> bool {
-          return multi_contents_view->GetActiveContentsView()->HasFocus();
-        });
-  }
-
-  auto OpenContextualSidePanel() {
-    using SidePanelViewObserver =
-        views::test::PollingViewObserver<bool, SidePanel>;
-    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(SidePanelViewObserver,
-                                        kSidePanelViewObserver);
-
-    return Steps(Do(base::BindLambdaForTesting([this]() {
-                   chrome::ExecuteCommandWithContext(
-                       browser(), IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL,
-                       actions::ActionInvocationContext::Builder()
-                           .SetProperty(kSidePanelOpenTriggerKey,
-                                        SidePanelOpenTrigger::kToolbarButton)
-                           .Build());
-                 })),
-                 PollView(kSidePanelViewObserver, kSidePanelElementId,
-                          [](const SidePanel* side_panel) -> bool {
-                            return side_panel->width() > 0 &&
-                                   side_panel->height() > 0;
-                          }),
-                 WaitForState(kSidePanelViewObserver, true));
-  }
-
   LocationBarView* location_bar() {
     return BrowserView::GetBrowserViewForBrowser(browser())
         ->toolbar()
@@ -571,6 +391,150 @@ class YeeMultiContentsViewUiTest
   }
 };
 
+class YeeMultiContentsViewUiTest
+    : public YeeContentsViewUiTest,
+      public ::testing::WithParamInterface<split_tabs::SplitTabLayout> {
+ protected:
+  GURL GetTestUrl() { return embedded_test_server()->GetURL("/title1.html"); }
+
+  auto EnterSplitView(int active_tab,
+                      std::optional<int> other_tab = std::nullopt,
+                      double ratio = 0.5) {
+    return SplitViewInteractiveTestMixin::EnterSplitView(active_tab, other_tab,
+                                                         GetParam(), ratio);
+  }
+
+  auto CreateTabsAndEnterSplitView() {
+    auto result = Steps(
+        AddInstrumentedTab(kNewTab, GURL(chrome::kChromeUISettingsURL), 0),
+        CheckResult([=, this]() { return tab_strip_model()->count(); }, 2u),
+        EnterSplitView(0, 1));
+    AddDescriptionPrefix(result, "CreateTabsAndEnterSplitView()");
+    return result;
+  }
+
+  // MultiContentsView의 Layout 재정의로 크기 변경이 다음 레이아웃까지 지연될 수
+  // 있다. PollView와 WaitForState로 해당 레이아웃 적용을 기다린다.
+  using MultiContentsViewLayoutObserver =
+      views::test::PollingViewObserver<bool, MultiContentsView>;
+
+  auto CheckResizeValues(
+      base::RepeatingCallback<bool(double, double)> check,
+      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
+    auto result = Steps(
+        PollView(observer_id, kMultiContentsViewElementId,
+                 [check](const MultiContentsView* multi_contents_view) -> bool {
+                   const gfx::Size& start_size =
+                       multi_contents_view->start_contents_view_for_testing()
+                           ->parent()
+                           ->size();
+                   const gfx::Size& end_size =
+                       multi_contents_view->end_contents_view_for_testing()
+                           ->parent()
+                           ->size();
+                   switch (multi_contents_view->GetSplitLayout()) {
+                     case split_tabs::SplitTabLayout::kSideBySide:
+                       return check.Run(start_size.width(), end_size.width());
+                     case split_tabs::SplitTabLayout::kStacked:
+                       return check.Run(start_size.height(), end_size.height());
+                     default:
+                       NOTREACHED();
+                   }
+                 }),
+        WaitForState(observer_id, true), StopObservingState(observer_id));
+    AddDescriptionPrefix(result, "CheckResizeValues()");
+    return result;
+  }
+
+  auto CheckResizeWithId(
+      int resize_amount,
+      base::RepeatingCallback<bool(double, double)> check,
+      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
+    auto result = Steps(Do([resize_amount, this]() {
+                          multi_contents_view()->OnResize(resize_amount, true);
+                        }),
+                        CheckResizeValues(check, observer_id));
+    AddDescriptionPrefix(result, "CheckResizeWithId()");
+    return result;
+  }
+
+  // 키보드로 크기를 바꾼 뒤 contents view 크기를 확인한다.
+  auto CheckResizeKey(
+      ui::KeyboardCode key_code,
+      base::RepeatingCallback<bool(double, double)> check,
+      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
+    auto result = Steps(
+        WithView(MultiContentsResizeHandle::kMultiContentsResizeHandleElementId,
+                 [key_code](MultiContentsResizeHandle* handle) {
+                   ui::KeyEvent press(ui::EventType::kKeyPressed, key_code,
+                                      ui::EF_NONE);
+                   handle->GetWidget()->OnKeyEvent(&press);
+                   ui::KeyEvent release(ui::EventType::kKeyReleased, key_code,
+                                        ui::EF_NONE);
+                   handle->GetWidget()->OnKeyEvent(&release);
+                 }),
+        CheckResizeValues(check, observer_id));
+    AddDescriptionPrefix(result, "CheckResizeKey()");
+    return result;
+  }
+
+  // 분할 축을 따라 contents 크기를 바꾼다.
+  auto ResizeContents(int size) {
+    auto result = Steps(Do([size, this]() {
+      BrowserView::GetBrowserViewForBrowser(browser())->SetContentsSize(
+          GetParam() == split_tabs::SplitTabLayout::kSideBySide
+              ? gfx::Size(size, 1000)
+              : gfx::Size(1000, size));
+    }));
+    AddDescriptionPrefix(result, "ResizeContents()");
+    return result;
+  }
+
+  // gfx::Rect에서 분할 축의 길이를 읽는다.
+  auto GetSize(gfx::Rect rect) {
+    return GetParam() == split_tabs::SplitTabLayout::kSideBySide
+               ? rect.width()
+               : rect.height();
+  }
+
+  // gfx::Size에서 분할 축의 길이를 읽는다.
+  auto GetSize(gfx::Size size) {
+    return GetParam() == split_tabs::SplitTabLayout::kSideBySide
+               ? size.width()
+               : size.height();
+  }
+
+  auto CheckActiveContentsHasFocus() {
+    return CheckView(
+        kMultiContentsViewElementId,
+        [](MultiContentsView* multi_contents_view) -> bool {
+          return multi_contents_view->GetActiveContentsView()->HasFocus();
+        });
+  }
+
+  auto OpenContextualSidePanel() {
+    using SidePanelViewObserver =
+        views::test::PollingViewObserver<bool, SidePanel>;
+    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(SidePanelViewObserver,
+                                        kSidePanelViewObserver);
+
+    return Steps(Do(base::BindLambdaForTesting([this]() {
+                   chrome::ExecuteCommandWithContext(
+                       browser(), IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL,
+                       actions::ActionInvocationContext::Builder()
+                           .SetProperty(kSidePanelOpenTriggerKey,
+                                        SidePanelOpenTrigger::kToolbarButton)
+                           .Build());
+                 })),
+                 PollView(kSidePanelViewObserver, kSidePanelElementId,
+                          [](const SidePanel* side_panel) -> bool {
+                            return side_panel->width() > 0 &&
+                                   side_panel->height() > 0;
+                          }),
+                 WaitForState(kSidePanelViewObserver, true));
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(
     SplitTabLayout,
     YeeMultiContentsViewUiTest,
@@ -694,7 +658,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
             location_bar()->GetCompactShellPopupSurfaceColor());
 }
 
-IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
+IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                        YeeMediaButtonTracksHeaderAndVisibility) {
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
@@ -1261,7 +1225,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
       Do([this]() { CloseYeeOmniboxPopup(); }));
 }
 
-IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
+IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                        YeeOmniboxSuggestionsHaveBalancedInsets) {
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
@@ -1288,15 +1252,12 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
   const auto capture_dir =
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
           "yee-omnibox-popup-capture-dir");
-  const std::string layout =
-      GetParam() == split_tabs::SplitTabLayout::kSideBySide ? "horizontal"
-                                                            : "vertical";
   const auto capture = [&](views::Widget* widget, const std::string& name) {
     if (capture_dir.empty()) {
       return;
     }
     CaptureYeeWidgetForTesting(widget,
-                               capture_dir.AppendASCII(layout + "-" + name));
+                               capture_dir.AppendASCII("single-" + name));
   };
   int surface_index = 0;
   for (SkColor surface :
@@ -1639,17 +1600,6 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
           kSplitExitObserver, kMultiContentsViewElementId,
           [](const MultiContentsView* view) { return !view->IsInSplitView(); }),
       WaitForState(kSplitExitObserver, true));
-}
-
-IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, ResizesToMinSize) {
-  RunTestSequence(CreateTabsAndEnterSplitView(), ResizeWindow(1000),
-                  // 작은 화면에서도 같은 결과를 얻도록 최소 크기를 낮춘다.
-                  SetMinSize(60),
-                  CheckResize(10000, base::BindRepeating([](double start_size,
-                                                            double end_size) {
-                                // 큰 창에서는 고정 최소 크기를 적용한다.
-                                return end_size == 60;
-                              })));
 }
 
 // split에서 contents view와 resize 영역의 합으로 inset을 확인한다.

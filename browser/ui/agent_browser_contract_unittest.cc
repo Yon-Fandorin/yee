@@ -309,16 +309,6 @@ TEST(AgentBrowserContractTest, OutputSignalsTruncationAtEveryBudget) {
   EXPECT_LE(SerializeAgentSemanticSnapshot(snapshot, nullptr, 2).size(), 2U);
 }
 
-TEST(AgentBrowserContractTest, OnlyExternalEffectsNeedApproval) {
-  EXPECT_FALSE(AgentBrowserEffectRequiresApproval(AgentBrowserEffect::kRead));
-  EXPECT_FALSE(AgentBrowserEffectRequiresApproval(
-      AgentBrowserEffect::kFillNonSensitiveField));
-  EXPECT_TRUE(
-      AgentBrowserEffectRequiresApproval(AgentBrowserEffect::kUseCredential));
-  EXPECT_TRUE(
-      AgentBrowserEffectRequiresApproval(AgentBrowserEffect::kPurchase));
-}
-
 // Release gates: references must remain unambiguous, and display truncation
 // must not suppress real document changes. These intentionally exercise cases
 // missing from the original happy-path suite.

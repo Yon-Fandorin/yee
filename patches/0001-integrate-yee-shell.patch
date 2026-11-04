@@ -27096,7 +27096,7 @@ index ae7f210dc7..d7f727c2ac 100644
          return StartSystemDnDSessionIfNecessary(attached_context_,
                                                  point_in_screen);
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
-index 83ab00a709..29f015a75a 100644
+index 83ab00a709..c9c05cdb71 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc
 @@ -12,19 +12,24 @@
@@ -27547,23 +27547,7 @@ index 83ab00a709..29f015a75a 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -2400,7 +2735,6 @@ void DragToSeparateWindowStep2(DetachToBrowserTabDragControllerTest* test,
- // Creates two browsers, drags from first into second.
- IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-                        MAYBE_DragToSeparateWindow) {
--
-   TabStrip* tab_strip = GetTabStripForBrowser(browser());
- 
-   AddTabsAndResetBrowser(browser(), 1);
-@@ -2472,7 +2806,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
- // from source to target before the target browser finishes ending drags.
- IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-                        MAYBE_DragToSeparateWindowDuringDragEnd) {
--
-   TabStrip* tab_strip = GetTabStripForBrowser(browser());
- 
-   AddTabsAndResetBrowser(browser(), 1);
-@@ -2523,7 +2856,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -2523,7 +2858,6 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    ASSERT_FALSE(TabDragController::IsActive());
  }
  
@@ -27571,7 +27555,7 @@ index 83ab00a709..29f015a75a 100644
  // Canceling tab dragging while the detached tab is reattached should
  // not cause dangling ptr. (crbug.com/459242414)
  IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
-@@ -4641,17 +4973,73 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4641,17 +4975,73 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    tab_groups::TabGroupId group = model->AddToNewGroup({0, 1, 2});
    StopAnimating(tab_strip);
    EnsureFocusToTabStrip(tab_strip);
@@ -27649,7 +27633,7 @@ index 83ab00a709..29f015a75a 100644
    EXPECT_EQ(model->group_model()->GetTabGroup(group)->ListTabs(),
              gfx::Range(0, 3));
  }
-@@ -4857,9 +5245,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4857,9 +5247,11 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the last tab to the left should cause it to swap places with the
    // collapsed group header.
    ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(3)));
@@ -27664,7 +27648,7 @@ index 83ab00a709..29f015a75a 100644
    ASSERT_TRUE(ReleaseInput());
    StopAnimating(tab_strip);
  
-@@ -4894,12 +5284,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
+@@ -4894,12 +5286,16 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
    // Dragging the first tab to the right should cause it to swap places with the
    // collapsed group header.
    const gfx::NativeWindow window_hint = GetWindowHint(tab_strip);
@@ -32607,7 +32591,7 @@ index 88f8dfaedc..d34395d127 100644
      return;  // |this| has been deleted.
    NotifyWindowVisibilityChangedUp(target, visible);
 diff --git a/ui/aura/window_unittest.cc b/ui/aura/window_unittest.cc
-index 5a278b3f99..11b90443e5 100644
+index 5a278b3f99..21abf778e3 100644
 --- a/ui/aura/window_unittest.cc
 +++ b/ui/aura/window_unittest.cc
 @@ -197,8 +197,7 @@ namespace {
@@ -32655,19 +32639,7 @@ index 5a278b3f99..11b90443e5 100644
  
    CaptureWindowDelegateImpl(const CaptureWindowDelegateImpl&) = delete;
    CaptureWindowDelegateImpl& operator=(const CaptureWindowDelegateImpl&) =
-@@ -924,9 +917,8 @@ TEST_F(WindowTest, DestroyTest) {
-         CreateTestWindow({.delegate = &parent_delegate,
-                           .parent = root_window(),
-                           .window_id = 0});
--    CreateTestWindow({.delegate = &child_delegate,
--                      .parent = parent.get(),
--                      .window_id = 0})
-+    CreateTestWindow(
-+        {.delegate = &child_delegate, .parent = parent.get(), .window_id = 0})
-         .release();
-   }
-   // Both the parent and child should have been destroyed.
-@@ -2299,10 +2291,7 @@ TEST_F(WindowTest, GetEventHandlerForPoint_NoDelegate) {
+@@ -2299,10 +2292,7 @@ TEST_F(WindowTest, GetEventHandlerForPoint_NoDelegate) {
  
  class VisibilityWindowDelegate : public TestWindowDelegate {
   public:
@@ -32679,17 +32651,7 @@ index 5a278b3f99..11b90443e5 100644
  
    VisibilityWindowDelegate(const VisibilityWindowDelegate&) = delete;
    VisibilityWindowDelegate& operator=(const VisibilityWindowDelegate&) = delete;
-@@ -2623,8 +2612,7 @@ TEST_F(WindowTest, SetBoundsInternalShouldCheckTargetBounds) {
-   EXPECT_EQ("0,0 100x100", w1->layer()->GetTargetBounds().ToString());
- 
-   // Confirm that the target bounds are reached.
--  base::TimeTicks start_time =
--      w1->layer()->GetAnimator()->last_step_time();
-+  base::TimeTicks start_time = w1->layer()->GetAnimator()->last_step_time();
- 
-   animator->Step(start_time + base::Milliseconds(1000));
- 
-@@ -2633,8 +2621,7 @@ TEST_F(WindowTest, SetBoundsInternalShouldCheckTargetBounds) {
+@@ -2633,8 +2623,7 @@ TEST_F(WindowTest, SetBoundsInternalShouldCheckTargetBounds) {
  
  typedef std::pair<const void*, intptr_t> PropertyChangeInfo;
  
@@ -32699,7 +32661,7 @@ index 5a278b3f99..11b90443e5 100644
   public:
    struct VisibilityInfo {
      bool window_visible;
-@@ -2710,9 +2697,7 @@ class WindowObserverTest : public WindowTest,
+@@ -2710,9 +2699,7 @@ class WindowObserverTest : public WindowTest,
      return layer_recreated_info_;
    }
  
@@ -32710,7 +32672,7 @@ index 5a278b3f99..11b90443e5 100644
  
    // Returns a description of the WindowObserver methods that have been invoked.
    std::string WindowObserverCountStateAndClear() {
-@@ -2824,7 +2809,7 @@ class WindowObserverTest : public WindowTest,
+@@ -2824,7 +2811,7 @@ class WindowObserverTest : public WindowTest,
    std::unique_ptr<VisibilityInfo> visibility_info_;
    raw_ptr<const void> property_key_ = nullptr;
    intptr_t old_property_value_ = -3;
@@ -32719,20 +32681,7 @@ index 5a278b3f99..11b90443e5 100644
    WindowBoundsInfo window_bounds_info_;
    WindowOpacityInfo window_opacity_info_;
    WindowTargetTransformChangingInfo window_target_transform_changing_info_;
-@@ -2958,9 +2943,9 @@ TEST_F(WindowObserverTest, PropertyChanged) {
-   EXPECT_EQ(PropertyChangeInfo(native_prop_key, 0),
-             PropertyChangeInfoAndClear());
-   w1->SetNativeWindowProperty(native_prop_key, nullptr);
--  EXPECT_EQ(PropertyChangeInfo(native_prop_key,
--                               reinterpret_cast<intptr_t>(&*w1)),
--            PropertyChangeInfoAndClear());
-+  EXPECT_EQ(
-+      PropertyChangeInfo(native_prop_key, reinterpret_cast<intptr_t>(&*w1)),
-+      PropertyChangeInfoAndClear());
- 
-   // Sanity check to see if |PropertyChangeInfoAndClear| really clears.
-   EXPECT_EQ(PropertyChangeInfo(nullptr, -3), PropertyChangeInfoAndClear());
-@@ -2983,6 +2968,47 @@ TEST_F(WindowObserverTest, WindowBoundsChanged) {
+@@ -2983,6 +2970,47 @@ TEST_F(WindowObserverTest, WindowBoundsChanged) {
              window_bounds_info().reason);
  }
  
@@ -32780,7 +32729,7 @@ index 5a278b3f99..11b90443e5 100644
  // Verify that WindowObserver::OnWindowBoundsChanged() is notified at every step
  // of a bounds animation.
  TEST_F(WindowObserverTest, WindowBoundsChangedAnimation) {
-@@ -3662,9 +3688,7 @@ class OwningWindowDelegate : public TestWindowDelegate {
+@@ -3662,9 +3690,7 @@ class OwningWindowDelegate : public TestWindowDelegate {
    OwningWindowDelegate(const OwningWindowDelegate&) = delete;
    OwningWindowDelegate& operator=(const OwningWindowDelegate&) = delete;
  
@@ -32791,7 +32740,7 @@ index 5a278b3f99..11b90443e5 100644
  
    void OnWindowDestroyed(Window* window) override { owned_window_.reset(); }
  
-@@ -3869,9 +3893,7 @@ class BoundsChangeDelegate : public TestWindowDelegate {
+@@ -3869,9 +3895,7 @@ class BoundsChangeDelegate : public TestWindowDelegate {
    BoundsChangeDelegate& operator=(const BoundsChangeDelegate&) = delete;
  
    void clear_bounds_changed() { bounds_changed_ = false; }
@@ -32802,27 +32751,7 @@ index 5a278b3f99..11b90443e5 100644
  
    // Window
    void OnBoundsChanged(const gfx::Rect& old_bounds,
-@@ -3913,8 +3935,7 @@ TEST_F(WindowTest, DelegateNotifiedAsBoundsChange) {
-   EXPECT_FALSE(delegate.bounds_changed());
- 
-   // Animate to the end, which should notify of the change.
--  base::TimeTicks start_time =
--      window->layer()->GetAnimator()->last_step_time();
-+  base::TimeTicks start_time = window->layer()->GetAnimator()->last_step_time();
-   ui::LayerAnimator* animator = window->layer()->GetAnimator();
-   animator->Step(start_time + base::Milliseconds(1000));
-   EXPECT_TRUE(delegate.bounds_changed());
-@@ -3957,8 +3978,7 @@ TEST_F(WindowTest, DelegateNotifiedAsBoundsChangeInHiddenLayer) {
-   delegate.clear_bounds_changed();
- 
-   // Animate to the end: will *not* notify of the change since we are hidden.
--  base::TimeTicks start_time =
--      window->layer()->GetAnimator()->last_step_time();
-+  base::TimeTicks start_time = window->layer()->GetAnimator()->last_step_time();
-   ui::LayerAnimator* animator = window->layer()->GetAnimator();
-   animator->Step(start_time + base::Milliseconds(1000));
- 
-@@ -4041,9 +4061,7 @@ class HierarchyObserver : public WindowObserver {
+@@ -4041,9 +4065,7 @@ class HierarchyObserver : public WindowObserver {
      ParamsMatch(params_[index], params);
    }
  
@@ -32833,7 +32762,7 @@ index 5a278b3f99..11b90443e5 100644
  
   private:
    // Overridden from WindowObserver:
-@@ -4286,8 +4304,7 @@ TEST_F(WindowTest, MutateHierarchyDuringNotifyAddedToRootWindow) {
+@@ -4286,8 +4308,7 @@ TEST_F(WindowTest, MutateHierarchyDuringNotifyAddedToRootWindow) {
  class TestLayerAnimationObserver : public ui::LayerAnimationObserver {
   public:
    TestLayerAnimationObserver()

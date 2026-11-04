@@ -30,8 +30,8 @@ UNIT_FILTER+=':BrowserSurfaceColorSampleTest.*'
 UNIT_FILTER+=':YeeNativePresentationTest.*:YeeTabIconPresentationTest.*'
 UNIT_FILTER+=':SplitPaneControlsTest.*:SplitPaneControlsTransitTest.*:SidePanelResizeGutterTest.*:SidePanelResizeGutterViewTest.*'
 INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*'
-INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility/*'
-INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets/*'
+INTERACTIVE_FILTER+=':YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility'
+INTERACTIVE_FILTER+=':YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets'
 RTL_FILTER='SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then

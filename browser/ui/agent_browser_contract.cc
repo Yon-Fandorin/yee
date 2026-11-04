@@ -207,22 +207,6 @@ bool AppendWithinBudget(std::string& output,
 
 }  // namespace
 
-bool AgentBrowserEffectRequiresApproval(AgentBrowserEffect effect) {
-  switch (effect) {
-    case AgentBrowserEffect::kRead:
-    case AgentBrowserEffect::kNavigate:
-    case AgentBrowserEffect::kFillNonSensitiveField:
-      return false;
-    case AgentBrowserEffect::kDownload:
-    case AgentBrowserEffect::kUpload:
-    case AgentBrowserEffect::kSendMessage:
-    case AgentBrowserEffect::kPublish:
-    case AgentBrowserEffect::kPurchase:
-    case AgentBrowserEffect::kUseCredential:
-      return true;
-  }
-}
-
 bool AgentSnapshotsHaveSameObservableSemantics(
     const AgentSemanticSnapshot& lhs,
     const AgentSemanticSnapshot& rhs,
