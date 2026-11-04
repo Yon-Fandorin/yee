@@ -452,6 +452,10 @@ TEST_F(BaselineListStoreTest,
   ASSERT_TRUE(base::ReadFileToString(path, &text));
   auto manifest = base::JSONReader::ReadDict(text, base::JSON_PARSE_RFC);
   ASSERT_TRUE(manifest);
+  ASSERT_TRUE(base::CopyFile(
+      Generation(generation).AppendASCII("easylist.txt"),
+      Generation(generation).DirName().AppendASCII("easylist.txt")));
+  ASSERT_EQ(generation, Read().generation);
   (*manifest->FindList("lists"))[0].GetDict().Set("file", "../easylist.txt");
   ASSERT_TRUE(base::WriteFile(path, base::WriteJson(*manifest).value()));
   EXPECT_TRUE(Read().generation.empty());

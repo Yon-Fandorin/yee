@@ -5,10 +5,14 @@
 #include "base/no_destructor.h"
 #include "base/run_loop.h"
 #include "base/task/execution_fence.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/task/thread_pool.h"
+#include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/scoped_command_line.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
+#include "base/test/test_waitable_event.h"
 #include "chrome/browser/yee_content_blocking/transport_filtering.h"
 #include "components/yee_content_blocking/settings.h"
 #include "mojo/core/embedder/embedder.h"
@@ -21,6 +25,7 @@
 #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
 #include "net/url_request/redirect_info.h"
 #include "services/network/public/cpp/content_security_policy/content_security_policy.h"
+#include "services/network/public/cpp/data_element.h"
 #include "services/network/public/cpp/resource_request_body.h"
 #include "services/network/public/cpp/url_loader_factory_builder.h"
 #include "services/network/public/mojom/parsed_headers.mojom.h"
@@ -198,10 +203,20 @@ TEST_F(FilteringFactoryTest, AllowedHandshakeResumesOnCallerSequence) {
       nullptr, nullptr, GURL("wss://normal.test/session"), origin, origin,
       client.Bind(),
       base::BindOnce(
-          [](base::test::TestFuture<bool>* started,
+          [](scoped_refptr<base::SequencedTaskRunner> caller,
+             base::test::TestFuture<bool>* started,
              mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>) {
-            started->SetValue(true);
+            const bool on_caller = caller->RunsTasksInCurrentSequence();
+            EXPECT_TRUE(on_caller);
+            caller->PostTask(
+                FROM_HERE,
+                base::BindOnce(
+                    [](base::test::TestFuture<bool>* result, bool on_caller) {
+                      result->SetValue(on_caller);
+                    },
+                    base::Unretained(started), on_caller));
           },
+          base::SequencedTaskRunner::GetCurrentDefault(),
           base::Unretained(&started)));
   EXPECT_TRUE(started.Get());
 }
@@ -259,7 +274,9 @@ TEST_F(FilteringFactoryTest, BlockedImageCollapsesInitiator) {
   EXPECT_TRUE(client_.completion_status().should_collapse_initiator);
   EXPECT_EQ(terminal_.total_requests(), 0u);
 }
-TEST_F(FilteringFactoryTest, BlockedIframeCollapsesInitiator) {
+// opaque 메타데이터의 탐색 팩터리도 iframe을 차단하고 발신 요소를 접는다.
+TEST_F(FilteringFactoryTest,
+       OpaqueNavigationFactoryBlocksIframeAndCollapsesInitiator) {
   ConnectNavigation();
   StartNavigation("https://yee-block.test/ad", false);
   client_.RunUntilComplete();
@@ -465,9 +482,38 @@ TEST_F(FilteringFactoryTest, ServerRedirectResourceWaitsForFollowAndCancelsUpstr
       redirect, network::mojom::URLResponseHead::New());
   client_.RunUntilRedirectReceived();
   EXPECT_FALSE(client_.has_received_response());
-  loader_->FollowRedirect({}, std::nullopt);
+  EXPECT_EQ(terminal_.NumPending(), 1);
+  {
+    Environment()->RunUntilIdle();
+    base::ThreadPoolInstance::ScopedRestrictedTasks restricted_tasks;
+    base::TestWaitableEvent writer_blocked;
+    base::TestWaitableEvent resume_writer;
+    // 공유 풀은 작업자가 최대 둘이다. 본문 쓰기와 같은 traits의 작업을
+    // 먼저 대기시켜 쓰기만 보류하고 전용 매칭 스레드는 계속 실행한다.
+    for (int i = 0; i < 2; ++i) {
+      auto blocker = base::ThreadPool::CreateSequencedTaskRunner(
+          {base::MayBlock(), base::TaskPriority::USER_VISIBLE});
+      blocker->PostTask(FROM_HERE, base::BindOnce(
+                                       [](base::TestWaitableEvent* blocked,
+                                          base::TestWaitableEvent* resume) {
+                                         blocked->Signal();
+                                         resume->Wait();
+                                       },
+                                       base::Unretained(&writer_blocked),
+                                       base::Unretained(&resume_writer)));
+    }
+    writer_blocked.Wait();
+    loader_->FollowRedirect({}, std::nullopt);
+    client_.RunUntilResponseReceived();
+    EXPECT_EQ(terminal_.NumPending(), 0);
+    EXPECT_FALSE(client_.has_received_completion());
+    resume_writer.Signal();
+    Environment()->RunUntilIdle();
+  }
   client_.RunUntilComplete();
   EXPECT_EQ(client_.completion_status().error_code, net::OK);
+  Environment()->RunUntilIdle();
+  EXPECT_EQ(terminal_.NumPending(), 0);
   EXPECT_EQ(terminal_.total_requests(), 1u);
   std::string body;
   EXPECT_TRUE(mojo::BlockingCopyToString(client_.response_body_release(), &body));
@@ -496,7 +542,10 @@ TEST_F(FilteringFactoryTest, QueryRewriteKeepsMethodBodyHeadersAndFactoryLifetim
   EXPECT_EQ(actual.headers.GetHeader("X-Original"), "retained");
   EXPECT_EQ(actual.headers.GetHeader("X-Follow"), "updated");
   ASSERT_TRUE(actual.request_body);
-  EXPECT_EQ(actual.request_body->elements()->size(), 1u);
+  ASSERT_EQ(actual.request_body->elements()->size(), 1u);
+  const auto& element = actual.request_body->elements()->front();
+  ASSERT_EQ(element.type(), network::DataElement::Tag::kBytes);
+  EXPECT_EQ(element.As<network::DataElementBytes>().AsStringView(), "retained");
   terminal_.SimulateResponseForPendingRequest("https://yee-query.test/?keep=1", "retained");
   client_.RunUntilComplete();
   EXPECT_EQ(client_.completion_status().error_code, net::OK);
@@ -670,13 +719,26 @@ TEST_F(FilteringFactoryTest, CspNavigationHonorsPublisherException) {
       1u);
 }
 TEST_F(FilteringFactoryTest, CspFilterExceptionPreservesOnlyServerPolicy) {
+  const auto server_policies = network::ParseContentSecurityPolicies(
+      "script-src 'self'", network::mojom::ContentSecurityPolicyType::kEnforce,
+      network::mojom::ContentSecurityPolicySource::kHTTP,
+      GURL("https://yee-csp.test/except/page"));
   AddCspResponse("https://yee-csp.test/except/page");
   ConnectNavigation();
   StartNavigation("https://yee-csp.test/except/page");
   client_.RunUntilComplete();
-  EXPECT_EQ(
-      client_.response_head()->parsed_headers->content_security_policy.size(),
-      1u);
+  ASSERT_EQ(client_.completion_status().error_code, net::OK);
+  const auto& head = client_.response_head();
+  ASSERT_TRUE(head);
+  ASSERT_TRUE(head->parsed_headers);
+  const auto& policies = head->parsed_headers->content_security_policy;
+  ASSERT_EQ(policies.size(), 1u);
+  ASSERT_TRUE(policies[0]->header);
+  EXPECT_EQ(policies[0]->header->header_value, "script-src 'self'");
+  ASSERT_EQ(server_policies.size(), 1u);
+  EXPECT_TRUE(policies[0].Equals(server_policies[0]));
+  EXPECT_EQ(head->headers->GetNormalizedHeader("Content-Security-Policy"),
+            "script-src 'self'");
 }
 TEST_F(FilteringFactoryTest, CspDoesNotInventParsedServerHeaders) {
   AddCspResponse("https://yee-csp.test/page", false);
@@ -692,13 +754,6 @@ TEST_F(FilteringFactoryTest, OpaqueNavigationFactoryBlocksMainDocument) {
   ConnectNavigation();
   StartNavigation("https://yee-block.test/ad", true, "https://page.test/",
                   "chrome://newtab/");
-  client_.RunUntilComplete();
-  EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
-  EXPECT_EQ(terminal_.total_requests(), 0u);
-}
-TEST_F(FilteringFactoryTest, OpaqueNavigationFactoryBlocksIframe) {
-  ConnectNavigation();
-  StartNavigation("https://yee-block.test/ad", false);
   client_.RunUntilComplete();
   EXPECT_EQ(client_.completion_status().error_code, net::ERR_BLOCKED_BY_CLIENT);
   EXPECT_EQ(terminal_.total_requests(), 0u);
@@ -760,6 +815,10 @@ TEST_F(FilteringFactoryTest, MainNavigationHonorsRedirectTargetException) {
 TEST_F(FilteringFactoryTest, DisabledFeatureDoesNotInstallNavigationProxy) {
   base::test::ScopedFeatureList feature;
   feature.InitAndDisableFeature(kYeeContentBlocking);
+  network::URLLoaderFactoryBuilder builder;
+  MaybeAppendFilteringFactory(builder, url::Origin(), url::Origin(),
+                              FactoryPurpose::kNavigation);
+  EXPECT_EQ(builder.num_interceptors(), 0u);
   terminal_.AddResponse("https://yee-block.test/ad", "retained");
   ConnectNavigation();
   StartNavigation("https://yee-block.test/ad");

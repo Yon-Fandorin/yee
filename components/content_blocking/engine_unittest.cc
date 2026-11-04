@@ -81,7 +81,7 @@ TEST(ContentBlockingEngine,
   EXPECT_FALSE(rejected.valid);
 }
 
-TEST(ContentBlockingEngine, ProceduralOperatorsAndActionsReachRenderer) {
+TEST(ContentBlockingEngine, ProceduralOperatorsAndActionsProducePageRuleData) {
   Engine engine(
       "page.test##.label:has-text(Advertisement):upward(1)\n"
       "page.test##.styled:style(color: red !important)\n"

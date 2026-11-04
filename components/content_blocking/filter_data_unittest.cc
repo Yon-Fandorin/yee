@@ -86,9 +86,24 @@ TEST_F(CommunityFilterDataTest, ChangedDataRejectsEntireSnapshot) {
 }
 TEST_F(CommunityFilterDataTest, ManifestCannotChooseAnotherFile) {
   WritePack("||tracker.test^\n");
-  ASSERT_TRUE(base::WriteFile(directory_.GetPath().AppendASCII(kManifest),
-      "{\"schema_version\":2,\"rules_file\":\"../private.cc\",\"rules_sha256\":\"" + std::string(64, '0') + "\"}"));
-  EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
+  ASSERT_EQ(Read().status, FilterDataStatus::kLoaded);
+  std::string text;
+  const auto path = directory_.GetPath().AppendASCII(kManifest);
+  ASSERT_TRUE(base::ReadFileToString(path, &text));
+  const auto original = base::JSONReader::ReadDict(text, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(original);
+  for (const auto* field : {"rules_file", "resources_file"}) {
+    SCOPED_TRACE(field);
+    auto manifest = original->Clone();
+    const auto* file = original->FindString(field);
+    ASSERT_TRUE(file);
+    const std::string alternate = "alternate-" + *file;
+    ASSERT_TRUE(base::CopyFile(directory_.GetPath().AppendASCII(*file),
+                               directory_.GetPath().AppendASCII(alternate)));
+    manifest.Set(field, alternate);
+    ASSERT_TRUE(base::WriteFile(path, base::WriteJson(manifest).value()));
+    EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
+  }
 }
 TEST_F(CommunityFilterDataTest, InvalidAndFutureManifestsAreRejected) {
   for (const auto* text : {"not json", "{}", "{\"schema_version\":3}"}) {
@@ -105,8 +120,16 @@ TEST_F(CommunityFilterDataTest, EmptyAndInvalidUtf8AreRejected) {
 TEST_F(CommunityFilterDataTest, OversizedFilesAreRejected) {
   WritePack(std::string(16 * 1024 * 1024 + 1, 'x'));
   EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
-  ASSERT_TRUE(base::WriteFile(directory_.GetPath().AppendASCII(kManifest),
-                             std::string(128 * 1024 + 1, ' ')));
+  WritePack("||tracker.test^\n");
+  ASSERT_EQ(Read().status, FilterDataStatus::kLoaded);
+  std::string manifest;
+  const auto path = directory_.GetPath().AppendASCII(kManifest);
+  ASSERT_TRUE(base::ReadFileToString(path, &manifest));
+  manifest.resize(128 * 1024, ' ');
+  ASSERT_TRUE(base::WriteFile(path, manifest));
+  ASSERT_EQ(Read().status, FilterDataStatus::kLoaded);
+  manifest.push_back(' ');
+  ASSERT_TRUE(base::WriteFile(path, manifest));
   EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
 }
 TEST_F(CommunityFilterDataTest, InvalidResourcesRejectFiltersToo) {
@@ -154,7 +177,12 @@ TEST_F(CommunityFilterDataTest, ResourcesContributeToGeneration) {
   EXPECT_NE(first.generation, second.generation);
 }
 TEST_F(CommunityFilterDataTest, OversizedResourcesAreRejected) {
-  WritePack("||tracker.test^\n", std::string(16 * 1024 * 1024 + 1, ' '));
+  std::string resources = "[]";
+  resources.resize(16 * 1024 * 1024, ' ');
+  WritePack("||tracker.test^\n", resources);
+  ASSERT_EQ(Read().status, FilterDataStatus::kLoaded);
+  resources.push_back(' ');
+  WritePack("||tracker.test^\n", resources);
   EXPECT_EQ(Read().status, FilterDataStatus::kInvalid);
 }
 TEST_F(CommunityFilterDataTest, CacheCannotOutliveEitherRuleGeneration) {
@@ -186,6 +214,16 @@ TEST(CommunityFilterProductionData, CompiledCacheMatchesTextEngine) {
       directory.AppendASCII("community-filter-test-data"));
   ASSERT_EQ(data.status, FilterDataStatus::kLoaded);
   ASSERT_FALSE(data.compiled_filters.empty());
+  // fallback 원문을 비워도 캐시에만 있는 광고 규칙이 작동해야 한다.
+  constexpr char sentinel[] =
+      "https://r1.googlevideo.com/initplayback?source=yt_ads&oad=1";
+  Engine empty("", kBundledResources, "", data.resources);
+  Engine cache_only("", kBundledResources, "", data.resources,
+                    data.compiled_filters);
+  EXPECT_FALSE(empty.ShouldBlock(sentinel, "https://www.youtube.com/",
+                                 "xmlhttprequest"));
+  EXPECT_TRUE(cache_only.ShouldBlock(sentinel, "https://www.youtube.com/",
+                                     "xmlhttprequest"));
   Engine text(kBundledFilters, kBundledResources, data.filters, data.resources);
   Engine cached(kBundledFilters, kBundledResources, data.filters, data.resources,
                 data.compiled_filters);
@@ -227,6 +265,9 @@ TEST(CommunityFilterProductionData, CompiledCacheMatchesTextEngine) {
   EXPECT_EQ(cached_generic, generic);
   auto corrupt = data.compiled_filters;
   corrupt[0] ^= 1;
+  Engine corrupt_empty("", kBundledResources, "", data.resources, corrupt);
+  EXPECT_FALSE(corrupt_empty.ShouldBlock(sentinel, "https://www.youtube.com/",
+                                         "xmlhttprequest"));
   Engine fallback(kBundledFilters, kBundledResources, data.filters, data.resources,
                   corrupt);
   EXPECT_TRUE(fallback.ShouldBlock(

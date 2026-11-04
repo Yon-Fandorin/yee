@@ -121,11 +121,17 @@ TEST_F(ContentBlockingServiceTest,
 
 TEST_F(ContentBlockingServiceTest, CapacityRejectsTheEntireImportBatch) {
   std::vector<BlockedDomain> rules;
-  for (size_t i = 0; i < kMaxBlockedDomains; ++i) {
+  for (size_t i = 0; i < kMaxBlockedDomains - 1; ++i) {
     rules.push_back({"domain" + std::to_string(i) + ".example", false});
   }
-  ASSERT_EQ(kMaxBlockedDomains, service_->ImportBlockedDomains(rules));
-  EXPECT_FALSE(service_->ImportBlockedDomains({{"another.example", true}}));
+  ASSERT_EQ(kMaxBlockedDomains - 1, service_->ImportBlockedDomains(rules));
+  const auto before = service_->BlockedDomains();
+  EXPECT_FALSE(service_->ImportBlockedDomains(
+      {{"first.example", true}, {"second.example", true}}));
+  EXPECT_EQ(before, service_->BlockedDomains());
+  RecreateService();
+  EXPECT_EQ(before, service_->BlockedDomains());
+  EXPECT_TRUE(service_->SetBlockedDomain("last.example", true));
   EXPECT_FALSE(service_->SetBlockedDomain("another.example", true));
   EXPECT_EQ(kMaxBlockedDomains, service_->BlockedDomains().size());
   EXPECT_TRUE(service_->SetBlockedDomain("domain0.example", true));
