@@ -182,7 +182,7 @@ class ProcessArgumentsTest(unittest.TestCase):
             return 0
 
         with (patch('browser_bundle_executables.sys.platform', 'darwin'),
-              patch('browser_bundle_executables.os.sysconf', return_value=1024),
+              patch('browser_bundle_executables.os.sysconf', return_value=1024, create=True),
               patch('browser_bundle_executables.ctypes.CDLL') as library):
             library.return_value.sysctl = sysctl
             self.assertEqual(process_arguments(123), ['/tmp/Yee', '--user-data-dir', '/tmp/profile archived'])

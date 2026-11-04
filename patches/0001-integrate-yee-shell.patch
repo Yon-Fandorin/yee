@@ -25487,7 +25487,7 @@ index be1fb0ad07..f3d9ed26de 100644
  
  source_set("icon_label_bubble") {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index d07cbfe86c..3da0fc1c68 100644
+index d07cbfe86c..6a56dafd75 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -25551,7 +25551,17 @@ index d07cbfe86c..3da0fc1c68 100644
  int IncrementalMinimumWidth(const views::View* view) {
    return (view && view->GetVisible()) ? view->GetMinimumSize().width() : 0;
  }
-@@ -255,7 +267,8 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
+@@ -230,6 +242,9 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
+     pref_registrar_->Add(omnibox::kShowAiModeOmniboxButton,
+                          base::BindRepeating(&LocationBarView::OnChanged,
+                                              base::Unretained(this)));
++    pref_registrar_->Add(omnibox::kPreventUrlElisionsInOmnibox,
++                         base::BindRepeating(&LocationBarView::OnChanged,
++                                             base::Unretained(this)));
+   }
+ 
+   run_omnibox_context_menu_callback_ =
+@@ -255,7 +270,8 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
            // Show focus ring when the Omnibox is visibly focused and either the
            // popup is closed or it's the full WebUI popup, which keeps the
            // focused look (see `ShouldUsePopupOpenAppearance()`).
@@ -25561,7 +25571,7 @@ index d07cbfe86c..3da0fc1c68 100644
                   !v->ShouldUsePopupOpenAppearance();
          }));
      views::FocusRing::Get(this)->SetOutsetFocusRingDisabled(true);
-@@ -467,6 +480,7 @@ void LocationBarView::Init() {
+@@ -467,6 +483,7 @@ void LocationBarView::Init() {
    omnibox_additional_text_view->SetVisible(false);
    omnibox_additional_text_view_ =
        AddChildView(std::move(omnibox_additional_text_view));
@@ -25569,7 +25579,7 @@ index d07cbfe86c..3da0fc1c68 100644
    omnibox_additional_text_view_->SetEnabledColor(kColorOmniboxResultsUrl);
  
    selected_keyword_view_ = AddChildView(std::make_unique<SelectedKeywordView>(
-@@ -504,6 +518,12 @@ void LocationBarView::Init() {
+@@ -504,6 +521,12 @@ void LocationBarView::Init() {
            page_action_items, page_actions::PageActionPropertiesProvider(),
            page_action_params));
  
@@ -25582,7 +25592,7 @@ index d07cbfe86c..3da0fc1c68 100644
    auto clear_all_button = views::CreateVectorImageButton(base::BindRepeating(
        static_cast<void (OmniboxView::*)(const std::u16string&)>(
            &OmniboxView::SetUserText),
-@@ -516,6 +536,8 @@ void LocationBarView::Init() {
+@@ -516,6 +539,8 @@ void LocationBarView::Init() {
    auto ai_mode_hint_label = std::make_unique<views::Label>(
        std::u16string(), CONTEXT_OMNIBOX_PRIMARY, views::style::STYLE_PRIMARY);
    ai_mode_hint_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -25591,7 +25601,7 @@ index d07cbfe86c..3da0fc1c68 100644
    ai_mode_hint_label->SetVisible(false);
    ai_mode_hint_label_ = AddChildView(std::move(ai_mode_hint_label));
  
-@@ -534,7 +556,139 @@ bool LocationBarView::IsInitialized() const {
+@@ -534,7 +559,139 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
  
@@ -25731,7 +25741,7 @@ index d07cbfe86c..3da0fc1c68 100644
    return ComputeBorderRadius(size());
  }
  
-@@ -551,8 +705,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
+@@ -551,8 +708,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
      gfx::Size size,
      SkBlendMode blend_mode,
      bool antialias,
@@ -25743,7 +25753,7 @@ index d07cbfe86c..3da0fc1c68 100644
    auto painter =
        stroke_color == SK_ColorTRANSPARENT
            ? views::Painter::CreateSolidRoundRectPainter(
-@@ -731,7 +886,10 @@ bool LocationBarView::HasFocus() const {
+@@ -731,7 +889,10 @@ bool LocationBarView::HasFocus() const {
  }
  
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -25755,7 +25765,7 @@ index d07cbfe86c..3da0fc1c68 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -758,7 +916,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -758,7 +919,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
  
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -25767,7 +25777,7 @@ index d07cbfe86c..3da0fc1c68 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -903,13 +1064,16 @@ void LocationBarView::Layout(PassKey) {
+@@ -903,13 +1067,16 @@ void LocationBarView::Layout(PassKey) {
  
    auto add_trailing_decoration = [&](View* view, int intra_item_padding,
                                       int edge_padding) {
@@ -25785,7 +25795,7 @@ index d07cbfe86c..3da0fc1c68 100644
    if (features::IsPageActionsElevatedToolbarEnabled()) {
      if (page_action_container_ && page_action_container_->GetVisible()) {
        const bool is_capsule_active = page_action_container_->IsCapsuleActive();
-@@ -1047,6 +1211,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -1047,6 +1214,10 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -25796,7 +25806,7 @@ index d07cbfe86c..3da0fc1c68 100644
    LayoutSuperclass<View>(this);
  }
  
-@@ -1065,7 +1233,11 @@ void LocationBarView::OnThemeChanged() {
+@@ -1065,7 +1236,11 @@ void LocationBarView::OnThemeChanged() {
    }
  
    RefreshBackground();
@@ -25809,7 +25819,7 @@ index d07cbfe86c..3da0fc1c68 100644
  }
  
  void LocationBarView::ChildPreferredSizeChanged(views::View* child) {
-@@ -1082,6 +1254,10 @@ void LocationBarView::Update(WebContents* contents) {
+@@ -1082,6 +1257,10 @@ void LocationBarView::Update(WebContents* contents) {
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
@@ -25820,7 +25830,7 @@ index d07cbfe86c..3da0fc1c68 100644
    location_icon_view_->Update(/*suppress_animations=*/contents,
                                ShouldUsePopupOpenAppearance());
  
-@@ -1222,6 +1398,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
+@@ -1222,6 +1401,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
    // fall back to the usual omnibox text color to ensure UI consistency.
    // In either case, all IconLabelBubbleViews situated within the location bar
    // will inherit the selected "surrounding foreground color".
@@ -25834,7 +25844,7 @@ index d07cbfe86c..3da0fc1c68 100644
    const auto color_id = ShouldShowKeywordBubble()
                              ? kColorOmniboxKeywordSeparator
                              : kColorOmniboxActionIcon;
-@@ -1233,6 +1416,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
+@@ -1233,6 +1419,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
  }
  
  SkColor LocationBarView::GetIconLabelBubbleBackgroundColor() const {
@@ -25844,7 +25854,7 @@ index d07cbfe86c..3da0fc1c68 100644
    return GetColorProvider()->GetColor(kColorLocationBarBackground);
  }
  
-@@ -1406,6 +1592,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
+@@ -1406,6 +1595,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
  int LocationBarView::GetMinimumTrailingWidth() const {
    int trailing_width = IncrementalMinimumWidth(page_action_container_);
  
@@ -25853,7 +25863,7 @@ index d07cbfe86c..3da0fc1c68 100644
    for (ContentSettingImageView* content_setting_view : content_setting_views_) {
      trailing_width += IncrementalMinimumWidth(content_setting_view);
    }
-@@ -1414,33 +1602,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1414,33 +1605,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
  
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -25908,7 +25918,7 @@ index d07cbfe86c..3da0fc1c68 100644
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1450,7 +1654,7 @@ void LocationBarView::RefreshBackground() {
+@@ -1450,7 +1657,7 @@ void LocationBarView::RefreshBackground() {
    }
  
    SkColor border_color = SK_ColorTRANSPARENT;
@@ -25917,7 +25927,7 @@ index d07cbfe86c..3da0fc1c68 100644
      // High contrast schemes get a border stroke even on a rounded omnibox.
      border_color =
          is_caret_visible
-@@ -1463,18 +1667,74 @@ void LocationBarView::RefreshBackground() {
+@@ -1463,18 +1670,74 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
  
@@ -25996,7 +26006,7 @@ index d07cbfe86c..3da0fc1c68 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1486,6 +1746,79 @@ void LocationBarView::RefreshBackground() {
+@@ -1486,6 +1749,83 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -26038,8 +26048,12 @@ index d07cbfe86c..3da0fc1c68 100644
 +
 +  std::u16string title;
 +  std::u16string origin;
++  // 전체 주소 표시를 선택하면 native URL을 장식 레이어로 덮지 않는다.
++  const bool show_full_url =
++      profile_ &&
++      profile_->GetPrefs()->GetBoolean(omnibox::kPreventUrlElisionsInOmnibox);
 +  bool visible =
-+      compact_shell_mode_ && !HasFocus() &&
++      compact_shell_mode_ && !show_full_url && !HasFocus() &&
 +      !GetOmniboxController()->edit_model()->user_input_in_progress() &&
 +      compact_shell_presentation_.has_value() &&
 +      compact_shell_presentation_->palette_mode ==
@@ -26076,7 +26090,7 @@ index d07cbfe86c..3da0fc1c68 100644
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1560,7 +1893,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1560,7 +1900,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -26084,7 +26098,7 @@ index d07cbfe86c..3da0fc1c68 100644
    }
  }
  
-@@ -1587,10 +1919,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
+@@ -1587,10 +1926,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
                                  : features::IsRoundedIconsEnabled()
                                      ? kCloseIcon
                                      : kTabCloseNormalOldIcon;
@@ -26113,7 +26127,7 @@ index d07cbfe86c..3da0fc1c68 100644
    clear_all_button_->SetBorder(views::CreateEmptyBorder(
        GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING)));
  }
-@@ -1815,6 +2161,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1815,6 +2168,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -26126,7 +26140,7 @@ index d07cbfe86c..3da0fc1c68 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1851,9 +2203,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1851,9 +2210,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
@@ -26139,7 +26153,7 @@ index d07cbfe86c..3da0fc1c68 100644
  }
  
  int LocationBarView::GetDragOperationsForView(views::View* sender,
-@@ -1952,6 +2304,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1952,6 +2311,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -26150,7 +26164,7 @@ index d07cbfe86c..3da0fc1c68 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -2148,6 +2504,10 @@ void LocationBarView::OnChanged() {
+@@ -2148,6 +2511,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -26161,7 +26175,7 @@ index d07cbfe86c..3da0fc1c68 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2381,9 +2741,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2381,9 +2748,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -26186,7 +26200,7 @@ index d07cbfe86c..3da0fc1c68 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2400,6 +2775,8 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2400,6 +2782,8 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -26195,7 +26209,7 @@ index d07cbfe86c..3da0fc1c68 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2434,18 +2811,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2434,18 +2818,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -26249,7 +26263,7 @@ index d07cbfe86c..3da0fc1c68 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2544,7 +2950,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2544,7 +2957,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  

@@ -1,4 +1,4 @@
-# Build helpers; loaded by common.ps1.
+﻿# Build helpers; loaded by common.ps1.
 
 function Set-YeeCacheEnvironment {
     $cacheRoot = Join-Path $script:LocalBuildRoot 'cache'
@@ -60,6 +60,7 @@ function Sync-YeeUiSources {
 }
 
 function Initialize-YeeBuildInputs {
+    Assert-YeeOutputSelection
     $null = Get-YeeBuildJobs
     Sync-YeeBranding
     Sync-YeeUiSources
@@ -69,17 +70,46 @@ function Initialize-YeeBuildInputs {
 }
 
 function Invoke-YeeBuildTarget {
-    param([Parameter(Mandatory = $true)][string] $Target)
+    param(
+        [Parameter(Mandatory = $true)][string[]] $Target,
+        [switch] $KeepGoing
+    )
 
+    Assert-YeeOutputSelection
     $jobs = Get-YeeBuildJobs
     Set-YeeCacheEnvironment
     $env:NINJA_SUMMARIZE_BUILD = '1'
     $autoninja = Get-DepotCommand -Name 'autoninja'
     Push-Location $script:ChromiumSrc
     try {
-        Write-Host "Building $Target with $jobs parallel jobs."
-        & $autoninja -C "out\$script:YeeOutName" -j $jobs $Target
-        if ($LASTEXITCODE -ne 0) { throw "Chromium $Target build failed." }
+        Write-Host "Building $($Target -join ', ') with $jobs parallel jobs."
+        $buildArguments = @('-C', "out\$script:YeeOutName", '-j', $jobs)
+        if ($KeepGoing) { $buildArguments += @('-k', '0') }
+        $launcher = $autoninja
+        if ($Target.Count -gt 1) {
+            # 다중 object 목록은 cmd의 8191자 한도를 넘으므로 배치 파일을 거치지 않는다.
+            $python = (Get-Command python3.exe -CommandType Application -ErrorAction Stop |
+                Select-Object -First 1).Source
+            if ((Get-Item -LiteralPath $python).Length -eq 0) {
+                throw '실제 depot_tools Python이 필요하다. Add-DepotToolsToPath로 개발 환경을 준비하라.'
+            }
+            $launcher = $python
+            $buildArguments = @((Join-Path $script:DepotToolsDir 'autoninja.py')) + $buildArguments
+        }
+        # Windows PowerShell 5.1의 native stderr도 경고·로그로 보존하고 종료 코드로 판정한다.
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $launcher @buildArguments @Target
+            $buildExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
+        if ($buildExitCode -ne 0) {
+            $buildError = [System.Exception]::new("Chromium $Target build failed.")
+            $buildError.Data['ExitCode'] = $buildExitCode
+            throw $buildError
+        }
     } finally {
         Pop-Location
     }

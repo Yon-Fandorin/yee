@@ -502,6 +502,8 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
   weight로 그려 URL을 기준 정보로 읽게 한다.
 - 기본 표시는 실제 native Omnibox 위의 non-interactive presentation layer이며,
   접근성 tree와 hit target은 native Omnibox가 계속 소유한다.
+- 사용자가 Chromium의 전체 URL 표시 설정을 켜면 대기 상태에서도 표시 layer를
+  숨기고 native Omnibox의 전체 URL을 보여준다.
 - click 또는 `Ctrl/⌘ L`에서 URL edit model로 전환하고 현재 URL을 전체 선택한다.
 - hover에서만 resolved surface의 2% contrast tint를 주며 별도 border를 추가하지
   않는다.

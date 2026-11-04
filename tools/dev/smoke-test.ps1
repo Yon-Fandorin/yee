@@ -3,6 +3,7 @@ param()
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+Assert-YeeOutputSelection
 $timeoutSeconds = if ($env:YEE_SMOKE_TIMEOUT_SECONDS) {
     [int]$env:YEE_SMOKE_TIMEOUT_SECONDS
 } else {

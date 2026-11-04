@@ -105,6 +105,13 @@ macOS는 native 포커스 요청의 활성화 허용 조건을 유지하며, 숨
 최소화 상태에서는 복원 요청을 취소한다. `EscapeRestoreDoesNotRevealHiddenOwner`는
 대기 중 owner를 숨겨도 복원 작업이 창을 다시 표시하지 않는지 확인한다.
 
+Footer 단위 fixture는 `ChromeViewsTestBase`의 `MOCK_TIME`을 사용한다. Windows의
+Escape 복원·trigger 분리 검사는 native 활성화 메시지를 기다리는 동안 가상 시계가
+먼저 만료하지 않도록 지연 `ScopedRunLoopTimeout`을 추가하지 않는다. 실제 Windows
+실행기의 사례별 wall-clock 제한은 유지한다. macOS는 기존 10초 제한을 유지하며,
+두 플랫폼 모두 traversal 이유·포커스 링·owner 활성화·분리 후 다른 대상의 포커스
+보존 판정을 그대로 검사한다.
+
 실제 Footer 검사는 별도 프로세스의 UI Automation 클라이언트가 브라우저·팝업
 트리를 보관하는 조건도 포함한다. 클라이언트는 전용 MTA에서 조회하고, 닫힌
 팝업의 현재 속성 조회가 실패하는지 확인한 뒤 COM 참조를 반환한다. 테스트는

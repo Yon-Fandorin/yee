@@ -700,7 +700,10 @@ TEST_F(SidebarFooterViewTest,
 }
 
 TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
+#if !BUILDFLAG(IS_WIN)
+  // Windows MOCK_TIME은 이 지연 타이머로 native 활성화 메시지보다 먼저 만료된다.
   base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
+#endif
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
@@ -741,7 +744,9 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
+#if BUILDFLAG(IS_MAC)
   base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
+#endif
   footer_ = nullptr;
   auto root = std::make_unique<views::View>();
   views::View* const container = root.get();

@@ -6,6 +6,7 @@ param(
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+Assert-YeeOutputSelection
 $profileDir = Join-Path $script:LocalBuildRoot 'runtime-profile'
 if (-not (Test-Path -LiteralPath $script:YeeBrowserBin -PathType Leaf)) {
     throw "Built $script:YeeProductName browser is missing: $script:YeeBrowserBin. Run .\tools\dev\build.ps1 first."

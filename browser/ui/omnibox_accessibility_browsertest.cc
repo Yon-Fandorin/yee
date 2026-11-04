@@ -1,9 +1,12 @@
 // Copyright 2026 The Yee Authors
 // Use of this source code is governed by a BSD-style license in LICENSE.
 
+#include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
@@ -13,6 +16,7 @@
 #include "base/test/run_until.h"
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/omnibox/omnibox_controller.h"
@@ -27,6 +31,8 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/omnibox/browser/omnibox_prefs.h"
+#include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
@@ -50,13 +56,117 @@
 #include <uiautomation.h>
 #include <wrl/client.h>
 
+#include "base/test/test_future.h"
+#include "base/threading/thread.h"
 #include "base/win/scoped_bstr.h"
 #include "base/win/scoped_variant.h"
+#include "content/public/test/scoped_accessibility_mode_override.h"
+#include "ui/accessibility/ax_mode.h"
 #include "ui/aura/test/ui_controls_aurawin.h"
+#include "ui/views/win/hwnd_util.h"
 #endif
 
 namespace yee {
 namespace {
+
+#if BUILDFLAG(IS_WIN)
+struct WindowAccessibleUrls {
+  HRESULT result = S_OK;
+  std::vector<std::u16string> addresses;
+  std::vector<std::u16string> documents;
+};
+
+// 주소창 포인터 없이 실제 HWND의 Control View에서 URL을 읽는다.
+WindowAccessibleUrls ReadWindowAccessibleUrls(HWND hwnd) {
+  WindowAccessibleUrls urls;
+  auto fail = [&](HRESULT result) {
+    urls.result = result;
+    return urls;
+  };
+  Microsoft::WRL::ComPtr<IUIAutomation> automation;
+  HRESULT result =
+      CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
+                       IID_PPV_ARGS(&automation));
+  if (FAILED(result)) {
+    return fail(result);
+  }
+  Microsoft::WRL::ComPtr<IUIAutomationElement> root;
+  result = automation->ElementFromHandle(hwnd, &root);
+  if (FAILED(result) || !root) {
+    return fail(FAILED(result) ? result : E_POINTER);
+  }
+  Microsoft::WRL::ComPtr<IUIAutomationCondition> edit;
+  Microsoft::WRL::ComPtr<IUIAutomationCondition> document;
+  Microsoft::WRL::ComPtr<IUIAutomationCondition> types;
+  Microsoft::WRL::ComPtr<IUIAutomationCondition> controls;
+  Microsoft::WRL::ComPtr<IUIAutomationCondition> condition;
+  if (FAILED(result = automation->CreatePropertyCondition(
+                 UIA_ControlTypePropertyId,
+                 base::win::ScopedVariant(UIA_EditControlTypeId), &edit)) ||
+      FAILED(result = automation->CreatePropertyCondition(
+                 UIA_ControlTypePropertyId,
+                 base::win::ScopedVariant(UIA_DocumentControlTypeId),
+                 &document)) ||
+      FAILED(result = automation->CreateOrCondition(edit.Get(), document.Get(),
+                                                    &types)) ||
+      FAILED(result = automation->get_ControlViewCondition(&controls)) ||
+      FAILED(result = automation->CreateAndCondition(
+                 controls.Get(), types.Get(), &condition))) {
+    return fail(result);
+  }
+  Microsoft::WRL::ComPtr<IUIAutomationElementArray> elements;
+  result = root->FindAll(TreeScope_Descendants, condition.Get(), &elements);
+  if (FAILED(result) || !elements) {
+    return fail(FAILED(result) ? result : E_POINTER);
+  }
+  int count = 0;
+  if (FAILED(result = elements->get_Length(&count))) {
+    return fail(result);
+  }
+  for (int index = 0; index < count; ++index) {
+    Microsoft::WRL::ComPtr<IUIAutomationElement> element;
+    if (FAILED(result = elements->GetElement(index, &element)) || !element) {
+      return fail(FAILED(result) ? result : E_POINTER);
+    }
+    BOOL offscreen = TRUE;
+    CONTROLTYPEID type = 0;
+    base::win::ScopedBstr name;
+    base::win::ScopedBstr class_name;
+    if (FAILED(result = element->get_CurrentIsOffscreen(&offscreen)) ||
+        FAILED(result = element->get_CurrentControlType(&type)) ||
+        FAILED(result = element->get_CurrentName(name.Receive())) ||
+        FAILED(result = element->get_CurrentClassName(class_name.Receive()))) {
+      return fail(result);
+    }
+    const bool address =
+        type == UIA_EditControlTypeId && class_name.Get() &&
+        std::wstring_view(class_name.Get()) == L"OmniboxViewViews";
+    const bool page =
+        type == UIA_DocumentControlTypeId && name.Get() &&
+        std::wstring_view(name.Get()) == L"Address accessibility fixture";
+    if (offscreen || (!address && !page)) {
+      continue;
+    }
+    Microsoft::WRL::ComPtr<IUIAutomationValuePattern> pattern;
+    base::win::ScopedBstr value;
+    result = element->GetCurrentPatternAs(UIA_ValuePatternId,
+                                          IID_PPV_ARGS(&pattern));
+    if (FAILED(result) || !pattern) {
+      return fail(FAILED(result) ? result : E_POINTER);
+    }
+    if (FAILED(result = pattern->get_CurrentValue(value.Receive()))) {
+      return fail(result);
+    }
+    if (!value.Get()) {
+      return fail(E_UNEXPECTED);
+    }
+    (address ? urls.addresses : urls.documents)
+        .push_back(base::WideToUTF16(value.Get()));
+  }
+  std::ranges::sort(urls.documents);
+  return urls;
+}
+#endif
 
 // 장식 레이어를 끈 경우와 비교하되 이를 무패치 Chromium으로 간주하지 않는다.
 class OmniboxAccessibilityBrowserTest
@@ -90,11 +200,25 @@ class OmniboxAccessibilityBrowserTest
         }));
     ASSERT_TRUE(Server()->Start());
 #if BUILDFLAG(IS_WIN)
+    accessibility_mode_ =
+        std::make_unique<content::ScopedAccessibilityModeOverride>(
+            ui::kAXModeComplete);
+    // UIA는 MTA에서 읽고, 브라우저 UI 스레드는 provider 요청을 처리한다.
+    accessibility_thread_.init_com_with_mta(true);
+    ASSERT_TRUE(accessibility_thread_.Start());
     aura::test::EnableUIControlsAuraWin();
 #else
     ui_controls::EnableUIControls();
 #endif
     ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  }
+
+  void TearDownOnMainThread() override {
+#if BUILDFLAG(IS_WIN)
+    accessibility_thread_.Stop();
+    accessibility_mode_.reset();
+#endif
+    InProcessBrowserTest::TearDownOnMainThread();
   }
 
  protected:
@@ -140,7 +264,8 @@ class OmniboxAccessibilityBrowserTest
   }
 
   void CheckAccessibleAddress(const std::string& phase,
-                              const std::u16string& expected) {
+                              const std::u16string& expected,
+                              const std::vector<GURL>& visible_documents = {}) {
     SCOPED_TRACE(phase);
     ASSERT_TRUE(Omnibox()->IsDrawn());
     ASSERT_FALSE(Omnibox()->GetBoundsInScreen().IsEmpty());
@@ -183,11 +308,46 @@ class OmniboxAccessibilityBrowserTest
     BOOL read_only = TRUE;
     ASSERT_HRESULT_SUCCEEDED(value_provider->get_IsReadOnly(&read_only));
     EXPECT_FALSE(read_only);
+
+    std::vector<std::u16string> expected_documents;
+    for (const auto& url : visible_documents.empty()
+                               ? std::vector<GURL>{Contents()->GetVisibleURL()}
+                               : visible_documents) {
+      expected_documents.push_back(base::UTF8ToUTF16(url.spec()));
+    }
+    std::ranges::sort(expected_documents);
+    const HWND hwnd = views::HWNDForWidget(View()->GetWidget());
+    ASSERT_TRUE(hwnd);
+    WindowAccessibleUrls window_urls;
+    const bool exposed = base::test::RunUntil([&]() {
+      base::test::TestFuture<WindowAccessibleUrls> future;
+      accessibility_thread_.task_runner()->PostTaskAndReplyWithResult(
+          FROM_HERE, base::BindOnce(&ReadWindowAccessibleUrls, hwnd),
+          future.GetCallback());
+      window_urls = future.Take();
+      return SUCCEEDED(window_urls.result) &&
+             window_urls.addresses == std::vector<std::u16string>{expected} &&
+             window_urls.documents == expected_documents;
+    });
+    EXPECT_HRESULT_SUCCEEDED(window_urls.result);
+    EXPECT_EQ(std::vector<std::u16string>{expected}, window_urls.addresses);
+    EXPECT_EQ(expected_documents, window_urls.documents);
+    ASSERT_TRUE(exposed);
+    RecordProperty(phase + "_window_omnibox_count",
+                   static_cast<int>(window_urls.addresses.size()));
+    for (size_t index = 0; index < window_urls.documents.size(); ++index) {
+      RecordProperty(phase + "_window_document_" + std::to_string(index),
+                     base::UTF16ToUTF8(window_urls.documents[index]));
+    }
 #endif
   }
 
  private:
   net::EmbeddedTestServer https_server_{net::EmbeddedTestServer::TYPE_HTTPS};
+#if BUILDFLAG(IS_WIN)
+  std::unique_ptr<content::ScopedAccessibilityModeOverride> accessibility_mode_;
+  base::Thread accessibility_thread_{"Yee window accessibility"};
+#endif
 };
 
 // 대기·편집 상태의 native URL 규칙과 Ctrl+L의 전체 선택을 보존한다.
@@ -213,6 +373,30 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
   ASSERT_TRUE(full_url.starts_with(scheme_prefix));
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress(
       "rest", base::UTF8ToUTF16(full_url.substr(scheme_prefix.size()))));
+  auto* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, true);
+  if (UsesShell()) {
+    ASSERT_TRUE(base::test::RunUntil([&]() {
+      return !View()
+                  ->GetLocationBarView()
+                  ->GetCompactShellRestingTextForTesting()
+                  ->GetVisible();
+    }));
+  }
+  ASSERT_NO_FATAL_FAILURE(
+      CheckAccessibleAddress("full_url_pref", base::UTF8ToUTF16(full_url)));
+  prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, false);
+  if (UsesShell()) {
+    ASSERT_TRUE(base::test::RunUntil([&]() {
+      return View()
+          ->GetLocationBarView()
+          ->GetCompactShellRestingTextForTesting()
+          ->GetVisible();
+    }));
+  }
+  ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress(
+      "restored_pref",
+      base::UTF8ToUTF16(full_url.substr(scheme_prefix.size()))));
   ASSERT_NO_FATAL_FAILURE(FocusAddress());
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress("ctrl_l", EditableUrl(Url())));
 }
@@ -256,8 +440,9 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
     EXPECT_EQ(expected, Contents()->GetVisibleURL());
     EXPECT_EQ(native_omnibox, Omnibox());
     EXPECT_EQ(native_id, Omnibox()->GetViewAccessibility().GetUniqueId());
-    ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress(
-        "split_" + std::to_string(index), EditableUrl(expected)));
+    ASSERT_NO_FATAL_FAILURE(
+        CheckAccessibleAddress("split_" + std::to_string(index),
+                               EditableUrl(expected), {Url(), Url("b.test")}));
   }
   model->RemoveSplit(split);
   View()->GetWidget()->LayoutRootViewIfNecessary();

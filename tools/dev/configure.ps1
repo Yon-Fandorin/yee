@@ -5,6 +5,7 @@ param(
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+Assert-YeeOutputSelection
 Add-DepotToolsToPath
 Assert-ChromiumSrc
 Assert-FreeGiB -RequiredGiB 45 -Purpose 'GN generation and the compact Chromium build'

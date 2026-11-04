@@ -3,6 +3,7 @@ param()
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+Assert-YeeOutputSelection
 # 설치 경로·등록은 Chromium mini_installer가 소유하고 이 진입점은 배포 산출물만 만든다.
 & (Join-Path $PSScriptRoot 'build.ps1') -Target mini_installer
 if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }

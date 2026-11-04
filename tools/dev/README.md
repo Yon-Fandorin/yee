@@ -32,7 +32,7 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 | `sync.*` | 현재 커밋에 필요한 관련 소스 맞추기 |
 | `configure.*` | 제품 코드 적용과 빌드 설정 생성 |
 | `build-ui.*` | `yee_ui`만 컴파일 |
-| `check-compile.sh [--list] [--include-unbuilt]` | macOS에서 패치·owned 컴파일 단위 사전 점검 (명시적으로 실행) |
+| `check-compile.*` | 패치·owned 컴파일 단위 사전 점검 (명시적으로 실행) |
 | `build.*` | 실제 앱 빌드 |
 | `run.*` | 빌드한 앱 실행 |
 | `smoke-test.*` | 기본 실행과 페이지 열기 확인 |
@@ -64,9 +64,11 @@ python3 tools/dev/chromium-version.py check
    변경과 미추적 파일을 보관하고 복원 가능 여부를 확인한다.
 3. 기존 `0001`·`0002`·`0003` 패치의 충돌과 제품 소스의 API 차이를 해결한다.
    적용된 패치를 다시 생성하고 브랜딩 문구·번역 변경을 별도로 검토한다.
-4. `configure.*`로 후보 출력의 graph를 준비한다. macOS에서는 긴 `build.sh` 전에
+4. `configure.*`로 후보 출력의 graph를 준비한다. 긴 앱 빌드 전에
    `check-compile.sh --list --include-unbuilt`로 대상을 확인하고
    `check-compile.sh --include-unbuilt`로 미빌드 object까지 사전 컴파일한다.
+   Windows 대응 명령은 `check-compile.ps1 -List -IncludeUnbuilt`와
+   `check-compile.ps1 -IncludeUnbuilt`다.
    아래 [사전 컴파일 점검](#chromium-이식-사전-컴파일-점검)을 참고한다.
 5. 후보 출력과 격리 프로필로 빌드한다. 컴파일, 영향 범위의 native 회귀 검사,
    탭·그룹·분할·설정·미디어·CLI 연결을 실제 앱에서 확인한다.
@@ -212,7 +214,7 @@ Swift 폼 승인 검사는 같은 zsh 호출로 두 가드와 제품 이름을 �
 
 ## Chromium 이식 사전 컴파일 점검
 
-macOS에서 이식한 코드의 컴파일 오류를 긴 `build.sh` 전에 확인하는 선택 단계다.
+이식한 코드의 컴파일 오류를 긴 앱 빌드 전에 확인하는 선택 단계다.
 기존 `YEE_LOCAL_BUILD_ROOT`·`YEE_OUT_NAME`의 `build.ninja`가 필요하며, 출력 폴더나
 graph가 없으면 생성하지 않고 중단한다. 다른 빌드가 실행 중이면 끝난 뒤 실행한다.
 
@@ -222,6 +224,18 @@ graph가 없으면 생성하지 않고 중단한다. 다른 빌드가 실행 중
 ./tools/dev/check-compile.sh
 ./tools/dev/build.sh
 ```
+
+```powershell
+.\tools\dev\check-compile.ps1 -List -IncludeUnbuilt
+.\tools\dev\check-compile.ps1 -IncludeUnbuilt
+.\tools\dev\build.ps1
+```
+
+Windows는 같은 Python 분류·보고 코드를 사용하고 `ninja.exe`를 조회한다.
+PowerShell의 `-List`, `-IncludeUnbuilt`는 아래 `--list`, `--include-unbuilt`와 같은 범위다.
+소스·도구·원본·출력은 기존 Windows 환경 변수를 따르며, `configure.ps1`로 graph를 준비한다.
+Windows 대상은 `^` 해석을 피하도록 `.obj` 경로로 전달하고, 복수 대상은 실제 Python에서
+`autoninja.py`를 직접 실행해 배치 파일의 8191자 한도를 피한다.
 
 `--list`는 기존 graph를 읽어 분류만 출력한다. 소스 동기화·컴파일·GN 재생성을
 수행하지 않으며 컴파일용 디스크 여유 공간 검사도 요구하지 않는다.
@@ -239,9 +253,11 @@ graph로 분류하며, 이때 플랫폼 미컴파일 분류는 확정된 결과�
 
 대상은 manifest의 shell 패치(`0001`)가 수정하는 `.cc`·`.mm` 중 삭제하지 않은 파일과,
 overlay 소스 복사 규칙으로 계산한 owned `.cc`·`.mm`의 Chromium 목적지다.
-Ninja의 조회 subtool로 소스별 object를 찾고, object가 하나면 `../../path/file.cc^`,
-여러 개면 선택한 각 object 경로를 전달한다. 같은 캐시·낮은 우선순위·`YEE_BUILD_JOBS`로
+Ninja의 조회 subtool로 소스별 object를 찾는다. macOS는 단일 출력에 `../../path/file.cc^`,
+다중 출력에는 선택한 각 object 경로를 전달한다. Windows는 항상 선택한 `.obj` 경로를 쓴다.
+같은 캐시·`YEE_BUILD_JOBS`로
 autoninja를 한 번 실행하며 `-k 0`으로 가능한 컴파일 오류를 함께 확인한다.
+macOS는 기존 빌드처럼 우선순위를 낮춘다.
 선택한 object가 요구하는 생성 헤더·모듈 등의 의존 단계도 실행하므로 cold 출력에서의
 작업량은 변경 파일 수보다 많을 수 있다. cold 시간 단축 여부는 아직 확인하지 않았다.
 앱·테스트 바이너리를 빌드 대상으로 지정하지 않는다.
@@ -270,7 +286,7 @@ object가 모두 미빌드이면 목록 모드와 컴파일 모드 모두 종료
 파일 수를 다시 출력한다. 미빌드를 생략했거나 플랫폼 미컴파일이 있으면 완료 요약에도
 **완전한 통과 아님**을 표시한다. `--include-unbuilt`로 포함한 object는 생략으로 세지 않는다.
 
-컴파일 모드의 기록 폴더는 `common.zsh`가 계산한 `$LOCAL_BUILD_ROOT/logs/compile-preflight.*`다.
+컴파일 모드의 기록 폴더는 공통 경로 코드가 계산한 `LocalBuildRoot/logs/compile-preflight.*`다.
 `YEE_LOCAL_BUILD_ROOT`를 지정했다면 그 아래이며, 미지정이면 저장소의 `.local-build/logs/`다.
 분류가 끝나면 `plan.json`·`targets.txt`를, 실제 빌드를 호출했을 때만 `build.log`를 남긴다.
 오래된 graph는 기록 폴더를 만들기 전에 **19**로 중단한다. `--list`도 기록 폴더를 만들지 않는다.
@@ -354,12 +370,22 @@ $env:YEE_LOCAL_BUILD_ROOT = 'F:\browser-dev'
 `YEE_DEPOT_TOOLS_DIR`, `YEE_CHROMIUM_ROOT`, `YEE_OUT_NAME`을 개별 지정할 수 있다.
 기존 호환 출력 디렉터리를 재사용하려면 설정·빌드 전에 `YEE_OUT_NAME`을 지정한다.
 
+`YEE_LOCAL_BUILD_ROOT`·`YEE_CHROMIUM_ROOT`를 모두 생략했고 기본 도구·소스가 없는데
+저장소 `.local-build/*/`에 기존 소스 또는 도구 후보가 있으면 종료 코드 **17**로 멈춘다.
+저장소 밖의 `F:\yee\...` 같은 루트는 검색하지 않으며 `YEE_CHROMIUM_ROOT`로 지정한다.
+출력 이름을 생략했고 `YeePilot/build.ninja`가 없는데 같은 원본의 다른 출력에 graph가 있으면
+설정·빌드·실행·패키징 전에 후보와 지정 예시를 출력하고 **18**로 멈춘다.
+명시값과 유효한 기본값을 우선하며, 후보 없는 새 장비는 기존 준비 동작을 유지한다.
+두 가드는 후보를 자동 선택하거나 기존 출력·프로필을 수정하지 않는다.
+
 ## Windows에서 작업하기
 
 ```powershell
 .\tools\dev\sync.ps1
 .\tools\dev\configure.ps1
 .\tools\dev\build-ui.ps1
+# 선택: 미빌드 object까지 이식 컴파일을 점검할 때 실행
+# .\tools\dev\check-compile.ps1 -IncludeUnbuilt
 .\tools\dev\build.ps1
 .\tools\dev\smoke-test.ps1
 .\tools\dev\run.ps1

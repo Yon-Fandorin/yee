@@ -1,5 +1,10 @@
 # Paths helpers; loaded by common.ps1.
 
+# 빈 환경 변수는 기존 기본값 처리와 같이 미지정으로 기록한다.
+$script:YeeLocalBuildRootExplicit = [bool]$env:YEE_LOCAL_BUILD_ROOT
+$script:YeeChromiumRootExplicit = [bool]$env:YEE_CHROMIUM_ROOT
+$script:YeeOutNameExplicit = [bool]$env:YEE_OUT_NAME
+
 $script:YeeRoot = Split-Path -Parent (Split-Path -Parent $script:WindowsDevDir)
 . (Join-Path $script:YeeRoot 'tools\overlay\brand-config.ps1')
 $script:YeeBrand = Get-YeeBrandConfig -SkipAssetValidation

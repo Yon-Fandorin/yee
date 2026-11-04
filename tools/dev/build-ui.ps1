@@ -3,6 +3,7 @@ param()
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 
+Assert-YeeOutputSelection
 Add-DepotToolsToPath
 Assert-ChromiumSrc
 Assert-FreeGiB -RequiredGiB 5 -Purpose "the isolated $script:YeeProductName UI target"

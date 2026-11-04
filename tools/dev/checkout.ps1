@@ -2,6 +2,7 @@
 param()
 
 . (Join-Path $PSScriptRoot 'common.ps1')
+Assert-YeeBuildRootSelection
 $jobs = Get-YeeSyncJobs
 
 New-Item -ItemType Directory -Path $script:LocalBuildRoot -Force | Out-Null

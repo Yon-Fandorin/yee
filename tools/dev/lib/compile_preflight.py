@@ -49,11 +49,17 @@ def check_graph(out_dir, allow_stale=False):
         return
     print('경고: 오래된 빌드 graph이거나 최신 여부를 확인할 수 없다:', file=sys.stderr)
     print('\n'.join('  ' + name for name in stale), file=sys.stderr)
-    print('빌드 설정을 먼저 갱신하라: ./tools/dev/configure.sh (같은 루트·출력 환경 유지)',
+    configure = '.\\tools\\dev\\configure.ps1' if sys.platform == 'win32' else './tools/dev/configure.sh'
+    print(f'빌드 설정을 먼저 갱신하라: {configure} (같은 루트·출력 환경 유지)',
           file=sys.stderr)
     if not allow_stale:
         raise SystemExit(19)
     print('목록은 기존 graph 기준이며 플랫폼 미컴파일 분류를 확정할 수 없다.', file=sys.stderr)
+
+
+def ninja_path(src):
+    """현재 호스트에서 실행할 Chromium Ninja를 선택한다."""
+    return src / 'third_party/ninja' / ('ninja.exe' if sys.platform == 'win32' else 'ninja')
 
 
 def query_graph(ninja, out_dir, paths):
@@ -112,7 +118,7 @@ def compile_plan(src, out_dir, include_unbuilt=False):
     sources = sorted(set(patch) | set(owned))
     if not sources:
         raise ValueError('패치와 owned 소스에서 컴파일 단위를 찾지 못했다.')
-    ninja = src / 'third_party/ninja/ninja'
+    ninja = ninja_path(src)
     candidates = {'../../' + path for path in sources}
     present = graph_sources(ninja, out_dir, candidates)
     nodes = query_graph(ninja, out_dir, sorted(present))
@@ -131,8 +137,9 @@ def compile_plan(src, out_dir, include_unbuilt=False):
         if not selected:
             continue
         compiled[path] = selected
-        # ^는 원래의 첫 출력만 선택한다. 미빌드 출력을 뺀 다중 object 소스도 경로로 지정한다.
-        targets.extend([source + '^'] if outputs == objects and len(objects) == 1 else selected)
+        # Windows cmd는 ^를 소비하므로 object 경로를 직접 전달한다.
+        use_source_target = sys.platform != 'win32' and outputs == objects and len(objects) == 1
+        targets.extend([source + '^'] if use_source_target else selected)
     return {'chromium_src': str(src), 'out_dir': str(out_dir),
             'patch_sources': patch, 'owned_sources': owned, 'compiled': compiled,
             'include_unbuilt': include_unbuilt, 'unbuilt_objects': unbuilt,
@@ -186,7 +193,7 @@ def report_failures(directory):
     if dependencies:
         src = Path(plan['chromium_src'])
         try:
-            nodes = query_graph(src / 'third_party/ninja/ninja', Path(plan['out_dir']), dependencies)
+            nodes = query_graph(ninja_path(src), Path(plan['out_dir']), dependencies)
             for node in nodes.values():
                 failed_sources.update(path.removeprefix('../../') for path in node['inputs']
                                       if Path(path).suffix in ('.cc', '.mm'))

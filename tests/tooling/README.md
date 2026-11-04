@@ -60,6 +60,14 @@ keep-going 호출과 실패 코드·파일 보고를 검사한다. 미빌드 obj
 overlay import가 새 바이트코드를 만들지 않는지도 확인한다.
 실제 Chromium 컴파일은 실행하지 않는다.
 
+`test_windows_build_selection.py`는 Windows PowerShell이 있을 때 임시 루트와 가짜 도구로
+명시값·기본값 보존, 후보 안내의 인용, 준비·빌드·실행·패키징의 부작용 전 중단을 검사한다.
+사전 컴파일 실행기의 목록 모드, 핀·graph 차단, 복수 object 전달, UTF-8 기록·범위 요약과
+실패 코드·실패 파일 보고도 확인한다. 공통 분류기의 Ninja 확장자와 Windows depfile의
+드라이브·공백 처리 검사는 GUI와 실제 컴파일 없이 실행한다.
+Windows 단일 object의 caret 제거 방지와 8191자를 넘는 목록 전달도 확인하며,
+PowerShell 5.1·7의 native stderr가 성공을 실패로 바꾸거나 실제 실패 코드를 가리지 않는지 검사한다.
+
 `test_development_tools.py`의 통합 fixture는 다른 OS 전용 사례를 목록에서 빼 두어
 레이아웃의 `horizontal`·`interactive`·`all`과 Sidebar의 플랫폼 필터 혼합을 확인한다.
 `test_build_selection.py`는 개발 환경 변수를 격리한 임시 루트에서 루트·출력 선택 가드와

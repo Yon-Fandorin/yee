@@ -11,7 +11,7 @@ Yee Shell·Shell 표시를 끈 native Toolbar의 조합으로 총 16개 실행�
 `YeeShell/OmniboxNavigationBrowserTest.*`는 HTTP·HTTPS에서 실제 Enter 이동과
 Alt+왼쪽·오른쪽의 문서·주소 동기화를 두 사례로 추가한다. 이 입력 조합을 쓰는
 Windows/Linux의 집중 gate는 총 18사례이며, macOS에서는 새 두 사례를 생략한다.
-이 수는 아래의 실제 앱 18개 사용자 시나리오와 다른 집계다.
+이 수는 실제 앱 검수 항목 18개와 다른 집계다.
 
 Windows 검사 입력은 가상 키 방식으로 전송할 때도 전용 방향키의 확장 표시를
 보존한다. 이 표시가 없으면 Alt+왼쪽·오른쪽이 숫자 키패드의 Alt 문자 입력으로
@@ -19,6 +19,8 @@ Windows 검사 입력은 가상 키 방식으로 전송할 때도 전용 방향�
 수정하며 제품 주소창의 숫자 키패드 처리와 단축키 정책은 유지한다.
 
 - Resting 표시가 입력·접근성에서 제외되고 원래 주소창의 값이 유지되는지 확인한다.
+- 전체 URL 표시 설정을 같은 탭에서 켜고 끄면 장식 표시가 사라졌다가 복원되고,
+  native 전체 URL과 기본 생략 규칙이 각각 유지되는지 확인한다.
 - 실제 Ctrl/⌘ L로 native 편집 URL과 전체 선택을 확인한다. HTTPS scheme 복원과 HTTP scheme 생략을 구분한다.
 - 같은 제목의 탭 전환, 분할 pane 전환·해제에서 같은 native 주소창과 활성 URL을 확인한다.
 - 편집 초안은 편집 가능한 값으로 노출하되 현재 문서 URL은 바뀌지 않고 취소 가능한지 확인한다.
@@ -27,6 +29,12 @@ Windows 검사 입력은 가상 키 방식으로 전송할 때도 전용 방향�
 Windows에서는 AX 데이터뿐 아니라 `IRawElementProviderSimple`과 `IValueProvider`의
 Edit 역할·실제 값·편집 가능 여부를 확인한다. HTTP는 편집 중에도 scheme을 생략하는 native 규칙을
 유지한다. 현재 문서 URL과 편집 중 문자열은 구분하며 title을 URL 대신 사용하지 않는다.
+추가로 Windows 창 HWND의 Control View에서 native 주소창과 보이는 문서를 찾아
+`IUIAutomationValuePattern` 값을 읽는다. 주소창 포인터를 이미 아는 직접 provider 검사와
+별개로 수행하며, 별도 MTA 스레드에서 읽는 동안 브라우저 UI 스레드는 요청을 처리한다.
+탭 전환 후 활성 문서 하나, 분할 중 두 문서, 분할 해제 후 문서 하나의 실제 URL을 확인한다.
+같은 제목의 문서도 URL로 구분하며, 편집 초안·첫 Escape·취소 뒤에도 문서의 URL을 확인한다.
+Yee의 현재 URL 처리는 Chromium 탭·내비게이션·주소창이 담당한다. 이 검사에는 Codex 연결이 필요하지 않다.
 이 gate는 외부 제어 도구의 URL 인식 성공이나 18개 수동 앱 검수를 대신 통과 처리하지 않는다.
 
 Windows에서도 같은 테스트 코드를 직접 실행할 수 있다.
