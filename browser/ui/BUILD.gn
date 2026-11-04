@@ -240,6 +240,16 @@ source_set("browser_surface_transition") {
   ]
 }
 
+source_set("applied_wait_core") {
+  testonly = true
+  public = [ "applied_wait_test_support.h" ]
+  sources = [ "applied_wait_test_support.cc" ]
+  public_deps = [
+    "//base",
+    "//ui/gfx/geometry",
+  ]
+}
+
 test("multi_contents_geometry_unittests") {
   sources = [
     "agent_browser_contract_unittest.cc",
@@ -247,6 +257,7 @@ test("multi_contents_geometry_unittests") {
     "agent_request_ledger_unittest.cc",
     "agent_tab_activity_unittest.cc",
     "agent_task_permissions_unittest.cc",
+    "applied_wait_test_support_unittest.cc",
     "browser_surface_transition_unittest.cc",
     "multi_contents_geometry_unittest.cc",
     "page_viewport_geometry_unittest.cc",
@@ -255,11 +266,13 @@ test("multi_contents_geometry_unittests") {
   deps = [
     ":agent_browser_contract",
     ":agent_tab_activity",
+    ":applied_wait_core",
     ":browser_surface_transition",
     ":multi_contents_geometry",
     ":page_viewport_geometry",
     ":page_viewport_migration",
     "//base/test:run_all_unittests",
+    "//base/test:test_support",
     "//testing/gtest",
   ]
 }

@@ -1846,6 +1846,604 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.AlreadyAppliedIsOnlyAllowedForExplicitNoOp": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.AppliedTerminalIsImmutableAndConsumedWaitCannotRepeat": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.AsyncAckFencesSynchronousAppliedSignals": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.CallbackBeforeWaitRetainsAppliedResult": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.CancelDeliversTerminalOnceAndIgnoresLateAckAndSignals": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ChangedConditionsAreInvalidWithoutConsumingCorrectWait": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ClosedSchemasMatchAndFormatEveryConditionKind": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ClosedSchemasRejectMismatchedValuesForEveryConditionKind": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.CurrentAfterDispatchCanUseUnchangedCurrentState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DeadlineBudgetStartsAtBeginAndIsNotExtendedByDispatch": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DestructionBeforeDispatchIsNotExpectedDestruction": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DestructionStillFailsIfAnotherConditionNeedsLiveOwner": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DiagnosticsUseHostPlatformAndRedactNonTestLabels": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DifferentObservedGroupsCanLatchSeparateSteps": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DispatchFenceExcludesChangesBetweenBeginAndDispatch": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DuplicateConsumersAreInvalidAndFirstCallbackSurvives": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.EveryWakeRereadsAllCurrentConditions": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ExpectedViewDestructionAndWidgetCloseLatchSuccess": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.HandleReleaseAlsoDropsQueuedTerminalDelivery": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.HandleReleaseStopsSubscriptionsQueuedWorkAndCallback": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.InvalidBeginInputsAndNullDispatchAreRejected": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.InvalidForeignAndMutatedTicketsCannotDispatchOrWait": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.InvalidObservationCallbackCanBeReleasedBeforeDelivery": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NewRequestSupersedesAnyOverlappingOwnerInSameDomain": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NoEvaluationGrowthWithoutEventsAndOneTaskPerWakeBatch": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ObservedGroupRequiresAllValuesInOneSample": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ObservedRunningLatchesButCurrentRunningSeesIdleInSameTask": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.OneOfTwoOwnersApplyingCannotCompleteAnd": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.OtherOwnersAndDomainsStayIndependent": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.PresentedSampleMustStillMatchCurrentCompositorAndGeometry": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.RedispatchIsInvalidAndActionRunsOnlyOnce": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.RejectedDispatchAndMissingAckHaveDifferentResults": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.ReplacementOwnerCannotInheritOldTicket": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.RequestEpochMustMatchWhenProductProvidesCorrelation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.SameValueReapplyRequiresNewApplySerial": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.SessionDestructionDropsInvalidObservationDelivery": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.SessionDestructionStopsCallbacksAndHandleCanOutliveIt": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.StaleApplyAndReverseNativeGenerationAreRejected": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.StaleObservationSequenceDoesNotLatchTransientState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.SubscribePrecedesBaselineRead": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TerminalCallbackMayDestroySession": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TimeoutDiagnosticsRecomputeSatisfactionFromFinalRead": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TimeoutKeepsExpectedLastSerialsAndLast32TimestampedEvents": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.UnexpectedOwnerDestructionIsTerminal": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.UnsupportedNativeCapabilityFailsAtBeginWithoutSubscription": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.WaitBeforeDispatchIsInvalidButObserveCanArmBeforeDispatch": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/bookmarks/bookmarks_browsertest.cc::BookmarksBrowserTest.EditPolicyAppliesToRendererAPIs": {
     "os": [
       "Darwin",
