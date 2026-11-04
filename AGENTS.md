@@ -77,7 +77,7 @@ Ask before guessing, especially for:
     immersive layout changed.
   - `./tools/dev/test-browser-surface-layout.sh browser` is a heavy explicit
     gate only when browser-level Side Panel coordinator behavior changed.
-  - `all` is a milestone/final-integration gate, not an inner-loop command.
+  - `all --tier=all` is a milestone/final-integration gate, not an inner-loop command.
 - Keep related findings that mutate the same layout pipeline in one structural
   checkpoint so a large integration binary is linked once. A reviewer may
   still audit each finding's acceptance criteria inside that checkpoint.

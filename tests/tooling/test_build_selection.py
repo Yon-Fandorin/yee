@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 NO_BUILD_ENTRIES = (
     ('test-agent-browser.sh', ['--no-build']),
     ('test-agent-prompt.sh', ['--no-build']),
-    ('test-omnibox-accessibility.sh', ['--no-build']),
+    ('test-omnibox-accessibility.sh', ['--no-build', '--tier=foreground']),
     ('test-site-controls.sh', ['--no-build']),
     ('test-header.sh', ['--no-build']),
     ('test-internal-pages.sh', ['--no-build']),
@@ -275,7 +275,7 @@ else:
         self.set_free_gib(14)
         checks = [('build-ui.sh', []), ('test-content-blocking-native.sh', []),
                   ('test-header.sh', ['unit']), ('test-agent-browser.sh', []),
-                  ('test-internal-pages.sh', []), ('test-omnibox-accessibility.sh', []),
+                  ('test-internal-pages.sh', []), ('test-omnibox-accessibility.sh', ['--tier=foreground']),
                   ('test-site-controls.sh', []), ('test-youtube-live.sh', ['off']),
                   ('test-sidebar.sh', ['unit']), ('test-browser-surface-layout.sh', ['fast'])]
         for entry, arguments in checks:

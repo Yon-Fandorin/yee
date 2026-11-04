@@ -106,7 +106,7 @@ checkout이 없으면 upstream 사례·GN 검사만 skip하고 이유를 출력�
 그대로 사용하며 앱·컴파일러는 실행하지 않는다. 새 native gate는 `GATE_MODES`에
 모드를 등록해야 한다. GN의 `sources`, `deps`, `public_deps`를 따라 실행 바이너리에
 소스가 포함되고 GTest 양수·음수 필터가 선언을 선택하는지 함께 확인한다. GN 조건은
-플랫폼의 합집합으로 읽는다. 기존 heavy layout browser gate의 두 원본 소스만 명시적 연결 표로 보완한다.
+플랫폼의 합집합으로 읽는다. 기존 heavy layout browser gate의 원본 fixture 소스는 명시적 연결 표로 보완한다.
 
 매개변수 테스트는 overlay·checkout의 `INSTANTIATE_*TEST_SUITE_P`에서 실제 prefix를
 읽는다. 기본 `Bool`·`Values`·`Combine`의 숫자 suffix와 단순 switch의 반환 이름도
@@ -119,3 +119,31 @@ checkout이 없으면 upstream 사례·GN 검사만 skip하고 이유를 출력�
 `gate_coverage_allowlist.json`은 정확한 `소스::Suite.Case`별로 소유 gate와 이유를 둔다.
 현재 예외는 opt-in YouTube 1개와 Windows 세션 소유 18개(Aura 포함)다. 삭제된 사례의
 stale 항목이나 빈 이유는 실패한다. 일반 누락을 예외에 추가하는 대신 gate에 연결한다.
+
+## 사례별 tier와 gate tier
+
+[`test_tiers.json`](test_tiers.json)은 정확한 `소스::Suite.Case`별로 OS 범위,
+A/B/C, 소유 gate, 실행 바이너리와 짧은 근거를 둔다. `binaries`는 GN 소스 연결과
+대조하며 같은 이름 패턴을 쓰는 다른 바이너리의 사례가 섞이지 않게 한다.
+매개변수 선언은 `parameters`에 실제
+`INSTANTIATE_*`의 prefix·suffix를 기록하며 coverage 파서와 대조한다.
+wildcard tier 기본값은 없다. allowlist 항목에도 tier가 필요하며 manifest와 같아야 한다.
+
+`test_gate_coverage.py`는 Yee 선언 외에도 gate가 선택한 upstream 선언을 수집한다.
+분류 누락·삭제되거나 선택에서 빠진 manifest 항목·background의 C 선택·C의
+OS별 소유 gate foreground/all 연결 누락을 실패로 처리한다. Header·Sidebar·layout·Projects의
+기존 모드와 `all`, layout의 `horizontal`, 세 실행 tier를 Darwin·Linux·Windows
+가짜 환경에서 평가한다. tier별 필터의 교집합이 비고 합집합이 전체 필터의 선택과
+같은지 확인하며 A 전용 실행의 display/종료 helper 호출도 막는다.
+
+필터 출력은 실제 개발 환경이나 native 실행 파일 없이 확인할 수 있다.
+
+```sh
+./tools/dev/test-header.sh interactive --tier=background --print-filters
+./tools/dev/test-header.sh interactive --tier=foreground --print-filters
+./tools/dev/test-header.sh interactive --tier=all --print-filters
+```
+
+이 검사는 실제 창·포커스·입력 격리나 native 테스트 통과를 증명하지 않는다.
+B는 현재 실행기를 유지하며 Yee 소유 headless main 전환과 검수는 다음 배치의 범위다.
+Foreground 실행 조건은 [개발 도구 안내](../../tools/dev/README.md#background와-foreground-tier)를 따른다.

@@ -6,25 +6,13 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
-MODE="${1:-fast}"
-SKIP_BUILD=false
-if [[ "$MODE" == "--no-build" ]]; then
-  MODE="fast"
-  SKIP_BUILD=true
-elif [[ "${2:-}" == "--no-build" ]]; then
-  SKIP_BUILD=true
-fi
+configure_test_tiers "fast" "fast|horizontal|interactive|browser|all" "$@"
 
-if [[ "$MODE" != "fast" && "$MODE" != "horizontal" && "$MODE" != "interactive" && \
-      "$MODE" != "browser" && "$MODE" != "all" ]]; then
-  print -u2 \
-    "Usage: ./tools/dev/test-browser-surface-layout.sh [fast|horizontal|interactive|browser|all] [--no-build]"
-  exit 2
+if [[ "$PRINT_FILTERS" == false ]]; then
+  require_depot_tools
+  require_chromium_src
+  require_yee_output_selection
 fi
-
-require_depot_tools
-require_chromium_src
-require_yee_output_selection
 
 FAST_TARGETS=(
   'chrome/browser/ui/views/tabs/common:yee_layout_unittests'
@@ -107,17 +95,17 @@ fi
 
 if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
   print "Running the small pure native/Yee Browser Surface layout gate."
-  run_native_test_gate "$YEE_OUT_DIR/yee_layout_unittests" \
+  run_tiered_native_test_gate "$YEE_OUT_DIR/yee_layout_unittests" \
     --gtest_filter="$NATIVE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
-  run_native_test_gate "$YEE_OUT_DIR/multi_contents_geometry_unittests" \
+  run_tiered_native_test_gate "$YEE_OUT_DIR/multi_contents_geometry_unittests" \
     --gtest_filter="$YEE_FAST_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
-      run_native_test_gate "$YEE_OUT_DIR/yee_aura_unittests" \
+      run_tiered_native_test_gate "$YEE_OUT_DIR/yee_aura_unittests" \
         --gtest_filter='WindowObserverTest.UnmanagedLayerKeepsScreenOriginAfterAncestorMoves' \
         --test-launcher-jobs=1 --test-launcher-retry-limit=0
       ;;
@@ -132,10 +120,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
     rtl_filter="$HORIZONTAL_FILTER:$HORIZONTAL_GROUP_UX_FILTER"
   fi
   print "Running applied ${MODE} UI tests; native input requires window focus."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$default_filter" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
@@ -143,10 +128,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
     --ui-test-action-timeout=10000
 
   print "Running ${MODE} UI regressions in RTL at 125% scale."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$rtl_filter" \
     --force-ui-direction=rtl \
     --force-device-scale-factor=1.25 \
@@ -156,10 +138,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
     --ui-test-action-timeout=10000
 
   print "Checking the same horizontal contract with Chromium's unified tab strip."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --enable-features=TabStripUnification \
     --gtest_filter="$HORIZONTAL_FILTER" \
     --test-launcher-jobs=1 \
@@ -170,10 +149,7 @@ fi
 
 if [[ "$MODE" == "browser" || "$MODE" == "all" ]]; then
   print "Running the explicit browser-level Side Panel and overlay lifecycle gate."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/browser_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/browser_tests" \
     --gtest_filter="$BROWSER_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0

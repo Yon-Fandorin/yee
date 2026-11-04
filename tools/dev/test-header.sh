@@ -6,23 +6,13 @@ unsetopt BG_NICE
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/common.zsh"
 
-MODE="${1:-unit}"
-SKIP_BUILD=false
-if [[ "$MODE" == "--no-build" ]]; then
-  MODE="unit"
-  SKIP_BUILD=true
-elif [[ "${2:-}" == "--no-build" ]]; then
-  SKIP_BUILD=true
-fi
+configure_test_tiers "unit" "unit|interactive|all" "$@"
 
-if [[ "$MODE" != "unit" && "$MODE" != "interactive" && "$MODE" != "all" ]]; then
-  print -u2 "Usage: ./tools/dev/test-header.sh [unit|interactive|all] [--no-build]"
-  exit 2
+if [[ "$PRINT_FILTERS" == false ]]; then
+  require_depot_tools
+  require_chromium_src
+  require_yee_output_selection
 fi
-
-require_depot_tools
-require_chromium_src
-require_yee_output_selection
 
 UNIT_FILTER='BrowserSurfaceColorControllerTest.*:BrowserSurfacePresentationResolverTest.*:YeeRestingTextViewTest.*:YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages:YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast:YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache:YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract'
 INTERACTIVE_FILTER='YeePopupWindowUiTest.PaneHeadersRetainNativeControls:SplitTabLayout/YeeMultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*'
@@ -49,7 +39,7 @@ fi
 if [[ "$MODE" == "unit" || "$MODE" == "all" ]]; then
   print "Running Header unit regressions without opening a browser window."
   print "Native View tests still require access to the active GUI session."
-  run_native_test_gate "$YEE_OUT_DIR/yee_header_unittests" \
+  run_tiered_native_test_gate "$YEE_OUT_DIR/yee_header_unittests" \
     --gtest_filter="$UNIT_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0
@@ -57,10 +47,7 @@ fi
 
 if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
   print "Interactive Header regressions open real Yee windows and may take focus."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$INTERACTIVE_FILTER" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
@@ -68,10 +55,7 @@ if [[ "$MODE" == "interactive" || "$MODE" == "all" ]]; then
     --ui-test-action-timeout=10000
 
   print "Running rendered color/binding regressions in RTL at 125% scale."
-  prepare_ui_test_display
-  gracefully_quit_yee
-  run_native_test_gate "$YEE_OUT_DIR/yee_interactive_ui_tests" \
-    "${YEE_UI_TEST_WINDOW_ARGS[@]}" \
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --gtest_filter="$RTL_FILTER" \
     --force-ui-direction=rtl \
     --force-device-scale-factor=1.25 \

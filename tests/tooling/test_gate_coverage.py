@@ -3,6 +3,7 @@
 import fnmatch
 import contextlib
 import difflib
+from dataclasses import dataclass
 import io
 import json
 import os
@@ -16,6 +17,9 @@ import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/dev/lib'))
+from test_tiers import case_names, load_manifest, resolve_filter
+
 PATCH = ROOT / 'patches/0001-integrate-yee-shell.patch'
 # 괄호와 선언을 찾을 때만 C++ 주석·문자열을 가린다. C++ 문법은 해석하지 않는다.
 CPP_LITERAL = re.compile(r'//[^\n]*|/\*.*?\*/|(?:u8|u|U|L)?R"([^ ()\\\t\r\n]*)\(.*?\)\1"|'
@@ -25,16 +29,31 @@ TEST = re.compile(r'^[ \t]*((?:IN_PROC_BROWSER_)?TEST(?:_F|_P)?|TYPED_TEST(?:_P)
 GATE_MODES = {
     'test-agent-browser.sh': [()],
     'test-agent-prompt.sh': [()],
-    'test-browser-surface-layout.sh': [('fast',), ('interactive',), ('browser',)],
+    'test-browser-surface-layout.sh': [('fast',), ('horizontal',), ('interactive',), ('browser',), ('all',)],
     'test-content-blocking-native.sh': [()],
-    'test-header.sh': [('unit',), ('interactive',)],
+    'test-header.sh': [('unit',), ('interactive',), ('all',)],
     'test-internal-pages.sh': [()],
     'test-macos-install.sh': [()],
     'test-omnibox-accessibility.sh': [()],
-    'test-projects.sh': [('unit',), ('browser',)],
-    'test-sidebar.sh': [('unit',), ('interactive',)],
+    'test-projects.sh': [('unit',), ('browser',), ('all',)],
+    'test-sidebar.sh': [('unit',), ('interactive',), ('all',)],
     'test-site-controls.sh': [()],
 }
+TIERED_GATES = {'test-header.sh', 'test-sidebar.sh', 'test-browser-surface-layout.sh',
+               'test-projects.sh', 'test-site-controls.sh', 'test-omnibox-accessibility.sh'}
+
+
+@dataclass
+class GateRun:
+    script: str
+    platform: str
+    binary: str
+    arguments: list
+    built: set
+    mode: tuple = ()
+    tier: str = 'background'
+    display: bool = False
+    shutdown: bool = False
 
 
 def case_ranges(text):
@@ -222,9 +241,13 @@ def gn_targets(root, patch, chromium=None):
         paths.add('chrome/browser/ui/animation/BUILD.gn')
         for path in paths:
             files[path] = (chromium / path).read_text()
-    # 기존 heavy browser tier의 두 원본 소스는 overlay 밖 조립 지점이다.
+    # 기존 heavy browser gate의 원본 fixture는 overlay 밖 조립 지점이다.
     targets = {'browser_tests': [
         'chrome/browser/glic/selection/selection_overlay_browsertest.cc',
+        'chrome/browser/ui/lens/lens_overlay_controller_browsertest.cc',
+        'chrome/browser/ui/read_anything/read_anything_controller_browsertest.cc',
+        'chrome/browser/ui/views/frame/browser_view_browsertest.cc',
+        'chrome/browser/ui/views/sad_tab_split_view_browsertest.cc',
         'chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc',
     ]}
     if chromium is None:
@@ -311,7 +334,8 @@ def selected(name, parameterized, arguments):
 
 
 def covered_by_gate(destination, name, parameterized, targets, runs):
-    for _, _, binary, arguments, built in runs:
+    for run in runs:
+        binary, arguments, built = run.binary, run.arguments, run.built
         if not selected(name, parameterized, arguments):
             continue
         for target in built:
@@ -321,7 +345,62 @@ def covered_by_gate(destination, name, parameterized, targets, runs):
     return False
 
 
-def gate_runs(root):
+def destination_path(path, catalog):
+    for source in catalog['source_roots']:
+        if path.startswith(source['source'] + '/'):
+            return source['destination'] + path[len(source['source']):]
+    return path
+
+
+def tier_inventory(root, chromium, patch, targets, catalog, runs):
+    """Yee 선언과 gate가 선택한 원본 선언을 함께 검사한다."""
+    found = overlay_inventory(root)
+    if chromium:
+        found.update(upstream_inventory(chromium, patch))
+    sources = {path for run in runs for target in run.built
+               for path in target_sources(targets, target)
+               if re.search(r'(?:test|tests)\.(?:cc|mm)$', path)}
+    for destination in sorted(sources):
+        path = destination
+        for source in catalog['source_roots']:
+            if destination.startswith(source['destination'] + '/'):
+                path = source['source'] + destination[len(source['destination']):]
+                break
+        file = root / path if (root / path).is_file() else chromium / path if chromium else None
+        if file is None or not file.is_file():
+            continue
+        text = file.read_text()
+        instances = instantiations(text)
+        for name, (_, _, parameterized) in case_ranges(text).items():
+            parameters = instances.get(name.split('.')[0], []) if parameterized else False
+            if covered_by_gate(destination, name, parameters, targets, runs):
+                found[path, name] = parameters
+    return {path + '::' + name: parameters for (path, name), parameters in found.items()}
+
+
+def tier_violations(inventory, manifest, targets, catalog, runs, allowlist=()):
+    errors = ['tier 없는 선언: ' + key for key in inventory.keys() - manifest.keys()]
+    errors += ['삭제되거나 gate에서 빠진 tier 항목: ' + key for key in manifest.keys() - inventory.keys()]
+    for key in inventory.keys() & manifest.keys():
+        entry = manifest[key]
+        path, name = key.split('::')
+        destination = destination_path(path, catalog)
+        matching = [run for run in runs
+                    if covered_by_gate(destination, name, inventory[key], targets, [run])]
+        if entry['tier'] == 'C':
+            if any(run.tier == 'background' for run in matching):
+                errors.append('background가 C를 선택한다: ' + key)
+            for platform in entry['os']:
+                for tier in ('foreground', 'all'):
+                    if not any(run.tier == tier
+                               and ('Windows' if run.platform.startswith(('MINGW', 'MSYS', 'CYGWIN')) else run.platform) == platform
+                               and (key in allowlist or run.script == entry['owner'])
+                               for run in matching):
+                        errors.append(f'{tier}에 C가 없다 ({platform}): ' + key)
+    return sorted(errors)
+
+
+def gate_runs(root, tier_values=(None, 'background', 'foreground', 'all')):
     """복사한 gate만 가짜 빌드·실행 함수로 평가한다. 실제 개발 환경은 읽지 않는다."""
     with tempfile.TemporaryDirectory() as directory:
         temp = Path(directory)
@@ -329,6 +408,12 @@ def gate_runs(root):
         for part in (dev, out, bin_dir):
             part.mkdir()
         scripts = [root / 'tools/dev' / name for name in GATE_MODES]
+        (dev / 'lib').mkdir()
+        for name in ('test_tiers.zsh', 'test_tiers.py'):
+            shutil.copy(ROOT / 'tools/dev/lib' / name, dev / 'lib' / name)
+        manifest_dir = temp / 'tests/tooling'
+        manifest_dir.mkdir(parents=True)
+        shutil.copy(ROOT / 'tests/tooling/test_tiers.json', manifest_dir)
         native_scripts = {path.name for path in (root / 'tools/dev').glob('test-*.sh')
                           if 'YEE_OUT_DIR/' in path.read_text()}
         if native_scripts != set(GATE_MODES) | {'test-youtube-live.sh'}:
@@ -337,6 +422,9 @@ def gate_runs(root):
         capture.write_text('import json,os,sys\nwith open(os.environ["CAPTURE"],"a") as f: f.write(json.dumps(sys.argv[1:])+"\\n")\n')
         (dev / 'common.zsh').write_text('''YEE_OUT_DIR="$FIXTURE/out"
 LOCAL_BUILD_ROOT="$FIXTURE"
+YEE_ROOT="$FIXTURE"
+COMMON_DIR="$FIXTURE/dev"
+source "$COMMON_DIR/lib/test_tiers.zsh"
 YEE_UI_TEST_WINDOW_ARGS=()
 require_depot_tools() { :; }
 require_chromium_src() { :; }
@@ -345,8 +433,8 @@ require_free_gib() { :; }
 sync_yee_ui_sources() { :; }
 sync_yee_branding() { :; }
 prepare_yee_build_inputs() { :; }
-prepare_ui_test_display() { :; }
-gracefully_quit_yee() { :; }
+prepare_ui_test_display() { python3 "$FIXTURE/capture.py" display; }
+gracefully_quit_yee() { python3 "$FIXTURE/capture.py" shutdown; }
 build_regression_targets() { shift; python3 "$FIXTURE/capture.py" build "$@"; }
 run_native_test_gate() {
   local count=0 argument
@@ -381,22 +469,33 @@ python3 "$FIXTURE/capture.py" run "$0" "$@"
             for script in scripts:
                 if script.name == 'test-macos-install.sh' and platform != 'Darwin':
                     continue
-                for mode in GATE_MODES[script.name]:
+                scenarios = [(mode, tier) for mode in GATE_MODES[script.name]
+                             for tier in (tier_values if script.name in TIERED_GATES else (None,))]
+                for mode, tier in scenarios:
                     log = temp / 'capture.jsonl'
                     log.unlink(missing_ok=True)
                     env = {**os.environ, 'FIXTURE': str(temp), 'CAPTURE': str(log),
                            'GATE_PLATFORM': platform, 'YEE_TEST_UI': 'off',
                            'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']}
-                    result = subprocess.run(['zsh', str(dev / script.name), *mode],
+                    tier_args = [f'--tier={tier}'] if tier else []
+                    result = subprocess.run(['zsh', str(dev / script.name), *mode, *tier_args],
                                             env=env, capture_output=True, text=True)
                     if result.returncode:
-                        raise AssertionError(f'{script.name} {mode} {platform}: {result.stderr}')
-                    events = [json.loads(line) for line in log.read_text().splitlines()]
+                        raise AssertionError(f'{script.name} {mode} {tier} {platform}: {result.stderr}')
+                    events = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
                     built = {arg.removeprefix('//') for event in events if event[0] == 'build' for arg in event[1:]}
+                    display, shutdown = False, False
                     for event in events:
-                        if event[0] == 'run':
+                        if event[0] == 'display':
+                            display = True
+                        elif event[0] == 'shutdown':
+                            shutdown = True
+                        elif event[0] == 'run':
                             binary = Path(event[1]).name
-                            runs.append((script.name, platform, binary, event[2:], built))
+                            resolved_tier = tier or 'background'
+                            runs.append(GateRun(script.name, platform, binary, event[2:], built,
+                                                mode, resolved_tier, display, shutdown))
+                            display, shutdown = False, False
         return runs
 
 
@@ -408,6 +507,7 @@ class GateCoverageTest(unittest.TestCase):
         cls.targets, cls.catalog = gn_targets(ROOT, cls.patch, cls.chromium)
         cls.runs = gate_runs(ROOT) if shutil.which('zsh') else None
         cls.allowlist = json.loads((ROOT / 'tests/tooling/gate_coverage_allowlist.json').read_text())
+        cls.manifest = load_manifest(ROOT / 'tests/tooling/test_tiers.json')
 
     def assert_covered(self, found, overlay):
         if self.runs is None:
@@ -425,6 +525,7 @@ class GateCoverageTest(unittest.TestCase):
                 self.assertTrue(entry['reason'].strip(), key)
                 self.assertTrue(entry['owner'].strip(), key)
                 self.assertIn(entry['kind'], ('opt-in', 'windows'))
+                self.assertEqual(entry['tier'], self.manifest[key]['tier'], key)
                 remaining.remove(key)
                 continue
             destination = path
@@ -440,18 +541,149 @@ class GateCoverageTest(unittest.TestCase):
     def test_overlay_cases_have_a_gate(self):
         self.assert_covered(overlay_inventory(ROOT), overlay=True)
 
+    def test_case_tiers_and_gate_tiers(self):
+        if self.runs is None:
+            self.skipTest('gate 평가에 zsh가 필요하다')
+        inventory = tier_inventory(ROOT, self.chromium, self.patch, self.targets, self.catalog, self.runs)
+        manifest = self.manifest
+        if self.chromium is None:
+            manifest = {key: entry for key, entry in manifest.items() if (ROOT / key.split('::')[0]).is_file()}
+        self.assertEqual(tier_violations(inventory, manifest, self.targets, self.catalog,
+                                         self.runs, self.allowlist), [])
+        compiled = {target.rsplit(':', 1)[-1]: target_sources(self.targets, target)
+                    for run in self.runs for target in run.built}
+        for key, parameters in inventory.items():
+            entry = manifest[key]
+            destination = destination_path(key.split('::')[0], self.catalog)
+            binaries = sorted(binary for binary, sources in compiled.items() if destination in sources)
+            if binaries:
+                self.assertEqual(entry['binaries'], binaries, key)
+            self.assertEqual(entry.get('parameters', False),
+                             json.loads(json.dumps(parameters)), key)
+            if key not in self.allowlist:
+                path, name = key.split('::')
+                self.assertTrue(any(run.script == entry['owner'] and covered_by_gate(
+                    destination_path(path, self.catalog), name, parameters, self.targets, [run])
+                                    for run in self.runs), 'owner gate가 선택하지 않는다: ' + key)
+
+    def test_tier_failures_are_not_covered_by_other_runs(self):
+        """다른 tier의 통과가 미분류·stale·C 혼입·foreground 누락을 가리지 않는다."""
+        key = 'area/test.cc::Fixture.Case'
+        inventory = {key: False}
+        manifest = {key: {'tier': 'C', 'os': ['Darwin'], 'owner': 'test-area.sh'}}
+        targets, catalog = {'area:small': ['area/test.cc']}, {'source_roots': []}
+        run = GateRun('test-area.sh', 'Darwin', 'small', ['--gtest_filter=Fixture.Case'], {'area:small'})
+        self.assertIn('tier 없는 선언: ' + key,
+                      tier_violations(inventory, {}, targets, catalog, [run]))
+        self.assertIn('삭제되거나 gate에서 빠진 tier 항목: ' + key,
+                      tier_violations({}, manifest, targets, catalog, [run]))
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, [run]), sorted([
+            'background가 C를 선택한다: ' + key,
+            'foreground에 C가 없다 (Darwin): ' + key, 'all에 C가 없다 (Darwin): ' + key]))
+        run.tier = 'all'
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, [run]),
+                         ['foreground에 C가 없다 (Darwin): ' + key])
+        manifest[key]['os'].append('Windows')
+        mac_foreground = GateRun('test-area.sh', 'Darwin', 'small', run.arguments, run.built, tier='foreground')
+        win_foreground = GateRun('test-area.sh', 'MSYS_NT-10.0', 'small', run.arguments, run.built, tier='foreground')
+        runs = [run, mac_foreground, win_foreground]
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, runs),
+                         ['all에 C가 없다 (Windows): ' + key])
+        runs.append(GateRun('test-other.sh', 'MSYS_NT-10.0', 'small', run.arguments, run.built, tier='all'))
+        self.assertEqual(tier_violations(inventory, manifest, targets, catalog, runs),
+                         ['all에 C가 없다 (Windows): ' + key])
+
+    def test_background_and_foreground_partition_each_run(self):
+        if self.runs is None:
+            self.skipTest('gate 평가에 zsh가 필요하다')
+        for run in self.runs:
+            if run.script not in TIERED_GATES:
+                continue
+            platform = 'Windows' if run.platform.startswith('MSYS') else run.platform
+            pattern = next(arg.split('=', 1)[1] for arg in run.arguments if arg.startswith('--gtest_filter='))
+            expected = {name for key, entry in self.manifest.items() if platform in entry['os']
+                        and covered_by_gate(destination_path(key.split('::')[0], self.catalog),
+                                            key.split('::')[1], entry.get('parameters', False), self.targets, [run])
+                        for name in case_names(key, entry) if selected(name, False, run.arguments)}
+            positive = pattern.partition('-')[0] or '*'
+            for part in positive.split(':'):
+                self.assertTrue(any(fnmatch.fnmatchcase(name, part) for name in expected),
+                                f'바이너리에서 발견할 수 없는 필터: {run.binary} {part}')
+            if run.tier != 'all':
+                continue
+            partitions = []
+            for tier in ('background', 'foreground'):
+                arguments = [arg for arg in run.arguments if not arg.startswith('--gtest_filter=')]
+                candidates = [other for other in self.runs
+                              if (other.script, other.platform, other.mode, other.binary, other.tier) ==
+                              (run.script, run.platform, run.mode, run.binary, tier)
+                              and [arg for arg in other.arguments if not arg.startswith('--gtest_filter=')] == arguments]
+                partitions.append({name for name in expected
+                                   if any(selected(name, False, other.arguments) for other in candidates)})
+            self.assertFalse(partitions[0] & partitions[1], (run.script, run.mode, pattern))
+            self.assertEqual(partitions[0] | partitions[1], expected, (run.script, run.mode, pattern))
+
+    def test_tier_resolution_preserves_os_parameters_and_negative_filters(self):
+        manifest = {
+            'area/test.cc::Fixture.Case': {'os': ['Darwin'], 'tier': 'B', 'binaries': ['small'],
+                                          'parameters': [['All', ['0', '1']]]},
+            'area/test.cc::Fixture.Native': {'os': ['Darwin'], 'tier': 'C', 'binaries': ['small']},
+            'area/browser.cc::Fixture.Browser': {'os': ['Darwin'], 'tier': 'B', 'binaries': ['browser_tests']},
+        }
+        pattern = 'All/Fixture.Case/*:Fixture.Native-All/Fixture.Case/1'
+        self.assertEqual(resolve_filter(manifest, pattern, 'Darwin', 'background', 'small'),
+                         ('All/Fixture.Case/0-All/Fixture.Case/1', 'B'))
+        self.assertEqual(resolve_filter(manifest, pattern, 'Darwin', 'foreground', 'small'),
+                         ('Fixture.Native-All/Fixture.Case/1', 'C'))
+        self.assertEqual(resolve_filter(manifest, 'Fixture.*', 'Darwin', 'background', 'small'),
+                         ('', ''))
+        with self.assertRaisesRegex(ValueError, '선택하지 못한 양수 패턴'):
+            resolve_filter(manifest, pattern, 'Linux', 'all', 'small')
+        with self.assertRaisesRegex(ValueError, 'Fixture.New'):
+            resolve_filter(manifest, 'Fixture.New', 'Darwin', 'background', 'small')
+
+    def test_tier_resolution_keeps_negative_patterns_with_unknown_parameter_suffixes(self):
+        """suffix를 열거할 수 없어도 각 tier는 제외한 인스턴스를 실행하지 않는다."""
+        pattern = 'All/F.C/*-All/F.C/Skip'
+        for tier, case_tier in (('background', 'B'), ('foreground', 'C')):
+            with self.subTest(tier=tier):
+                manifest = {'area/test.cc::F.C': {
+                    'os': ['Darwin'], 'tier': case_tier, 'binaries': ['small'],
+                    'parameters': [['All', None]],
+                }}
+                resolved, tiers = resolve_filter(manifest, pattern, 'Darwin', tier, 'small')
+                self.assertEqual((resolved, tiers), (pattern, case_tier))
+                arguments = ['--gtest_filter=' + resolved]
+                self.assertTrue(selected('All/F.C/Keep', False, arguments))
+                self.assertFalse(selected('All/F.C/Skip', False, arguments))
+
+    def test_a_only_runs_preserve_desktop(self):
+        if self.runs is None:
+            self.skipTest('gate 평가에 zsh가 필요하다')
+        checked = 0
+        for run in self.runs:
+            platform = 'Windows' if run.platform.startswith('MSYS') else run.platform
+            tiers = {entry['tier'] for key, entry in self.manifest.items() if platform in entry['os']
+                     and covered_by_gate(destination_path(key.split('::')[0], self.catalog),
+                                         key.split('::')[1], entry.get('parameters', False), self.targets, [run])}
+            if tiers == {'A'}:
+                checked += 1
+                self.assertFalse(run.display or run.shutdown, (run.script, run.mode, run.tier))
+        self.assertGreater(checked, 0)
+
     def test_aura_guard_is_built_and_run_only_on_windows(self):
         if self.runs is None:
             self.skipTest('gate 평가에 zsh가 필요하다')
         target = 'chrome/browser/ui/views/yee:yee_aura_unittests'
-        for script, platform, binary, _, built in self.runs:
+        for run in self.runs:
+            script, platform, binary, built = run.script, run.platform, run.binary, run.built
             if script != 'test-browser-surface-layout.sh':
                 continue
             if platform in ('Darwin', 'Linux'):
                 self.assertNotIn(target, built)
                 self.assertNotEqual(binary, 'yee_aura_unittests')
-        self.assertTrue(any(platform.startswith('MSYS') and binary == 'yee_aura_unittests'
-                            and target in built for _, platform, binary, _, built in self.runs))
+        self.assertTrue(any(run.platform.startswith('MSYS') and run.binary == 'yee_aura_unittests'
+                            and target in run.built for run in self.runs))
 
     def test_upstream_cases_have_a_gate(self):
         if self.chromium is None:
@@ -534,14 +766,14 @@ source_set("cases") { sources = [ "dependency.cc" ] }
     def test_gate_requires_the_selected_binary_and_source(self):
         """필터가 맞아도 소스·의존·실행 바이너리가 다르면 실패한다."""
         targets = {'area:small': ['area:cases'], 'area:cases': ['area/test.cc']}
-        runs = [('test-area.sh', 'Darwin', 'small', ['--gtest_filter=Fixture.*'], {'area:small'})]
+        runs = [GateRun('test-area.sh', 'Darwin', 'small', ['--gtest_filter=Fixture.*'], {'area:small'})]
         self.assertTrue(covered_by_gate('area/test.cc', 'Fixture.Case', False, targets, runs))
         self.assertFalse(covered_by_gate('area/other.cc', 'Fixture.Case', False, targets, runs))
         self.assertFalse(covered_by_gate('area/test.cc', 'Other.Case', False, targets, runs))
         self.assertFalse(covered_by_gate('area/test.cc', 'Fixture.Case', False,
                                         {'area:small': []}, runs))
         self.assertFalse(covered_by_gate('area/test.cc', 'Fixture.Case', False, targets,
-                                        [('test-area.sh', 'Darwin', 'large', [], {'area:small'})]))
+                                        [GateRun('test-area.sh', 'Darwin', 'large', [], {'area:small'})]))
 
     def test_gtest_negative_filter_and_parameterized_selection(self):
         instances = instantiations('INSTANTIATE_TEST_SUITE_P(All, Fixture, testing::Bool());')['Fixture']
@@ -578,7 +810,7 @@ INSTANTIATE_TEST_SUITE_P(Orientations, NamedTest,
                 ('NamedTest', 'Orientations', 'Typo', False)):
             with self.subTest(suite=suite, prefix=prefix, suffix=suffix):
                 name = suite + '.RemoveSplit_NTP'
-                runs = [('test-area.sh', 'Darwin', 'small',
+                runs = [GateRun('test-area.sh', 'Darwin', 'small',
                          [f'--gtest_filter={prefix}/{name}/{suffix}'], {'area:small'})]
                 self.assertEqual(covered_by_gate('area/test.cc', name, instantiations(text)[suite],
                                                  targets, runs), expected)

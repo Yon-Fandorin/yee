@@ -48,6 +48,7 @@ build_regression_targets() {
 run_native_test_gate() {
   local test_binary="$1"
   shift
+  print -u2 -r -- "Native test gate: tier=${YEE_TEST_TIER:-background} binary=${test_binary:t}"
   require_yee_build_root_selection || return $?
   require_yee_output_selection || return $?
   if [[ ! -f "$test_binary" || ! -x "$test_binary" ]]; then

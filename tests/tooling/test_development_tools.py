@@ -23,9 +23,12 @@ class DevelopmentToolsTest(unittest.TestCase):
         self.dev = self.repo / 'tools/dev'
         self.dev.mkdir(parents=True)
         shutil.copytree(ROOT / 'tools/dev/lib', self.dev / 'lib')
+        (self.repo / 'tests/tooling').mkdir(parents=True)
+        shutil.copy(ROOT / 'tests/tooling/test_tiers.json', self.repo / 'tests/tooling')
         for name in ('common.zsh', 'build.sh', 'build-ui.sh',
                      'test-header.sh', 'test-sidebar.sh', 'test-browser-surface-layout.sh',
                      'test-projects.sh', 'test-macos-install.sh',
+                     'test-site-controls.sh', 'test-omnibox-accessibility.sh',
                      'browser_bundle_executables.py', 'ui-test-display.swift'):
             shutil.copy(ROOT / 'tools/dev' / name, self.dev / name)
         self.overlay = self.repo / 'tools/overlay'
@@ -110,7 +113,7 @@ done
         for name, argument_lists in (
                 ('test-projects.sh', [('browser', '--unknown'), ('--no-build', 'browser'),
                                       ('unit', 'extra'), ('all', '--no-build', 'extra'),
-                                      ('--no-build', '--no-build'), ('',)]),
+                                      ('--no-build', '--no-build'), ('unit|browser',), ('',)]),
                 ('test-macos-install.sh', [('--unknown',), ('--no-build', 'extra'),
                                           ('--no-build', '--no-build'), ('',)])):
             for arguments in argument_lists:
@@ -119,6 +122,47 @@ done
                     result = self.run_script(name, *arguments)
                     self.assertEqual(result.returncode, 2, result.stderr)
                     self.assertIn('Usage:', result.stderr)
+                    self.assertEqual(self.events(), [])
+
+    def test_tier_filter_printing_and_empty_background_need_no_development_environment(self):
+        """필터 출력과 C 전용 gate의 빈 기본 실행은 개발 도구·창을 사용하지 않는다."""
+        missing_root = str(self.repo / 'missing build root')
+        for name, mode in (
+                ('test-header.sh', ('interactive',)), ('test-sidebar.sh', ('interactive',)),
+                ('test-browser-surface-layout.sh', ('horizontal',)),
+                ('test-browser-surface-layout.sh', ('interactive',)),
+                ('test-projects.sh', ('browser',)), ('test-site-controls.sh', ()),
+                ('test-omnibox-accessibility.sh', ())):
+            for tier in ('background', 'foreground', 'all'):
+                with self.subTest(script=name, mode=mode, tier=tier):
+                    result = self.run_script(name, *mode, f'--tier={tier}', '--print-filters',
+                                             YEE_LOCAL_BUILD_ROOT=missing_root)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn('tier=' + tier, result.stdout)
+                    self.assertEqual(self.events(), [])
+        result = self.run_script('test-omnibox-accessibility.sh', YEE_LOCAL_BUILD_ROOT=missing_root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('cases=none', result.stdout)
+        self.assertEqual(self.events(), [])
+
+    def test_all_scope_modes_default_to_background(self):
+        """all을 포함한 모든 범위에서 C 실행에는 명시적인 tier가 필요하다."""
+        for name, modes in (
+                ('test-header.sh', ('unit', 'interactive', 'all')),
+                ('test-sidebar.sh', ('unit', 'interactive', 'all')),
+                ('test-browser-surface-layout.sh', ('fast', 'horizontal', 'interactive', 'browser', 'all')),
+                ('test-projects.sh', ('unit', 'browser', 'all')),
+                ('test-site-controls.sh', ()), ('test-omnibox-accessibility.sh', ())):
+            for mode in ((), *((mode,) for mode in modes)):
+                with self.subTest(script=name, mode=mode):
+                    arguments = (*mode, '--no-build', '--print-filters')
+                    default = self.run_script(name, *arguments)
+                    background = self.run_script(name, *arguments, '--tier=background')
+                    self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
+                    self.assertEqual(background.returncode, 0, background.stdout + background.stderr)
+                    self.assertEqual(default.stdout, background.stdout)
+                    self.assertIn('tier=background', default.stdout)
+                    self.assertNotRegex(default.stdout, r'cases=[ABC]*C')
                     self.assertEqual(self.events(), [])
 
     def test_ui_build_prepares_once_and_uses_shared_cache(self):
@@ -217,7 +261,7 @@ done
                     (('all', '--no-build'), [unit_binary] + ['yee_interactive_ui_tests'] * interactive_runs)):
                 with self.subTest(name=name, arguments=arguments):
                     self.log.unlink(missing_ok=True)
-                    result = self.run_script(name, *arguments)
+                    result = self.run_script(name, *arguments, '--tier=all')
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual([event.removeprefix('run:') for event in self.events()
                                       if event.startswith('run:')], expected)
@@ -304,7 +348,7 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
                 with self.subTest(platform=platform, script=name, mode=mode):
                     self.log.unlink(missing_ok=True)
                     # 가짜 build도 실행해 원본 전체 target을 다시 요청하지 않는지 확인한다.
-                    result = self.run_script(name, mode, YEE_TEST_PLATFORM=platform)
+                    result = self.run_script(name, mode, '--tier=all', YEE_TEST_PLATFORM=platform)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     targets = [event for event in self.events() if event.startswith('target:')]
                     self.assertEqual(len(targets), 1)

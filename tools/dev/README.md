@@ -458,7 +458,7 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
 - `test-browser-surface-layout.sh interactive`: 실제 BrowserView·Side Panel·전환 테스트
 - `test-browser-surface-layout.sh browser`: Side Panel의 브라우저 동작 제어 변경 테스트
 - `test-projects.sh [unit|browser|all]`: 기본은 `project_service_unittests`의 7개 검사.
-  `browser`는 `site_controls_browsertests`의 프로젝트 전체와 TabStripUnification 전용 사례를 순서대로 실행
+  `browser`는 선택한 tier의 프로젝트 사례와 TabStripUnification 전용 사례를 순서대로 실행
 - `test-macos-install.sh`: macOS의 `install_sh_test`에서 임시 DMG 4개·가짜 updater 1개만 선택
 - `test-content-blocking-native.sh`: 기존 두 단위 바이너리와 소형
   `yee_service_worker_unittests`의 `WrapSubresourceLoaderFactory_*` 3개 실행
@@ -482,7 +482,55 @@ Sidebar unit은 Group Header의 hover·focus guard를, interactive는 gesture do
 같은 실행 파일에 원본 guard와 아직 이전하지 않은 drag·Omnibox·플랫폼 테스트를
 선택해 넣는다. 모든 필수 필터의 실제 사례 발견 검사는 그대로 적용한다.
 Windows `.ps1` gate의 실행 파일·필터 전환은 후속 작업이다.
-- `all`: 여러 변경을 마친 뒤 전체 확인
+
+### Background와 foreground tier
+
+Header·Sidebar·Browser Surface layout·Projects·Site Controls·Omnibox 접근성의
+`.sh` gate는 `--tier=background|foreground|all`을 지원한다. 기존
+`unit|fast|horizontal|interactive|browser|all`은 검사 범위를 선택한다.
+
+- 기본 `background`: manifest의 A(최상위 창 없음)·B(Widget/브라우저, 실제 입력 불필요)만 선택한다.
+- `foreground`: 실제 입력·native 메뉴·OS 활성화·fullscreen이 필요한 C만 선택한다.
+- `--tier=all`: 해당 범위의 A/B/C를 모두 선택한다.
+
+`all`을 포함한 모든 범위는 tier를 생략하면 `background`다.
+C는 `--tier=foreground` 또는 `--tier=all`을 명시해야 실행한다.
+
+현재 B는 기존 실행기를 사용하므로 창을 표시하거나 포커스를 가져갈 수 있다.
+B의 Yee 소유 headless main 전환은 다음 배치에서 수행한다. `background`라는 이름만으로
+현재 B의 무창·입력 격리를 보장하지 않는다. A만 선택한 실행은 개발 Yee 종료나 물리
+display 배치 helper를 호출하지 않는다. B/C의 기존 display·정상 종료 준비는 유지한다.
+Omnibox 접근성은 모두 C이므로 기본 실행은 환경 확인·빌드·바이너리 조회 없이
+`cases=none`을 출력하고 끝난다.
+
+```sh
+./tools/dev/test-header.sh interactive --tier=background --no-build
+./tools/dev/test-header.sh interactive --tier=foreground --no-build
+./tools/dev/test-sidebar.sh interactive --tier=foreground --no-build
+./tools/dev/test-browser-surface-layout.sh horizontal --tier=foreground --no-build
+./tools/dev/test-browser-surface-layout.sh interactive --tier=foreground --no-build
+./tools/dev/test-projects.sh browser --tier=foreground --no-build
+./tools/dev/test-site-controls.sh --tier=foreground --no-build
+./tools/dev/test-omnibox-accessibility.sh --tier=foreground --no-build
+```
+
+`--tier=foreground`와 `--tier=all`은 전용 모니터에서 직렬로 실행한다. 실행하는 터미널/IDE에
+손쉬운 사용 권한을 미리 부여하고 테스트 창을 가리지 않는다. 완료할 때까지 마우스·키보드에서
+손을 떼고 원격 데스크톱·Computer Use 등 화면 제어도 중단한다. 전용 모니터는 앱 활성화나
+입력을 격리하지 않는다. B도 현재 실행기에서는 별도의 화면 사용 구간이 필요할 수 있다.
+
+`--print-filters`는 선택한 tier·A/B/C·바이너리·실제 필터와 실행 옵션만 출력한다.
+환경 검사·소스 동기화·빌드·목록 조회·창 조작은 수행하지 않는다.
+
+```sh
+./tools/dev/test-browser-surface-layout.sh interactive --tier=background --print-filters
+./tools/dev/test-browser-surface-layout.sh interactive --tier=foreground --print-filters
+./tools/dev/test-browser-surface-layout.sh interactive --tier=all --print-filters
+```
+
+분류와 매개변수 인스턴스는 [`test_tiers.json`](../../tests/tooling/test_tiers.json)에서
+관리한다. tier를 지원하는 gate의 실행 필터는 해당 OS·바이너리의 manifest와 기존 범위 필터의 교집합이다.
+`run_native_test_gate` 출력에는 선택한 tier가 포함된다.
 
 이 세 게이트는 각 바이너리 실행 직전에 같은 필터·특성·창 인수에
 `--gtest_list_tests`를 추가해 목록을 조회한다. 조회 실패, 빈 목록, 또는 음수 필터와
@@ -543,11 +591,11 @@ Windows는 실제 앱 종료 때 UI 스레드가 살아 있는 동안 외부 UIA
 일반 창 닫기·앱 종료·마지막 창이 먼저 닫힌 종료를 확인한다.
 
 계산·색상·직접 callback 검사는 창 활성화를 피한다. native popup·focus 단위 검사와
-명시적 `interactive` 검사는 필요한 창 활성화를 유지한다. Sidebar는 Header의 주소줄
+B/C 브라우저 검사는 현재 실행기의 창 활성화를 유지한다. Sidebar는 Header의 주소줄
 검사를 중복 실행하지 않으므로 두 영역을 바꿨을 때 각각의 gate를 선택한다. 실제
 hover·클릭·drag·renderer·native popup 검사를 단위 검사 통과로 대체하지 않는다.
 수평 탭 수정 중에는 `fast`와 `horizontal`을 사용하고, 전체 레이아웃 checkpoint에서
-`interactive`를 실행한다. `horizontal`도 실제 입력을 사용하므로 포커스를 가져간다.
+`interactive`를 실행한다. 실제 입력은 해당 범위의 `--tier=foreground` 또는 `--tier=all`에서 확인한다.
 같은 수평 시나리오를 기본·RTL 125%·통합 탭바 경로에서 실행하며 그룹의 접기/펴기와
 탭 추가/제거 후 favicon 요약 갱신, 전환 전후의 pin·group·활성 탭 보존을 확인한다.
 회전 모니터 지정은 창 위치를 정하며 macOS 앱 포커스를 격리하지는 않는다.
