@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
@@ -90,6 +91,34 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitBrowserTest,
                                 })));
   const auto result = session.WaitForApplied(ticket, conditions);
   EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+}
+
+IN_PROC_BROWSER_TEST_F(YeeAppliedWaitBrowserTest,
+                       TabCollectionIdlePublishesSingleProgress) {
+  AppliedBrowserObservers source;
+  const auto owner = source.ObserveTabCollectionAnimations(*view(), 704);
+  const AppliedCondition idle{
+      .owner = owner,
+      .expected = AnimationMatches{.group_id = 704, .running = false},
+      .freshness = AppliedFreshness::kCurrentAfterDispatch,
+      .coordinates = GetAppliedViewCoordinates(*view())};
+  const AppliedConditions conditions{idle};
+  AppliedWaitSession session(source);
+  const auto ticket =
+      session.BeginRequest(Intent(conditions), conditions, Options());
+  ASSERT_FALSE(session.Dispatch(ticket, base::BindLambdaForTesting([&] {
+                                  tabs::VerticalTabStripStateController::From(
+                                      browser())
+                                      ->SetVerticalTabsEnabled(true);
+                                })));
+  const auto result = session.WaitForApplied(ticket, conditions);
+  ASSERT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+  ASSERT_TRUE(result.diagnostics.conditions[0].last);
+  const auto& animation =
+      std::get<AnimationMatches>(result.diagnostics.conditions[0].last->value);
+  EXPECT_FALSE(animation.running);
+  EXPECT_EQ(1, animation.progress_min);
+  EXPECT_EQ(animation.progress_min, animation.progress_max);
 }
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitBrowserTest,
@@ -305,6 +334,8 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitBrowserTest,
   auto expected = std::get<WebUiStateMatches>(
       source.Read({owner, AppliedConditionKind::kWebUiStateMatches})->value);
   expected.popup_rows.push_back(2);
+  // 두 empty row는 같은 200×0 rect를 갖는다. 새 행의 값도 schema에 포함한다.
+  expected.row_bounds.push_back(expected.row_bounds.front());
   expected.selected_index = 1;
   const AppliedConditions conditions{
       {.owner = owner,
@@ -324,6 +355,28 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitBrowserTest,
                                 })));
   const auto result = session.WaitForApplied(ticket, conditions);
   EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+  // DOM 표본이 그대로여도 native bounds 변경은 같은 조건의 최신값으로 읽는다.
+  auto* native_view = view()->AddChildView(std::make_unique<views::View>());
+  native_view->SetBounds(10, 20, 200, 80);
+  ASSERT_EQ(owner, source.ObserveWebUiPopupBounds(owner, *native_view));
+  base::test::TestFuture<void> native_changed;
+  auto native_subscription = source.Subscribe(
+      {{owner, AppliedConditionKind::kWebUiStateMatches}},
+      base::BindLambdaForTesting([&](const AppliedSignalSample&) {
+        if (!native_changed.IsReady())
+          native_changed.SetValue();
+      }));
+  native_view->SetBounds(10, 20, 200, 120);
+  ASSERT_TRUE(native_changed.Wait());
+  const auto native_snapshot =
+      source.Read({owner, AppliedConditionKind::kWebUiStateMatches});
+  ASSERT_TRUE(native_snapshot);
+  const auto& current = std::get<WebUiStateMatches>(native_snapshot->value);
+  EXPECT_EQ(expected.row_bounds, current.row_bounds);
+  EXPECT_EQ(native_view->GetBoundsInScreen(),
+            current.native_view_bounds_in_screen);
+  EXPECT_EQ(native_view->GetWidget()->GetWindowBoundsInScreen(),
+            current.native_widget_bounds_in_screen);
   const auto pending =
       session.BeginRequest(Intent(conditions), conditions, Options());
   ASSERT_FALSE(session.Dispatch(

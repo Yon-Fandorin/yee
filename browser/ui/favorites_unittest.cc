@@ -87,6 +87,7 @@ TEST_F(FavoritesPreviewAppliedStateTest,
   Show();
   HideFavoritesDragPreview(tab_strip_);
   HideFavoritesDragPreview(tab_strip_);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   ASSERT_EQ(3u, snapshots.size());
   for (size_t i = 0; i < snapshots.size(); ++i) {
@@ -147,6 +148,7 @@ TEST_F(FavoritesPreviewAppliedStateTest, HideCancelsMotionBeforePublishing) {
         EXPECT_FALSE(snapshot.running);
       }));
   HideFavoritesDragPreview(tab_strip_);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, calls);
   const auto hidden = state.GetSnapshot();
@@ -163,6 +165,7 @@ TEST_F(FavoritesPreviewAppliedStateTest, SubscriptionAndWeakPtrFollowPreview) {
   auto subscription = state.Subscribe(base::BindLambdaForTesting(
       [&](const FavoritesDragPreviewAppliedSnapshot&) { ++calls; }));
   Show(/*leading_inset=*/24);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_GT(calls, 0);
   subscription = {};

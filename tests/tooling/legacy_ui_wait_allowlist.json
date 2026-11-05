@@ -1,0 +1,482 @@
+{
+  "schema_version": 1,
+  "sites": [
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.CallbackBeforeWaitRetainsAppliedResult",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "fake source 완료를 mock TaskEnvironment에 전달한 뒤 Wait 전 terminal 보존을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.SameValueReapplyRequiresNewApplySerial",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock source의 기존 serial 평가를 전달해 미완료 상태를 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.TimeoutKeepsExpectedLastSerialsAndLast32TimestampedEvents",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock source 이벤트와 진단 ring buffer를 TaskEnvironment에 전달한다. 실제 UI 상태는 없다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.TimeoutKeepsExpectedLastSerialsAndLast32TimestampedEvents",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock source 이벤트와 진단 ring buffer를 TaskEnvironment에 전달한다. 실제 UI 상태는 없다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.HandleReleaseAlsoDropsQueuedTerminalDelivery",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "해제된 관측의 예약 terminal callback이 전달되지 않음을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.TerminalCallbackMayDestroySession",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock terminal callback에서 세션을 파괴하는 수명 검증이다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.ObservedGroupRequiresAllValuesInOneSample",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "서로 다른 fake sample이 같은 순간의 AND 조건으로 합쳐지지 않음을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.NoEvaluationGrowthWithoutEventsAndOneTaskPerWakeBatch",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock TaskEnvironment에서 이벤트 없는 평가 증가와 wake batch 합치기를 계측한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.NoEvaluationGrowthWithoutEventsAndOneTaskPerWakeBatch",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock TaskEnvironment에서 이벤트 없는 평가 증가와 wake batch 합치기를 계측한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.NoEvaluationGrowthWithoutEventsAndOneTaskPerWakeBatch",
+      "kind": "idle",
+      "ordinal": 3,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock TaskEnvironment에서 이벤트 없는 평가 증가와 wake batch 합치기를 계측한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.AsyncAckFencesSynchronousAppliedSignals",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "fake 입력 ACK 전 queued 평가를 전달해 선행 성공 금지를 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.RequestEpochMustMatchWhenProductProvidesCorrelation",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "다른 fake request epoch의 평가가 성공하지 않음을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.AppliedTerminalIsImmutableAndConsumedWaitCannotRepeat",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock terminal 이후 평가를 전달해 결과 불변성을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.InvalidObservationCallbackCanBeReleasedBeforeDelivery",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "잘못된 ticket의 예약 오류 callback 해제를 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.SessionDestructionDropsInvalidObservationDelivery",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "세션 파괴가 예약 오류 callback을 폐기함을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.TimeoutDiagnosticsRecomputeSatisfactionFromFinalRead",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock deadline 직전 상태 평가와 최종 진단을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.DeadlineReadCannotTurnLateMatchingStateIntoApplied",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock deadline 이후 matching sample이 성공으로 바뀌지 않음을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.EvaluationQueueDelayIsReported",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "1dc2ec575216a7538e1cb36f6e1a6eb768e59b1624669e738af02f7e6cb1e68c",
+      "classification": "mock_clock",
+      "reason": "mock 시계로 지연시킨 평가 task의 진단 시간을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.PartialVisibilityStillRequiresFreshApplyAndOwner",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "b74b98afef5f022f1fe9706bc7b379cb042855a663dd53dbeadf9e92e017801d",
+      "classification": "mock_clock",
+      "reason": "fake source 부분 visibility 조건도 새 apply와 owner를 요구함을 검증한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.PartialVisibilityStillRequiresFreshApplyAndOwner",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "5cf60fd80f72954c3043dc7e2a87afed98573e630e96ad989617c9abaf88c3b2",
+      "classification": "mock_clock",
+      "reason": "fake source 부분 visibility 조건도 새 apply와 owner를 요구함을 검증한다."
+    },
+    {
+      "file": "browser/ui/favorites_unittest.cc",
+      "scope": "FavoritesPreviewAppliedStateTest.SameUpdateAndHidePublishAppliedValues",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 Favorites preview 값 fixture의 SameUpdateAndHidePublishAppliedValues 신호/수명 callback task를 전달한다."
+    },
+    {
+      "file": "browser/ui/favorites_unittest.cc",
+      "scope": "FavoritesPreviewAppliedStateTest.HideCancelsMotionBeforePublishing",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 Favorites preview 값 fixture의 HideCancelsMotionBeforePublishing 신호/수명 callback task를 전달한다."
+    },
+    {
+      "file": "browser/ui/favorites_unittest.cc",
+      "scope": "FavoritesPreviewAppliedStateTest.SubscriptionAndWeakPtrFollowPreview",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 Favorites preview 값 fixture의 SubscriptionAndWeakPtrFollowPreview 신호/수명 callback task를 전달한다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "@helpers",
+      "kind": "js_delay",
+      "ordinal": 1,
+      "fingerprint": "648e0a6be8d3e8c369ef6344f465adf0704b7af2d9683bc615d8fcc2b6db7a0d",
+      "classification": "deadline",
+      "reason": "DOM/서비스 이벤트 callback의 실패 한도만 정하는 일회 deadline이다. 상태를 재검사하거나 성공시키는 timer가 아니다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "@helpers",
+      "kind": "js_delay",
+      "ordinal": 2,
+      "fingerprint": "648e0a6be8d3e8c369ef6344f465adf0704b7af2d9683bc615d8fcc2b6db7a0d",
+      "classification": "deadline",
+      "reason": "DOM/서비스 이벤트 callback의 실패 한도만 정하는 일회 deadline이다. 상태를 재검사하거나 성공시키는 timer가 아니다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "SiteControlsBrowserTest.RapidTabSwitchKeepsBadgeOwner",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "6b69bc96a407bdcc0759db4ad0afdee9c0d3738613ff18e6dba6b53b3921905c",
+      "classification": "non_ui",
+      "reason": "비UI 차단 결과 IPC를 전달해 inactive document의 badge 소유권 갱신을 검증한다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "SiteControlsBrowserTest.LinkPrefetchReadsSiteException",
+      "kind": "js_delay",
+      "ordinal": 1,
+      "fingerprint": "648e0a6be8d3e8c369ef6344f465adf0704b7af2d9683bc615d8fcc2b6db7a0d",
+      "classification": "deadline",
+      "reason": "DOM/서비스 이벤트 callback의 실패 한도만 정하는 일회 deadline이다. 상태를 재검사하거나 성공시키는 timer가 아니다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "SiteControlsBrowserTest.PrerenderDoesNotCountAgainstPrimaryPage",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "6b69bc96a407bdcc0759db4ad0afdee9c0d3738613ff18e6dba6b53b3921905c",
+      "classification": "non_ui",
+      "reason": "prerender 요청 차단의 비UI IPC/IO 결과를 주 document 집계와 분리해 검증한다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "SiteControlsBrowserTest.PrerenderDoesNotCountAgainstPrimaryPage",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "6b69bc96a407bdcc0759db4ad0afdee9c0d3738613ff18e6dba6b53b3921905c",
+      "classification": "non_ui",
+      "reason": "prerender 요청 차단의 비UI IPC/IO 결과를 주 document 집계와 분리해 검증한다."
+    },
+    {
+      "file": "browser/ui/site_controls_browsertest.cc",
+      "scope": "SiteControlsBrowserTest.BackForwardCacheRestoresDocument",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "6b69bc96a407bdcc0759db4ad0afdee9c0d3738613ff18e6dba6b53b3921905c",
+      "classification": "non_ui",
+      "reason": "BFCache 복귀 후 비UI 차단 결과 IPC/IO의 document 소유권을 검증한다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.PublishesCompleteSameGeometryReapplications",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.PublishesCompleteSameGeometryReapplications",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.SubscriptionAndWeakPtrFollowTheClipHost",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.SubscriptionAndWeakPtrFollowTheClipHost",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.SubscriptionAndWeakPtrFollowTheClipHost",
+      "kind": "idle",
+      "ordinal": 3,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.SubscriptionAndWeakPtrFollowTheClipHost",
+      "kind": "idle",
+      "ordinal": 4,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.OwnerDeletionStopsRemainingNotifications",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "PageViewportAppliedStateTest.QueuedDeliveryHonorsSubscriptionBoundary",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 PageViewportAppliedStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.PublishesStartProgressAndEnd",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.ReversalPublishesTheCurrentExpansion",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.ReversalPublishesTheCurrentExpansion",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.ReducedMotionPublishesCancelAndReset",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.ReducedMotionPublishesCancelAndReset",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.ReducedMotionPublishesCancelAndReset",
+      "kind": "idle",
+      "ordinal": 3,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.SubscriptionEndsOnRemovalAndDecorationDestruction",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.SubscriptionEndsOnRemovalAndDecorationDestruction",
+      "kind": "idle",
+      "ordinal": 2,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.QueuedSnapshotsPreserveMotionAndSubscriptionBoundary",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "a85313fea0214355e11ded96814b745ef3cf6fdc545873a22714003bb5a821cf",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/yee_ui_unittest.cc",
+      "scope": "HorizontalTabGroupCapsuleStateTest.DestructionInvalidatesBeforeViewObserversRunTasks",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "c362c453f7140100e928d51183f8ba9f7e897d9880965f59b635ecc58d74ec15",
+      "classification": "non_ui",
+      "reason": "창 없는 HorizontalTabGroupCapsuleStateTest fixture에서 값 신호/삭제 callback task를 전달한다. UI layout 완료를 기다리지 않는다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support.cc",
+      "scope": "@helpers",
+      "kind": "timer",
+      "ordinal": 1,
+      "fingerprint": "2ceea7c09f48b5085b101842444442abe268cfd9e53702e1041888ee4288158e",
+      "classification": "deadline",
+      "reason": "Begin에서 정한 절대 deadline의 일회 실패 timer다. 상태 재검사나 완료 재시도를 예약하지 않는다."
+    },
+    {
+      "file": "browser/ui/youtube_live_browsertest.cc",
+      "scope": "YouTubeLiveBrowserTest.DISABLED_MidrollObservation",
+      "kind": "js_interval",
+      "ordinal": 1,
+      "fingerprint": "410b759528567fef7f93185528f3340c31295dd36ae11421178357577415d021",
+      "classification": "callback",
+      "reason": "opt-in live playback의 광고·오디오 decode·재생 시간 통계를 1초마다 기록하는 측정 callback이다. 완료 대기는 종료 event의 once listener를 사용한다."
+    },
+    {
+      "file": "browser/ui/internal_page_test_support.h",
+      "scope": "@helpers",
+      "kind": "js_delay",
+      "ordinal": 1,
+      "fingerprint": "b0cfda75898ebbaad592afd08dbae9da2d86fff4a0788a372b69cada9fbeb034",
+      "classification": "deadline",
+      "reason": "DOM·shadow root mutation과 리소스·native 완료 이벤트를 기다리며 5초 실패 deadline만 한 번 예약한다."
+    },
+    {
+      "file": "browser/ui/applied_wait_kombucha.h",
+      "scope": "@helpers",
+      "kind": "state_wait",
+      "ordinal": 1,
+      "fingerprint": "79cc1f64a41ae975d016fd592db537f4e44a5cb9359b8692222f52b7b6766215",
+      "classification": "callback",
+      "reason": "AppliedStateObserver의 이벤트 기반 terminal callback을 Kombucha에 연결한다. PollingStateObserver/주기 평가를 사용하지 않는다."
+    },
+    {
+      "file": "browser/ui/applied_wait_test_support_unittest.cc",
+      "scope": "AppliedWaitTest.PopupGrowthCannotReuseEarlierRowBounds",
+      "kind": "idle",
+      "ordinal": 1,
+      "fingerprint": "58abbfc070a486e07e19ccdefd4eca9b007e2af3605d1fd32c44ac2798d17c44",
+      "classification": "mock_clock",
+      "reason": "fake DOM/native 표본을 mock TaskEnvironment에 전달해 행 추가 후 과거 높이로 완료되지 않음을 검사한다."
+    }
+  ]
+}

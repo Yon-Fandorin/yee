@@ -13,6 +13,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -75,17 +76,8 @@ class ExtensionsBrowserTest : public extensions::ExtensionBrowserTest {
   }
 
   bool WaitFor(const std::string& condition) {
-    const auto result = content::EvalJs(Contents(), std::string(R"JS(
-      (async () => {
-        for (let attempt = 0; attempt < 250; ++attempt) {
-          if (
-    )JS") + condition + R"JS(
-          ) return true;
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-        return false;
-      })()
-    )JS");
+    const auto result =
+        content::EvalJs(Contents(), test::WaitForInternalPageScript(condition));
     EXPECT_TRUE(result.is_bool()) << result;
     return result.is_bool() && result.ExtractBool();
   }

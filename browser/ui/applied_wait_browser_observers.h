@@ -7,13 +7,20 @@
 
 #include "chrome/browser/ui/views/yee/applied_wait_views_observers.h"
 
+class BrowserView;
 class BrowserWindowInterface;
+class LocationBarView;
 class MultiContentsView;
 class TabCollectionAnimatingLayoutManager;
 class TabStripModel;
+class TabContainerImpl;
+class InfoBarView;
 class BrowserAnimationController;
 class BrowserAnimationGroup;
 class BrowserAnimationSequence;
+namespace infobars {
+class InfoBar;
+}
 namespace content {
 class RenderFrameHost;
 class WebContents;
@@ -31,6 +38,8 @@ struct WebUiAppliedSelectors {
   std::string root;
   std::string rows;
   std::string selected;
+  enum class Probe { kRoot, kOmnibox, kCustomization, kInput };
+  Probe probe = Probe::kRoot;
 };
 
 class AppliedBrowserObservers final : public AppliedSignalSource {
@@ -40,6 +49,26 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
   AppliedBrowserObservers(const AppliedBrowserObservers&) = delete;
   AppliedBrowserObservers& operator=(const AppliedBrowserObservers&) = delete;
 
+  enum class UiProbe {
+    kSidebarHover,
+    kTabAndAdjacentHover,
+    kImageCenter,
+    kPaintedBackground,
+    kScrollTargets,
+    kFooterMenu,
+    kFooterContexts,
+    kFooterInkHidden,
+    kSiteControlsPopup,
+    kSidePanelEntry,
+    kSidebarCollapsed
+  };
+  AppliedOwnerToken ObserveUiState(views::View& view, UiProbe probe);
+  AppliedOwnerToken ObserveRendererBackground(content::WebContents& contents);
+  AppliedOwnerToken ObserveProjectNavigation(BrowserView& view);
+  AppliedOwnerToken ObserveProjectPage(BrowserView& view, std::string page_id);
+  AppliedOwnerToken ObserveOmnibox(LocationBarView& view);
+  AppliedOwnerToken ObserveFavicon(content::WebContents& contents);
+  AppliedOwnerToken ObserveDocumentTitle(content::WebContents& contents);
   AppliedViewsObservers& views();
   AppliedOwnerToken BrowserToken(BrowserWindowInterface& browser);
   uint64_t SplitId(const TabStripModel& model, int tab_index);
@@ -54,7 +83,9 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
   AppliedOwnerToken ExpectPageHosts(BrowserWindowInterface& browser,
                                     MultiContentsView& panes,
                                     uint64_t pane_id,
-                                    uint64_t tab_handle);
+                                    uint64_t tab_handle,
+                                    bool require_new_apply = true,
+                                    uint64_t split_peer = 0);
   AppliedOwnerToken ObserveSurfaceEpoch(views::View& browser_view);
   AppliedOwnerToken ObserveBrowserAnimation(
       views::View& lifetime,
@@ -62,22 +93,40 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
       BrowserAnimationGroup group,
       BrowserAnimationSequence sequence,
       uint64_t group_id);
+  AppliedOwnerToken ObserveInfoBarAnimation(const infobars::InfoBar& bar,
+                                            uint64_t group_id);
+  // animated_view를 지정하면 그 View의 native bounds animation 진행값을 읽는다.
+  AppliedOwnerToken ObserveTabContainerAnimation(
+      TabContainerImpl& host,
+      uint64_t group_id,
+      views::View* animated_view = nullptr);
   AppliedOwnerToken ObserveUnifiedAnimation(
       views::View& host,
       TabCollectionAnimatingLayoutManager& manager,
       uint64_t group_id);
+  // 새 그룹의 생성도 포함해 현재 트리의 실제 collection manager들을 읽는다.
+  AppliedOwnerToken ObserveTabCollectionAnimations(BrowserView& root,
+                                                   uint64_t group_id);
   AppliedOwnerToken ObserveRendererViewport(content::WebContents& contents);
   // 미래 surface는 목표 viewport/scale의 첫 activation에 한 번 bind한다.
   // next_document이면 다음 primary document/RFH에도 같은 규칙을 적용한다.
   AppliedCondition ExpectRendererViewport(content::WebContents& contents,
                                           gfx::Size viewport_pixels,
                                           double scale,
-                                          bool next_document = false);
+                                          bool next_document = false,
+                                          bool allow_current_surface = false);
   // ACK callback 이후에만 Begin/Dispatch한다. navigation은 기존 owner를
   // 폐기한다.
   AppliedOwnerToken InstallWebUiObserver(content::RenderFrameHost& frame,
                                          WebUiAppliedSelectors selectors,
                                          base::OnceCallback<void(bool)> ready);
+  // 같은 document의 최신 행 경계와 native View/Widget 경계를 함께 읽는다.
+  // native_view 삭제도 이 document 관측을 종료한다.
+  AppliedOwnerToken ObserveWebUiPopupBounds(AppliedOwnerToken document,
+                                            views::View& native_view);
+  AppliedOwnerToken ObserveSurfaceColor(
+      content::WebContents& contents,
+      LocationBarView* location_bar = nullptr);
   AppliedOwnerToken ObservePresentation(
       views::View& consumer,
       BrowserSurfacePresentationBinding& binding,

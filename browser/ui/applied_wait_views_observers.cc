@@ -12,7 +12,6 @@
 
 #include "base/check.h"
 #include "base/functional/bind.h"
-#include "base/hash/hash.h"
 #include "base/i18n/rtl.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
@@ -28,8 +27,13 @@
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/compositor_observer.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_animation_observer.h"
+#include "ui/compositor/layer_animator.h"
+#include "ui/compositor/layer_observer.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/views/controls/scroll_view.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/animating_layout_manager.h"
 #include "ui/views/layout/layout_manager.h"
 #include "ui/views/view.h"
@@ -52,16 +56,13 @@ AppliedSnapshot Snapshot(AppliedOwnerToken owner,
           .coordinates = coordinates};
 }
 
-bool SameValue(const AppliedConditionValue& expected,
-               const AppliedConditionValue& actual) {
-  if (const auto* animation = std::get_if<AnimationMatches>(&expected)) {
-    const auto* value = std::get_if<AnimationMatches>(&actual);
-    return value && animation->group_id == value->group_id &&
-           animation->running == value->running &&
-           value->progress_min >= animation->progress_min &&
-           value->progress_max <= animation->progress_max;
-  }
-  return expected == actual;
+bool SameObservedValue(const AppliedSnapshot& left,
+                       const AppliedSnapshot& right) {
+  return left.owner == right.owner && left.value == right.value &&
+         left.coordinates == right.coordinates &&
+         left.request_epoch == right.request_epoch &&
+         left.serials.apply_serial == right.serials.apply_serial &&
+         left.serials.native_generation == right.serials.native_generation;
 }
 
 }  // namespace
@@ -83,7 +84,62 @@ class AppliedViewsObservers::Impl {
     bool full_progress_only = false;
     bool deferred = false;
     uint64_t delivered_serial = 0;
+    std::optional<AppliedSnapshot> last;
+    size_t subscribers = 0;
   };
+
+  struct LayerWatch : ui::LayerObserver, ui::LayerAnimationObserver {
+    explicit LayerWatch(Impl& owner) : owner(owner) {}
+    ~LayerWatch() override { Release(); }
+    void Bind(ui::Layer& value) {
+      layer = &value;
+      layer->AddObserver(this);
+      layer->GetAnimator()->AddObserver(this);
+    }
+    void Release() {
+      if (!layer)
+        return;
+      layer->GetAnimator()->RemoveObserver(this);
+      layer->RemoveObserver(this);
+      owner->layer_by_address.erase(layer);
+      layer = nullptr;
+    }
+    void LayerDestroyed(ui::Layer*) override {
+      Release();
+      owner->Notify();
+    }
+    void OnLayerRecreated(ui::Layer*, ui::Layer* replacement) override {
+      Release();
+      if (replacement) {
+        owner->layer_by_address[replacement] = this;
+        Bind(*replacement);
+      }
+      owner->Notify();
+    }
+    void OnLayerAnimationStarted(ui::LayerAnimationSequence*) override {
+      owner->Notify();
+    }
+    void OnLayerAnimationEnded(ui::LayerAnimationSequence*) override {
+      owner->Notify();
+    }
+    void OnLayerAnimationAborted(ui::LayerAnimationSequence*) override {
+      owner->Notify();
+    }
+    void OnLayerAnimationScheduled(ui::LayerAnimationSequence*) override {
+      owner->Notify();
+    }
+    raw_ref<Impl> owner;
+    raw_ptr<ui::Layer> layer = nullptr;
+  };
+  void WatchLayer(ui::Layer* layer) {
+    if (!layer || layer_by_address.contains(layer))
+      return;
+    auto watch = std::make_unique<LayerWatch>(*this);
+    auto* ptr = watch.get();
+    layer_by_address[layer] = ptr;
+    layers.push_back(std::move(watch));
+    ptr->Bind(*layer);
+  }
 
   struct ViewWatch : views::ViewObserver {
     ViewWatch(Impl& owner, views::View& view) : owner(owner), tracker(&view) {
@@ -91,6 +147,8 @@ class AppliedViewsObservers::Impl {
     }
     ~ViewWatch() override = default;
     void Changed() {
+      if (tracker.view())
+        owner->WatchLayer(tracker.view()->layer());
       ++serial;
       owner->Notify();
     }
@@ -156,6 +214,27 @@ class AppliedViewsObservers::Impl {
       ViewStateMatches value{.drawn = view->IsDrawn(),
                              .visible = view->GetVisible(),
                              .bounds = view->bounds()};
+      value.opacity = view->layer() ? view->layer()->opacity() : 1;
+      value.hovered = view->IsMouseHovered();
+      value.screen_bounds = view->GetBoundsInScreen();
+      value.visible_bounds = view->GetVisibleBounds();
+      value.contents_bounds_in_screen = view->GetContentsBounds();
+      views::View::ConvertRectToScreen(view, &value.contents_bounds_in_screen);
+      value.has_background = view->background() != nullptr;
+      if (view->GetFocusManager())
+        value.focus_change_reason =
+            static_cast<int>(view->GetFocusManager()->focus_change_reason());
+      if (!view->size().IsEmpty() && HorizontalTabGroupCapsuleState::From(
+                                         *const_cast<views::View*>(view))) {
+        // 같은 UI 표본 안에서 실제 paint 결과와 animation 진행값을 복사한다.
+        gfx::Canvas canvas(view->size(), 1.f, false);
+        PaintHorizontalTabGroupCapsule(canvas, *view, SK_ColorBLUE);
+        const auto bitmap = canvas.GetBitmap();
+        for (int y = 0; y < view->height(); ++y) {
+          if (SkColorGetA(bitmap.getColor(view->width() / 2, y)))
+            value.painted_bounds.Union(gfx::Rect(0, y, view->width(), 1));
+        }
+      }
       if (view->parent()) {
         const auto parent = owner->view_by_address.find(view->parent());
         if (parent == owner->view_by_address.end())
@@ -201,7 +280,10 @@ class AppliedViewsObservers::Impl {
       if (compositor)
         compositor->RemoveObserver(this);
     }
-    void OnCompositingDidCommit(ui::Compositor*) override { owner->Notify(); }
+    void OnCompositingDidCommit(ui::Compositor*) override {
+      owner->Notify();
+      committed.Notify();
+    }
     void OnCompositingShuttingDown(ui::Compositor* dying) override {
       dying->RemoveObserver(this);
       owner->compositors.erase(dying);
@@ -255,6 +337,10 @@ class AppliedViewsObservers::Impl {
       WidgetStateMatches value{.visible = widget->IsVisible(),
                                .bounds = widget->GetWindowBoundsInScreen(),
                                .capture = widget->HasCapture()};
+      value.active = widget->IsActive();
+      value.opacity = widget->GetLayer() ? widget->GetLayer()->opacity() : 1;
+      value.visible_on_screen = widget->IsVisibleOnScreen();
+      value.paint_as_active = widget->ShouldPaintAsActive();
       if (widget->IsFullscreen()) {
         value.show_state = WidgetStateMatches::ShowState::kFullscreen;
       } else if (widget->IsMinimized()) {
@@ -273,6 +359,7 @@ class AppliedViewsObservers::Impl {
     AppliedOwnerToken token = AppliedOwnerToken::Create();
     uint64_t serial = 0;
     bool destroying = false;
+    base::RepeatingClosureList committed;
     std::unique_ptr<NativeWindowObservation> native;
     base::ScopedObservation<views::Widget, views::WidgetObserver> observation{
         this};
@@ -411,7 +498,7 @@ class AppliedViewsObservers::Impl {
           if (dependency.owner == value.owner &&
               GetAppliedConditionKind(dependency.expected) ==
                   GetAppliedConditionKind(value.value) &&
-              !SameValue(dependency.expected, value.value))
+              !AppliedValueMatches(dependency, value.value))
             Invalidate();
         }
       }
@@ -438,9 +525,8 @@ class AppliedViewsObservers::Impl {
       SetCompositor(nullptr);
       owner->Notify();
     }
-    void OnCompositingDidCommit(ui::Compositor*) override { owner->Notify(); }
     void Schedule() {
-      if (queued || !active) {
+      if (queued || !active || armed_digest) {
         return;
       }
       queued = true;
@@ -448,12 +534,12 @@ class AppliedViewsObservers::Impl {
           FROM_HERE, base::BindOnce(&FrameWatch::Arm, weak.GetWeakPtr()));
     }
     std::optional<uint64_t> Digest(bool require_fresh) const {
-      std::string geometry;
+      std::vector<AppliedSnapshot> geometry;
       for (size_t i = 0; i < dependencies.size(); ++i) {
         const auto& condition = dependencies[i];
         const auto snapshot = owner->Read(
             {condition.owner, GetAppliedConditionKind(condition.expected)});
-        if (!snapshot || !SameValue(condition.expected, snapshot->value) ||
+        if (!snapshot || !AppliedValueMatches(condition, snapshot->value) ||
             snapshot->coordinates != condition.coordinates) {
           return std::nullopt;
         }
@@ -468,10 +554,9 @@ class AppliedViewsObservers::Impl {
                 baselines[i].observation_sequence) {
           return std::nullopt;
         }
-        if (!std::holds_alternative<AnimationMatches>(snapshot->value))
-          geometry += FormatAppliedValue(snapshot->value);
+        geometry.push_back(*snapshot);
       }
-      return base::PersistentHash(geometry);
+      return AppliedFrameGeometryDigest(geometry);
     }
     void Arm() {
       queued = false;
@@ -493,25 +578,78 @@ class AppliedViewsObservers::Impl {
       weak.InvalidateWeakPtrs();
       armed_digest = digest;
       result.successful = false;
+      ++feedback_requests;
       compositor->RequestSuccessfulPresentationTimeForNextFrame(
           base::BindOnce(&FrameWatch::Presented, weak.GetWeakPtr(), *digest,
                          result.compositor));
-      compositor->ScheduleFullRedraw();
+      if (request_redraw)
+        compositor->ScheduleFullRedraw();
     }
     void Presented(uint64_t digest,
                    AppliedOwnerToken identity,
                    const viz::FrameTimingDetails&) {
+      ++feedback_callbacks;
       auto* host = view.view();
       if (!active || !owner->alive.contains(token) || !host ||
           !host->GetWidget() ||
           host->GetWidget()->GetCompositor() != compositor ||
-          result.compositor != identity || Digest(false) != digest) {
+          result.compositor != identity) {
+        return;
+      }
+      if (Digest(false) != digest) {
+        // callback 자체도 새 geometry를 발견한 이벤트다. View 알림이 없었던
+        // 변화로 feedback을 거부해도 이전 digest에 묶인 채 멈추지 않는다.
+        Invalidate();
+        Schedule();
         return;
       }
       result.geometry_digest = digest;
       result.successful = true;
       ++serial;
       owner->Notify();
+    }
+    std::string Diagnostics() {
+      auto* host = view.view();
+      auto* widget = host ? host->GetWidget() : nullptr;
+      std::string text =
+          "dependencies=" + std::to_string(dependencies.size()) +
+          " ready=" + std::to_string(Digest(false).has_value()) +
+          " fresh_ready=" + std::to_string(active && Digest(true).has_value()) +
+          " feedback_requests=" + std::to_string(feedback_requests) +
+          " feedback_callbacks=" + std::to_string(feedback_callbacks) +
+          " armed=" + std::to_string(armed_digest.has_value()) +
+          " widget_visible=" + std::to_string(widget && widget->IsVisible()) +
+          " compositor_visible=" +
+          std::to_string(compositor && compositor->IsVisible());
+      if (widget) {
+        const auto found = owner->widget_by_address.find(widget);
+        if (found != owner->widget_by_address.end())
+          text += " widget=" + found->second->token.ToString();
+      }
+      for (size_t i = 0; i < dependencies.size(); ++i) {
+        const auto& condition = dependencies[i];
+        const auto snapshot = owner->Read(
+            {condition.owner, GetAppliedConditionKind(condition.expected)});
+        const bool matches =
+            snapshot && AppliedValueMatches(condition, snapshot->value);
+        const bool coordinates =
+            snapshot && snapshot->coordinates == condition.coordinates;
+        text += " dependency[" + std::to_string(i) +
+                "]=" + (matches ? "value-ok" : "value-unmet") + "," +
+                (coordinates ? "coordinates-ok" : "coordinates-unmet");
+        if (!matches || !coordinates) {
+          text += " expected={" + FormatAppliedValue(condition.expected) +
+                  " DSF=" +
+                  std::to_string(condition.coordinates.device_scale_factor) +
+                  "} actual={" +
+                  (snapshot ? FormatAppliedValue(snapshot->value) + " DSF=" +
+                                  std::to_string(
+                                      snapshot->coordinates.device_scale_factor)
+                            : "missing") +
+                  "}";
+        }
+      }
+      return text;
     }
     void Start() {
       if (active++) {
@@ -523,7 +661,9 @@ class AppliedViewsObservers::Impl {
             {dependency.owner, GetAppliedConditionKind(dependency.expected)});
         baselines.push_back(value ? value->serials : AppliedSerials{});
       }
-      Schedule();
+      // paint만 바꾸는 action도 첫 frame을 놓치지 않도록 Begin의 구독 시점에
+      // feedback을 연결한다. geometry가 바뀌면 해당 알림에서 다시 arm한다.
+      Arm();
     }
     void Stop() {
       if (--active == 0) {
@@ -541,8 +681,11 @@ class AppliedViewsObservers::Impl {
     raw_ptr<ui::Compositor> compositor = nullptr;
     std::optional<uint64_t> armed_digest;
     uint64_t serial = 0;
+    uint64_t feedback_requests = 0;
+    uint64_t feedback_callbacks = 0;
     int active = 0;
     bool queued = false;
+    bool request_redraw = true;
     base::WeakPtrFactory<FrameWatch> weak{this};
   };
 
@@ -561,6 +704,7 @@ class AppliedViewsObservers::Impl {
         found != view_by_address.end()) {
       return *found->second;
     }
+    WatchLayer(view.layer());
     auto watch = std::make_unique<ViewWatch>(*this, view);
     auto* ptr = watch.get();
     view_by_address[&view] = ptr;
@@ -610,6 +754,7 @@ class AppliedViewsObservers::Impl {
     if (widget.IsClosed()) {
       return nullptr;
     }
+    WatchLayer(widget.GetLayer());
     auto watch = std::make_unique<WidgetWatch>(*this, widget);
     auto* ptr = watch.get();
     widget_by_address[&widget] = ptr;
@@ -675,7 +820,9 @@ class AppliedViewsObservers::Impl {
       const std::vector<AppliedSnapshot>& captured = {}) {
     std::vector<AppliedSnapshot> snapshots;
     for (auto& [key, signal] : signals) {
-      if (!Alive(key.first))
+      // 지난 ticket의 reader는 동기 layout 경로에서 실행하지 않는다.
+      // 현재 구독의 순간 AND 표본과 frame 의존성만 함께 복사한다.
+      if (!signal.subscribers || !Alive(key.first))
         continue;
       auto value = signal.read.Run();
       auto delivered = signal.delivered_serial;
@@ -740,19 +887,26 @@ class AppliedViewsObservers::Impl {
       for (auto& value : past.snapshots) {
         value.sample_id = sequence;
         value.serials.observation_sequence = sequence;
+        if (auto* signal =
+                Find({value.owner, GetAppliedConditionKind(value.value)}))
+          signal->observation = sequence;
       }
       callbacks.Notify(past);
     }
     ++sequence;
     AppliedSignalSample sample{pending.current ? *pending.current
                                                : CaptureCurrent()};
-    std::erase_if(sample.snapshots, [&](const auto& value) {
-      return !Alive(value.owner);
-    });
+    std::erase_if(sample.snapshots,
+                  [&](const auto& value) { return !Alive(value.owner); });
     for (auto& value : sample.snapshots) {
-      Find({value.owner, GetAppliedConditionKind(value.value)})->observation =
-          sequence;
-      value.serials.observation_sequence = sequence;
+      auto* signal = Find({value.owner, GetAppliedConditionKind(value.value)});
+      // SetLayerBounds는 동일 bounds에도 알린다. 다른 View의 알림이나
+      // compositor commit을 이 owner의 새 적용·관측으로 전파하지 않는다.
+      const auto& last = signal->last;
+      if (!last || !SameObservedValue(*last, value))
+        signal->observation = sequence;
+      signal->last = value;
+      value.serials.observation_sequence = signal->observation;
       value.sample_id = sequence;
     }
     callbacks.Notify(sample);
@@ -769,6 +923,10 @@ class AppliedViewsObservers::Impl {
         frame->Invalidate();
         frame->SetCompositor(nullptr);
       }
+      if (std::ranges::any_of(frame->dependencies, [&](const auto& condition) {
+            return condition.owner == owner;
+          }))
+        Destroy(frame->token);
     }
     callbacks.Notify(AppliedSignalSample{.destroyed_owners = {owner}});
   }
@@ -783,6 +941,8 @@ class AppliedViewsObservers::Impl {
   base::RepeatingCallbackList<void(const AppliedSignalSample&)> callbacks;
   base::RepeatingClosureList wakes;
   base::RepeatingClosureList releases;
+  std::map<ui::Layer*, LayerWatch*> layer_by_address;
+  std::vector<std::unique_ptr<LayerWatch>> layers;
   std::map<const views::View*, ViewWatch*> view_by_address;
   std::map<views::Widget*, WidgetWatch*> widget_by_address;
   std::map<ui::Compositor*, AppliedOwnerToken> compositors;
@@ -846,9 +1006,13 @@ AppliedOwnerToken AppliedViewsObservers::ObservePageHosts(
          const PageViewportAppliedSnapshot& s) {
         return Snapshot(
             s.owner,
-            PageHostsApplied{pane, tab, s.clip_host_bounds_in_container,
-                             s.geometry.current_clip_in_target,
-                             s.clip_host_radii, s.target_host_bounds_in_clip},
+            PageHostsApplied{
+                pane, tab, s.clip_host_bounds_in_container,
+                s.geometry.current_clip_in_target, s.clip_host_radii,
+                s.target_host_bounds_in_clip, s.overlay_host_bounds_in_clip,
+                s.clip_host_bounds_in_container,
+                s.geometry.current_clip_in_target, s.target_host_bounds_in_clip,
+                s.overlay_host_bounds_in_clip, true},
             s.apply_serial, s.geometry.generation,
             view->tracker.view()
                 ? GetAppliedViewCoordinates(*view->tracker.view(),
@@ -861,15 +1025,22 @@ AppliedOwnerToken AppliedViewsObservers::ObservePageHosts(
   ObserveView(GetPageTargetHost(clip_host));
   auto* target_watch = impl_->view_by_address.at(&GetPageTargetHost(clip_host));
   target_watch->tokens.push_back(token);
+  ObserveView(GetViewportOverlayHost(clip_host));
+  auto* overlay_watch =
+      impl_->view_by_address.at(&GetViewportOverlayHost(clip_host));
+  overlay_watch->tokens.push_back(token);
   auto& signal = impl_->Register(
       token, AppliedConditionKind::kPageHostsApplied,
       base::BindRepeating(
           [](base::WeakPtr<PageViewportAppliedState> state,
              decltype(convert) convert, Impl::ViewWatch* clip,
-             Impl::ViewWatch* target) -> std::optional<AppliedSnapshot> {
+             Impl::ViewWatch* target,
+             Impl::ViewWatch* overlay) -> std::optional<AppliedSnapshot> {
             auto* view = clip->tracker.view();
             if (!state || state->GetSnapshot().apply_serial == 0 || !view ||
-                !target->tracker.view() || !view->layer() ||
+                !target->tracker.view() || !overlay->tracker.view() ||
+                target->tracker.view()->parent() != view ||
+                overlay->tracker.view()->parent() != view || !view->layer() ||
                 !view->layer()->GetMasksToBounds()) {
               return std::nullopt;
             }
@@ -886,10 +1057,20 @@ AppliedOwnerToken AppliedViewsObservers::ObservePageHosts(
               else
                 value.clip.Intersect(effective_clip);
             }
+            value.overlay = overlay->tracker.view()->bounds();
+            value.geometry_applied =
+                value.bounds == value.applied_bounds &&
+                value.clip == value.applied_clip &&
+                value.target == value.applied_target &&
+                value.overlay == value.applied_overlay &&
+                value.radii == state->GetSnapshot().clip_host_radii;
+            for (views::View* child : target->tracker.view()->children())
+              value.geometry_applied &=
+                  child->bounds() == target->tracker.view()->GetLocalBounds();
             return snapshot;
           },
           state->GetWeakPtr(), convert, base::Unretained(clip_watch),
-          base::Unretained(target_watch)));
+          base::Unretained(target_watch), base::Unretained(overlay_watch)));
   signal.deferred = true;
   signal.delivered_serial = state->GetSnapshot().apply_serial;
   impl_->view_by_address.at(&clip_host)->tokens.push_back(token);
@@ -1071,20 +1252,17 @@ AppliedOwnerToken AppliedViewsObservers::ObserveNativeWindow(
 }
 AppliedCondition AppliedViewsObservers::ObservePresentedAfterApply(
     views::View& view,
-    AppliedConditions dependencies) {
+    AppliedConditions dependencies,
+    bool request_redraw) {
   ObserveView(view);
   CHECK(!dependencies.empty());
   auto frame = std::make_unique<Impl::FrameWatch>(*impl_, view, dependencies);
   auto* ptr = frame.get();
+  ptr->request_redraw = request_redraw;
   ptr->SetCompositor(view.GetWidget() ? view.GetWidget()->GetCompositor()
                                       : nullptr);
-  std::string geometry;
-  for (const auto& condition : dependencies) {
-    if (!std::holds_alternative<AnimationMatches>(condition.expected))
-      geometry += FormatAppliedValue(condition.expected);
-  }
   PresentedAfterApply expected = ptr->result;
-  expected.geometry_digest = base::PersistentHash(geometry);
+  expected.geometry_digest = ptr->Digest(false).value_or(0);
   expected.successful = true;
   impl_->view_by_address.at(&view)->tokens.push_back(ptr->token);
   const bool has_geometry =
@@ -1111,18 +1289,24 @@ AppliedCondition AppliedViewsObservers::ObservePresentedAfterApply(
                 frame->Digest(false) != value.geometry_digest) {
               value.successful = false;
             }
-            return Snapshot(
+            auto snapshot = Snapshot(
                 frame->token, value, frame->serial, 0,
                 view ? GetAppliedViewCoordinates(*view) : AppliedCoordinates{});
+            if (!value.successful)
+              snapshot.adapter_diagnostics = frame->Diagnostics();
+            return snapshot;
           },
           base::Unretained(ptr)));
   impl_->frames.push_back(std::move(frame));
   return {.owner = ptr->token,
           .expected = expected,
-          .coordinates = GetAppliedViewCoordinates(view)};
+          .coordinates = GetAppliedViewCoordinates(view),
+          .match = AppliedMatch::kPresentedFrame};
 }
 
 bool AppliedViewsObservers::Supports(const AppliedCondition& condition) const {
+  if (!IsAppliedMatchCompatible(condition))
+    return false;
   auto* signal = impl_->Find(
       {condition.owner, GetAppliedConditionKind(condition.expected)});
   if (!signal) {
@@ -1176,6 +1360,10 @@ std::optional<AppliedSnapshot> AppliedViewsObservers::Read(
 base::CallbackListSubscription AppliedViewsObservers::Subscribe(
     const std::vector<AppliedSignalKey>& keys,
     Observer observer) {
+  using Key = std::pair<AppliedOwnerToken, AppliedConditionKind>;
+  std::set<Key> observed;
+  for (const auto& key : keys)
+    observed.emplace(key.owner, key.kind);
   std::vector<Impl::FrameWatch*> frames;
   for (const auto& frame : impl_->frames) {
     if (std::ranges::find(
@@ -1183,48 +1371,111 @@ base::CallbackListSubscription AppliedViewsObservers::Subscribe(
             AppliedSignalKey{frame->token,
                              AppliedConditionKind::kPresentedAfterApply}) !=
         keys.end()) {
-      frame->Start();
+      for (const auto& dependency : frame->dependencies)
+        observed.emplace(dependency.owner,
+                         GetAppliedConditionKind(dependency.expected));
       frames.push_back(frame.get());
     }
   }
+  for (const auto& [owner, kind] : observed) {
+    if (auto* signal = impl_->Find({owner, kind}); signal) {
+      if (!signal->subscribers++)
+        signal->last = signal->read.Run();
+    }
+  }
+  for (auto* frame : frames)
+    frame->Start();
+  std::map<Key, std::optional<AppliedSnapshot>> previous;
+  for (const auto& key : keys) {
+    auto* signal = impl_->Find(key);
+    if (signal && !signal->last)
+      signal->last = signal->read.Run();
+    previous.emplace(std::make_pair(key.owner, key.kind), impl_->Read(key));
+  }
   auto subscription = std::make_unique<base::CallbackListSubscription>(
       impl_->callbacks.Add(base::BindRepeating(
-          [](std::vector<AppliedSignalKey> keys, Observer callback,
+          [](base::WeakPtr<Impl> impl, std::vector<AppliedSignalKey> keys,
+             Observer callback,
+             std::map<Key, std::optional<AppliedSnapshot>>& previous,
              const AppliedSignalSample& sample) {
+            if (!impl)
+              return;
             AppliedSignalSample filtered;
+            bool changed = false;
             for (const auto& value : sample.snapshots) {
               if (std::ranges::find(
                       keys, AppliedSignalKey{value.owner,
                                              GetAppliedConditionKind(
-                                                 value.value)}) != keys.end()) {
-                filtered.snapshots.push_back(value);
-              }
+                                                 value.value)}) == keys.end())
+                continue;
+              filtered.snapshots.push_back(value);
+              auto& last = previous.at(
+                  {value.owner, GetAppliedConditionKind(value.value)});
+              changed |= !last || !SameObservedValue(*last, value);
+              last = value;
             }
             for (auto owner : sample.destroyed_owners) {
               if (std::ranges::any_of(keys, [&](const auto& key) {
                     return key.owner == owner;
-                  })) {
+                  }))
                 filtered.destroyed_owners.push_back(owner);
-              }
             }
-            if (!filtered.snapshots.empty() ||
-                !filtered.destroyed_owners.empty()) {
-              callback.Run(filtered);
+            if (!changed && filtered.destroyed_owners.empty())
+              return;
+            // 선택된 조건 하나가 변하면 변하지 않은 geometry도 같은 순간에
+            // 관측한 새 표본이다. source Read의 watermark도 함께 올려
+            // ObservedSinceDispatch의 묶음과 Current 재조회를 모두 보존한다.
+            for (auto& value : filtered.snapshots) {
+              auto* signal = impl->Find(
+                  {value.owner, GetAppliedConditionKind(value.value)});
+              signal->observation =
+                  std::max(signal->observation, value.sample_id);
+              value.serials.observation_sequence = signal->observation;
             }
+            callback.Run(filtered);
           },
-          keys, std::move(observer))));
+          impl_->weak.GetWeakPtr(), keys, std::move(observer),
+          base::OwnedRef(std::move(previous)))));
   // callback list의 제거 callback으로 frame의 예약·feedback도 함께 해제한다.
   auto release = std::make_shared<base::ScopedClosureRunner>(base::BindOnce(
       [](std::unique_ptr<base::CallbackListSubscription> subscription,
-         std::vector<Impl::FrameWatch*> frames) {
+         std::vector<Impl::FrameWatch*> frames, base::WeakPtr<Impl> impl,
+         const std::set<Key>& observed) {
         subscription.reset();
         for (auto* frame : frames) {
           frame->Stop();
         }
+        if (impl) {
+          for (const auto& [owner, kind] : observed) {
+            if (auto* signal = impl->Find({owner, kind}); signal)
+              --signal->subscribers;
+          }
+        }
       },
-      std::move(subscription), std::move(frames)));
+      std::move(subscription), std::move(frames), impl_->weak.GetWeakPtr(),
+      std::move(observed)));
   return impl_->releases.Add(base::BindRepeating(
       [](std::shared_ptr<base::ScopedClosureRunner>) {}, release));
+}
+base::CallbackListSubscription AppliedViewsObservers::SubscribeCompositorFrames(
+    views::Widget& widget,
+    std::vector<AppliedSignalKey> keys,
+    Observer observer) {
+  auto* watch = impl_->WidgetFor(widget);
+  CHECK(watch);
+  return watch->committed.Add(base::BindRepeating(
+      [](base::WeakPtr<Impl> impl, const std::vector<AppliedSignalKey>& keys,
+         Observer observer) {
+        if (!impl)
+          return;
+        AppliedSignalSample sample;
+        for (const auto& key : keys) {
+          if (auto value = impl->Read(key))
+            sample.snapshots.push_back(std::move(*value));
+        }
+        observer.Run(sample);
+      },
+      impl_->weak.GetWeakPtr(), std::move(keys), std::move(observer)));
 }
 void AppliedViewsObservers::RegisterSignal(AppliedOwnerToken owner,
                                            AppliedConditionKind kind,

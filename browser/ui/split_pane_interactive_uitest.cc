@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -19,13 +20,13 @@
 #include "base/numerics/ranges.h"
 #include "base/run_loop.h"
 #include "base/task/sequenced_task_runner.h"
-#include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
@@ -43,10 +44,12 @@
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/toolbar/bookmark_sub_menu_model.h"
 #include "chrome/browser/ui/ui_features.h"
+#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_button.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_outline.h"
+#include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/custom_floating_corner.h"
 #include "chrome/browser/ui/views/frame/multi_contents_background_view.h"
@@ -74,8 +77,11 @@
 #include "chrome/browser/ui/views/test/tab_strip_interactive_test_mixin.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
+#include "chrome/browser/ui/views/yee/applied_wait_kombucha.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
+#include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_footer.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
@@ -133,9 +139,8 @@ namespace {
 void CaptureYeeWidgetForTesting(views::Widget* widget,
                                 const base::FilePath& path) {
   widget->LayoutRootViewIfNecessary();
-  auto* compositor = widget->GetCompositor();
-  compositor->ScheduleFullRedraw();
-  ASSERT_TRUE(ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+  yee::test::AppliedTestContext<yee::test::AppliedViewsObservers> frame;
+  ASSERT_TRUE(frame.WaitForPresentedFrame(*widget));
 #if BUILDFLAG(IS_WIN)
   // 실제 Aura 합성 출력을 읽는다. 캡처 실행에는
   // --enable-pixel-output-in-tests가 필요하며, GL 그리기가 없는 결과는 시각
@@ -177,8 +182,8 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kSecondTab);
 namespace {
 
 class YeeContentsViewUiTest
-    : public SplitViewInteractiveTestMixin<
-          TabStripInteractiveTestMixin<InteractiveBrowserTest>> {
+    : public SplitViewInteractiveTestMixin<TabStripInteractiveTestMixin<
+          yee::test::AppliedWaitInteractiveTestMixin<InteractiveBrowserTest>>> {
  public:
   YeeContentsViewUiTest() = default;
 
@@ -191,12 +196,50 @@ class YeeContentsViewUiTest
   }
 
   void TearDownOnMainThread() override {
+    applied_.Stop();
     browser()->GetProfile()->GetPrefs()->ClearPref(
         prefs::kTabSearchPinnedToTabstrip);
     SplitViewInteractiveTestMixin::TearDownOnMainThread();
   }
 
  protected:
+  yee::test::AppliedTestContext<yee::test::AppliedBrowserObservers> applied_;
+
+  yee::test::AppliedCondition ColorCondition(int index,
+                                             SkColor color,
+                                             bool actual_location = false) {
+    auto* contents = tab_strip_model()->GetWebContentsAt(index);
+    const auto owner = applied_.source().ObserveSurfaceColor(
+        *contents, actual_location ? location_bar() : nullptr);
+    return applied_.Condition(
+        owner,
+        yee::test::PresentationMatches{
+            .source_id = YeeSurfaceSourceForTab(index)->source_id(),
+            .background_color = color},
+        yee::test::AppliedMatch::kPresentationColor);
+  }
+
+  yee::test::AppliedOwnerToken ObserveOmniboxDom(
+      content::WebContents& contents) {
+    base::test::TestFuture<bool> installed;
+    const auto owner = applied_.source().InstallWebUiObserver(
+        *contents.GetPrimaryMainFrame(),
+        {.root = "html",
+         .probe = yee::test::WebUiAppliedSelectors::Probe::kOmnibox},
+        installed.GetCallback());
+    // DOM observer 설치 ACK를 기다린 뒤에만 입력 ticket을 arm한다.
+    EXPECT_TRUE(installed.Get());
+    return owner;
+  }
+
+  yee::test::AppliedCondition DomCondition(
+      yee::test::AppliedOwnerToken owner,
+      yee::test::WebUiStateMatches expected,
+      yee::test::AppliedMatch match) {
+    expected.document = owner;
+    return applied_.Condition(owner, expected, match);
+  }
+
   LocationBarView* location_bar() {
     return BrowserView::GetBrowserViewForBrowser(browser())
         ->toolbar()
@@ -322,7 +365,6 @@ class YeeContentsViewUiTest
         ChromeAutocompleteSchemeClassifier(browser()->GetProfile()));
     input.set_omit_asynchronous_matches(true);
     controller->StartAutocomplete(input);
-    base::RunLoop().RunUntilIdle();
 
     OmniboxPopupView* const popup_view =
         location_bar_view->GetOmniboxPopupView();
@@ -395,87 +437,184 @@ class YeeMultiContentsViewUiTest
     : public YeeContentsViewUiTest,
       public ::testing::WithParamInterface<split_tabs::SplitTabLayout> {
  protected:
+  yee::test::DispatchDone drag_done_;
   GURL GetTestUrl() { return embedded_test_server()->GetURL("/title1.html"); }
 
-  auto EnterSplitView(int active_tab,
-                      std::optional<int> other_tab = std::nullopt,
-                      double ratio = 0.5) {
-    return SplitViewInteractiveTestMixin::EnterSplitView(active_tab, other_tab,
-                                                         GetParam(), ratio);
+  yee::test::AppliedCondition ActiveTabCondition(int index) {
+    return applied_.Condition(
+        applied_.source().ObserveTabModel(*tab_strip_model()),
+        yee::test::TabModelMatches{
+            .active_tab = static_cast<uint64_t>(tab_strip_model()
+                                                    ->GetTabAtIndex(index)
+                                                    ->GetHandle()
+                                                    .raw_value())},
+        yee::test::AppliedMatch::kTabActive);
+  }
+
+  auto AddActiveInstrumentedTab(ui::ElementIdentifier id, GURL url, int index) {
+    return ApplyStepsAndWait(
+        applied_,
+        [this] {
+          const auto owner =
+              applied_.source().ObserveTabModel(*tab_strip_model());
+          const auto before = applied_.source().Read(
+              {owner, yee::test::AppliedConditionKind::kTabModelMatches});
+          // 생성 전에는 새 handle이 없다. 기존 handle/순서를 보존하면서
+          // 추가된 유일한 handle이 활성 탭인지 같은 모델 표본에서 확인한다.
+          return yee::test::AppliedConditions{applied_.Condition(
+              owner, before->value, yee::test::AppliedMatch::kNewTabActive)};
+        },
+        AddInstrumentedTab(id, url, index));
+  }
+
+  auto EnterSplitView(int active_tab, int other_tab, double ratio = 0.5) {
+    return Steps(
+        ApplyStepsAndWait(
+            applied_,
+            [this, active_tab] {
+              return yee::test::AppliedConditions{
+                  ActiveTabCondition(active_tab)};
+            },
+            Steps(SelectTab(kTabStripElementId, active_tab))),
+        ApplyAndWait(
+            applied_,
+            [=, this] {
+              using namespace yee::test;
+              AppliedConditions conditions{ActiveTabCondition(active_tab)};
+              const uint64_t first = tab_strip_model()
+                                         ->GetTabAtIndex(active_tab)
+                                         ->GetHandle()
+                                         .raw_value();
+              const uint64_t second = tab_strip_model()
+                                          ->GetTabAtIndex(other_tab)
+                                          ->GetHandle()
+                                          .raw_value();
+              for (auto [handle, peer] :
+                   {std::pair(first, second), std::pair(second, first)}) {
+                auto condition = applied_.Condition(
+                    applied_.source().ExpectPageHosts(
+                        *browser(), *multi_contents_view(), handle, handle,
+                        true, peer),
+                    PageHostsApplied{.pane_id = handle, .tab_handle = handle},
+                    AppliedMatch::kPageIdentity, AppliedFreshness::kNewApply);
+                condition.coordinates.space =
+                    AppliedCoordinates::Space::kParent;
+                condition.coordinates.device_scale_factor =
+                    GetAppliedViewCoordinates(*multi_contents_view())
+                        .device_scale_factor;
+                condition.coordinates.rtl = base::i18n::IsRTL();
+                conditions.push_back(std::move(condition));
+              }
+              conditions.push_back(applied_.View(
+                  *multi_contents_view()->resize_area_for_testing(),
+                  {.bounds = gfx::Rect(0, 0, 1, 1)},
+                  AppliedMatch::kViewNonEmpty));
+              if (yee::IsShellEnabled()) {
+                auto* header = multi_contents_view()->mini_toolbar_for_testing(
+                    active_tab < other_tab ? 0 : 1);
+                conditions.push_back(applied_.View(
+                    *location_bar(),
+                    {.parent = applied_.views().ObserveView(*header)},
+                    AppliedMatch::kViewParent));
+                conditions.push_back(applied_.View(
+                    *location_bar(),
+                    {.bounds =
+                         gfx::Rect(0, 0, 0,
+                                   yee::kSidebarMetrics
+                                       .browser_surface_location_bar_height)},
+                    AppliedMatch::kViewHeight));
+                for (int pane : {0, 1}) {
+                  conditions.push_back(applied_.View(
+                      *multi_contents_view()->mini_toolbar_for_testing(pane),
+                      {.bounds = gfx::Rect(
+                           0, 0, 0,
+                           yee::kSidebarMetrics.split_pane_header_height -
+                               yee::kSidebarMetrics
+                                   .split_pane_content_stroke_inset)},
+                      AppliedMatch::kViewHeight));
+                }
+              }
+              return conditions;
+            },
+            [=, this] {
+              tab_strip_model()->AddToNewSplit(
+                  {other_tab},
+                  split_tabs::SplitTabVisualData(GetParam(), ratio),
+                  split_tabs::SplitTabCreatedSource::kToolbarButton);
+            }));
   }
 
   auto CreateTabsAndEnterSplitView() {
     auto result = Steps(
-        AddInstrumentedTab(kNewTab, GURL(chrome::kChromeUISettingsURL), 0),
+        AddActiveInstrumentedTab(kNewTab, GURL(chrome::kChromeUISettingsURL),
+                                 0),
         CheckResult([=, this]() { return tab_strip_model()->count(); }, 2u),
         EnterSplitView(0, 1));
     AddDescriptionPrefix(result, "CreateTabsAndEnterSplitView()");
     return result;
   }
 
-  // MultiContentsView의 Layout 재정의로 크기 변경이 다음 레이아웃까지 지연될 수
-  // 있다. PollView와 WaitForState로 해당 레이아웃 적용을 기다린다.
-  using MultiContentsViewLayoutObserver =
-      views::test::PollingViewObserver<bool, MultiContentsView>;
-
-  auto CheckResizeValues(
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(
-        PollView(observer_id, kMultiContentsViewElementId,
-                 [check](const MultiContentsView* multi_contents_view) -> bool {
-                   const gfx::Size& start_size =
-                       multi_contents_view->start_contents_view_for_testing()
-                           ->parent()
-                           ->size();
-                   const gfx::Size& end_size =
-                       multi_contents_view->end_contents_view_for_testing()
-                           ->parent()
-                           ->size();
-                   switch (multi_contents_view->GetSplitLayout()) {
-                     case split_tabs::SplitTabLayout::kSideBySide:
-                       return check.Run(start_size.width(), end_size.width());
-                     case split_tabs::SplitTabLayout::kStacked:
-                       return check.Run(start_size.height(), end_size.height());
-                     default:
-                       NOTREACHED();
-                   }
-                 }),
-        WaitForState(observer_id, true), StopObservingState(observer_id));
-    AddDescriptionPrefix(result, "CheckResizeValues()");
-    return result;
+  auto ExitSplitView(int index) {
+    return ApplyStepsAndWait(
+        applied_,
+        [this, index] {
+          return yee::test::AppliedConditions{ActiveTabCondition(index)};
+        },
+        YeeContentsViewUiTest::ExitSplitView(index));
   }
 
-  auto CheckResizeWithId(
-      int resize_amount,
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(Do([resize_amount, this]() {
-                          multi_contents_view()->OnResize(resize_amount, true);
-                        }),
-                        CheckResizeValues(check, observer_id));
-    AddDescriptionPrefix(result, "CheckResizeWithId()");
-    return result;
+  yee::test::AppliedConditions SplitConditions(double ratio,
+                                               bool increasing = false) {
+    using namespace yee::test;
+    auto* panes = multi_contents_view();
+    const auto owner = applied_.source().ObservePaneLayout(*browser(), *panes);
+    const auto snapshot =
+        applied_.source().Read({owner, AppliedConditionKind::kPaneLayoutMatches});
+    auto expected = std::get<PaneLayoutMatches>(snapshot->value);
+    expected.ratio = ratio;
+    if (increasing) {
+      expected.ratio_min = std::nextafter(ratio, 1.0);
+      expected.ratio_max = 1;
+    }
+    AppliedConditions conditions{
+        applied_.Condition(owner, expected, AppliedMatch::kPaneSplit)};
+    for (const auto& container : panes->contents_container_views()) {
+      if (!container->GetVisible())
+        continue;
+      auto* tab = tabs::TabInterface::GetFromContents(
+          container->contents_view()->web_contents());
+      auto* clip = container->GetViewByID(yee::kPageViewportClipHostViewId);
+      const uint64_t handle = tab->GetHandle().raw_value();
+      const auto page =
+          applied_.source().ExpectPageHosts(*browser(), *panes, handle, handle);
+      conditions.push_back(applied_.Condition(
+          page, PageHostsApplied{.pane_id = handle, .tab_handle = handle},
+          AppliedMatch::kPageIdentity, AppliedFreshness::kNewApply));
+      conditions.back().coordinates =
+          GetAppliedViewCoordinates(*clip, AppliedCoordinates::Space::kParent);
+    }
+    return conditions;
   }
 
-  // 키보드로 크기를 바꾼 뒤 contents view 크기를 확인한다.
-  auto CheckResizeKey(
-      ui::KeyboardCode key_code,
-      base::RepeatingCallback<bool(double, double)> check,
-      ui::test::StateIdentifier<MultiContentsViewLayoutObserver> observer_id) {
-    auto result = Steps(
-        WithView(MultiContentsResizeHandle::kMultiContentsResizeHandleElementId,
-                 [key_code](MultiContentsResizeHandle* handle) {
-                   ui::KeyEvent press(ui::EventType::kKeyPressed, key_code,
-                                      ui::EF_NONE);
-                   handle->GetWidget()->OnKeyEvent(&press);
-                   ui::KeyEvent release(ui::EventType::kKeyReleased, key_code,
-                                        ui::EF_NONE);
-                   handle->GetWidget()->OnKeyEvent(&release);
-                 }),
-        CheckResizeValues(check, observer_id));
-    AddDescriptionPrefix(result, "CheckResizeKey()");
-    return result;
+  yee::test::AppliedConditions SidebarConditions(bool expanded) {
+    auto conditions = SplitConditions(multi_contents_view()->GetSplitRatio());
+    conditions[0].match = yee::test::AppliedMatch::kPaneSplitCurrentExtent;
+    auto* region = BrowserView::GetBrowserViewForBrowser(browser())
+                       ->vertical_tab_strip_region_view_for_testing();
+    auto* actions = region->sidebar_header_actions();
+    for (auto* control :
+         {actions->children()[0].get(), actions->children()[1].get()})
+      conditions.push_back(
+          applied_.View(*control, {.visible = expanded},
+                        yee::test::AppliedMatch::kViewVisible));
+    const auto animation = applied_.source().ObserveBrowserAnimation(
+        *region, *BrowserAnimationController::From(browser()),
+        TabStripAnimations::kVerticalTabStrip,
+        TabStripAnimations::kTabStripWidth, 1);
+    conditions.push_back(applied_.Condition(
+        animation,
+        yee::test::AnimationMatches{.group_id = 1, .running = false}));
+    return conditions;
   }
 
   // 분할 축을 따라 contents 크기를 바꾼다.
@@ -513,25 +652,23 @@ class YeeMultiContentsViewUiTest
   }
 
   auto OpenContextualSidePanel() {
-    using SidePanelViewObserver =
-        views::test::PollingViewObserver<bool, SidePanel>;
-    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(SidePanelViewObserver,
-                                        kSidePanelViewObserver);
-
-    return Steps(Do(base::BindLambdaForTesting([this]() {
-                   chrome::ExecuteCommandWithContext(
-                       browser(), IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL,
-                       actions::ActionInvocationContext::Builder()
-                           .SetProperty(kSidePanelOpenTriggerKey,
-                                        SidePanelOpenTrigger::kToolbarButton)
-                           .Build());
-                 })),
-                 PollView(kSidePanelViewObserver, kSidePanelElementId,
-                          [](const SidePanel* side_panel) -> bool {
-                            return side_panel->width() > 0 &&
-                                   side_panel->height() > 0;
-                          }),
-                 WaitForState(kSidePanelViewObserver, true));
+    return ApplyAndWait(
+        applied_,
+        [this] {
+          auto* panel =
+              BrowserView::GetBrowserViewForBrowser(browser())->side_panel();
+          return yee::test::AppliedConditions{
+              applied_.View(*panel, {.bounds = gfx::Rect(0, 0, 1, 1)},
+                            yee::test::AppliedMatch::kViewNonEmpty)};
+        },
+        [this] {
+          chrome::ExecuteCommandWithContext(
+              browser(), IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL,
+              actions::ActionInvocationContext::Builder()
+                  .SetProperty(kSidePanelOpenTriggerKey,
+                               SidePanelOpenTrigger::kToolbarButton)
+                  .Build());
+        });
   }
 };
 
@@ -544,11 +681,9 @@ INSTANTIATE_TEST_SUITE_P(
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        YeeSingleAndSplitHeadersShareLocationBarGeometry) {
   ASSERT_TRUE(yee::IsShellEnabled());
-  using LocationBarRestoreObserver =
-      views::test::PollingViewObserver<bool, LocationBarView>;
-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(LocationBarRestoreObserver,
-                                      kLocationBarRestored);
   int single_location_bar_center_y = 0;
+  gfx::Rect single_location_bar_bounds;
+  gfx::Rect single_toolbar_bounds;
   RunTestSequence(
       Check([&]() {
         BrowserView* browser_view =
@@ -557,13 +692,15 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
             browser_view->toolbar()->location_bar_view();
         single_location_bar_center_y =
             location_bar->GetBoundsInScreen().CenterPoint().y();
+        single_location_bar_bounds = location_bar->bounds();
+        single_toolbar_bounds = browser_view->toolbar()->bounds();
         return location_bar->parent() == browser_view->toolbar() &&
                browser_view->toolbar()->height() ==
                    yee::kSidebarMetrics.toolbar_height &&
                location_bar->height() ==
                    yee::kSidebarMetrics.browser_surface_location_bar_height;
       }),
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0), Check([&]() {
+      CreateTabsAndEnterSplitView(), Check([&]() {
         BrowserView* browser_view =
             BrowserView::GetBrowserViewForBrowser(browser());
         MultiContentsViewMiniToolbar* const active_header =
@@ -586,56 +723,80 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                    yee::kSidebarMetrics.split_pane_header_height -
                        yee::kSidebarMetrics.split_pane_content_stroke_inset;
       }),
-      Do([&]() { tab_strip_model()->ActivateTabAt(1); }),
-      WaitForActiveTabChange(1), Check([&]() {
+      ApplyAndWait(
+          applied_,
+          [&] { return yee::test::AppliedConditions{ActiveTabCondition(1)}; },
+          [&] { tab_strip_model()->ActivateTabAt(1); }),
+      Check([&]() {
         BrowserView* browser_view =
             BrowserView::GetBrowserViewForBrowser(browser());
         return browser_view->toolbar()->location_bar_view()->parent() ==
                multi_contents_view()->mini_toolbar_for_testing(1);
       }),
-      ExitSplitView(1), WaitForActiveTabChange(1),
-      PollView(kLocationBarRestored, kLocationBarElementId,
-               [&](const LocationBarView* location_bar) {
-                 BrowserView* browser_view =
-                     BrowserView::GetBrowserViewForBrowser(browser());
-                 return location_bar->parent() == browser_view->toolbar() &&
-                        location_bar->height() ==
-                            yee::kSidebarMetrics
-                                .browser_surface_location_bar_height &&
-                        location_bar->GetBoundsInScreen().CenterPoint().y() ==
-                            single_location_bar_center_y;
-               }),
-      WaitForState(kLocationBarRestored, true),
-      StopObservingState(kLocationBarRestored));
+      ApplyAndWait(
+          applied_,
+          [&] {
+            auto* toolbar =
+                BrowserView::GetBrowserViewForBrowser(browser())->toolbar();
+            // reparent는 Toolbar 배치보다 먼저 일어난다. 단일 header의
+            // 두 실제 bounds도 돌아온 뒤 기존 screen-center를 검사한다.
+            return yee::test::AppliedConditions{
+                ActiveTabCondition(1),
+                applied_.View(
+                    *location_bar(),
+                    {.parent = applied_.views().ObserveView(*toolbar)},
+                    yee::test::AppliedMatch::kViewParent),
+                applied_.View(*toolbar, {.bounds = single_toolbar_bounds},
+                              yee::test::AppliedMatch::kViewBounds),
+                applied_.View(*location_bar(),
+                              {.bounds = single_location_bar_bounds},
+                              yee::test::AppliedMatch::kViewBounds)};
+          },
+          [&] { multi_contents_view()->OnExitSplit(); }),
+      Check([&] {
+        return location_bar()->height() ==
+                   yee::kSidebarMetrics.browser_surface_location_bar_height &&
+               location_bar()->GetBoundsInScreen().CenterPoint().y() ==
+                   single_location_bar_center_y;
+      }));
 }
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        YeeRenderedBoundaryTracksDelayedCssWithoutMetadata) {
   RunTestSequence(CreateTabsAndEnterSplitView());
   auto* const contents = tab_strip_model()->GetActiveWebContents();
-  ASSERT_TRUE(content::NavigateToURL(
-      contents,
-      GURL("data:text/html,<style>html,body{margin:0;background:rgb(255,0,0)}"
-           "[id=edge]{height:8px;background:rgb(20,40,60)}</style>"
-           "<div id='edge'></div><p>Real compositor boundary fixture</p>")));
   auto* const source =
       yee::BrowserSurfaceColorController::GetOrCreateForWebContents(contents);
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return source->GetColor() == SkColorSetRGB(20, 40, 60); }));
+  const auto sampling = applied_.source().ObserveSurfaceColor(*contents);
+  ASSERT_TRUE(applied_.Run(
+      {ColorCondition(tab_strip_model()->active_index(),
+                      SkColorSetRGB(20, 40, 60)),
+       applied_.Condition(sampling, yee::test::PresentationMatches{},
+                          yee::test::AppliedMatch::kSamplingSettled)},
+      [&] {
+        ASSERT_TRUE(content::NavigateToURL(
+            contents,
+            GURL("data:text/"
+                 "html,<style>html,body{margin:0;background:rgb(255,0,0)}"
+                 "[id=edge]{height:8px;background:rgb(20,40,60)}</style>"
+                 "<div id='edge'></div><p>Real compositor boundary "
+                 "fixture</p>")));
+      }));
+  ASSERT_EQ(source->GetColor(), SkColorSetRGB(20, 40, 60));
   EXPECT_EQ(source->GetColor(),
             location_bar()->GetCompactShellPopupSurfaceColor());
   const auto background = contents->GetBackgroundColor();
   const auto metadata = contents->GetThemeColor();
-  // 탐색·스크롤·입력·메타데이터 변경 없이 초기 80/100-ms 안정화 샘플 이후에
-  // 그린다.
-  ASSERT_TRUE(content::ExecJs(contents, R"(
-    new Promise(resolve => setTimeout(() => {
-      document.getElementById('edge').style.background = 'rgb(80,100,120)';
-      resolve();
-    }, 1000));
-  )"));
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return source->GetColor() == SkColorSetRGB(80, 100, 120); }));
+  // 첫 적용을 관측한 뒤 탐색·스크롤·입력·메타데이터 변경 없이 다시 그린다.
+  ASSERT_TRUE(applied_.Run({ColorCondition(tab_strip_model()->active_index(),
+                                           SkColorSetRGB(80, 100, 120))},
+                           [&] {
+                             ASSERT_TRUE(content::ExecJs(
+                                 contents,
+                                 "document.getElementById('edge').style."
+                                 "background = 'rgb(80,100,120)';"));
+                           }));
+  ASSERT_EQ(source->GetColor(), SkColorSetRGB(80, 100, 120));
   EXPECT_EQ(background, contents->GetBackgroundColor());
   EXPECT_EQ(metadata, contents->GetThemeColor());
   EXPECT_EQ(source->GetColor(),
@@ -649,9 +810,13 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
     };
     document.body.appendChild(button);
   )"));
-  content::SimulateMouseClickOrTapElementWithId(contents, "change-edge");
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return source->GetColor() == SkColorSetRGB(30, 60, 90); }));
+  ASSERT_TRUE(applied_.Run({ColorCondition(tab_strip_model()->active_index(),
+                                           SkColorSetRGB(30, 60, 90))},
+                           [&] {
+                             content::SimulateMouseClickOrTapElementWithId(
+                                 contents, "change-edge");
+                           }));
+  ASSERT_EQ(source->GetColor(), SkColorSetRGB(30, 60, 90));
   EXPECT_EQ(background, contents->GetBackgroundColor());
   EXPECT_EQ(metadata, contents->GetThemeColor());
   EXPECT_EQ(source->GetColor(),
@@ -704,7 +869,8 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     EXPECT_EQ(gfx::Size(yee::kSidebarMetrics.shell_control_size,
                         yee::kSidebarMetrics.shell_control_size),
               media->GetPreferredSize());
-    RunScheduledLayouts();
+    // 이 fixture의 명시적 layout 자극을 한 번만 실행한다.
+    toolbar->GetWidget()->LayoutRootViewIfNecessary();
     // native URL을 덮는 표면까지 실제 마우스 오버 경로로 검사한다.
     auto* resting = location_bar()->GetCompactShellRestingTextForTesting();
     ASSERT_TRUE(resting);
@@ -712,24 +878,25 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     EXPECT_TRUE(
         toolbar->IsPositionInWindowCaption(divider->bounds().CenterPoint()));
     // macOS의 tracking-area 입력이 실제 대상 NSView에 전달되도록 창을 지정한다.
-    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-        location_bar()->GetBoundsInScreen().CenterPoint(),
-        location_bar()->GetWidget()->GetNativeWindow()));
-    ASSERT_TRUE(base::test::RunUntil([&] {
-      return location_bar()->GetBackgroundColorForTesting() ==
-             presentation->location_hover;
-    }));
+    ASSERT_TRUE(applied_.Run(
+        {ColorCondition(0, presentation->location_hover, true)}, [&] {
+          ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+              location_bar()->GetBoundsInScreen().CenterPoint(),
+              location_bar()->GetWidget()->GetNativeWindow()));
+        }));
+    ASSERT_EQ(location_bar()->GetBackgroundColorForTesting(),
+              presentation->location_hover);
     auto hovered = *presentation;
     hovered.surface = presentation->location_hover;
     EXPECT_TRUE(YeeRestingTextViewMatchesPresentation(
         location_bar()->GetCompactShellRestingTextForTesting(), hovered));
     capture("media-hover-" + std::to_string(surface_index) + ".png");
-    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-        media->GetBoundsInScreen().CenterPoint(),
-        media->GetWidget()->GetNativeWindow()));
-    ASSERT_TRUE(base::test::RunUntil([&] {
-      return location_bar()->GetBackgroundColorForTesting() == surface;
+    ASSERT_TRUE(applied_.Run({ColorCondition(0, surface, true)}, [&] {
+      ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+          media->GetBoundsInScreen().CenterPoint(),
+          media->GetWidget()->GetNativeWindow()));
     }));
+    ASSERT_EQ(location_bar()->GetBackgroundColorForTesting(), surface);
     EXPECT_TRUE(YeeRestingTextViewMatchesPresentation(
         location_bar()->GetCompactShellRestingTextForTesting(), *presentation));
     capture("media-rest-" + std::to_string(surface_index++) + ".png");
@@ -807,9 +974,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
   RunTestSequence(
       Do([&]() {
         SetYeeSurfaceColorForTab(0, kSurfaceA);
-        ASSERT_TRUE(base::test::RunUntil([&]() {
-          return location_bar()->GetBackgroundColorForTesting() == kSurfaceA;
-        }));
+        ASSERT_EQ(location_bar()->GetBackgroundColorForTesting(), kSurfaceA);
         presentation_a = YeeSurfaceSourceForTab(0)->GetPresentation();
         rehost_sync_count =
             location_bar()->GetCompactShellRehostSyncCountForTesting();
@@ -818,7 +983,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
         return presentation_a.has_value() &&
                location_bar_matches(*presentation_a);
       }),
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0), Check([&]() {
+      CreateTabsAndEnterSplitView(), Check([&]() {
         return location_bar()->GetCompactShellRehostSyncCountForTesting() ==
                    rehost_sync_count + 1 &&
                location_bar()->parent() ==
@@ -842,8 +1007,11 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                    multi_contents_view()->mini_toolbar_for_testing(1),
                    *presentation_b);
       }),
-      Do([&]() { tab_strip_model()->ActivateTabAt(1); }),
-      WaitForActiveTabChange(1), Check([&]() {
+      ApplyAndWait(
+          applied_,
+          [&] { return yee::test::AppliedConditions{ActiveTabCondition(1)}; },
+          [&] { tab_strip_model()->ActivateTabAt(1); }),
+      Check([&]() {
         return presentation_b.has_value() &&
                location_bar()->GetCompactShellRehostSyncCountForTesting() ==
                    rehost_sync_count + 1 &&
@@ -851,21 +1019,31 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                    multi_contents_view()->mini_toolbar_for_testing(1) &&
                location_bar_matches(*presentation_b);
       }),
+      ApplyAndWait(
+          applied_,
+          [&] {
+            return yee::test::AppliedConditions{
+                applied_.Condition(
+                    applied_.source().ObserveOmnibox(*location_bar()),
+                    yee::test::ViewStateMatches{.popup_open = true},
+                    yee::test::AppliedMatch::kOmniboxPopup),
+                applied_.Focus(*location_bar()->omnibox_view())};
+          },
+          [&] {
+            open_popup = OpenYeeOmniboxPopup();
+            open_popup_view = location_bar()->GetOmniboxPopupView();
+          }),
       Check([&]() {
-        open_popup = OpenYeeOmniboxPopup();
-        open_popup_view = location_bar()->GetOmniboxPopupView();
         if (!open_popup || !open_popup_view || !presentation_b.has_value() ||
             open_popup->GetColorProvider()->GetColor(
                 kColorOmniboxResultsBackground) != presentation_b->surface) {
           return false;
         }
         // 색 전환은 논리상 열린 상태가 아니라 실제 표시된 팝업을 대상으로 한다.
-        if (!base::test::RunUntil([&]() {
-              auto* const current = YeeOmniboxPopupWidget(open_popup_view);
-              return current == open_popup && current && current->IsVisible() &&
-                     location_bar()->GetFocusManager()->GetFocusedView() ==
-                         location_bar()->omnibox_view();
-            })) {
+        auto* const current = YeeOmniboxPopupWidget(open_popup_view);
+        if (!(current == open_popup && current && current->IsVisible() &&
+              location_bar()->GetFocusManager()->GetFocusedView() ==
+                  location_bar()->omnibox_view())) {
           return false;
         }
         popup_rebuild_count =
@@ -878,19 +1056,18 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
           return false;
         }
         popup_revision_before_transition = current_presentation->popup_revision;
-        YeeSurfaceSourceForTab(1)->TransitionToPageSurfaceColorForTesting(
-            kSurfaceC);
         return true;
       }),
-      PollUntil(
-          [&]() {
-            const auto& presentation =
-                YeeSurfaceSourceForTab(1)->GetPresentation();
-            return presentation && presentation->surface == kSurfaceC &&
-                   presentation->popup_revision ==
-                       popup_revision_before_transition + 1;
+      ApplyAndWait(
+          applied_,
+          [&] {
+            return yee::test::AppliedConditions{
+                ColorCondition(1, kSurfaceC, true)};
           },
-          "페이지 색상과 팝업 revision의 전환 완료를 기다린다"),
+          [&] {
+            YeeSurfaceSourceForTab(1)->TransitionToPageSurfaceColorForTesting(
+                kSurfaceC);
+          }),
       Check([&]() {
         presentation_c = YeeSurfaceSourceForTab(1)->GetPresentation();
         auto* const current_popup = YeeOmniboxPopupWidget(open_popup_view);
@@ -933,28 +1110,32 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                                  : SK_ColorTRANSPARENT);
         return matches && location_matches;
       }),
-      Do([&]() {
-        auto* const presenter = open_popup_view->presenter();
-        if (!presenter) {
-          return;
-        }
-        ASSERT_TRUE(presenter->GetWebUIContent());
-        auto* const contents =
-            presenter->GetWebUIContent()->GetWrappedWebContents();
-        ASSERT_TRUE(contents);
-        ASSERT_TRUE(content::WaitForLoadStop(contents));
-        auto* const current_popup = YeeOmniboxPopupWidget(open_popup_view);
-        ASSERT_EQ(open_popup, current_popup);
-        ASSERT_TRUE(current_popup);
-        ASSERT_TRUE(current_popup->IsVisible());
-        // WebUI가 native hover 역할과 같은 보정된 색을 실제 행에 전달해야 한다.
-        const SkColor expected = presentation_c->popup_hover;
-        EXPECT_EQ(expected, current_popup->GetColorProvider()->GetColor(
-                                kColorOmniboxResultsBackgroundHovered));
-        EXPECT_TRUE(base::test::RunUntil([&]() {
-          return content::EvalJs(
-                     contents, content::JsReplace(
-                                   R"JS(
+      Do([] {}));
+  {
+    auto* const presenter = open_popup_view->presenter();
+    if (presenter) {
+      ASSERT_TRUE(presenter->GetWebUIContent());
+      auto* const contents =
+          presenter->GetWebUIContent()->GetWrappedWebContents();
+      ASSERT_TRUE(contents);
+      ASSERT_TRUE(content::WaitForLoadStop(contents));
+      auto* const current_popup = YeeOmniboxPopupWidget(open_popup_view);
+      ASSERT_EQ(open_popup, current_popup);
+      ASSERT_TRUE(current_popup);
+      ASSERT_TRUE(current_popup->IsVisible());
+      // WebUI가 native hover 역할과 같은 보정된 색을 실제 행에 전달해야 한다.
+      const SkColor expected = presentation_c->popup_hover;
+      EXPECT_EQ(expected, current_popup->GetColorProvider()->GetColor(
+                              kColorOmniboxResultsBackgroundHovered));
+      const auto dom = ObserveOmniboxDom(*contents);
+      ASSERT_TRUE(applied_.Run(
+          {DomCondition(dom, {.hover_background = expected},
+                        yee::test::AppliedMatch::kWebUiHoverColor)},
+          [] {}, yee::test::AppliedDomain::kWebUi,
+          TestTimeouts::action_timeout(), true));
+      EXPECT_TRUE(content::EvalJs(
+                      contents, content::JsReplace(
+                                    R"JS(
             (() => {
               const row = document.querySelector('omnibox-popup-app')?.shadowRoot
                   ?.querySelector('cr-searchbox-dropdown')?.shadowRoot
@@ -968,10 +1149,11 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
               return !!actual && actual === probe.style.backgroundColor;
             })()
           )JS",
-                                   color_utils::SkColorToRgbaString(expected)))
-              .ExtractBool();
-        }));
-      }),
+                                    color_utils::SkColorToRgbaString(expected)))
+                      .ExtractBool());
+    }
+  }
+  RunTestSequence(
       Do([&]() {
         rehost_sync_count =
             location_bar()->GetCompactShellRehostSyncCountForTesting();
@@ -980,7 +1162,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
         // 전환 전에 닫는다.
         CloseYeeOmniboxPopup();
       }),
-      ExitSplitView(1), WaitForActiveTabChange(1), Check([&]() {
+      ExitSplitView(1), Check([&]() {
         return presentation_c.has_value() &&
                location_bar()->GetCompactShellRehostSyncCountForTesting() ==
                    rehost_sync_count + 1 &&
@@ -1094,7 +1276,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
   content::WebContents* first_contents = nullptr;
   content::WebContents* second_contents = nullptr;
   RunTestSequence(
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0), Do([&]() {
+      CreateTabsAndEnterSplitView(), Do([&]() {
         first_contents = tab_strip_model()->GetWebContentsAt(0);
         second_contents = tab_strip_model()->GetWebContentsAt(1);
       }),
@@ -1109,21 +1291,31 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        widget->IsVisible());
         return brought_to_front && widget->IsActive() && widget->IsVisible();
       }),
-      PollUntil(
-          [this]() {
-            auto* const header =
-                multi_contents_view()->mini_toolbar_for_testing(1);
-            auto* const address = header->yee_resting_text_for_testing();
-            if (!address || !address->IsDrawn() ||
-                address->GetBoundsInScreen().IsEmpty()) {
-              return false;
-            }
-            auto* const root = header->GetWidget()->GetRootView();
-            const gfx::Point target = views::View::ConvertPointFromScreen(
-                root, address->GetBoundsInScreen().CenterPoint());
-            return root->GetEventHandlerForPoint(target) == header;
+      ApplyAndWait(
+          applied_,
+          [this] {
+            auto* address = multi_contents_view()
+                                ->mini_toolbar_for_testing(1)
+                                ->yee_resting_text_for_testing();
+            return yee::test::AppliedConditions{
+                applied_.View(*address, {.drawn = true},
+                              yee::test::AppliedMatch::kViewDrawn),
+                applied_.View(*address, {.bounds = gfx::Rect(0, 0, 1, 1)},
+                              yee::test::AppliedMatch::kViewNonEmpty)};
           },
-          "비활성 주소 표면의 실제 배치와 입력 대상을 기다린다"),
+          [] {}, yee::test::AppliedDomain::kLayout, true),
+      Check([this] {
+        auto* const header = multi_contents_view()->mini_toolbar_for_testing(1);
+        auto* const address = header->yee_resting_text_for_testing();
+        if (!address || !address->IsDrawn() ||
+            address->GetBoundsInScreen().IsEmpty()) {
+          return false;
+        }
+        auto* const root = header->GetWidget()->GetRootView();
+        const gfx::Point target = views::View::ConvertPointFromScreen(
+            root, address->GetBoundsInScreen().CenterPoint());
+        return root->GetEventHandlerForPoint(target) == header;
+      }),
       Do([this]() {
         auto* const header = multi_contents_view()->mini_toolbar_for_testing(1);
         auto* const root = header->GetWidget()->GetRootView();
@@ -1163,7 +1355,12 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                root->GetEventHandlerForPoint(
                    views::View::ConvertPointFromScreen(root, cursor)) == header;
       }),
-      ClickMouse(),
+      ApplyStepsAndWait(
+          applied_,
+          [this] {
+            return yee::test::AppliedConditions{ActiveTabCondition(1)};
+          },
+          Steps(ClickMouse())),
       Do([]() { RecordProperty("yee_inactive_header_click_completed", 1); }),
       Check([&]() {
         return tab_strip_model()->count() == 2 &&
@@ -1173,7 +1370,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                tab_strip_model()->GetTabAtIndex(0)->GetSplit() ==
                    tab_strip_model()->GetTabAtIndex(1)->GetSplit();
       }),
-      WaitForActiveTabChange(1), Check([&]() {
+      Check([&]() {
         BrowserView* browser_view =
             BrowserView::GetBrowserViewForBrowser(browser());
         LocationBarView* location_bar =
@@ -1189,22 +1386,28 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
   RunTestSequence(
       Check([this]() { return YeeOmniboxPopupMatchesLocationBar(); }),
       Do([this]() { CloseYeeOmniboxPopup(); }), CreateTabsAndEnterSplitView(),
-      WaitForActiveTabChange(0), Check([this]() {
+      Check([this]() {
         return location_bar()->IsCompactShellSplitMode() &&
                location_bar()->parent() ==
                    multi_contents_view()->mini_toolbar_for_testing(0) &&
                YeeOmniboxPopupMatchesLocationBar();
       }),
-      Do([this]() { CloseYeeOmniboxPopup(); }), Do([this]() {
-        ASSERT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
-        // 새 탭 관찰 전에 알림이 끝나 이전 탭 상태만 남은 경우를 재현한다.
-        split_tabs::SplitTabHighlightController::From(browser())
-            ->OnOmniboxPopupVisibilityChanged(true);
-        ASSERT_TRUE(split_tabs::SplitTabHighlightController::From(browser())
-                        ->ShouldHighlight());
-        tab_strip_model()->ActivateTabAt(1);
-      }),
-      WaitForActiveTabChange(1), Check([this]() {
+      Do([this]() { CloseYeeOmniboxPopup(); }),
+      ApplyAndWait(
+          applied_,
+          [this] {
+            return yee::test::AppliedConditions{ActiveTabCondition(1)};
+          },
+          [this]() {
+            ASSERT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
+            // 새 탭 관찰 전에 알림이 끝나 이전 탭 상태만 남은 경우를 재현한다.
+            split_tabs::SplitTabHighlightController::From(browser())
+                ->OnOmniboxPopupVisibilityChanged(true);
+            ASSERT_TRUE(split_tabs::SplitTabHighlightController::From(browser())
+                            ->ShouldHighlight());
+            tab_strip_model()->ActivateTabAt(1);
+          }),
+      Check([this]() {
         return !location_bar()->GetOmniboxController()->IsPopupOpen() &&
                !split_tabs::SplitTabHighlightController::From(browser())
                     ->ShouldHighlight() &&
@@ -1215,7 +1418,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                YeeOmniboxPopupMatchesLocationBar();
       }),
       Do([this]() { CloseYeeOmniboxPopup(); }), ExitSplitView(1),
-      WaitForActiveTabChange(1), Check([this]() {
+      Check([this]() {
         return !location_bar()->IsCompactShellSplitMode() &&
                location_bar()->parent() ==
                    BrowserView::GetBrowserViewForBrowser(browser())
@@ -1241,17 +1444,21 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     auto* const contents = webui_content->GetWrappedWebContents();
     ASSERT_TRUE(contents);
     ASSERT_TRUE(content::WaitForLoadStop(contents));
-    ASSERT_TRUE(base::test::RunUntil([&] {
-      return content::EvalJs(
-                 contents,
-                 content::JsReplace(
-                     R"(
-        document.documentElement?.style.getPropertyValue(
-            '--omnibox-popup-results-padding-top') === $1 + 'px'
-      )",
-                     yee::kSidebarMetrics.omnibox_popup_results_padding))
-          .ExtractBool();
-    }));
+    const auto dom = ObserveOmniboxDom(*contents);
+    ASSERT_TRUE(applied_.Run(
+        {DomCondition(dom,
+                      {.results_padding =
+                           yee::kSidebarMetrics.omnibox_popup_results_padding},
+                      yee::test::AppliedMatch::kWebUiResultsPadding)},
+        [] {}, yee::test::AppliedDomain::kWebUi, TestTimeouts::action_timeout(),
+        true));
+    EXPECT_EQ(
+        true,
+        content::EvalJs(
+            contents, content::JsReplace(
+                          "document.documentElement.style.getPropertyValue('--"
+                          "omnibox-popup-results-padding-top') === $1 + 'px'",
+                          yee::kSidebarMetrics.omnibox_popup_results_padding)));
   }
   const auto capture_dir =
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
@@ -1280,6 +1487,7 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
       auto* webui_content = presenter->GetWebUIContent();
       auto* contents = webui_content->GetWrappedWebContents();
       ASSERT_TRUE(contents);
+      const auto dom = ObserveOmniboxDom(*contents);
       ASSERT_TRUE(content::ExecJs(contents, R"(
         window.yeePopupRowsForTesting = () => {
           const app = document.querySelector('omnibox-popup-app');
@@ -1289,18 +1497,25 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
               .filter(row => row && row.getBoundingClientRect().height > 0);
         };
       )"));
-      ASSERT_TRUE(base::test::RunUntil([&] {
-        return content::EvalJs(
-                   contents,
-                   content::JsReplace(
-                       R"(
+      ASSERT_TRUE(applied_.Run(
+          {DomCondition(
+              dom,
+              {.popup_rows = {1, 2},
+               .padding_top =
+                   yee::kSidebarMetrics.omnibox_popup_results_padding},
+              yee::test::AppliedMatch::kWebUiPadding)},
+          [] {}, yee::test::AppliedDomain::kWebUi,
+          TestTimeouts::action_timeout(), true));
+      ASSERT_TRUE((
+          content::EvalJs(
+              contents, content::JsReplace(
+                            R"(
           yeePopupRowsForTesting().length >= 2 &&
           getComputedStyle(document.querySelector('omnibox-popup-app')
               .shadowRoot.querySelector('.dropdownContainer')).paddingTop === $1 + 'px'
         )",
-                       yee::kSidebarMetrics.omnibox_popup_results_padding))
-            .ExtractBool();
-      }));
+                            yee::kSidebarMetrics.omnibox_popup_results_padding))
+              .ExtractBool()));
       EXPECT_EQ(true,
                 content::EvalJs(
                     contents,
@@ -1347,13 +1562,23 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
         features.Append(base::DictValue()
                             .Set("name", "prefers-contrast")
                             .Set("value", contrast));
-        ASSERT_TRUE(media_emulation.SendCommandSync(
-            "Emulation.setEmulatedMedia",
-            base::DictValue().Set("features", std::move(features))));
-        EXPECT_TRUE(base::test::RunUntil([&] {
-          return content::EvalJs(
-                     contents,
-                     content::JsReplace(R"(
+        ASSERT_TRUE(applied_.Run(
+            {DomCondition(dom,
+                          {.forced_colors = forced_colors,
+                           .prefers_contrast_more = contrast == "more",
+                           .focus_indicator_visible =
+                               forced_colors || contrast == "more"},
+                          yee::test::AppliedMatch::kWebUiMedia)},
+            [&] {
+              ASSERT_TRUE(media_emulation.SendCommandSync(
+                  "Emulation.setEmulatedMedia",
+                  base::DictValue().Set("features", std::move(features))));
+            }));
+        EXPECT_TRUE(
+            (content::EvalJs(
+                 contents,
+                 content::JsReplace(
+                     R"(
             (() => {
               const match = yeePopupRowsForTesting()
                   .map(row => row.getRootNode().host)
@@ -1364,36 +1589,98 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                   indicator && getComputedStyle(indicator).display === $3;
             })()
           )",
-                                        forced_colors, contrast == "more",
-                                        forced_colors || contrast == "more"
-                                            ? "block"
-                                            : "none"))
-              .ExtractBool();
-        }));
+                     forced_colors, contrast == "more",
+                     forced_colors || contrast == "more" ? "block" : "none"))
+                 .ExtractBool()));
       }
       ASSERT_TRUE(media_emulation.SendCommandSync(
           "Emulation.setEmulatedMedia",
           base::DictValue().Set("features", base::ListValue())));
       detach_media_emulation.RunAndReset();
-      // DOM 결과가 먼저 생겨도 native WebView는 아직 1 DIP일 수 있다.
-      // 자동 크기 조절을 마친 뒤 실제 화면 좌표를 구한다.
-      ASSERT_TRUE(base::test::RunUntil([&] {
-        popup_widget->LayoutRootViewIfNecessary();
-        const int rows_bottom = content::EvalJs(contents, R"(
-          (() => {
-            const rows = yeePopupRowsForTesting();
-            return rows.length >= 2
-                ? Math.ceil(rows.at(-1).getBoundingClientRect().bottom) : 0;
-          })()
-        )")
-                                    .ExtractInt();
-        return rows_bottom > 0 && webui_content->height() >= rows_bottom &&
-               webui_content->width() > 1 &&
-               popup_widget->GetLayer()->opacity() == 1.0f;
-      }));
-      popup_widget->GetCompositor()->ScheduleFullRedraw();
-      ASSERT_TRUE(ui::WaitForNextFrameToBePresented(
-          popup_widget->GetCompositor(), base::Seconds(5)));
+      // 행이 추가되면 최신 DOM 경계와 native View/Widget 경계를 같은
+      // 조건에서 다시 읽는다. 과거 행 높이만으로 자동 크기 조절을 끝내지
+      // 않는다.
+      const auto popup_bounds =
+          applied_.source().ObserveWebUiPopupBounds(dom, *webui_content);
+      const yee::test::AppliedConditions popup_geometry{
+          DomCondition(popup_bounds, {.popup_rows = {1, 2}},
+                       yee::test::AppliedMatch::kWebUiRowsFitNativeBounds),
+          applied_.Widget(*popup_widget, {.opacity = 1},
+                          yee::test::AppliedMatch::kWidgetOpacity),
+          applied_.View(*popup_widget->GetRootView(), {.drawn = true},
+                        yee::test::AppliedMatch::kViewDrawn)};
+#if BUILDFLAG(IS_MAC)
+      {
+        // Mac의 native-hosted WebUI 팝업은 foreground 재실행에서도 성공
+        // presentation feedback이 없었다. 자신의 commit에서 현재 DOM·native
+        // 경계를 함께 확인하고 ACK한다. dispatch 뒤 commit만 허용한다.
+        const auto ticket = applied_.Begin(
+            popup_geometry, yee::test::AppliedDomain::kFrame, base::Seconds(5));
+        yee::test::DispatchDone popup_committed;
+        std::vector<yee::test::AppliedSignalKey> geometry_keys;
+        for (const auto& condition : popup_geometry) {
+          geometry_keys.push_back(
+              {condition.owner,
+               yee::test::GetAppliedConditionKind(condition.expected)});
+        }
+        auto commit_subscription = applied_.views().SubscribeCompositorFrames(
+            *popup_widget, std::move(geometry_keys),
+            base::BindLambdaForTesting(
+                [&](const yee::test::AppliedSignalSample& sample) {
+                  if (!popup_committed)
+                    return;
+                  for (const auto& condition : popup_geometry) {
+                    const auto snapshot = std::ranges::find_if(
+                        sample.snapshots, [&](const auto& value) {
+                          return value.owner == condition.owner &&
+                                 yee::test::GetAppliedConditionKind(
+                                     value.value) ==
+                                     yee::test::GetAppliedConditionKind(
+                                         condition.expected);
+                        });
+                    if (snapshot == sample.snapshots.end() ||
+                        snapshot->coordinates != condition.coordinates ||
+                        !yee::test::AppliedValueMatches(condition,
+                                                        snapshot->value))
+                      return;
+                  }
+                  std::move(popup_committed)
+                      .Run(yee::test::AppliedDispatchStatus::kAccepted);
+                }));
+        const auto dispatch_error = applied_.session().DispatchAsync(
+            ticket,
+            base::BindLambdaForTesting([&](yee::test::DispatchDone done) {
+              popup_committed = std::move(done);
+              popup_widget->LayoutRootViewIfNecessary();
+              popup_widget->GetCompositor()->ScheduleFullRedraw();
+            }));
+        ASSERT_FALSE(dispatch_error)
+            << (dispatch_error ? dispatch_error->ToString() : "");
+        ASSERT_TRUE(applied_.Wait(ticket, popup_geometry));
+      }
+#else
+      auto presented_popup = popup_geometry;
+      // media 복원 뒤 auto-resize가 남아 있을 수 있다. 시작 시 bounds를
+      // 고정하지 않고 현재 행·View·Widget geometry에 성공 feedback을 묶는다.
+      // 크기가 바뀌면 FrameWatch가 새 지문으로 재등록하고 redraw를 요청한다.
+      presented_popup.push_back(applied_.views().ObservePresentedAfterApply(
+          *popup_widget->GetRootView(), popup_geometry));
+      ASSERT_TRUE(applied_.Run(
+          std::move(presented_popup),
+          [&] { popup_widget->LayoutRootViewIfNecessary(); },
+          yee::test::AppliedDomain::kFrame, base::Seconds(5)));
+#endif
+      const auto dom_snapshot = applied_.source().Read(
+          {dom, yee::test::AppliedConditionKind::kWebUiStateMatches});
+      ASSERT_TRUE(dom_snapshot);
+      const auto& row_state =
+          std::get<yee::test::WebUiStateMatches>(dom_snapshot->value);
+      ASSERT_GE(row_state.row_bounds.size(), 2u);
+      const int rows_bottom = std::ceil(row_state.row_bounds.back().bottom());
+      ASSERT_GT(rows_bottom, 0);
+      EXPECT_GE(webui_content->height(), rows_bottom);
+      EXPECT_GT(webui_content->width(), 1);
+      EXPECT_EQ(1.f, popup_widget->GetLayer()->opacity());
       gfx::Point hover = webui_content->GetBoundsInScreen().origin();
       hover.Offset(content::EvalJs(contents, R"(
         Math.floor(yeePopupRowsForTesting()[1].getBoundingClientRect().x +
@@ -1405,34 +1692,43 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                    yeePopupRowsForTesting()[1].getBoundingClientRect().height / 2)
       )")
                        .ExtractInt());
-      ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-          hover, popup_widget->GetNativeWindow()));
-      ASSERT_TRUE(base::test::RunUntil([&] {
-        // 결과가 교체되는 프레임에는 행이 잠시 사라질 수 있다.
-        return content::EvalJs(
-                   contents,
-                   "Boolean(yeePopupRowsForTesting()[1]?.matches(':hover'))")
-            .ExtractBool();
-      }));
+      ASSERT_TRUE(
+          applied_.Run({DomCondition(dom, {.hovered_index = 1},
+                                     yee::test::AppliedMatch::kWebUiHover)},
+                       [&] {
+                         ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+                             hover, popup_widget->GetNativeWindow()));
+                       }));
+      ASSERT_TRUE(
+          (content::EvalJs(
+               contents,
+               "Boolean(yeePopupRowsForTesting()[1]?.matches(':hover'))")
+               .ExtractBool()));
       capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
               prefix + "-hover-window.png");
       capture(popup_widget, prefix + "-hover-popup.png");
-      ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_DOWN,
-                                                  false, false, false, false));
-      EXPECT_TRUE(base::test::RunUntil([&]() {
-        return content::EvalJs(contents, R"(
+      ASSERT_TRUE(applied_.Run(
+          {DomCondition(dom, {.selected_index = 1},
+                        yee::test::AppliedMatch::kWebUiSelection)},
+          [&] {
+            ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+                browser(), ui::VKEY_DOWN, false, false, false, false));
+          }));
+      EXPECT_TRUE((content::EvalJs(contents, R"(
           yeePopupRowsForTesting()[1]?.getRootNode().host.matches('[selected]') === true
         )")
-            .ExtractBool();
-      }));
-      ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_UP, false,
-                                                  false, false, false));
-      EXPECT_TRUE(base::test::RunUntil([&]() {
-        return content::EvalJs(contents, R"(
+                       .ExtractBool()));
+      ASSERT_TRUE(applied_.Run(
+          {DomCondition(dom, {.selected_index = 0},
+                        yee::test::AppliedMatch::kWebUiSelection)},
+          [&] {
+            ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+                browser(), ui::VKEY_UP, false, false, false, false));
+          }));
+      EXPECT_TRUE((content::EvalJs(contents, R"(
           yeePopupRowsForTesting()[0]?.getRootNode().host.matches('[selected]') === true
         )")
-            .ExtractBool();
-      }));
+                       .ExtractBool()));
       for (int attempt = 0;
            attempt < 2 && location_bar()->GetOmniboxController()->IsPopupOpen();
            ++attempt) {
@@ -1446,8 +1742,12 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     auto* popup = static_cast<OmniboxPopupViewViews*>(
         location_bar()->GetOmniboxPopupView());
     popup_widget->LayoutRootViewIfNecessary();
-    ASSERT_TRUE(base::test::RunUntil(
-        [&] { return popup_widget->GetLayer()->opacity() == 1.0f; }));
+    ASSERT_TRUE(applied_.Run(
+        {applied_.Widget(*popup_widget, {.opacity = 1},
+                         yee::test::AppliedMatch::kWidgetOpacity)},
+        [] {}, yee::test::AppliedDomain::kWidget,
+        TestTimeouts::action_timeout(), true));
+    EXPECT_EQ(1.f, popup_widget->GetLayer()->opacity());
     std::vector<OmniboxRowView*> rows;
     for (views::View* child : popup->children()) {
       auto* row = views::AsViewClass<OmniboxRowView>(child);
@@ -1471,13 +1771,16 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
             prefix + "-selected-window.png");
     capture(popup_widget, prefix + "-selected-popup.png");
-    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-        rows[1]->result_view()->GetBoundsInScreen().CenterPoint(),
-        popup_widget->GetNativeWindow()));
-    ASSERT_TRUE(base::test::RunUntil([&] {
-      return rows[1]->result_view()->GetThemeState() ==
-             OmniboxPartState::HOVERED;
-    }));
+    ASSERT_TRUE(applied_.Run(
+        {applied_.View(*rows[1]->result_view(), {.hovered = true},
+                       yee::test::AppliedMatch::kViewHovered)},
+        [&] {
+          ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+              rows[1]->result_view()->GetBoundsInScreen().CenterPoint(),
+              popup_widget->GetNativeWindow()));
+        }));
+    EXPECT_EQ(OmniboxPartState::HOVERED,
+              rows[1]->result_view()->GetThemeState());
     capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
             prefix + "-hover-window.png");
     capture(popup_widget, prefix + "-hover-popup.png");
@@ -1550,31 +1853,28 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
     return controls == original_controls;
   };
 
-  RunTestSequence(
-      Check([&]() { return controls_match(true); }),
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
-      Check([&]() { return controls_match(true); }), Do([&]() {
-        tabs::VerticalTabStripStateController::From(browser())->RequestCollapse(
-            true);
-      }),
-      WaitForEvent(kTabStripRegionElementId,
-                   VerticalTabStripRegionView::kAnimationCompletedEvent),
-      Do([&]() { RunScheduledLayouts(); }),
-      Check([&]() { return controls_match(false); }), Do([&]() {
-        tabs::VerticalTabStripStateController::From(browser())->RequestCollapse(
-            false);
-      }),
-      WaitForEvent(kTabStripRegionElementId,
-                   VerticalTabStripRegionView::kAnimationCompletedEvent),
-      Check([&]() { return controls_match(true); }));
+  RunTestSequence(Check([&]() { return controls_match(true); }),
+                  CreateTabsAndEnterSplitView(),
+                  Check([&]() { return controls_match(true); }),
+                  ApplyAndWait(
+                      applied_, [&] { return SidebarConditions(false); },
+                      [&] {
+                        tabs::VerticalTabStripStateController::From(browser())
+                            ->RequestCollapse(true);
+                      }),
+                  Check([&]() { return controls_match(false); }),
+                  ApplyAndWait(
+                      applied_, [&] { return SidebarConditions(true); },
+                      [&] {
+                        tabs::VerticalTabStripStateController::From(browser())
+                            ->RequestCollapse(false);
+                      }),
+                  Check([&]() { return controls_match(true); }));
 }
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        YeeSplitCommandsUpdateChromiumModel) {
   ASSERT_TRUE(yee::IsShellEnabled());
-  using SplitExitObserver =
-      views::test::PollingViewObserver<bool, MultiContentsView>;
-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(SplitExitObserver, kSplitExitObserver);
   const split_tabs::SplitTabLayout initial_layout = GetParam();
   const split_tabs::SplitTabLayout toggled_layout =
       initial_layout == split_tabs::SplitTabLayout::kSideBySide
@@ -1583,7 +1883,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
   tabs::TabInterface* original_start_tab = nullptr;
   tabs::TabInterface* original_end_tab = nullptr;
   RunTestSequence(
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
+      CreateTabsAndEnterSplitView(),
       Do([&]() { multi_contents_view()->OnToggleSplitLayout(); }), Check([&]() {
         const auto split = tab_strip_model()->GetActiveTab()->GetSplit();
         return split.has_value() &&
@@ -1616,11 +1916,16 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
         return tabs.size() == 2u && tabs[0] == original_end_tab &&
                tabs[1] == original_start_tab;
       }),
-      Do([&]() { multi_contents_view()->OnExitSplit(); }),
-      PollView(
-          kSplitExitObserver, kMultiContentsViewElementId,
-          [](const MultiContentsView* view) { return !view->IsInSplitView(); }),
-      WaitForState(kSplitExitObserver, true));
+      ApplyAndWait(
+          applied_,
+          [&] {
+            auto* panes = multi_contents_view();
+            return yee::test::AppliedConditions{applied_.View(
+                *panes->resize_area_for_testing(), {.visible = false},
+                yee::test::AppliedMatch::kViewVisible)};
+          },
+          [&] { multi_contents_view()->OnExitSplit(); }),
+      Check([&] { return !multi_contents_view()->IsInSplitView(); }));
 }
 
 // split에서 contents view와 resize 영역의 합으로 inset을 확인한다.
@@ -1658,8 +1963,10 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, InsetsOnlyInSplit) {
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        YeeDividerMouseDragResizesBothPanesAndKeepsTabs) {
-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewLayoutObserver,
+  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(yee::test::AppliedStateObserver,
                                       kDraggedLayoutObserver);
+  yee::test::AppliedTicket drag_ticket;
+  yee::test::AppliedConditions drag_conditions;
   content::WebContents* start_contents = nullptr;
   content::WebContents* end_contents = nullptr;
   std::optional<split_tabs::SplitTabId> split_id;
@@ -1703,15 +2010,32 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
       Check([&]() { return split_id.has_value(); }),
       // OnResize를 직접 호출하지 않고 실제 resize area의 입력 경로를 검증한다.
       MoveMouseTo(MultiContentsResizeArea::kMultiContentsResizeAreaElementId),
+      Do([&] {
+        drag_conditions = SplitConditions(initial_ratio, true);
+        drag_ticket = applied_.Begin(drag_conditions);
+        ASSERT_FALSE(applied_.session().DispatchAsync(
+            drag_ticket,
+            base::BindLambdaForTesting([&](yee::test::DispatchDone done) {
+              drag_done_ = std::move(done);
+            })));
+      }),
+      ArmApplied(
+          kDraggedLayoutObserver, applied_.session(), [&] { return drag_ticket; },
+          [&] { return drag_conditions; }),
       DragMouseTo(
           base::BindLambdaForTesting([&]() { return drag_destination; }),
           /*release=*/false),
-      CheckResizeValues(
-          base::BindLambdaForTesting([&](double start, double end) {
-            return start > initial_start_size + 20 &&
-                   end < initial_end_size - 20;
-          }),
-          kDraggedLayoutObserver),
+      Do([&] {
+        std::move(drag_done_).Run(yee::test::AppliedDispatchStatus::kAccepted);
+      }),
+      WaitForApplied(kDraggedLayoutObserver), Check([&] {
+        const auto* start =
+            multi_contents_view()->start_contents_view_for_testing();
+        const auto* end =
+            multi_contents_view()->end_contents_view_for_testing();
+        return GetSize(start->parent()->size()) > initial_start_size + 20 &&
+               GetSize(end->parent()->size()) < initial_end_size - 20;
+      }),
       Check([&]() {
         return multi_contents_view()->resize_area_for_testing()->is_resizing();
       }),
@@ -1738,10 +2062,6 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        ResizeMouseDoubleClickEqualizesSplitViews) {
-  using MultiContentsViewRatioObserver =
-      views::test::PollingViewObserver<bool, MultiContentsView>;
-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewRatioObserver,
-                                      kMultiContentsViewRatioObserver);
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
   RunTestSequence(
       InstrumentTab(kWebContentsId),
@@ -1759,30 +2079,33 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                    ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
       }),
       CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
-      Do([&]() { multi_contents_view()->OnResize(100, true); }),
+      ApplyAndWait(
+          applied_, [&] { return SplitConditions(0.5, true); },
+          [&] { multi_contents_view()->OnResize(100, true); }),
       Check([&]() { return multi_contents_view()->GetSplitRatio() != 0.5; }),
       // 마우스 더블클릭은 제스처 더블탭처럼 pane 순서를 유지하며 50:50으로
       // 복원한다.
-      Do([&]() {
-        auto* resize_area = multi_contents_view()->resize_area_for_testing();
-        gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-        ui::MouseEvent press_event(
-            ui::EventType::kMousePressed, center, center, ui::EventTimeForNow(),
-            ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
-        ui::MouseEvent release_event(ui::EventType::kMouseReleased, center,
-                                     center, ui::EventTimeForNow(),
-                                     ui::EF_LEFT_MOUSE_BUTTON,
-                                     ui::EF_LEFT_MOUSE_BUTTON);
-        press_event.SetClickCount(2);
-        release_event.SetClickCount(2);
-        resize_area->OnMousePressed(press_event);
-        resize_area->OnMouseReleased(release_event);
-      }),
-      PollView(kMultiContentsViewRatioObserver, kMultiContentsViewElementId,
-               [](const MultiContentsView* multi_contents_view) {
-                 return multi_contents_view->GetSplitRatio() == 0.5;
-               }),
-      WaitForState(kMultiContentsViewRatioObserver, true), Check([&]() {
+      ApplyAndWait(
+          applied_, [&] { return SplitConditions(0.5); },
+          [&]() {
+            auto* resize_area =
+                multi_contents_view()->resize_area_for_testing();
+            gfx::Point center(resize_area->width() / 2,
+                              resize_area->height() / 2);
+            ui::MouseEvent press_event(ui::EventType::kMousePressed, center,
+                                       center, ui::EventTimeForNow(),
+                                       ui::EF_LEFT_MOUSE_BUTTON,
+                                       ui::EF_LEFT_MOUSE_BUTTON);
+            ui::MouseEvent release_event(ui::EventType::kMouseReleased, center,
+                                         center, ui::EventTimeForNow(),
+                                         ui::EF_LEFT_MOUSE_BUTTON,
+                                         ui::EF_LEFT_MOUSE_BUTTON);
+            press_event.SetClickCount(2);
+            release_event.SetClickCount(2);
+            resize_area->OnMousePressed(press_event);
+            resize_area->OnMouseReleased(release_event);
+          }),
+      Check([&]() {
         return multi_contents_view()
                    ->start_contents_view_for_testing()
                    ->GetWebContents()
@@ -1800,10 +2123,6 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        ResizeGestureDoubleTapEqualizesSplitViews) {
-  using MultiContentsViewRatioObserver =
-      views::test::PollingViewObserver<bool, MultiContentsView>;
-  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewRatioObserver,
-                                      kMultiContentsViewRatioObserver);
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
   RunTestSequence(
       // split을 만든 뒤 WebContents와 활성 인덱스를 확인한다.
@@ -1822,23 +2141,25 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                    ->GetVisibleURL() == chrome::ChromeUINewTabURLAsGURL();
       }),
       CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
-      Do([&]() { multi_contents_view()->OnResize(100, true); }),
+      ApplyAndWait(
+          applied_, [&] { return SplitConditions(0.5, true); },
+          [&] { multi_contents_view()->OnResize(100, true); }),
       Check([&]() { return multi_contents_view()->GetSplitRatio() != 0.5; }),
       // resize 영역의 더블탭으로 pane 순서를 유지하며 같은 크기로 복원한다.
-      Do([&]() {
-        auto* resize_area = multi_contents_view()->resize_area_for_testing();
-        gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
-        ui::GestureEventDetails details(ui::EventType::kGestureTap);
-        details.set_tap_count(2);
-        ui::GestureEvent gesture_event(center.x(), center.y(), ui::EF_NONE,
-                                       ui::EventTimeForNow(), details);
-        resize_area->OnGestureEvent(&gesture_event);
-      }),
-      PollView(kMultiContentsViewRatioObserver, kMultiContentsViewElementId,
-               [&](const MultiContentsView* multi_contents_view) -> bool {
-                 return multi_contents_view->GetSplitRatio() == 0.5;
-               }),
-      WaitForState(kMultiContentsViewRatioObserver, true), Check([&]() {
+      ApplyAndWait(
+          applied_, [&] { return SplitConditions(0.5); },
+          [&]() {
+            auto* resize_area =
+                multi_contents_view()->resize_area_for_testing();
+            gfx::Point center(resize_area->width() / 2,
+                              resize_area->height() / 2);
+            ui::GestureEventDetails details(ui::EventType::kGestureTap);
+            details.set_tap_count(2);
+            ui::GestureEvent gesture_event(center.x(), center.y(), ui::EF_NONE,
+                                           ui::EventTimeForNow(), details);
+            resize_area->OnGestureEvent(&gesture_event);
+          }),
+      Check([&]() {
         return multi_contents_view()
                    ->start_contents_view_for_testing()
                    ->GetWebContents()
@@ -1857,7 +2178,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 #if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, RoundedCornersForSplitView) {
   RunTestSequence(
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
+      CreateTabsAndEnterSplitView(),
       // contents web view의 모서리가 둥근지 확인한다.
       CheckView(kMultiContentsViewElementId,
                 [](MultiContentsView* multi_contents_view) -> bool {
@@ -1869,8 +2190,8 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, RoundedCornersForSplitView) {
                               .IsEmpty();
                 }),
       // 탭바에 일반 탭을 추가한다.
-      AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
-      WaitForActiveTabChange(2),
+      AddActiveInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL),
+                               2),
       // Yee의 단일 Browser Surface는 하단 hard clip을 유지하며 upstream은
       // 둥글지 않은 일반 contents view로 돌아간다.
       CheckView(kMultiContentsViewElementId,
@@ -1886,7 +2207,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, RoundedCornersForSplitView) {
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, BackgroundVisibility) {
   RunTestSequence(
-      CreateTabsAndEnterSplitView(), WaitForActiveTabChange(0),
+      CreateTabsAndEnterSplitView(),
       // Yee의 Split Canvas는 투명한 배치 영역이며 각 pane 카드가 표면을
       // 소유한다. upstream Chromium은 공통 split 바탕을 유지한다.
       CheckView(kMultiContentsViewElementId,
@@ -1897,8 +2218,8 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest, BackgroundVisibility) {
                   return yee::IsShellEnabled() ? !visible : visible;
                 }),
       // 탭바에 일반 탭을 추가한다.
-      AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL), 2),
-      WaitForActiveTabChange(2),
+      AddActiveInstrumentedTab(kSecondTab, GURL(chrome::kChromeUISettingsURL),
+                               2),
       CheckView(kMultiContentsViewElementId,
                 [](MultiContentsView* multi_contents_view) -> bool {
                   return !multi_contents_view->background_view_for_testing()

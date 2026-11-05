@@ -5,12 +5,14 @@
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 #include <utility>
 
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/hash/hash.h"
 #include "base/i18n/rtl.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -19,24 +21,54 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+#include "chrome/browser/ui/omnibox/omnibox_controller.h"
+#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
+#include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
+#include "chrome/browser/ui/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/frame/base_tab_strip_region_view.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+#include "chrome/browser/ui/views/infobars/infobar_view.h"
+#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
+#include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/tab.h"
+#include "chrome/browser/ui/views/tabs/tab_container_impl.h"
+#include "chrome/browser/ui/views/tabs/tab_style_views.h"
+#include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation_binding.h"
 #include "chrome/browser/ui/views/yee/browser_surface_transition.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
+#include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
+#include "chrome/browser/ui/views/yee/sidebar_footer.h"
+#include "chrome/browser/ui/views/yee/site_controls.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
+#include "chrome/browser/yee_projects/project_service.h"
+#include "chrome/browser/yee_projects/project_service_factory.h"
+#include "chrome/browser/yee_projects/project_tab_coordinator.h"
+#include "components/favicon/content/content_favicon_driver.h"
+#include "components/favicon/core/favicon_driver_observer.h"
+#include "components/omnibox/browser/autocomplete_controller.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/page.h"
@@ -48,9 +80,21 @@
 #include "content/public/test/browser_test_utils.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
+#include "ui/gfx/animation/slide_animation.h"
+#include "ui/gfx/canvas.h"
+#include "ui/gfx/color_utils.h"
+#include "ui/gfx/image/image.h"
+#include "ui/gfx/image/image_skia_rep.h"
+#include "ui/views/animation/bounds_animator.h"
+#include "ui/views/animation/bounds_animator_observer.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/background.h"
+#include "ui/views/controls/image_view.h"
 #include "ui/views/view.h"
 #include "ui/views/view_observer.h"
 #include "ui/views/view_tracker.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee::test {
@@ -125,10 +169,199 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     base::ScopedObservation<views::View, views::ViewObserver> observation{this};
   };
 
+  struct OmniboxWatch : AutocompleteController::Observer {
+    OmniboxWatch(Impl& owner, LocationBarView& view)
+        : owner(owner),
+          view(&view),
+          controller(view.GetOmniboxController()->autocomplete_controller()) {
+      controller->AddObserver(this);
+      BindPopup();
+    }
+    ~OmniboxWatch() override {
+      if (controller)
+        controller->RemoveObserver(this);
+    }
+    views::Widget* Popup() const {
+      auto* location = static_cast<const LocationBarView*>(view.view());
+      if (!location)
+        return nullptr;
+      auto* popup =
+          const_cast<LocationBarView*>(location)->GetOmniboxPopupView();
+      if (!popup)
+        return nullptr;
+      if (auto* presenter = popup->presenter())
+        return presenter->get_widget_for_testing();
+      return static_cast<OmniboxPopupViewViews*>(popup)->GetWidget();
+    }
+    void BindPopup() {
+      if (auto* popup = Popup()) {
+        owner->signals.ObserveWidget(*popup);
+        owner->signals.ObserveView(*popup->GetRootView());
+      }
+    }
+    void OnResultChanged(AutocompleteController*, bool) override {
+      BindPopup();
+      ++serial;
+      owner->signals.Notify();
+    }
+    void OnControllerDestroying(AutocompleteController*) override {
+      controller->RemoveObserver(this);
+      controller = nullptr;
+      owner->signals.OwnerDestroyed(token);
+    }
+    std::optional<AppliedSnapshot> Read() const {
+      auto* location = static_cast<const LocationBarView*>(view.view());
+      if (!location || !controller)
+        return std::nullopt;
+      const auto* omni = location->GetOmniboxController();
+      auto* popup = Popup();
+      return Snapshot(
+          token,
+          ViewStateMatches{
+              .visible = popup && popup->IsVisible(),
+              .popup_open = omni->IsPopupOpen(),
+              .editing = omni->edit_model()->user_input_in_progress()},
+          serial, GetAppliedViewCoordinates(*location));
+    }
+    raw_ref<Impl> owner;
+    views::ViewTracker view;
+    raw_ptr<AutocompleteController> controller;
+    AppliedOwnerToken token = AppliedOwnerToken::Create();
+    uint64_t serial = 0;
+  };
+
+  struct FaviconWatch : content::WebContentsObserver,
+                        favicon::FaviconDriverObserver {
+    FaviconWatch(Impl& owner, content::WebContents& contents)
+        : content::WebContentsObserver(&contents), owner(owner) {
+      driver = favicon::ContentFaviconDriver::FromWebContents(&contents);
+      if (driver)
+        driver->AddObserver(this);
+    }
+    ~FaviconWatch() override {
+      if (driver)
+        driver->RemoveObserver(this);
+    }
+    void WebContentsDestroyed() override {
+      if (driver)
+        driver->RemoveObserver(this);
+      driver = nullptr;
+      owner->signals.OwnerDestroyed(token);
+    }
+    void OnFaviconUpdated(favicon::FaviconDriver*,
+                          NotificationIconType,
+                          const GURL&,
+                          bool,
+                          const gfx::Image&) override {
+      ++serial;
+      owner->signals.Notify();
+    }
+    std::optional<AppliedSnapshot> Read() const {
+      if (!driver)
+        return std::nullopt;
+      const auto image = driver->GetFavicon();
+      uint64_t digest = 0;
+      if (!image.IsEmpty()) {
+        auto bytes = image.As1xPNGBytes();
+        digest = base::PersistentHash(std::string_view(
+            reinterpret_cast<const char*>(bytes->front()), bytes->size()));
+      }
+      return Snapshot(
+          token,
+          PresentationMatches{
+              .icon_id = digest,
+              .icon_ready = driver->FaviconIsValid() && !image.IsEmpty()},
+          serial);
+    }
+    raw_ref<Impl> owner;
+    raw_ptr<favicon::FaviconDriver> driver = nullptr;
+    AppliedOwnerToken token = AppliedOwnerToken::Create();
+    uint64_t serial = 0;
+  };
+
+  struct ColorWatch : content::WebContentsObserver {
+    ColorWatch(Impl& owner,
+               content::WebContents& contents,
+               LocationBarView* view,
+               bool renderer_background = false)
+        : content::WebContentsObserver(&contents),
+          owner(owner),
+          consumer(view),
+          renderer_background(renderer_background) {
+      auto* source =
+          BrowserSurfaceColorController::GetOrCreateForWebContents(&contents);
+      subscription = source->AddPresentationChangedCallback(base::BindRepeating(
+          [](ColorWatch* watch) { watch->owner->signals.Notify(); },
+          base::Unretained(this)));
+      sampling_subscription =
+          source->AddSamplingStateChangedCallback(base::BindRepeating(
+              [](ColorWatch* watch,
+                 BrowserSurfaceColorController::SamplingSnapshot) {
+                watch->owner->signals.Notify();
+              },
+              base::Unretained(this)));
+    }
+    void WebContentsDestroyed() override {
+      owner->signals.OwnerDestroyed(token);
+    }
+    void OnBackgroundColorChanged() override { owner->signals.Notify(); }
+    void TitleWasSet(content::NavigationEntry*) override {
+      owner->signals.Notify();
+    }
+    std::optional<AppliedSnapshot> Read() const {
+      if (!web_contents())
+        return std::nullopt;
+      const auto* source =
+          BrowserSurfaceColorController::GetOrCreateForWebContents(
+              web_contents());
+      const auto& presentation = source->GetPresentation();
+      if (title)
+        return Snapshot(
+            token, PresentationMatches{
+                       .presentation_id = base::PersistentHash(
+                           base::UTF16ToUTF8(web_contents()->GetTitle()))});
+      if (renderer_background) {
+        const auto color = web_contents()->GetBackgroundColor();
+        if (!color)
+          return std::nullopt;
+        return Snapshot(token,
+                        PresentationMatches{
+                            .background_color = *color,
+                            .use_native_theme = color_utils::IsDark(*color)});
+      }
+      if (!presentation)
+        return std::nullopt;
+      auto* view = static_cast<const LocationBarView*>(consumer.view());
+      return Snapshot(
+          token,
+          PresentationMatches{
+              .source_id = source->source_id(),
+              .presentation_id = presentation->revision,
+              .background_color = view ? view->GetBackgroundColorForTesting()
+                                       : presentation->surface,
+              .foreground_color = presentation->primary,
+              .popup_revision = presentation->popup_revision,
+              .sampling_settled = source->GetSamplingSnapshot().settled},
+          presentation->revision,
+          view ? GetAppliedViewCoordinates(*view) : AppliedCoordinates{});
+    }
+    raw_ref<Impl> owner;
+    views::ViewTracker consumer;
+    bool renderer_background;
+    bool title = false;
+    AppliedOwnerToken token = AppliedOwnerToken::Create();
+    base::CallbackListSubscription subscription;
+    base::CallbackListSubscription sampling_subscription;
+  };
+
   struct ModelWatch : TabStripModelObserver {
     ModelWatch(Impl& owner, TabStripModel& model)
         : owner(owner), model(&model) {
       model.AddObserver(this);
+    }
+    ~ModelWatch() override {
+      if (model)
+        model->RemoveObserver(this);
     }
     void Changed() {
       ++serial;
@@ -172,7 +405,9 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     AppliedOwnerToken bound_owner;
     uint64_t pane_id = 0;
     uint64_t handle = 0;
+    uint64_t split_peer = 0;
     bool bound = false;
+    bool require_new_apply = true;
     uint64_t bound_baseline = 0;
     std::map<AppliedOwnerToken, uint64_t> baselines;
     std::unique_ptr<views::ViewTracker> container;
@@ -199,7 +434,8 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
                   content::WebContents& contents,
                   std::optional<gfx::Size> target = std::nullopt,
                   double scale = 1,
-                  bool next_document = false)
+                  bool next_document = false,
+                  bool allow_current_surface = false)
         : content::WebContentsObserver(&contents),
           owner(owner),
           target(target),
@@ -207,6 +443,13 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
           awaiting_document(next_document),
           next_document(next_document) {
       Attach(*contents.GetPrimaryMainFrame());
+      if (allow_current_surface && !next_document && target &&
+          metadata.local_surface_id &&
+          metadata.viewport_size_in_pixels == *target &&
+          metadata.device_scale_factor == target_scale) {
+        bound_surface = metadata.local_surface_id;
+        ++serial;
+      }
     }
     ~RendererWatch() override = default;
     void Attach(content::RenderFrameHost& host) {
@@ -400,6 +643,29 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
       value.rect = gfx::RectF(*x, *y, *width, *height);
       value.opacity = *opacity;
       value.focused = *focused;
+      value.hovered_index = data.FindInt("hovered").value_or(-1);
+      value.padding_top = data.FindInt("paddingTop").value_or(0);
+      value.results_padding = data.FindInt("resultsPadding").value_or(0);
+      value.forced_colors = data.FindBool("forcedColors").value_or(false);
+      value.prefers_contrast_more =
+          data.FindBool("contrastMore").value_or(false);
+      value.focus_indicator_visible =
+          data.FindBool("focusIndicator").value_or(false);
+      value.hover_background =
+          static_cast<uint32_t>(data.FindDouble("hoverColor").value_or(0));
+      value.customization_ready =
+          data.FindBool("customizationReady").value_or(false);
+      value.click_count = data.FindInt("clickCount").value_or(0);
+      value.row_bounds.clear();
+      if (const auto* row_rects = data.FindList("rowBounds")) {
+        for (const auto& rect : *row_rects) {
+          const auto& list = rect.GetList();
+          if (list.size() == 4)
+            value.row_bounds.emplace_back(
+                list[0].GetDouble(), list[1].GetDouble(), list[2].GetDouble(),
+                list[3].GetDouble());
+        }
+      }
       coordinates.device_scale_factor = *scale;
       coordinates.rtl = *rtl;
       installed = true;
@@ -413,6 +679,7 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     content::WeakDocumentPtr document;
     AppliedOwnerToken token = AppliedOwnerToken::Create();
     WebUiStateMatches value;
+    views::ViewTracker native_view;
     AppliedCoordinates coordinates;
     uint64_t serial = 0;
     bool installed = false;
@@ -583,7 +850,9 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     ScheduleBindings();
   }
   void ScheduleBindings() {
-    if (binding_queued) {
+    if (binding_queued || !std::ranges::any_of(panes, [&](const auto& binding) {
+          return !binding->bound && signals.IsOwnerAlive(binding->token);
+        })) {
       return;
     }
     binding_queued = true;
@@ -607,6 +876,17 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
         if (!tab || static_cast<uint64_t>(tab->GetHandle().raw_value()) !=
                         binding->handle) {
           continue;
+        }
+        if (binding->split_peer) {
+          if (!tab->GetSplit())
+            continue;
+          const auto peers =
+              binding->model->model->GetSplitData(*tab->GetSplit())->ListTabs();
+          if (!std::ranges::any_of(peers, [&](const auto* peer) {
+                return static_cast<uint64_t>(peer->GetHandle().raw_value()) ==
+                       binding->split_peer;
+              }))
+            continue;
         }
         auto* clip = container->GetViewByID(kPageViewportClipHostViewId);
         if (!clip || !PageViewportAppliedState::From(*clip)) {
@@ -650,6 +930,9 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
   base::ScopedObservation<GlobalBrowserCollection, BrowserCollectionObserver>
       collection{this};
   std::vector<std::unique_ptr<ModelWatch>> models;
+  std::vector<std::unique_ptr<ColorWatch>> colors;
+  std::vector<std::unique_ptr<FaviconWatch>> favicons;
+  std::vector<std::unique_ptr<OmniboxWatch>> omniboxes;
   std::vector<std::unique_ptr<Lifetime>> lifetimes;
   std::vector<std::unique_ptr<PaneBinding>> panes;
   std::vector<std::unique_ptr<RendererWatch>> renderers;
@@ -732,6 +1015,35 @@ AppliedOwnerToken AppliedBrowserObservers::ObservePaneLayout(
                         .raw_value());
               }
             }
+            if (view->IsInSplitView()) {
+              value.start_parent_extent =
+                  view->start_contents_view_for_testing()->parent()->size();
+              value.end_parent_extent =
+                  view->end_contents_view_for_testing()->parent()->size();
+              value.start_container_extent =
+                  view->contents_container_views()[0]->size();
+              value.end_container_extent =
+                  view->contents_container_views()[1]->size();
+              const bool horizontal = value.axis == AppliedAxis::kHorizontal;
+              const int start = horizontal
+                                    ? value.start_container_extent.width()
+                                    : value.start_container_extent.height();
+              const int end = horizontal ? value.end_container_extent.width()
+                                         : value.end_container_extent.height();
+              const int divider =
+                  horizontal ? value.divider.width() : value.divider.height();
+              const int extent =
+                  horizontal
+                      ? value.parent_extent.width() - value.insets.width()
+                      : value.parent_extent.height() - value.insets.height();
+              value.geometry_matches_ratio =
+                  !value.start_parent_extent.IsEmpty() &&
+                  !value.end_parent_extent.IsEmpty() && start > 0 && end > 0 &&
+                  start + end + divider == extent &&
+                  start == std::round(value.ratio * (extent - divider));
+            } else {
+              value.geometry_matches_ratio = true;
+            }
             return Snapshot(token, value, watch->serial,
                             GetAppliedViewCoordinates(*view));
           },
@@ -743,7 +1055,9 @@ AppliedOwnerToken AppliedBrowserObservers::ExpectPageHosts(
     BrowserWindowInterface& browser,
     MultiContentsView& panes,
     uint64_t pane_id,
-    uint64_t tab_handle) {
+    uint64_t tab_handle,
+    bool require_new_apply,
+    uint64_t split_peer) {
   auto binding = std::make_unique<Impl::PaneBinding>();
   auto* ptr = binding.get();
   ptr->model = &impl_->Model(*browser.GetTabStripModel());
@@ -751,6 +1065,8 @@ AppliedOwnerToken AppliedBrowserObservers::ExpectPageHosts(
   ptr->lifetime->Own(ptr->token);
   ptr->pane_id = pane_id;
   ptr->handle = tab_handle;
+  ptr->split_peer = split_peer;
+  ptr->require_new_apply = require_new_apply;
   for (const auto& container : panes.contents_container_views()) {
     if (auto* clip = container->GetViewByID(kPageViewportClipHostViewId)) {
       if (auto* state = PageViewportAppliedState::From(*clip)) {
@@ -771,7 +1087,7 @@ AppliedOwnerToken AppliedBrowserObservers::ExpectPageHosts(
             auto snapshot =
                 impl->signals.Read({binding->bound_owner,
                                     AppliedConditionKind::kPageHostsApplied});
-            if (snapshot &&
+            if (snapshot && binding->require_new_apply &&
                 snapshot->serials.apply_serial <= binding->bound_baseline)
               return std::nullopt;
             if (snapshot) {
@@ -851,12 +1167,11 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveBrowserAnimation(
               return std::nullopt;
             }
             const auto progress = controller->GetCurrentValue(group, sequence);
-            if (!progress) {
-              return std::nullopt;
-            }
+            const double value =
+                progress.value_or(controller->IsAnimating(group) ? 0.0 : 1.0);
             return Snapshot(token,
                             AnimationMatches{id, controller->IsAnimating(group),
-                                             *progress, *progress},
+                                             value, value},
                             *serial,
                             GetAppliedViewCoordinates(*life->view.view()));
           },
@@ -870,6 +1185,79 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveBrowserAnimation(
                    impl->signals.Notify();
                  },
                  base::Unretained(impl_.get()), serial)));
+  return token;
+}
+AppliedOwnerToken AppliedBrowserObservers::ObserveInfoBarAnimation(
+    const infobars::InfoBar& bar,
+    uint64_t group_id) {
+  auto& view = static_cast<InfoBarView&>(const_cast<infobars::InfoBar&>(bar));
+  auto& life = impl_->Life(view);
+  const auto token = AppliedOwnerToken::Create();
+  life.Own(token);
+  impl_->signals.RegisterSignal(
+      token, AppliedConditionKind::kAnimationMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life, AppliedOwnerToken token,
+             uint64_t group) -> std::optional<AppliedSnapshot> {
+            const auto* view =
+                static_cast<const InfoBarView*>(life->view.view());
+            if (!view)
+              return std::nullopt;
+            const auto& animation = view->animation();
+            return Snapshot(token,
+                            AnimationMatches{group, animation.is_animating(),
+                                             animation.GetCurrentValue(),
+                                             animation.GetCurrentValue()},
+                            0, GetAppliedViewCoordinates(*view));
+          },
+          base::Unretained(&life), token, group_id));
+  return token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveTabContainerAnimation(
+    TabContainerImpl& host,
+    uint64_t group_id,
+    views::View* animated_view) {
+  auto& life = impl_->Life(host);
+  auto* target = animated_view ? &impl_->Life(*animated_view) : nullptr;
+  const auto token = AppliedOwnerToken::Create();
+  life.Own(token);
+  if (target)
+    target->Own(token);
+  // BoundsAnimator는 파생 View의 멤버여서 base View 삭제 알림보다 먼저 죽는다.
+  // View bounds/invalidation·compositor commit을 깨움으로 쓰고 현재 상태만
+  // 읽는다.
+  impl_->signals.RegisterSignal(
+      token, AppliedConditionKind::kAnimationMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life, Impl::Lifetime* target,
+             AppliedOwnerToken token,
+             uint64_t group) -> std::optional<AppliedSnapshot> {
+            auto* host = static_cast<TabContainerImpl*>(life->view.view());
+            if (!host)
+              return std::nullopt;
+            if (target) {
+              auto* view = target->view.view();
+              if (!view || view->parent() != host)
+                return std::nullopt;
+              // 공개 getter는 const animator를 반환하지만 조회 함수 자체는
+              // non-const다. delegate·observer·animation은 변경하지 않는다.
+              auto& animator = const_cast<views::BoundsAnimator&>(
+                  host->GetBoundsAnimatorForTesting());
+              const auto* animation = animator.GetAnimationForView(view);
+              const double progress =
+                  animation ? animation->GetCurrentValue() : 1.0;
+              return Snapshot(
+                  token,
+                  AnimationMatches{group, animator.IsAnimating(view), progress,
+                                   progress},
+                  0, GetAppliedViewCoordinates(*host));
+            }
+            const bool running = host->IsAnimating();
+            return Snapshot(token, AnimationMatches{group, running, 0, 0}, 0,
+                            GetAppliedViewCoordinates(*host));
+          },
+          base::Unretained(&life), base::Unretained(target), token, group_id));
   return token;
 }
 AppliedOwnerToken AppliedBrowserObservers::ObserveUnifiedAnimation(
@@ -909,6 +1297,49 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveUnifiedAnimation(
           base::Unretained(&lifetime), group_id, token));
   return token;
 }
+AppliedOwnerToken AppliedBrowserObservers::ObserveTabCollectionAnimations(
+    BrowserView& root,
+    uint64_t group_id) {
+  auto& life = impl_->Life(root);
+  const auto token = AppliedOwnerToken::Create();
+  life.Own(token);
+  impl_->signals.RegisterSignal(
+      token, AppliedConditionKind::kAnimationMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life, AppliedOwnerToken token,
+             uint64_t group) -> std::optional<AppliedSnapshot> {
+            auto* browser = static_cast<BrowserView*>(life->view.view());
+            if (!browser || !browser->tab_strip_view())
+              return std::nullopt;
+            auto* root = browser->tab_strip_view()->GetTabStripView();
+            if (!root)
+              return std::nullopt;
+            const auto running = [&](auto&& self, views::View* view) -> bool {
+              // 생성 직후 예약된 layout도 첫 animation tick 전에 완료로 보지
+              // 않는다.
+              if (view->IsDrawn() && view->needs_layout())
+                return true;
+              if ((views::IsViewClass<TabGroupView>(view) ||
+                   views::IsViewClass<UnpinnedTabContainerView>(view)) &&
+                  view->GetLayoutManager() &&
+                  static_cast<TabCollectionAnimatingLayoutManager*>(
+                      view->GetLayoutManager())
+                      ->is_animating())
+                return true;
+              for (views::View* child : view->children())
+                if (self(self, child))
+                  return true;
+              return false;
+            };
+            const bool animating = running(running, root);
+            const double progress = animating ? 0.0 : 1.0;
+            return Snapshot(
+                token, AnimationMatches{group, animating, progress, progress},
+                0, GetAppliedViewCoordinates(*root));
+          },
+          base::Unretained(&life), token, group_id));
+  return token;
+}
 AppliedOwnerToken AppliedBrowserObservers::ObserveRendererViewport(
     content::WebContents& contents) {
   auto watch = std::make_unique<Impl::RendererWatch>(*impl_, contents);
@@ -923,16 +1354,19 @@ AppliedCondition AppliedBrowserObservers::ExpectRendererViewport(
     content::WebContents& contents,
     gfx::Size pixels,
     double scale,
-    bool next_document) {
+    bool next_document,
+    bool allow_current_surface) {
   CHECK_GT(scale, 0);
-  auto watch = std::make_unique<Impl::RendererWatch>(*impl_, contents, pixels,
-                                                     scale, next_document);
+  auto watch = std::make_unique<Impl::RendererWatch>(
+      *impl_, contents, pixels, scale, next_document, allow_current_surface);
   auto* ptr = watch.get();
   impl_->signals.RegisterSignal(
       ptr->token, AppliedConditionKind::kRendererViewportMatches,
       base::BindRepeating(&Impl::RendererWatch::Read, base::Unretained(ptr)));
   impl_->renderers.push_back(std::move(watch));
   AppliedCondition condition{ptr->token, ptr->Value(pixels, scale)};
+  if (allow_current_surface)
+    condition.freshness = AppliedFreshness::kCurrentAfterDispatch;
   condition.coordinates.units = AppliedCoordinates::Units::kPixel;
   condition.coordinates.device_scale_factor = scale;
   condition.coordinates.rtl = base::i18n::IsRTL();
@@ -954,7 +1388,14 @@ AppliedOwnerToken AppliedBrowserObservers::InstallWebUiObserver(
                 !watch->document.AsRenderFrameHostIfValid()) {
               return std::nullopt;
             }
-            return Snapshot(watch->token, watch->value, watch->serial,
+            auto value = watch->value;
+            if (const auto* view = watch->native_view.view();
+                view && view->GetWidget()) {
+              value.native_view_bounds_in_screen = view->GetBoundsInScreen();
+              value.native_widget_bounds_in_screen =
+                  view->GetWidget()->GetWindowBoundsInScreen();
+            }
+            return Snapshot(watch->token, std::move(value), watch->serial,
                             watch->coordinates);
           },
           base::Unretained(ptr)));
@@ -994,20 +1435,74 @@ AppliedOwnerToken AppliedBrowserObservers::InstallWebUiObserver(
         domAutomationController.send({yeeWait:key});
         return;
       }
-      let next = 0;
+      const probe = $6;
+      let next = 0, clickCount = 0;
+      const watched = new WeakSet();
       const ids = new WeakMap();
       let queued = false, stopped = false;
       const send = () => {
         queued = false;
         if (stopped) return;
-        const rows = $4 ? Array.from(root.querySelectorAll($4)) : [];
-        const rect = root.getBoundingClientRect();
+        let rows = $4 ? Array.from(root.querySelectorAll($4)) : [];
+        let selected = rows.findIndex(row => $5 && row.matches($5));
+        let hovered = -1, paddingTop = 0, resultsPadding = 0, hoverColor = 0;
+        let focusIndicator = false, customizationReady = false;
+        let measured = root;
+        if (probe === 1) {
+          const app = document.querySelector('omnibox-popup-app')?.shadowRoot;
+          const dropdown = app?.querySelector('cr-searchbox-dropdown')?.shadowRoot;
+          const matches = Array.from(dropdown?.querySelectorAll('cr-searchbox-match') || []);
+          rows = matches.map(match => match.shadowRoot?.querySelector('.container:not(.actions)'))
+              .filter(row => row && row.getBoundingClientRect().height > 0);
+          selected = matches.findIndex(match => match.matches('[selected]'));
+          hovered = rows.findIndex(row => row.matches(':hover'));
+          const wrapper = app?.querySelector('.dropdownContainer');
+          if (wrapper) { measured = wrapper; paddingTop = parseInt(getComputedStyle(wrapper).paddingTop) || 0; }
+          resultsPadding = parseInt(document.documentElement.style.getPropertyValue('--omnibox-popup-results-padding-top')) || 0;
+          const indicator = matches[selected]?.shadowRoot?.querySelector('#focusIndicator');
+          focusIndicator = !!indicator && getComputedStyle(indicator).display !== 'none';
+          if (rows[0]) {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 1;
+            const context = canvas.getContext('2d');
+            context.fillStyle = getComputedStyle(rows[0]).getPropertyValue('--color-searchbox-results-background-hovered');
+            context.fillRect(0,0,1,1);
+            const c = context.getImageData(0,0,1,1).data;
+            hoverColor = ((c[3]<<24) | (c[0]<<16) | (c[1]<<8) | c[2]) >>> 0;
+          }
+        } else if (probe === 2) {
+          const app = document.querySelector('customize-chrome-app')?.shadowRoot;
+          const layout = app?.querySelector('yee-tab-layout')?.shadowRoot?.querySelector('#layout:not(:disabled)');
+          const shortcuts = app?.querySelector('customize-chrome-shortcuts')?.shadowRoot;
+          const toggle = shortcuts?.querySelector('#showToggle');
+          const collapse = shortcuts?.querySelector('cr-collapse');
+          const radio = shortcuts?.querySelector('#radioSelection');
+          customizationReady = !!(layout && toggle && collapse && radio?.selected &&
+              shortcuts.querySelector('#radioSelection cr-radio-button') &&
+              collapse.classList.contains(toggle.checked ? 'collapse-opened' : 'collapse-closed'));
+        }
+        const watch = node => {
+          if (!node) return;
+          if (!watched.has(node)) {
+            watched.add(node);
+            mutation.observe(node, {subtree:true, attributes:true, childList:true});
+            if (node.nodeType === Node.ELEMENT_NODE) resize.observe(node);
+          }
+          for (const child of node.querySelectorAll('*')) if (child.shadowRoot) watch(child.shadowRoot);
+        };
+        watch(root);
+        for (const row of rows) { watch(row.getRootNode()); resize.observe(row); }
+        const rect = measured.getBoundingClientRect();
         domAutomationController.send({yeeWait:key,
           rows: rows.map(row => {
             if (!ids.has(row)) ids.set(row, ++next);
             return ids.get(row);
           }),
-          selected: rows.findIndex(row => $5 && row.matches($5)),
+          selected, hovered, paddingTop, resultsPadding, hoverColor, focusIndicator,
+          forcedColors:matchMedia('(forced-colors: active)').matches,
+          contrastMore:matchMedia('(prefers-contrast: more)').matches,
+          rowBounds:rows.map(row => { const r=row.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }),
+          customizationReady, clickCount,
           x:rect.x, y:rect.y, width:rect.width, height:rect.height,
           opacity:Number(getComputedStyle(root).opacity), focused:document.hasFocus(),
           scale:window.devicePixelRatio, rtl:getComputedStyle(root).direction === 'rtl'});
@@ -1019,22 +1514,404 @@ AppliedOwnerToken AppliedBrowserObservers::InstallWebUiObserver(
       mutation.observe(root, {subtree:true, attributes:true, childList:true});
       const resize = new ResizeObserver(wake);
       resize.observe(root);
-      const events = ['focus','blur','focusin','focusout','transitionrun',
+      const events = ['mouseover','mouseout','pointerover','pointerout','keydown','keyup','focus','blur','focusin','focusout','transitionrun',
                       'transitionend','transitioncancel','animationstart',
                       'animationend','animationcancel'];
       for (const name of events) window.addEventListener(name, wake, true);
+      const click = () => { ++clickCount; wake(); };
+      window.addEventListener('click', click, true);
+      const media = [matchMedia('(forced-colors: active)'), matchMedia('(prefers-contrast: more)')];
+      for (const query of media) query.addEventListener('change', wake);
       window[key] = {stop() {
         stopped = true; mutation.disconnect(); resize.disconnect();
         for (const name of events) window.removeEventListener(name, wake, true);
+        window.removeEventListener('click', click, true);
+        for (const query of media) query.removeEventListener('change', wake);
         delete window[key];
       }};
       send();
     })();
   )JS",
                                  ptr->Key(), std::move(shadow), selectors.root,
-                                 selectors.rows, selectors.selected));
+                                 selectors.rows, selectors.selected,
+                                 static_cast<int>(selectors.probe)));
   return ptr->token;
 }
+AppliedOwnerToken AppliedBrowserObservers::ObserveProjectNavigation(
+    BrowserView& view) {
+  auto& life = impl_->Life(view);
+  auto* controller =
+      projects::ProjectNavigationController::From(view.browser());
+  if (!controller)
+    return AppliedOwnerToken::Create();
+  const auto token = controller->GetAppliedSnapshot().owner;
+  if (impl_->signals.Read({token, AppliedConditionKind::kViewStateMatches}))
+    return token;
+  life.Own(token);
+  impl_->signals.RegisterSignal(
+      token, AppliedConditionKind::kViewStateMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life,
+             base::WeakPtr<projects::ProjectNavigationController> controller,
+             AppliedOwnerToken token) -> std::optional<AppliedSnapshot> {
+            if (!life->view.view() || !controller)
+              return std::nullopt;
+            const auto snapshot = controller->GetAppliedSnapshot();
+            return Snapshot(
+                token,
+                ViewStateMatches{.visible = snapshot.showing_hub,
+                                 .refresh_pending = snapshot.refresh_pending},
+                snapshot.apply_serial,
+                GetAppliedViewCoordinates(*life->view.view()));
+          },
+          base::Unretained(&life), controller->GetWeakPtr(), token));
+  life.subscriptions.push_back(controller->SubscribeApplied(base::BindRepeating(
+      [](Impl* impl, const projects::ProjectNavigationAppliedSnapshot& value) {
+        if (value.destroyed)
+          impl->signals.OwnerDestroyed(value.owner);
+        else
+          impl->signals.Notify();
+      },
+      base::Unretained(impl_.get()))));
+  return token;
+}
+AppliedOwnerToken AppliedBrowserObservers::ObserveProjectPage(
+    BrowserView& view,
+    std::string page_id) {
+  auto& life = impl_->Life(view);
+  auto* service = projects::ProjectServiceFactory::GetForProfile(
+      view.browser()->GetProfile());
+  auto* coordinator = projects::ProjectTabCoordinator::GetForProfile(
+      view.browser()->GetProfile());
+  const auto token = AppliedOwnerToken::Create();
+  life.Own(token);
+  impl_->signals.RegisterSignal(
+      token, AppliedConditionKind::kTabModelMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life, projects::ProjectService* service,
+             projects::ProjectTabCoordinator* coordinator, std::string id,
+             AppliedOwnerToken token) -> std::optional<AppliedSnapshot> {
+            auto* view = static_cast<BrowserView*>(life->view.view());
+            if (!view)
+              return std::nullopt;
+            const auto* page = service->FindPage(id);
+            const auto* tab = coordinator->FindLiveTab(id, view->browser());
+            return Snapshot(
+                token,
+                TabModelMatches{
+                    .project_page = base::PersistentHash(id),
+                    .project_title = page ? base::PersistentHash(
+                                                base::UTF16ToUTF8(page->title))
+                                          : 0,
+                    .project_live_tab = tab ? static_cast<uint64_t>(
+                                                  tab->GetHandle().raw_value())
+                                            : 0},
+                0, GetAppliedViewCoordinates(*view));
+          },
+          base::Unretained(&life), base::Unretained(service),
+          base::Unretained(coordinator), page_id, token));
+  life.subscriptions.push_back(service->Subscribe(base::BindRepeating(
+      &AppliedViewsObservers::Notify, base::Unretained(&impl_->signals),
+      std::vector<AppliedSnapshot>{})));
+  life.subscriptions.push_back(coordinator->Subscribe(base::BindRepeating(
+      &AppliedViewsObservers::Notify, base::Unretained(&impl_->signals),
+      std::vector<AppliedSnapshot>{})));
+  return token;
+}
+AppliedOwnerToken AppliedBrowserObservers::ObserveOmnibox(
+    LocationBarView& view) {
+  auto watch = std::make_unique<Impl::OmniboxWatch>(*impl_, view);
+  auto* ptr = watch.get();
+  impl_->Life(view).Own(ptr->token);
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kViewStateMatches,
+      base::BindRepeating(&Impl::OmniboxWatch::Read, base::Unretained(ptr)));
+  impl_->omniboxes.push_back(std::move(watch));
+  return ptr->token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveFavicon(
+    content::WebContents& contents) {
+  auto watch = std::make_unique<Impl::FaviconWatch>(*impl_, contents);
+  auto* ptr = watch.get();
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kPresentationMatches,
+      base::BindRepeating(&Impl::FaviconWatch::Read, base::Unretained(ptr)));
+  impl_->favicons.push_back(std::move(watch));
+  return ptr->token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveDocumentTitle(
+    content::WebContents& contents) {
+  auto watch = std::make_unique<Impl::ColorWatch>(*impl_, contents, nullptr);
+  auto* ptr = watch.get();
+  ptr->title = true;
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kPresentationMatches,
+      base::BindRepeating(&Impl::ColorWatch::Read, base::Unretained(ptr)));
+  impl_->colors.push_back(std::move(watch));
+  return ptr->token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveWebUiPopupBounds(
+    AppliedOwnerToken document,
+    views::View& native_view) {
+  const auto found = std::ranges::find_if(
+      impl_->doms, [&](const auto& dom) { return dom->token == document; });
+  CHECK(found != impl_->doms.end());
+  CHECK((*found)->installed);
+  CHECK(native_view.GetWidget());
+  (*found)->native_view.SetView(&native_view);
+  impl_->Life(native_view).Own(document);
+  impl_->signals.ObserveWidget(*native_view.GetWidget());
+  return document;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveUiState(views::View& view,
+                                                          UiProbe probe) {
+  auto& life = impl_->Life(view);
+  const auto token = AppliedOwnerToken::Create();
+  life.Own(token);
+  if (probe == UiProbe::kSiteControlsPopup) {
+    auto* button = views::AsViewClass<SiteControlsButton>(&view);
+    if (!button)
+      return token;
+    life.subscriptions.push_back(
+        button->SubscribePopupApplied(base::BindRepeating(
+            [](Impl* impl, const SiteControlsPopupAppliedSnapshot&) {
+              impl->signals.Notify();
+            },
+            base::Unretained(impl_.get()))));
+  }
+  if (probe == UiProbe::kFooterMenu || probe == UiProbe::kFooterContexts) {
+    struct MenuState {
+      SidebarFooterAppliedSnapshot applied;
+      views::ViewTracker menu;
+      AppliedOwnerToken menu_owner;
+      AppliedOwnerToken widget_owner;
+    };
+    auto state = std::make_shared<MenuState>();
+    auto capture = base::BindRepeating(
+        [](Impl* impl, Impl::Lifetime* life, std::shared_ptr<MenuState> state,
+           const SidebarFooterAppliedSnapshot& applied) {
+          state->applied = applied;
+          if (!applied.menu_open) {
+            state->menu.SetView(nullptr);
+            state->menu_owner = {};
+            state->widget_owner = {};
+          } else if (auto* footer = life->view.view()) {
+            // 제품의 open 적용값은 FooterBubble 생성이 끝난 뒤에만 발행된다.
+            // 임의 View 알림에서는 생성 중 menu/Widget을 다시 찾지 않는다.
+            auto* menu = GetSidebarFooterMenuForTesting(*footer);
+            if (menu && menu != state->menu.view()) {
+              state->menu.SetView(menu);
+              state->menu_owner = impl->signals.ObserveView(*menu);
+              if (auto* widget = menu->GetWidget())
+                state->widget_owner = impl->signals.ObserveWidget(*widget);
+            }
+          }
+          impl->signals.Notify();
+        },
+        base::Unretained(impl_.get()), base::Unretained(&life), state);
+    capture.Run(GetSidebarFooterAppliedSnapshot(view));
+    life.subscriptions.push_back(SubscribeSidebarFooterApplied(view, capture));
+    impl_->signals.RegisterSignal(
+        token, AppliedConditionKind::kViewStateMatches,
+        base::BindRepeating(
+            [](Impl* impl, Impl::Lifetime* life,
+               std::shared_ptr<MenuState> state, AppliedOwnerToken token,
+               UiProbe probe) -> std::optional<AppliedSnapshot> {
+              auto* footer = life->view.view();
+              if (!footer)
+                return std::nullopt;
+              ViewStateMatches value;
+              const auto menu = impl->signals.Read(
+                  {state->menu_owner, AppliedConditionKind::kViewStateMatches});
+              const auto widget = impl->signals.Read(
+                  {state->widget_owner,
+                   AppliedConditionKind::kWidgetStateMatches});
+              if (state->applied.menu_open && menu && widget &&
+                  state->menu.view()) {
+                value.drawn =
+                    std::get<WidgetStateMatches>(widget->value).active;
+                value.visible =
+                    std::get<WidgetStateMatches>(widget->value).visible &&
+                    (probe == UiProbe::kFooterMenu ||
+                     (!state->menu.view()->GetViewByID(
+                          kSidebarFooterRootContextViewId) &&
+                      std::get<ViewStateMatches>(menu->value).opacity == 1));
+              }
+              return Snapshot(token, value, state->applied.apply_serial,
+                              GetAppliedViewCoordinates(*footer));
+            },
+            base::Unretained(impl_.get()), base::Unretained(&life), state,
+            token, probe));
+    return token;
+  }
+  if (probe == UiProbe::kFooterInkHidden) {
+    life.subscriptions.push_back(SubscribeSidebarFooterApplied(
+        view, base::BindRepeating(
+                  [](Impl* impl, const SidebarFooterAppliedSnapshot&) {
+                    impl->signals.Notify();
+                  },
+                  base::Unretained(impl_.get()))));
+  }
+  const bool presentation = probe == UiProbe::kImageCenter ||
+                            probe == UiProbe::kPaintedBackground ||
+                            probe == UiProbe::kSidePanelEntry;
+  impl_->signals.RegisterSignal(
+      token,
+      presentation ? AppliedConditionKind::kPresentationMatches
+                   : AppliedConditionKind::kViewStateMatches,
+      base::BindRepeating(
+          [](Impl::Lifetime* life, AppliedOwnerToken token,
+             UiProbe probe) -> std::optional<AppliedSnapshot> {
+            auto* view = life->view.view();
+            if (!view)
+              return std::nullopt;
+            if (probe == UiProbe::kSidebarCollapsed) {
+              auto* browser_view = views::AsViewClass<BrowserView>(view);
+              if (!browser_view)
+                return std::nullopt;
+              return Snapshot(
+                  token,
+                  ViewStateMatches{
+                      .visible = tabs::VerticalTabStripStateController::From(
+                                     browser_view->browser())
+                                     ->IsCollapsed()},
+                  0, GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kSidePanelEntry) {
+              auto* browser_view = views::AsViewClass<BrowserView>(view);
+              auto* panel = browser_view
+                                ? SidePanelUI::From(browser_view->browser())
+                                : nullptr;
+              if (!panel)
+                return std::nullopt;
+              const auto entry = panel->GetCurrentEntryId();
+              return Snapshot(
+                  token,
+                  PresentationMatches{
+                      .presentation_id = panel->IsSidePanelShowing() && entry
+                                             ? static_cast<uint64_t>(*entry) + 1
+                                             : 0},
+                  0, GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kSiteControlsPopup) {
+              auto* button = views::AsViewClass<SiteControlsButton>(view);
+              if (!button)
+                return std::nullopt;
+              const auto state = button->GetPopupAppliedSnapshot();
+              return Snapshot(token, ViewStateMatches{.visible = state.showing},
+                              state.apply_serial,
+                              GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kScrollTargets) {
+              auto* strip = views::AsViewClass<TabStripView>(view);
+              if (!strip)
+                return std::nullopt;
+              return Snapshot(
+                  token,
+                  ViewStateMatches{
+                      .scroll_animation_running =
+                          strip->GetPrimaryScrollTargetForTesting() ||
+                          strip->GetSecondaryScrollTargetForTesting()},
+                  0, GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kFooterInkHidden) {
+              const bool hidden =
+                  views::InkDrop::Get(view)
+                      ->GetInkDrop()
+                      ->GetTargetInkDropState() == views::InkDropState::HIDDEN;
+              return Snapshot(token, ViewStateMatches{.visible = hidden}, 0,
+                              GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kSidebarHover) {
+              auto* region =
+                  views::AsViewClass<VerticalTabStripRegionView>(view);
+              if (!region)
+                return std::nullopt;
+              return Snapshot(
+                  token,
+                  ViewStateMatches{.expanded_on_hover =
+                                       region->is_expanded_on_hover()},
+                  0, GetAppliedViewCoordinates(*view));
+            }
+            if (probe == UiProbe::kTabAndAdjacentHover) {
+              const TabStyleViews* style = nullptr;
+              if (auto* tab = views::AsViewClass<Tab>(view))
+                style = tab->tab_style_views();
+              if (auto* tab = views::AsViewClass<TabView>(view))
+                style = tab->tab_styling();
+              if (!style)
+                return std::nullopt;
+              auto* delegate = style->delegate();
+              ViewStateMatches value{.opacity = 0};
+              for (auto* item : {delegate, delegate->GetAdjacentTab(true),
+                                 delegate->GetAdjacentTab(false)}) {
+                if (!item)
+                  continue;
+                value.hovered |= item->IsHovering();
+                value.hover_animation_running |= item->IsHoverAnimationActive();
+                value.opacity = std::max(
+                    value.opacity,
+                    static_cast<double>(item->GetHoverAnimationValue()));
+              }
+              return Snapshot(token, value, 0,
+                              GetAppliedViewCoordinates(*view));
+            }
+            PresentationMatches value;
+            if (probe == UiProbe::kImageCenter) {
+              auto* image = views::AsViewClass<views::ImageView>(view);
+              if (!image)
+                return std::nullopt;
+              if (!image->GetImage().isNull()) {
+                const auto bitmap =
+                    image->GetImage().GetRepresentation(1.f).GetBitmap();
+                if (bitmap.width() > 8 && bitmap.height() > 8)
+                  value.icon_id = bitmap.getColor(8, 8);
+              }
+            } else {
+              if (!view->background() || view->size().IsEmpty())
+                return std::nullopt;
+              gfx::Canvas canvas(view->size(), 1.f, false);
+              view->background()->Paint(&canvas, view);
+              value.background_color = canvas.GetBitmap().getColor(
+                  view->width() / 2, view->height() / 2);
+            }
+            return Snapshot(token, value, 0, GetAppliedViewCoordinates(*view));
+          },
+          base::Unretained(&life), token, probe));
+  return token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveRendererBackground(
+    content::WebContents& contents) {
+  auto watch =
+      std::make_unique<Impl::ColorWatch>(*impl_, contents, nullptr, true);
+  auto* ptr = watch.get();
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kPresentationMatches,
+      base::BindRepeating(&Impl::ColorWatch::Read, base::Unretained(ptr)));
+  impl_->colors.push_back(std::move(watch));
+  return ptr->token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveSurfaceColor(
+    content::WebContents& contents,
+    LocationBarView* location_bar) {
+  auto watch =
+      std::make_unique<Impl::ColorWatch>(*impl_, contents, location_bar);
+  auto* ptr = watch.get();
+  if (location_bar)
+    impl_->Life(*location_bar).Own(ptr->token);
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kPresentationMatches,
+      base::BindRepeating(&Impl::ColorWatch::Read, base::Unretained(ptr)));
+  impl_->colors.push_back(std::move(watch));
+  return ptr->token;
+}
+
 AppliedOwnerToken AppliedBrowserObservers::ObservePresentation(
     views::View& consumer,
     BrowserSurfacePresentationBinding& binding,

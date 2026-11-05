@@ -13,7 +13,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
-#include "base/test/run_until.h"
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/profiles/profile.h"
@@ -27,6 +26,8 @@
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
+#include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -55,6 +56,11 @@
 #include <oleacc.h>
 #include <uiautomation.h>
 #include <wrl/client.h>
+#include <wrl/implements.h>
+#include "base/memory/raw_ref.h"
+#include "base/memory/weak_ptr.h"
+#include "base/task/bind_post_task.h"
+#include "base/task/sequenced_task_runner.h"
 
 #include "base/test/test_future.h"
 #include "base/threading/thread.h"
@@ -166,6 +172,151 @@ WindowAccessibleUrls ReadWindowAccessibleUrls(HWND hwnd) {
   std::ranges::sort(urls.documents);
   return urls;
 }
+// UIA provider가 값·구조 변경을 알릴 때만 MTA에서 다시 읽는다.
+class AccessibleUrlEvents
+    : public Microsoft::WRL::RuntimeClass<
+          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+          IUIAutomationPropertyChangedEventHandler,
+          IUIAutomationStructureChangedEventHandler> {
+ public:
+  explicit AccessibleUrlEvents(base::RepeatingClosure changed)
+      : changed_(std::move(changed)) {}
+  IFACEMETHODIMP HandlePropertyChangedEvent(IUIAutomationElement*,
+                                            PROPERTYID,
+                                            VARIANT) override {
+    changed_.Run();
+    return S_OK;
+  }
+  IFACEMETHODIMP HandleStructureChangedEvent(IUIAutomationElement*,
+                                             StructureChangeType,
+                                             SAFEARRAY*) override {
+    changed_.Run();
+    return S_OK;
+  }
+
+ private:
+  base::RepeatingClosure changed_;
+};
+struct AccessibleUrlSubscription {
+  Microsoft::WRL::ComPtr<IUIAutomation> automation;
+  Microsoft::WRL::ComPtr<IUIAutomationElement> root;
+  Microsoft::WRL::ComPtr<AccessibleUrlEvents> events;
+  HRESULT status = E_FAIL;
+  ~AccessibleUrlSubscription() {
+    if (automation && root && events) {
+      automation->RemovePropertyChangedEventHandler(root.Get(), events.Get());
+      automation->RemoveStructureChangedEventHandler(root.Get(), events.Get());
+    }
+  }
+  static std::unique_ptr<AccessibleUrlSubscription> Create(
+      HWND hwnd,
+      base::RepeatingClosure changed) {
+    auto sub = std::make_unique<AccessibleUrlSubscription>();
+    sub->status =
+        CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_PPV_ARGS(&sub->automation));
+    if (FAILED(sub->status))
+      return sub;
+    sub->status = sub->automation->ElementFromHandle(hwnd, &sub->root);
+    if (FAILED(sub->status) || !sub->root)
+      return sub;
+    sub->events = Microsoft::WRL::Make<AccessibleUrlEvents>(std::move(changed));
+    PROPERTYID properties[] = {UIA_ValueValuePropertyId, UIA_NamePropertyId,
+                               UIA_IsOffscreenPropertyId};
+    sub->status = sub->automation->AddPropertyChangedEventHandlerNativeArray(
+        sub->root.Get(), TreeScope_Subtree, nullptr, sub->events.Get(),
+        properties, std::size(properties));
+    if (SUCCEEDED(sub->status))
+      sub->status = sub->automation->AddStructureChangedEventHandler(
+          sub->root.Get(), TreeScope_Subtree, nullptr, sub->events.Get());
+    return sub;
+  }
+};
+class AccessibleUrlsCallback {
+ public:
+  AccessibleUrlsCallback(base::Thread& thread,
+                         HWND hwnd,
+                         std::u16string expected,
+                         std::vector<std::u16string> documents)
+      : thread_(thread),
+        hwnd_(hwnd),
+        expected_(std::move(expected)),
+        documents_(std::move(documents)) {
+    base::test::TestFuture<std::unique_ptr<AccessibleUrlSubscription>>
+        installed;
+    thread_->task_runner()->PostTaskAndReplyWithResult(
+        FROM_HERE,
+        base::BindOnce(&AccessibleUrlSubscription::Create, hwnd,
+                       base::BindPostTask(
+                           base::SequencedTaskRunner::GetCurrentDefault(),
+                           base::BindRepeating(&AccessibleUrlsCallback::Read,
+                                               weak_.GetWeakPtr()))),
+        installed.GetCallback());
+    // UIA 구독 설치 ACK를 받은 뒤 최초 provider snapshot을 읽는다.
+    subscription_ = installed.Take();
+    if (FAILED(subscription_->status)) {
+      WindowAccessibleUrls failed;
+      failed.result = subscription_->status;
+      completed_.SetValue(std::move(failed));
+    } else {
+      Read();
+    }
+  }
+  ~AccessibleUrlsCallback() {
+    weak_.InvalidateWeakPtrs();
+    base::test::TestFuture<void> released;
+    thread_->task_runner()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](std::unique_ptr<AccessibleUrlSubscription> sub,
+               base::OnceClosure done) {
+              sub.reset();
+              std::move(done).Run();
+            },
+            std::move(subscription_), released.GetSequenceBoundCallback()));
+    // COM observer를 생성한 MTA에서 해제한 완료 callback이다.
+    EXPECT_TRUE(released.Wait());
+  }
+  WindowAccessibleUrls Take() { return completed_.Take(); }
+
+ private:
+  void Read() {
+    if (completed_.IsReady())
+      return;
+    if (pending_) {
+      changed_while_pending_ = true;
+      return;
+    }
+    pending_ = true;
+    thread_->task_runner()->PostTaskAndReplyWithResult(
+        FROM_HERE, base::BindOnce(&ReadWindowAccessibleUrls, hwnd_),
+        base::BindOnce(&AccessibleUrlsCallback::ReadComplete,
+                       weak_.GetWeakPtr()));
+  }
+  void ReadComplete(WindowAccessibleUrls value) {
+    pending_ = false;
+    if (SUCCEEDED(value.result) &&
+        value.addresses == std::vector<std::u16string>{expected_} &&
+        value.documents == documents_) {
+      completed_.SetValue(std::move(value));
+      return;
+    }
+    if (changed_while_pending_) {
+      changed_while_pending_ = false;
+      Read();
+    }
+  }
+  raw_ref<base::Thread> thread_;
+  HWND hwnd_;
+  std::u16string expected_;
+  std::vector<std::u16string> documents_;
+  std::unique_ptr<AccessibleUrlSubscription> subscription_;
+  bool pending_ = false;
+  bool changed_while_pending_ = false;
+  base::test::TestFuture<WindowAccessibleUrls> completed_;
+  base::WeakPtrFactory<AccessibleUrlsCallback> weak_{this};
+};
+
 #endif
 
 // 장식 레이어를 끈 경우와 비교하되 이를 무패치 Chromium으로 간주하지 않는다.
@@ -214,6 +365,7 @@ class OmniboxAccessibilityBrowserTest
   }
 
   void TearDownOnMainThread() override {
+    applied_.Stop();
 #if BUILDFLAG(IS_WIN)
     accessibility_thread_.Stop();
     accessibility_mode_.reset();
@@ -253,13 +405,43 @@ class OmniboxAccessibilityBrowserTest
                                  : url.spec());
   }
 
+  yee::test::AppliedTestContext<yee::test::AppliedBrowserObservers> applied_;
+  yee::test::AppliedCondition PopupState(bool open,
+                                         bool editing = false,
+                                         bool check_editing = false) {
+    auto* location = View()->GetLocationBarView();
+    return applied_.Condition(
+        applied_.source().ObserveOmnibox(*location),
+        yee::test::ViewStateMatches{.popup_open = open, .editing = editing},
+        check_editing ? yee::test::AppliedMatch::kOmniboxEditing
+                      : yee::test::AppliedMatch::kOmniboxPopup);
+  }
+  void SetElisionPref(bool full) {
+    auto* prefs = browser()->GetProfile()->GetPrefs();
+    if (UsesShell()) {
+      auto* resting =
+          View()->GetLocationBarView()->GetCompactShellRestingTextForTesting();
+      ASSERT_TRUE(applied_.Run(
+          {applied_.View(*resting, {.visible = !full},
+                         yee::test::AppliedMatch::kViewVisible)},
+          [&] {
+            prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, full);
+          }));
+    } else {
+      prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, full);
+    }
+  }
+
   void FocusAddress() {
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_L,
-                                                /*control=*/!BUILDFLAG(IS_MAC),
-                                                /*shift=*/false,
-                                                /*alt=*/false,
-                                                /*command=*/BUILDFLAG(IS_MAC)));
-    ASSERT_TRUE(base::test::RunUntil([&]() { return Omnibox()->HasFocus(); }));
+    ASSERT_TRUE(applied_.Run({applied_.Focus(*Omnibox())}, [&] {
+      ASSERT_TRUE(
+          ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_L,
+                                          /*control=*/!BUILDFLAG(IS_MAC),
+                                          /*shift=*/false,
+                                          /*alt=*/false,
+                                          /*command=*/BUILDFLAG(IS_MAC)));
+    }));
+    ASSERT_TRUE(Omnibox()->HasFocus());
     ASSERT_TRUE(Omnibox()->IsSelectAll());
   }
 
@@ -318,17 +500,13 @@ class OmniboxAccessibilityBrowserTest
     std::ranges::sort(expected_documents);
     const HWND hwnd = views::HWNDForWidget(View()->GetWidget());
     ASSERT_TRUE(hwnd);
-    WindowAccessibleUrls window_urls;
-    const bool exposed = base::test::RunUntil([&]() {
-      base::test::TestFuture<WindowAccessibleUrls> future;
-      accessibility_thread_.task_runner()->PostTaskAndReplyWithResult(
-          FROM_HERE, base::BindOnce(&ReadWindowAccessibleUrls, hwnd),
-          future.GetCallback());
-      window_urls = future.Take();
-      return SUCCEEDED(window_urls.result) &&
-             window_urls.addresses == std::vector<std::u16string>{expected} &&
-             window_urls.documents == expected_documents;
-    });
+    AccessibleUrlsCallback exposed_urls(accessibility_thread_, hwnd, expected,
+                                        expected_documents);
+    const WindowAccessibleUrls window_urls = exposed_urls.Take();
+    const bool exposed =
+        SUCCEEDED(window_urls.result) &&
+        window_urls.addresses == std::vector<std::u16string>{expected} &&
+        window_urls.documents == expected_documents;
     EXPECT_HRESULT_SUCCEEDED(window_urls.result);
     EXPECT_EQ(std::vector<std::u16string>{expected}, window_urls.addresses);
     EXPECT_EQ(expected_documents, window_urls.documents);
@@ -354,13 +532,14 @@ class OmniboxAccessibilityBrowserTest
 IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
                        RestAndCtrlLKeepNativeAccessibleUrl) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url()));
-  Contents()->Focus();
-  ASSERT_TRUE(base::test::RunUntil([&]() { return !Omnibox()->HasFocus(); }));
+  ASSERT_TRUE(applied_.Run({applied_.Focus(*Omnibox(), false)},
+                           [&] { Contents()->Focus(); }));
+  ASSERT_FALSE(Omnibox()->HasFocus());
   if (UsesShell()) {
     auto* resting =
         View()->GetLocationBarView()->GetCompactShellRestingTextForTesting();
     ASSERT_TRUE(resting);
-    ASSERT_TRUE(base::test::RunUntil([&]() { return resting->GetVisible(); }));
+    ASSERT_TRUE(resting->GetVisible());
     EXPECT_TRUE(resting->GetViewAccessibility().GetIsIgnored());
     EXPECT_FALSE(resting->GetCanProcessEventsWithinSubtree());
     for (views::View* child : resting->children()) {
@@ -373,26 +552,25 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
   ASSERT_TRUE(full_url.starts_with(scheme_prefix));
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress(
       "rest", base::UTF8ToUTF16(full_url.substr(scheme_prefix.size()))));
-  auto* prefs = browser()->GetProfile()->GetPrefs();
-  prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, true);
+  SetElisionPref(true);
   if (UsesShell()) {
-    ASSERT_TRUE(base::test::RunUntil([&]() {
+    ASSERT_TRUE(([&]() {
       return !View()
                   ->GetLocationBarView()
                   ->GetCompactShellRestingTextForTesting()
                   ->GetVisible();
-    }));
+    })());
   }
   ASSERT_NO_FATAL_FAILURE(
       CheckAccessibleAddress("full_url_pref", base::UTF8ToUTF16(full_url)));
-  prefs->SetBoolean(omnibox::kPreventUrlElisionsInOmnibox, false);
+  SetElisionPref(false);
   if (UsesShell()) {
-    ASSERT_TRUE(base::test::RunUntil([&]() {
+    ASSERT_TRUE(([&]() {
       return View()
           ->GetLocationBarView()
           ->GetCompactShellRestingTextForTesting()
           ->GetVisible();
-    }));
+    })());
   }
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress(
       "restored_pref",
@@ -461,28 +639,31 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
   ASSERT_NO_FATAL_FAILURE(FocusAddress());
   const std::u16string draft = u"https://uncommitted.yee-fixture.test/draft";
   auto* controller = View()->GetLocationBarView()->GetOmniboxController();
-  Omnibox()->SetUserText(draft, /*update_popup=*/true);
-  ASSERT_TRUE(
-      base::test::RunUntil([&]() { return controller->IsPopupOpen(); }));
+  ASSERT_TRUE(applied_.Run({PopupState(true)}, [&] {
+    Omnibox()->SetUserText(draft, /*update_popup=*/true);
+  }));
+  ASSERT_TRUE(controller->IsPopupOpen());
   EXPECT_TRUE(controller->edit_model()->user_input_in_progress());
   RecordProperty("draft_popup_open", controller->IsPopupOpen());
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress("draft", draft));
   EXPECT_EQ(Url(), Contents()->GetVisibleURL());
   EXPECT_EQ(Url(), Contents()->GetLastCommittedURL());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE, false,
-                                              false, false, false));
+  ASSERT_TRUE(applied_.Run({PopupState(false)}, [&] {
+    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+                                                false, false, false, false));
+  }));
   // 첫 Escape는 제안만 닫고 초안을 유지한다. 다음 Escape가 편집을 취소한다.
-  ASSERT_TRUE(
-      base::test::RunUntil([&]() { return !controller->IsPopupOpen(); }));
+  ASSERT_FALSE(controller->IsPopupOpen());
   EXPECT_TRUE(controller->edit_model()->user_input_in_progress());
   RecordProperty("after_first_escape_popup_open", controller->IsPopupOpen());
   ASSERT_NO_FATAL_FAILURE(CheckAccessibleAddress("popup_closed_draft", draft));
   EXPECT_EQ(Url(), Contents()->GetVisibleURL());
   EXPECT_EQ(Url(), Contents()->GetLastCommittedURL());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE, false,
-                                              false, false, false));
-  ASSERT_TRUE(base::test::RunUntil(
-      [&]() { return !controller->edit_model()->user_input_in_progress(); }));
+  ASSERT_TRUE(applied_.Run({PopupState(false, false, true)}, [&] {
+    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+                                                false, false, false, false));
+  }));
+  ASSERT_FALSE(controller->edit_model()->user_input_in_progress());
   EXPECT_EQ(Url(), Contents()->GetVisibleURL());
   EXPECT_EQ(Url(), Contents()->GetLastCommittedURL());
   ASSERT_NO_FATAL_FAILURE(FocusAddress());

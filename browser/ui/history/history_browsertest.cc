@@ -11,6 +11,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/browser/ui/webui/history/history_ui.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -53,18 +54,16 @@ class HistoryBrowserTest : public InProcessBrowserTest {
   }
 
   bool WaitForRows(int count) {
-    return content::EvalJs(Contents(), content::JsReplace(R"JS(
-      (async () => {
-        for (let attempt = 0; attempt < 250; ++attempt) {
-          const list = document.querySelector('[data-history-list]');
-          if (list && list.closest('section').getAttribute('aria-busy') === 'false' &&
-              list.querySelectorAll('[data-history-id]').length === $1) return true;
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-        return false;
-      })()
-    )JS",
-                                                          count))
+    return content::EvalJs(Contents(), test::WaitForInternalPageScript(
+                                           content::JsReplace(R"JS(
+          (() => {
+            const list = document.querySelector('[data-history-list]');
+            return !!list &&
+                list.closest('section').getAttribute('aria-busy') === 'false' &&
+                list.querySelectorAll('[data-history-id]').length === $1;
+          })()
+        )JS",
+                                                              count)))
         .ExtractBool();
   }
 
@@ -91,16 +90,14 @@ IN_PROC_BROWSER_TEST_F(HistoryBrowserTest,
   EXPECT_EQ(branding::HistoryURL(), Contents()->GetLastCommittedURL());
   EXPECT_TRUE(Contents()->GetWebUI()->GetController()->GetAs<::HistoryUI>());
   ASSERT_TRUE(WaitForRows(2));
-  EXPECT_EQ(true, content::EvalJs(Contents(), R"JS(
-    (async () => {
-      for (let attempt = 0; attempt < 250; ++attempt) {
-        const icons = [...document.querySelectorAll('.site-icon img')];
-        if (icons.length === 2 && icons.every(icon => icon.complete && icon.naturalWidth > 0)) return true;
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      return false;
+  EXPECT_EQ(true,
+            content::EvalJs(Contents(), test::WaitForInternalPageScript(R"JS(
+    (() => {
+      const icons = [...document.querySelectorAll('.site-icon img')];
+      return icons.length === 2 &&
+          icons.every(icon => icon.complete && icon.naturalWidth > 0);
     })()
-  )JS"));
+  )JS")));
   Search("Alpha review");
   ASSERT_TRUE(WaitForRows(1));
   EXPECT_EQ("Alpha review",

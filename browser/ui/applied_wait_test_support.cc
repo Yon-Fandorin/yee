@@ -16,6 +16,7 @@
 
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/hash/hash.h"
 #include "base/location.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
@@ -116,6 +117,144 @@ std::string DiagnosticLabel(const std::string& label) {
   return safe ? label : "<redacted>";
 }
 
+const char* MatchName(AppliedMatch match) {
+  switch (match) {
+    case AppliedMatch::kExact:
+      return "kExact";
+    case AppliedMatch::kPageIdentity:
+      return "kPageIdentity";
+    case AppliedMatch::kPageGeometry:
+      return "kPageGeometry";
+    case AppliedMatch::kPaneSplit:
+      return "kPaneSplit";
+    case AppliedMatch::kPaneSplitCurrentExtent:
+      return "kPaneSplitCurrentExtent";
+    case AppliedMatch::kViewVisible:
+      return "kViewVisible";
+    case AppliedMatch::kViewDrawn:
+      return "kViewDrawn";
+    case AppliedMatch::kViewBounds:
+      return "kViewBounds";
+    case AppliedMatch::kViewSize:
+      return "kViewSize";
+    case AppliedMatch::kViewHeight:
+      return "kViewHeight";
+    case AppliedMatch::kViewParent:
+      return "kViewParent";
+    case AppliedMatch::kViewParentDifferent:
+      return "kViewParentDifferent";
+    case AppliedMatch::kViewChildren:
+      return "kViewChildren";
+    case AppliedMatch::kViewNonEmpty:
+      return "kViewNonEmpty";
+    case AppliedMatch::kViewCenterVisible:
+      return "kViewCenterVisible";
+    case AppliedMatch::kViewPointerFocus:
+      return "kViewPointerFocus";
+    case AppliedMatch::kViewDestroyed:
+      return "kViewDestroyed";
+    case AppliedMatch::kViewOpacity:
+      return "kViewOpacity";
+    case AppliedMatch::kViewOpacityPositive:
+      return "kViewOpacityPositive";
+    case AppliedMatch::kViewHovered:
+      return "kViewHovered";
+    case AppliedMatch::kViewChildCount:
+      return "kViewChildCount";
+    case AppliedMatch::kSidebarHover:
+      return "kSidebarHover";
+    case AppliedMatch::kTabHoverIdle:
+      return "kTabHoverIdle";
+    case AppliedMatch::kViewScrollIdle:
+      return "kViewScrollIdle";
+    case AppliedMatch::kOmniboxPopup:
+      return "kOmniboxPopup";
+    case AppliedMatch::kOmniboxEditing:
+      return "kOmniboxEditing";
+    case AppliedMatch::kWidgetVisible:
+      return "kWidgetVisible";
+    case AppliedMatch::kWidgetOpacity:
+      return "kWidgetOpacity";
+    case AppliedMatch::kWidgetBounds:
+      return "kWidgetBounds";
+    case AppliedMatch::kWidgetClosed:
+      return "kWidgetClosed";
+    case AppliedMatch::kWidgetCapture:
+      return "kWidgetCapture";
+    case AppliedMatch::kWidgetActive:
+      return "kWidgetActive";
+    case AppliedMatch::kWidgetReady:
+      return "kWidgetReady";
+    case AppliedMatch::kWidgetShowState:
+      return "kWidgetShowState";
+    case AppliedMatch::kWidgetSizeNear:
+      return "kWidgetSizeNear";
+    case AppliedMatch::kFooterMenu:
+      return "kFooterMenu";
+    case AppliedMatch::kProjectRefreshed:
+      return "kProjectRefreshed";
+    case AppliedMatch::kProjectTitle:
+      return "kProjectTitle";
+    case AppliedMatch::kProjectLive:
+      return "kProjectLive";
+    case AppliedMatch::kTabCount:
+      return "kTabCount";
+    case AppliedMatch::kTabActive:
+      return "kTabActive";
+    case AppliedMatch::kNewTabActive:
+      return "kNewTabActive";
+    case AppliedMatch::kPresentationRevision:
+      return "kPresentationRevision";
+    case AppliedMatch::kPresentationRevisionChanged:
+      return "kPresentationRevisionChanged";
+    case AppliedMatch::kPresentationIconChanged:
+      return "kPresentationIconChanged";
+    case AppliedMatch::kPresentationIconReady:
+      return "kPresentationIconReady";
+    case AppliedMatch::kSamplingSettled:
+      return "kSamplingSettled";
+    case AppliedMatch::kNativeActive:
+      return "kNativeActive";
+    case AppliedMatch::kNativeFullscreen:
+      return "kNativeFullscreen";
+    case AppliedMatch::kPresentationColor:
+      return "kPresentationColor";
+    case AppliedMatch::kPresentationIcon:
+      return "kPresentationIcon";
+    case AppliedMatch::kPresentationAlpha:
+      return "kPresentationAlpha";
+    case AppliedMatch::kPresentationDark:
+      return "kPresentationDark";
+    case AppliedMatch::kWebUiRowsAtLeast:
+      return "kWebUiRowsAtLeast";
+    case AppliedMatch::kWebUiRowsFitNativeBounds:
+      return "kWebUiRowsFitNativeBounds";
+    case AppliedMatch::kWebUiSelection:
+      return "kWebUiSelection";
+    case AppliedMatch::kWebUiOpacity:
+      return "kWebUiOpacity";
+    case AppliedMatch::kWebUiHover:
+      return "kWebUiHover";
+    case AppliedMatch::kWebUiPadding:
+      return "kWebUiPadding";
+    case AppliedMatch::kWebUiResultsPadding:
+      return "kWebUiResultsPadding";
+    case AppliedMatch::kWebUiMedia:
+      return "kWebUiMedia";
+    case AppliedMatch::kWebUiHoverColor:
+      return "kWebUiHoverColor";
+    case AppliedMatch::kWebUiCustomizationReady:
+      return "kWebUiCustomizationReady";
+    case AppliedMatch::kWebUiClickCount:
+      return "kWebUiClickCount";
+    case AppliedMatch::kSurfaceDestination:
+      return "kSurfaceDestination";
+    case AppliedMatch::kPresentedFrame:
+      return "kPresentedFrame";
+  }
+  return "invalid";
+}
+
 AppliedSignalKey KeyFor(const AppliedCondition& condition) {
   return {condition.owner, GetAppliedConditionKind(condition.expected)};
 }
@@ -208,7 +347,8 @@ class Request {
     bool supported = true;
     std::vector<AppliedSignalKey> keys;
     for (auto& diagnostic : diagnostics_.conditions) {
-      diagnostic.supported = source_->Supports(diagnostic.condition);
+      diagnostic.supported = IsAppliedMatchCompatible(diagnostic.condition) &&
+                             source_->Supports(diagnostic.condition);
       if (!diagnostic.supported) {
         diagnostic.blockers = {AppliedConditionBlocker::kUnsupported};
       }
@@ -256,6 +396,7 @@ class Request {
       Finish(AppliedResultKind::kTimedOut);
       return;
     }
+    // 절대 deadline의 일회 실패 알림이며 상태 재검사를 예약하지 않는다.
     deadline_.Start(
         FROM_HERE, diagnostics_.options.deadline - base::TimeTicks::Now(),
         base::BindOnce(&Request::OnDeadline, work_weak_.GetWeakPtr()));
@@ -502,7 +643,7 @@ class Request {
     if (GetAppliedConditionKind(condition.expected) !=
         GetAppliedConditionKind(snapshot.value)) {
       blockers.push_back(Blocker::kKindMismatch);
-    } else if (!ValueMatches(condition.expected, snapshot.value)) {
+    } else if (!AppliedValueMatches(condition, snapshot.value)) {
       blockers.push_back(Blocker::kValueMismatch);
     }
     if (condition.coordinates != snapshot.coordinates) {
@@ -719,9 +860,373 @@ class Request {
 
 }  // namespace
 
+bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
+  const auto kind = GetAppliedConditionKind(condition.expected);
+  switch (condition.match) {
+    case AppliedMatch::kExact:
+      return true;
+    case AppliedMatch::kPageIdentity:
+    case AppliedMatch::kPageGeometry:
+      return kind == AppliedConditionKind::kPageHostsApplied;
+    case AppliedMatch::kPaneSplit:
+    case AppliedMatch::kPaneSplitCurrentExtent:
+      return kind == AppliedConditionKind::kPaneLayoutMatches;
+    case AppliedMatch::kViewVisible:
+    case AppliedMatch::kViewDrawn:
+    case AppliedMatch::kViewBounds:
+    case AppliedMatch::kViewSize:
+    case AppliedMatch::kViewHeight:
+    case AppliedMatch::kViewParent:
+    case AppliedMatch::kViewParentDifferent:
+    case AppliedMatch::kViewChildren:
+    case AppliedMatch::kViewNonEmpty:
+    case AppliedMatch::kViewCenterVisible:
+    case AppliedMatch::kViewPointerFocus:
+    case AppliedMatch::kViewDestroyed:
+    case AppliedMatch::kViewOpacity:
+    case AppliedMatch::kViewOpacityPositive:
+    case AppliedMatch::kViewHovered:
+    case AppliedMatch::kViewChildCount:
+    case AppliedMatch::kSidebarHover:
+    case AppliedMatch::kTabHoverIdle:
+    case AppliedMatch::kViewScrollIdle:
+    case AppliedMatch::kOmniboxPopup:
+    case AppliedMatch::kOmniboxEditing:
+    case AppliedMatch::kFooterMenu:
+    case AppliedMatch::kProjectRefreshed:
+      return kind == AppliedConditionKind::kViewStateMatches;
+    case AppliedMatch::kWidgetVisible:
+    case AppliedMatch::kWidgetOpacity:
+    case AppliedMatch::kWidgetBounds:
+    case AppliedMatch::kWidgetClosed:
+    case AppliedMatch::kWidgetCapture:
+    case AppliedMatch::kWidgetActive:
+    case AppliedMatch::kWidgetReady:
+    case AppliedMatch::kWidgetShowState:
+    case AppliedMatch::kWidgetSizeNear:
+      return kind == AppliedConditionKind::kWidgetStateMatches;
+    case AppliedMatch::kProjectTitle:
+    case AppliedMatch::kProjectLive:
+    case AppliedMatch::kTabCount:
+    case AppliedMatch::kTabActive:
+    case AppliedMatch::kNewTabActive:
+      return kind == AppliedConditionKind::kTabModelMatches;
+    case AppliedMatch::kPresentationRevision:
+    case AppliedMatch::kPresentationRevisionChanged:
+    case AppliedMatch::kPresentationIconChanged:
+    case AppliedMatch::kPresentationIconReady:
+    case AppliedMatch::kSamplingSettled:
+    case AppliedMatch::kPresentationColor:
+    case AppliedMatch::kPresentationIcon:
+    case AppliedMatch::kPresentationAlpha:
+    case AppliedMatch::kPresentationDark:
+      return kind == AppliedConditionKind::kPresentationMatches;
+    case AppliedMatch::kNativeActive:
+    case AppliedMatch::kNativeFullscreen:
+      return kind == AppliedConditionKind::kNativeWindowMatches;
+    case AppliedMatch::kWebUiRowsAtLeast:
+    case AppliedMatch::kWebUiRowsFitNativeBounds:
+    case AppliedMatch::kWebUiSelection:
+    case AppliedMatch::kWebUiOpacity:
+    case AppliedMatch::kWebUiHover:
+    case AppliedMatch::kWebUiPadding:
+    case AppliedMatch::kWebUiResultsPadding:
+    case AppliedMatch::kWebUiMedia:
+    case AppliedMatch::kWebUiHoverColor:
+    case AppliedMatch::kWebUiCustomizationReady:
+    case AppliedMatch::kWebUiClickCount:
+      return kind == AppliedConditionKind::kWebUiStateMatches;
+    case AppliedMatch::kSurfaceDestination:
+      return kind == AppliedConditionKind::kSurfaceEpochCommitted;
+    case AppliedMatch::kPresentedFrame:
+      return kind == AppliedConditionKind::kPresentedAfterApply;
+  }
+  return false;
+}
+
+bool AppliedValueMatches(const AppliedCondition& condition,
+                         const AppliedConditionValue& actual) {
+  if (condition.match == AppliedMatch::kExact)
+    return ValueMatches(condition.expected, actual);
+  if (condition.expected.index() != actual.index())
+    return false;
+  return std::visit(
+      [&](const auto& expected) {
+        using T = std::decay_t<decltype(expected)>;
+        const auto& value = std::get<T>(actual);
+        if constexpr (std::is_same_v<T, PageHostsApplied>) {
+          if (condition.match == AppliedMatch::kPageGeometry)
+            return value.geometry_applied && !value.bounds.IsEmpty();
+          return condition.match == AppliedMatch::kPageIdentity &&
+                 expected.pane_id == value.pane_id &&
+                 expected.tab_handle == value.tab_handle &&
+                 value.geometry_applied && !value.bounds.IsEmpty();
+        } else if constexpr (std::is_same_v<T, PaneLayoutMatches>) {
+          // Header·InfoBar·footer가 차지하는 요청 geometry를 각 카드에 적용해
+          // 실제 renderer 부모의 목표 extent를 비교한다. 카드 ratio만으로
+          // PageTargetHost의 적용 완료를 대신하지 않는다.
+          const auto parent_target = [](gfx::Size container,
+                                        gfx::Size expected_container,
+                                        gfx::Size expected_parent) {
+            return gfx::Size(container.width() - expected_container.width() +
+                                 expected_parent.width(),
+                             container.height() - expected_container.height() +
+                                 expected_parent.height());
+          };
+          return (condition.match == AppliedMatch::kPaneSplit ||
+                  condition.match == AppliedMatch::kPaneSplitCurrentExtent) &&
+                 expected.split_id == value.split_id &&
+                 expected.axis == value.axis &&
+                 (condition.match == AppliedMatch::kPaneSplitCurrentExtent ||
+                  expected.parent_extent == value.parent_extent) &&
+                 value.ratio >= expected.ratio_min.value_or(expected.ratio) &&
+                 value.ratio <= expected.ratio_max.value_or(expected.ratio) &&
+                 expected.tab_handles == value.tab_handles &&
+                 !value.start_parent_extent.IsEmpty() &&
+                 !value.end_parent_extent.IsEmpty() &&
+                 value.start_parent_extent ==
+                     parent_target(value.start_container_extent,
+                                   expected.start_container_extent,
+                                   expected.start_parent_extent) &&
+                 value.end_parent_extent ==
+                     parent_target(value.end_container_extent,
+                                   expected.end_container_extent,
+                                   expected.end_parent_extent) &&
+                 value.geometry_matches_ratio;
+        } else if constexpr (std::is_same_v<T, ViewStateMatches>) {
+          switch (condition.match) {
+            case AppliedMatch::kViewVisible:
+              return expected.visible == value.visible;
+            case AppliedMatch::kViewDrawn:
+              return expected.drawn == value.drawn;
+            case AppliedMatch::kViewBounds:
+              return expected.bounds == value.bounds;
+            case AppliedMatch::kViewSize:
+              return expected.bounds.size() == value.bounds.size();
+            case AppliedMatch::kViewHeight:
+              return expected.bounds.height() == value.bounds.height();
+            case AppliedMatch::kViewParent:
+              return expected.parent == value.parent;
+            case AppliedMatch::kViewParentDifferent:
+              return expected.parent != value.parent;
+            case AppliedMatch::kViewChildren:
+              return expected.children == value.children;
+            case AppliedMatch::kViewNonEmpty:
+              return value.bounds.width() >= expected.bounds.width() &&
+                     value.bounds.height() >= expected.bounds.height();
+            case AppliedMatch::kViewCenterVisible:
+              return !value.bounds.IsEmpty() &&
+                     value.visible_bounds.Contains(
+                         gfx::Rect(value.bounds.size()).CenterPoint());
+            case AppliedMatch::kViewPointerFocus:
+              return value.has_background &&
+                     expected.focus_change_reason == value.focus_change_reason;
+            case AppliedMatch::kViewDestroyed:
+              return expected.destroyed == value.destroyed;
+            case AppliedMatch::kViewOpacity:
+              return expected.opacity == value.opacity;
+            case AppliedMatch::kViewOpacityPositive:
+              return value.opacity > 0;
+            case AppliedMatch::kViewHovered:
+              return expected.hovered == value.hovered;
+            case AppliedMatch::kViewChildCount:
+              return expected.children.size() == value.children.size();
+            case AppliedMatch::kProjectRefreshed:
+              return !value.refresh_pending;
+            case AppliedMatch::kFooterMenu:
+              return expected.visible == value.visible &&
+                     (!expected.visible || value.drawn);
+            case AppliedMatch::kOmniboxPopup:
+              return expected.popup_open == value.popup_open &&
+                     (!expected.popup_open || value.visible);
+            case AppliedMatch::kOmniboxEditing:
+              return expected.editing == value.editing;
+            case AppliedMatch::kViewScrollIdle:
+              return !value.scroll_animation_running;
+            case AppliedMatch::kSidebarHover:
+              return expected.expanded_on_hover == value.expanded_on_hover;
+            case AppliedMatch::kTabHoverIdle:
+              return !value.hovered && !value.hover_animation_running &&
+                     value.opacity == 0;
+            default:
+              return false;
+          }
+        } else if constexpr (std::is_same_v<T, WidgetStateMatches>) {
+          switch (condition.match) {
+            case AppliedMatch::kWidgetOpacity:
+              return expected.opacity == value.opacity;
+            case AppliedMatch::kWidgetVisible:
+              return expected.visible == value.visible;
+            case AppliedMatch::kWidgetBounds:
+              return expected.bounds == value.bounds;
+            case AppliedMatch::kWidgetClosed:
+              return expected.closed == value.closed;
+            case AppliedMatch::kWidgetCapture:
+              return expected.capture == value.capture;
+            case AppliedMatch::kWidgetActive:
+              return expected.active == value.active;
+            case AppliedMatch::kWidgetReady:
+              return value.visible_on_screen && value.active &&
+                     value.paint_as_active;
+            case AppliedMatch::kWidgetShowState:
+              return expected.show_state == value.show_state;
+            case AppliedMatch::kWidgetSizeNear:
+              return std::abs(expected.bounds.width() - value.bounds.width()) <=
+                         1 &&
+                     std::abs(expected.bounds.height() -
+                              value.bounds.height()) <= 1;
+            default:
+              return false;
+          }
+        } else if constexpr (std::is_same_v<T, NativeWindowMatches>) {
+          if (condition.match == AppliedMatch::kNativeActive)
+            return expected.active == value.active;
+          return condition.match == AppliedMatch::kNativeFullscreen &&
+                 expected.fullscreen == value.fullscreen &&
+                 value.fullscreen_transition_complete;
+        } else if constexpr (std::is_same_v<T, PresentationMatches>) {
+          if (condition.match == AppliedMatch::kSamplingSettled)
+            return value.sampling_settled;
+          if (condition.match == AppliedMatch::kPresentationRevision)
+            return expected.presentation_id == value.presentation_id;
+          if (condition.match == AppliedMatch::kPresentationRevisionChanged)
+            return expected.presentation_id != value.presentation_id;
+          if (condition.match == AppliedMatch::kPresentationIconReady)
+            return value.icon_ready;
+          if (condition.match == AppliedMatch::kPresentationIconChanged)
+            return value.icon_ready && expected.icon_id != value.icon_id;
+          if (condition.match == AppliedMatch::kPresentationIcon)
+            return expected.icon_id == value.icon_id;
+          if (condition.match == AppliedMatch::kPresentationAlpha) {
+            const auto alpha = value.background_color >> 24;
+            return expected.background_color ? alpha > 0 && alpha < 255
+                                             : alpha == 0;
+          }
+          if (condition.match == AppliedMatch::kPresentationDark)
+            return expected.use_native_theme == value.use_native_theme;
+          return condition.match == AppliedMatch::kPresentationColor &&
+                 expected.source_id == value.source_id &&
+                 expected.background_color == value.background_color;
+        } else if constexpr (std::is_same_v<T, TabModelMatches>) {
+          if (condition.match == AppliedMatch::kTabCount)
+            return expected.tabs.size() == value.tabs.size();
+          if (condition.match == AppliedMatch::kTabActive)
+            return expected.active_tab != 0 &&
+                   expected.active_tab == value.active_tab;
+          if (condition.match == AppliedMatch::kNewTabActive) {
+            if (value.tabs.size() != expected.tabs.size() + 1 ||
+                value.active_tab == 0)
+              return false;
+            auto remaining = value.tabs;
+            const auto inserted = std::ranges::find(remaining, value.active_tab,
+                                                    &AppliedTabState::handle);
+            if (inserted == remaining.end() ||
+                std::ranges::find(expected.tabs, value.active_tab,
+                                  &AppliedTabState::handle) !=
+                    expected.tabs.end())
+              return false;
+            remaining.erase(inserted);
+            return remaining == expected.tabs;
+          }
+          if (expected.project_page != value.project_page)
+            return false;
+          if (condition.match == AppliedMatch::kProjectTitle)
+            return expected.project_title == value.project_title;
+          if (condition.match == AppliedMatch::kProjectLive)
+            return bool(expected.project_live_tab) ==
+                   bool(value.project_live_tab);
+          return false;
+        } else if constexpr (std::is_same_v<T, WebUiStateMatches>) {
+          if (expected.document != value.document)
+            return false;
+          switch (condition.match) {
+            case AppliedMatch::kWebUiRowsAtLeast:
+              return value.popup_rows.size() >= expected.popup_rows.size();
+            case AppliedMatch::kWebUiRowsFitNativeBounds: {
+              const auto& viewport = value.native_view_bounds_in_screen;
+              const auto& widget = value.native_widget_bounds_in_screen;
+              return value.popup_rows.size() >= expected.popup_rows.size() &&
+                     !value.row_bounds.empty() &&
+                     value.row_bounds.size() == value.popup_rows.size() &&
+                     viewport.width() > 1 && widget.Contains(viewport) &&
+                     std::ranges::all_of(
+                         value.row_bounds, [&](const auto& row) {
+                           return !row.IsEmpty() && row.bottom() > 0 &&
+                                  row.bottom() <= viewport.height();
+                         });
+            }
+            case AppliedMatch::kWebUiSelection:
+              return expected.selected_index == value.selected_index;
+            case AppliedMatch::kWebUiOpacity:
+              return expected.opacity == value.opacity;
+            case AppliedMatch::kWebUiHover:
+              return expected.hovered_index == value.hovered_index;
+            case AppliedMatch::kWebUiPadding:
+              return expected.padding_top == value.padding_top &&
+                     value.popup_rows.size() >= expected.popup_rows.size();
+            case AppliedMatch::kWebUiResultsPadding:
+              return expected.results_padding == value.results_padding;
+            case AppliedMatch::kWebUiMedia:
+              return expected.forced_colors == value.forced_colors &&
+                     expected.prefers_contrast_more ==
+                         value.prefers_contrast_more &&
+                     expected.focus_indicator_visible ==
+                         value.focus_indicator_visible;
+            case AppliedMatch::kWebUiHoverColor:
+              return expected.hover_background == value.hover_background &&
+                     !value.popup_rows.empty();
+            case AppliedMatch::kWebUiCustomizationReady:
+              return expected.customization_ready == value.customization_ready;
+            case AppliedMatch::kWebUiClickCount:
+              return expected.click_count == value.click_count;
+            default:
+              return false;
+          }
+        } else if constexpr (std::is_same_v<T, PresentedAfterApply>) {
+          return condition.match == AppliedMatch::kPresentedFrame &&
+                 expected.compositor == value.compositor &&
+                 !value.compositor.is_empty() &&
+                 expected.applied_sample_id == value.applied_sample_id &&
+                 value.successful;
+        } else if constexpr (std::is_same_v<T, SurfaceEpochCommitted>) {
+          return condition.match == AppliedMatch::kSurfaceDestination &&
+                 value.phase == SurfaceEpochCommitted::Phase::kStable &&
+                 value.destination == expected.destination &&
+                 value.epoch > expected.epoch &&
+                 value.committed_generation == value.epoch &&
+                 value.committed_generation > expected.committed_generation;
+        }
+        return false;
+      },
+      condition.expected);
+}
+
 AppliedConditionKind GetAppliedConditionKind(
     const AppliedConditionValue& value) {
   return static_cast<AppliedConditionKind>(value.index());
+}
+
+uint64_t AppliedFrameGeometryDigest(
+    const std::vector<AppliedSnapshot>& snapshots) {
+  std::string geometry;
+  for (const auto& snapshot : snapshots) {
+    if (std::holds_alternative<AnimationMatches>(snapshot.value))
+      continue;
+    auto value = snapshot.value;
+    if (auto* view = std::get_if<ViewStateMatches>(&value)) {
+      view->hovered = false;
+      view->expanded_on_hover = false;
+      view->hover_animation_running = false;
+      view->scroll_animation_running = false;
+      view->refresh_pending = false;
+      view->popup_open = false;
+      view->editing = false;
+      view->focus_change_reason = 0;
+    }
+    geometry += snapshot.owner.ToString() + FormatAppliedValue(value) +
+                FormatCoordinates(snapshot.coordinates);
+  }
+  return base::PersistentHash(geometry);
 }
 
 std::string FormatAppliedValue(const AppliedConditionValue& value) {
@@ -735,7 +1240,13 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("bounds", state.bounds)
               .Add("clip", state.clip)
               .Add("radii", state.radii)
-              .Add("target", state.target);
+              .Add("target", state.target)
+              .Add("overlay", state.overlay)
+              .Add("applied_bounds", state.applied_bounds)
+              .Add("applied_clip", state.applied_clip)
+              .Add("applied_target", state.applied_target)
+              .Add("applied_overlay", state.applied_overlay)
+              .Add("geometry_applied", state.geometry_applied);
         } else if constexpr (std::is_same_v<T, PaneLayoutMatches>) {
           fields.Add("split", state.split_id)
               .Add("axis", state.axis)
@@ -743,7 +1254,14 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("ratio", state.ratio)
               .Add("insets", state.insets)
               .Add("divider", state.divider)
-              .Add("tabs", state.tab_handles);
+              .Add("tabs", state.tab_handles)
+              .Add("start_parent", state.start_parent_extent)
+              .Add("end_parent", state.end_parent_extent)
+              .Add("start_container", state.start_container_extent)
+              .Add("end_container", state.end_container_extent)
+              .Add("geometry_matches_ratio", state.geometry_matches_ratio)
+              .Add("ratio_min", state.ratio_min.value_or(state.ratio))
+              .Add("ratio_max", state.ratio_max.value_or(state.ratio));
         } else if constexpr (std::is_same_v<T, ViewStateMatches>) {
           fields.Add("drawn", state.drawn)
               .Add("visible", state.visible)
@@ -751,7 +1269,21 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("parent", state.parent)
               .Add("children", state.children)
               .Add("scroll", state.scroll_offset)
-              .Add("destroyed", state.destroyed);
+              .Add("destroyed", state.destroyed)
+              .Add("opacity", state.opacity)
+              .Add("hovered", state.hovered)
+              .Add("expanded_on_hover", state.expanded_on_hover)
+              .Add("hover_animation_running", state.hover_animation_running)
+              .Add("scroll_animation_running", state.scroll_animation_running)
+              .Add("refresh_pending", state.refresh_pending)
+              .Add("popup_open", state.popup_open)
+              .Add("editing", state.editing)
+              .Add("screen_bounds", state.screen_bounds)
+              .Add("visible_bounds", state.visible_bounds)
+              .Add("painted_bounds", state.painted_bounds)
+              .Add("contents_bounds_in_screen", state.contents_bounds_in_screen)
+              .Add("has_background", state.has_background)
+              .Add("focus_change_reason", state.focus_change_reason);
         } else if constexpr (std::is_same_v<T, AnimationMatches>) {
           fields.Add("group", state.group_id)
               .Add("running", state.running)
@@ -767,7 +1299,11 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("bounds", state.bounds)
               .Add("capture", state.capture)
               .Add("show_state", state.show_state)
-              .Add("closed", state.closed);
+              .Add("closed", state.closed)
+              .Add("active", state.active)
+              .Add("opacity", state.opacity)
+              .Add("visible_on_screen", state.visible_on_screen)
+              .Add("paint_as_active", state.paint_as_active);
         } else if constexpr (std::is_same_v<T, FocusMatches>) {
           constexpr std::array<const char*, 3> kKinds = {
               "logical_view", "renderer_document", "native_key_window"};
@@ -782,7 +1318,10 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("fullscreen", state.fullscreen)
               .Add("fullscreen_complete", state.fullscreen_transition_complete);
         } else if constexpr (std::is_same_v<T, TabModelMatches>) {
-          fields.Add("active", state.active_tab);
+          fields.Add("active", state.active_tab)
+              .Add("project_page", state.project_page)
+              .Add("project_title", state.project_title)
+              .Add("project_live_tab", state.project_live_tab);
           for (const auto& tab : state.tabs) {
             fields.Add("tab", tab.handle)
                 .Add("pinned", tab.pinned)
@@ -833,14 +1372,32 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("selected", state.selected_index)
               .Add("rect", state.rect)
               .Add("opacity", state.opacity)
-              .Add("focused", state.focused);
+              .Add("focused", state.focused)
+              .Add("hovered_index", state.hovered_index)
+              .Add("padding_top", state.padding_top)
+              .Add("results_padding", state.results_padding)
+              .Add("forced_colors", state.forced_colors)
+              .Add("contrast_more", state.prefers_contrast_more)
+              .Add("focus_indicator", state.focus_indicator_visible)
+              .Add("hover_background", state.hover_background)
+              .Add("customization_ready", state.customization_ready)
+              .Add("click_count", state.click_count)
+              .Add("native_view_bounds_in_screen",
+                   state.native_view_bounds_in_screen)
+              .Add("native_widget_bounds_in_screen",
+                   state.native_widget_bounds_in_screen);
+          for (const auto& rect : state.row_bounds)
+            fields.Add("row_bounds", rect);
         } else if constexpr (std::is_same_v<T, PresentationMatches>) {
           fields.Add("source_id", state.source_id)
               .Add("presentation", state.presentation_id)
               .Add("background", state.background_color)
               .Add("foreground", state.foreground_color)
               .Add("icon", state.icon_id)
-              .Add("native_theme", state.use_native_theme);
+              .Add("native_theme", state.use_native_theme)
+              .Add("popup_revision", state.popup_revision)
+              .Add("icon_ready", state.icon_ready)
+              .Add("sampling_settled", state.sampling_settled);
         } else if constexpr (std::is_same_v<T, PresentedAfterApply>) {
           fields.Add("compositor", state.compositor)
               .Add("geometry_digest", state.geometry_digest)
@@ -923,6 +1480,7 @@ std::string AppliedWaitDiagnostics::ToString() const {
         << " owner=" << condition.owner.ToString()
         << " freshness=" << kFreshness[static_cast<int>(condition.freshness)]
         << " mode=" << kModes[static_cast<int>(condition.mode)]
+        << " match=" << MatchName(condition.match)
         << " group=" << condition.observation_group
         << " supported=" << diagnostic.supported
         << " satisfied=" << diagnostic.satisfied
@@ -950,6 +1508,8 @@ std::string AppliedWaitDiagnostics::ToString() const {
         if (s->request_epoch) {
           out << "epoch=" << *s->request_epoch;
         }
+        if (!s->adapter_diagnostics.empty())
+          out << " adapter={" << s->adapter_diagnostics << '}';
       } else {
         out << (diagnostic.supported ? "unobserved" : "unsupported");
       }

@@ -12,7 +12,6 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
-#include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
@@ -30,6 +29,8 @@
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
+#include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
+#include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
@@ -94,6 +95,21 @@ T* FindView(views::View* root) {
 
 class SiteControlsBrowserTest : public InProcessBrowserTest {
  public:
+  void TearDownOnMainThread() override {
+    applied_.Stop();
+    InProcessBrowserTest::TearDownOnMainThread();
+  }
+
+  yee::test::AppliedTestContext<yee::test::AppliedBrowserObservers> applied_;
+  yee::test::AppliedCondition VerticalIdle() {
+    auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+    auto owner = applied_.source().ObserveBrowserAnimation(
+        *view, *BrowserAnimationController::From(browser()),
+        TabStripAnimations::kVerticalTabStrip,
+        TabStripAnimations::kTabStripWidth, 1);
+    return applied_.Condition(
+        owner, yee::test::AnimationMatches{.group_id = 1, .running = false});
+  }
   void SetUpCommandLine(base::CommandLine* command_line) override {
     InProcessBrowserTest::SetUpCommandLine(command_line);
     command_line->AppendSwitch("yee-content-blocking-test-rules");
@@ -238,10 +254,13 @@ class SiteControlsBrowserTest : public InProcessBrowserTest {
     auto* toggle = FindView<views::ToggleButton>(widget->GetContentsView());
     ASSERT_TRUE(toggle);
     content::TestNavigationObserver reload(contents);
-    views::test::ButtonTestApi(toggle).NotifyDefaultMouseClick();
+    const yee::test::AppliedConditions closed{applied_.Widget(
+        *widget, {.closed = true}, yee::test::AppliedMatch::kWidgetClosed)};
+    ASSERT_TRUE(applied_.Run(closed, [&] {
+      views::test::ButtonTestApi(toggle).NotifyDefaultMouseClick();
+    }));
     reload.Wait();
     EXPECT_TRUE(reload.last_navigation_succeeded());
-    base::RunLoop().RunUntilIdle();
     EXPECT_FALSE(IsSiteControlsBubbleShowing());
   }
 
@@ -373,11 +392,8 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
 #endif
   for (bool vertical : {false, true}) {
     SCOPED_TRACE(vertical);
-    state->SetVerticalTabsEnabled(vertical);
-    base::RunLoop().RunUntilIdle();
     bool observed_unready_layout = false;
-    // 방향 전환의 실제 배치가 끝나야 화면 좌표가 native 클릭 대상과 맞는다.
-    const bool layout_ready = base::test::RunUntil([&] {
+    const auto layout_ready_now = [&] {
       auto* current = Button();
       const bool ready =
           !BrowserAnimationController::From(browser())->IsAnimating(
@@ -388,7 +404,28 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
               current->GetLocalBounds().CenterPoint());
       observed_unready_layout |= !ready;
       return ready;
-    });
+    };
+    const yee::test::AppliedConditions layout_conditions{
+        VerticalIdle(),
+        applied_.View(*Button(), {.drawn = true},
+                      yee::test::AppliedMatch::kViewDrawn),
+        applied_.View(*Button(), {.bounds = gfx::Rect(0, 0, 1, 1)},
+                      yee::test::AppliedMatch::kViewNonEmpty),
+        applied_.View(*Button(), {},
+                      yee::test::AppliedMatch::kViewCenterVisible)};
+    std::vector<yee::test::AppliedSignalKey> keys;
+    for (const auto& condition : layout_conditions)
+      keys.push_back({condition.owner,
+                      yee::test::GetAppliedConditionKind(condition.expected)});
+    auto observation = applied_.source().Subscribe(
+        keys,
+        base::BindLambdaForTesting([&](const yee::test::AppliedSignalSample&) {
+          observed_unready_layout |= !layout_ready_now();
+        }));
+    ASSERT_TRUE(applied_.Run(layout_conditions,
+                             [&] { state->SetVerticalTabsEnabled(vertical); }));
+    const bool layout_ready = layout_ready_now();
+    observation = {};
     RecordProperty(vertical ? "YeeVerticalProtectionObservedUnreadyLayout"
                             : "YeeHorizontalProtectionObservedUnreadyLayout",
                    observed_unready_layout ? 1 : 0);
@@ -420,12 +457,21 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
       ASSERT_TRUE(moved);
       ASSERT_TRUE(button->IsMouseHovered())
           << "실제 포인터가 Protection 버튼에 도착하지 않았습니다";
-      const bool clicked = ui_test_utils::SendMouseEventsSync(
-          ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
-          native_window);
-      record_input(phase + "-after-click", intended);
-      ASSERT_TRUE(clicked);
-      base::RunLoop().RunUntilIdle();
+      auto popup = applied_.Condition(
+          applied_.source().ObserveUiState(
+              *button,
+              yee::test::AppliedBrowserObservers::UiProbe::kSiteControlsPopup),
+          yee::test::ViewStateMatches{.visible = expected_open},
+          yee::test::AppliedMatch::kViewVisible,
+          yee::test::AppliedFreshness::kNewApply);
+      ASSERT_TRUE(applied_.Run({popup}, [&] {
+        const bool clicked = ui_test_utils::SendMouseEventsSync(
+            ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP,
+            native_window);
+        record_input(phase + "-after-click", intended);
+        ASSERT_TRUE(clicked);
+      }));
+      // 기존 metric 이름을 유지하되 실제 popup 적용 뒤 시점을 기록한다.
       record_input(phase + "-after-idle", intended);
       RecordProperty("YeeProtectionInputPhase", phase);
       RecordProperty("YeeProtectionCurrentButtonBounds",
@@ -450,8 +496,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
     widget->LayoutRootViewIfNecessary();
     auto* compositor = widget->GetCompositor();
     compositor->ScheduleFullRedraw();
-    ASSERT_TRUE(
-        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+    ASSERT_TRUE(applied_.WaitForPresentedFrame(*widget));
 #if BUILDFLAG(IS_WIN)
     // DirectComposition 팝업은 PrintWindow로 캡처하면 비어 있을 수 있다.
     // Windows에서는 실제 합성 프레임을 캡처한다.
@@ -527,7 +572,6 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
       "chrome://settings/content/siteDetails?site="));
   EXPECT_NE(std::string::npos,
             settings_contents->GetVisibleURL().spec().find("yee-fixture.test"));
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 }
 
@@ -537,15 +581,21 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, ButtonOutlivesDestroyedTab) {
   SiteControlsButton detached_button(browser());
   detached_button.Update(Contents(), false);
   ASSERT_TRUE(detached_button.GetVisible());
-  ASSERT_TRUE(OpenControls());
+  auto* popup = OpenControls();
+  ASSERT_TRUE(popup);
   content::WebContentsDestroyedWatcher destroyed(Contents());
-  browser()->tab_strip_model()->CloseWebContentsAt(0, 0);
-  destroyed.Wait();
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*popup, {.closed = true},
+                       yee::test::AppliedMatch::kWidgetClosed)},
+      [&] {
+        browser()->tab_strip_model()->CloseWebContentsAt(0, 0);
+        destroyed.Wait();
+      },
+      yee::test::AppliedDomain::kWidget));
   EXPECT_EQ(nullptr, detached_button.web_contents());
   EXPECT_FALSE(detached_button.GetVisible());
   detached_button.SetSurfacePresentation(
       ResolveBrowserSurfacePresentation(SK_ColorWHITE, 1, 1, 1));
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 }
 
@@ -570,6 +620,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
                 second,
                 "fetch('http://yee-block.test:' + location.port + '/second')"
                 ".then(() => false, () => true)"));
+  // renderer의 차단 결과 IPC/IO 알림을 비UI 모델에 전달한다.
   base::RunLoop().RunUntilIdle();
   auto* first_helper =
       content_blocking::ContentBlockingTabHelper::FromWebContents(first);
@@ -603,9 +654,13 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
                   canvas.GetBitmap().getColor(center.x(), center.y())),
               color_utils::kMinimumReadableContrastRatio);
   }
-  ASSERT_TRUE(OpenControls());
-  browser()->tab_strip_model()->ActivateTabAt(0);
-  base::RunLoop().RunUntilIdle();
+  auto* popup = OpenControls();
+  ASSERT_TRUE(popup);
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*popup, {.closed = true},
+                       yee::test::AppliedMatch::kWidgetClosed)},
+      [&] { browser()->tab_strip_model()->ActivateTabAt(0); },
+      yee::test::AppliedDomain::kWidget));
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
 
   const auto capture_dir =
@@ -627,8 +682,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
     view->GetWidget()->LayoutRootViewIfNecessary();
     auto* compositor = view->GetWidget()->GetCompositor();
     compositor->ScheduleFullRedraw();
-    ASSERT_TRUE(
-        ui::WaitForNextFrameToBePresented(compositor, base::Seconds(5)));
+    ASSERT_TRUE(applied_.WaitForPresentedFrame(*view->GetWidget()));
     base::test::TestFuture<scoped_refptr<base::RefCountedMemory>> snapshot;
     ui::GrabWindowSnapshotAsPNG(
         view->GetWidget()->GetNativeWindow(),
@@ -674,10 +728,14 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
   ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
       view->GetLocationBarView()->GetBoundsInScreen().CenterPoint(),
       native_window));
-  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
-      badge->GetBoundsInScreen().CenterPoint(), native_window));
-  ASSERT_TRUE(base::test::RunUntil(
-      [&]() { return button->GetState() == views::Button::STATE_HOVERED; }));
+  ASSERT_TRUE(applied_.Run(
+      {applied_.View(*button, {.hovered = true},
+                     yee::test::AppliedMatch::kViewHovered)},
+      [&] {
+        ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+            badge->GetBoundsInScreen().CenterPoint(), native_window));
+      }));
+  ASSERT_EQ(views::Button::STATE_HOVERED, button->GetState());
   capture("dark-sidebar-hover.png");
   ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
       ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP, native_window));
@@ -936,6 +994,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   ASSERT_TRUE(frame);
   EXPECT_EQ(true, content::EvalJs(frame, "window.blocked",
                                   content::EXECUTE_SCRIPT_NO_USER_GESTURE));
+  // renderer의 차단 결과 IPC/IO 알림을 비UI 모델에 전달한다.
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(0u, helper->blocked_count());
   prerender_helper_.NavigatePrimaryPage(target);
@@ -945,6 +1004,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                       Contents(),
                       content::JsReplace(
                           "fetch($1).then(() => false, () => true)", AdURL())));
+  // renderer의 차단 결과 IPC/IO 알림을 비UI 모델에 전달한다.
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(1u, helper->blocked_count());
 }
@@ -989,6 +1049,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                       Contents(),
                       content::JsReplace(
                           "fetch($1).then(() => false, () => true)", AdURL())));
+  // renderer의 차단 결과 IPC/IO 알림을 비UI 모델에 전달한다.
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(1u, helper->blocked_count());
 }

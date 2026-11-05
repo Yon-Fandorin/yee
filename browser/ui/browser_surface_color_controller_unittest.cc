@@ -9,10 +9,13 @@
 #include <optional>
 
 #include "base/functional/bind.h"
+#include "base/test/bind.h"
 #include "base/test/task_environment.h"
+#include "base/test/test_file_util.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation_binding.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
+#include "chrome/test/base/testing_profile.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -30,6 +33,14 @@ class BrowserSurfaceColorControllerTest
             base::test::TaskEnvironment::TimeSource::MOCK_TIME) {}
 
  protected:
+  std::unique_ptr<TestingProfile> CreateTestingProfile() override {
+    // 창 없는 fixture의 프로필을 테스트 수명의 임시 폴더에 격리한다.
+    TestingProfile::Builder builder;
+    builder.SetPath(base::CreateUniqueTempDirectoryScopedToTest());
+    builder.AddTestingFactories(GetTestingFactories());
+    return builder.Build();
+  }
+
   gfx::AnimationTestApi::RenderModeResetter rich_animation_ =
       gfx::AnimationTestApi::SetRichAnimationRenderMode(
           gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
@@ -161,6 +172,12 @@ class BrowserSurfaceColorControllerTest
     controller.OnTopStripCaptured(sampling_epoch, result);
   }
 
+  void FinishInitialSamplesForTesting(
+      BrowserSurfaceColorController& controller) {
+    controller.sample_timer_.Stop();
+    controller.pending_page_settling_samples_ = 0;
+  }
+
   bool HasLateVerification(BrowserSurfaceColorController& controller) {
     return controller.late_page_sample_timer_.IsRunning();
   }
@@ -201,14 +218,13 @@ TEST(BrowserSurfaceColorSampleTest, BoundaryOwnsColorNotLowerMajority) {
 }
 
 TEST(BrowserSurfaceColorSampleTest, ConvertsDisplayP3ReadbackToHeaderSrgb) {
-  const auto p3 = SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB,
-                                       SkNamedGamut::kDisplayP3);
-  for (SkColor color : {SkColorSetRGB(80, 100, 120),
-                       SkColorSetRGB(200, 70, 40),
-                       SkColorSetRGB(40, 170, 90)}) {
+  const auto p3 =
+      SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB, SkNamedGamut::kDisplayP3);
+  for (SkColor color : {SkColorSetRGB(80, 100, 120), SkColorSetRGB(200, 70, 40),
+                        SkColorSetRGB(40, 170, 90)}) {
     SkBitmap original;
-    original.allocPixels(SkImageInfo::MakeN32Premul(
-        96, 8, SkColorSpace::MakeSRGB()));
+    original.allocPixels(
+        SkImageInfo::MakeN32Premul(96, 8, SkColorSpace::MakeSRGB()));
     original.eraseColor(color);
     SkBitmap readback;
     readback.allocPixels(SkImageInfo::MakeN32Premul(96, 8, p3));
@@ -226,14 +242,14 @@ TEST(BrowserSurfaceColorSampleTest, ConvertsDisplayP3ReadbackToHeaderSrgb) {
 TEST(BrowserSurfaceColorSampleTest, ConvertsLinearReadbackAndPreservesSrgb) {
   const SkColor color = SkColorSetRGB(80, 100, 120);
   SkBitmap original;
-  original.allocPixels(SkImageInfo::MakeN32Premul(
-      96, 8, SkColorSpace::MakeSRGB()));
+  original.allocPixels(
+      SkImageInfo::MakeN32Premul(96, 8, SkColorSpace::MakeSRGB()));
   original.eraseColor(color);
   EXPECT_EQ(color, ResolveBrowserSurfaceColorSample(original));
   SkBitmap linear;
-  linear.allocPixels(SkImageInfo::Make(
-      96, 8, kRGBA_F16_SkColorType, kPremul_SkAlphaType,
-      SkColorSpace::MakeSRGBLinear()));
+  linear.allocPixels(SkImageInfo::Make(96, 8, kRGBA_F16_SkColorType,
+                                       kPremul_SkAlphaType,
+                                       SkColorSpace::MakeSRGBLinear()));
   ASSERT_TRUE(original.readPixels(linear.pixmap()));
   EXPECT_NE(color, linear.getColor(0, 0));
   EXPECT_EQ(color, ResolveBrowserSurfaceColorSample(linear));
@@ -449,6 +465,41 @@ TEST_F(BrowserSurfaceColorControllerTest,
   StopSamplingForTesting(*source);
 }
 
+TEST_F(BrowserSurfaceColorControllerTest,
+       SettlingSignalWaitsForCaptureCompletion) {
+  auto* source = SourceFor(web_contents());
+  source->SetThemeFallbackColor(SK_ColorWHITE);
+  DidFirstVisuallyNonEmptyPaintForTesting(*source);
+  SetPageReadyForCommitForTesting(*source);
+  std::vector<BrowserSurfaceColorController::SamplingSnapshot> snapshots;
+  auto subscription =
+      source->AddSamplingStateChangedCallback(base::BindLambdaForTesting(
+          [&](BrowserSurfaceColorController::SamplingSnapshot value) {
+            snapshots.push_back(value);
+          }));
+  EXPECT_FALSE(source->GetSamplingSnapshot().settled);
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(96, 8);
+  bitmap.eraseColor(SK_ColorBLUE);
+  const auto epoch = SamplingEpochForTesting(*source);
+  FinishInitialSamplesForTesting(*source);
+  DeliverCaptureForTesting(*source, epoch,
+                           viz::CopyOutputBitmapWithMetadata(bitmap));
+  ASSERT_EQ(1u, snapshots.size());
+  EXPECT_FALSE(snapshots.back().settled);
+  FinishInitialSamplesForTesting(*source);
+  SetCaptureInFlightForTesting(*source, true);
+  EXPECT_FALSE(source->GetSamplingSnapshot().settled);
+  DeliverCaptureForTesting(*source, epoch,
+                           viz::CopyOutputBitmapWithMetadata(bitmap));
+  ASSERT_EQ(2u, snapshots.size());
+  EXPECT_EQ(epoch, snapshots.back().epoch);
+  EXPECT_TRUE(snapshots.back().settled);
+  EXPECT_TRUE(HasLateVerification(*source));
+  StopSamplingForTesting(*source);
+  EXPECT_FALSE(source->GetSamplingSnapshot().settled);
+}
+
 TEST_F(BrowserSurfaceColorControllerTest, HiddenTabSchedulesSamplingWhenShown) {
   web_contents()->WasHidden();
   BrowserSurfaceColorController* source = SourceFor(web_contents());
@@ -496,8 +547,7 @@ TEST_F(BrowserSurfaceColorControllerTest,
 
   StartScrollSamplingForTesting(*source);
   const uint64_t scroll_epoch = SamplingEpochForTesting(*source);
-  const base::TimeDelta timeout =
-      CurrentScrollTimeoutDelayForTesting(*source);
+  const base::TimeDelta timeout = CurrentScrollTimeoutDelayForTesting(*source);
   const SkColor candidate = SkColorSetRGB(0x24, 0x68, 0x92);
   SetCandidateColorForTesting(*source, candidate);
   SetStableCandidateCountForTesting(*source, 1);

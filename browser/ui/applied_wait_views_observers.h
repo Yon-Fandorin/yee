@@ -61,7 +61,8 @@ class AppliedViewsObservers final : public AppliedSignalSource {
   // dependencies의 새 적용을 확인한 뒤 성공 presentation feedback을 요청한다.
   // 반환값의 sample identity는 이 등록에만 유효하다.
   AppliedCondition ObservePresentedAfterApply(views::View& view,
-                                              AppliedConditions dependencies);
+                                              AppliedConditions dependencies,
+                                              bool request_redraw = true);
 
   bool Supports(const AppliedCondition& condition) const override;
   bool IsOwnerAlive(AppliedOwnerToken owner) const override;
@@ -70,6 +71,12 @@ class AppliedViewsObservers final : public AppliedSignalSource {
   base::CallbackListSubscription Subscribe(
       const std::vector<AppliedSignalKey>& keys,
       Observer observer) override;
+  // sibling bounds 갱신 도중이 아닌 실제 compositor commit의 같은 표본을
+  // 읽는다.
+  base::CallbackListSubscription SubscribeCompositorFrames(
+      views::Widget& widget,
+      std::vector<AppliedSignalKey> keys,
+      Observer observer);
 
  private:
   friend class AppliedBrowserObservers;

@@ -189,6 +189,43 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
 }
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
+                       SubscriptionReleaseStopsUnrelatedSnapshotReads) {
+  class CountingView : public views::View {
+   public:
+    bool IsDrawn() const override {
+      ++reads;
+      return views::View::IsDrawn();
+    }
+    mutable int reads = 0;
+  } counted;
+  views::View trigger;
+  AppliedViewsObservers source;
+  const auto owner = source.ObserveView(counted);
+  source.ObserveView(trigger);
+  const std::vector<AppliedSignalKey> keys{
+      {owner, AppliedConditionKind::kViewStateMatches}};
+  const auto observe = [&] {
+    return source.Subscribe(keys, base::DoNothing());
+  };
+  auto first = observe();
+  auto second = observe();
+  first = {};
+  counted.reads = 0;
+  trigger.SetBoundsRect(gfx::Rect(1, 1, 10, 10));
+  EXPECT_GT(counted.reads, 0);
+  second = {};
+  counted.reads = 0;
+  trigger.SetBoundsRect(gfx::Rect(2, 2, 10, 10));
+  EXPECT_EQ(counted.reads, 0);
+  // 다시 구독하면 새 현재값을 읽고 다음 순간 표본에도 참여한다.
+  auto next = observe();
+  EXPECT_GT(counted.reads, 0);
+  counted.reads = 0;
+  trigger.SetBoundsRect(gfx::Rect(3, 3, 10, 10));
+  EXPECT_GT(counted.reads, 0);
+}
+
+IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
                        OwnerDestructionRejectsAddressReuse) {
   alignas(views::View) unsigned char storage[sizeof(views::View)];
   auto* view = std::construct_at(reinterpret_cast<views::View*>(storage));
@@ -307,13 +344,24 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
   auto expected = std::get<ViewStateMatches>(
       source.Read({owner, AppliedConditionKind::kViewStateMatches})->value);
   expected.bounds = gfx::Rect(1, 2, 30, 40);
+  // 실제 target은 같은 task에서 원래 bounds로 복원된다. 별도 View에 목표
+  // bounds를 적용해 관측 당시의 파생 geometry를 계산한다.
+  views::View expected_target;
+  expected_target.SetBoundsRect(expected.bounds);
+  expected.screen_bounds = expected_target.GetBoundsInScreen();
+  expected.visible_bounds = expected_target.GetVisibleBounds();
+  expected.painted_bounds = gfx::Rect();
+  expected.contents_bounds_in_screen = expected_target.GetContentsBounds();
+  views::View::ConvertRectToScreen(&expected_target,
+                                   &expected.contents_bounds_in_screen);
   const AppliedConditions conditions{
       {.owner = owner,
        .expected = expected,
        .freshness = AppliedFreshness::kNewObservation,
        .mode = AppliedEvaluationMode::kObservedSinceDispatch,
        .coordinates = GetAppliedViewCoordinates(
-           target, AppliedCoordinates::Space::kParent)}};
+           target, AppliedCoordinates::Space::kParent),
+       .match = AppliedMatch::kViewBounds}};
   AppliedWaitSession session(source);
   const auto ticket =
       session.BeginRequest(Intent(conditions), conditions, Options());
@@ -553,6 +601,12 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
                        FrameGeometryBounceAndAnimationRangeRearm) {
+  auto rich = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  auto reduced =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
   auto* parent = BrowserView::GetBrowserViewForBrowser(browser());
   auto* host = parent->AddChildView(CreatePageViewportHostTree());
   base::ScopedClosureRunner remove(
@@ -586,6 +640,48 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
       })));
   const auto result = session.WaitForApplied(ticket, conditions);
   EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+  // 무관한 compositor commit·feedback이 같은 page apply를 재발행하면 안 된다.
+  int page_wakes = 0;
+  auto page_subscription =
+      source.Subscribe({{page.owner, AppliedConditionKind::kPageHostsApplied}},
+                       base::BindLambdaForTesting(
+                           [&](const AppliedSignalSample&) { ++page_wakes; }));
+  auto current_page = page;
+  current_page.freshness = AppliedFreshness::kCurrentAfterDispatch;
+  const auto next_frame =
+      source.ObservePresentedAfterApply(*host, {current_page});
+  const AppliedConditions frame_conditions{next_frame};
+  const auto frame_ticket =
+      session.BeginRequest(Intent(frame_conditions, AppliedDomain::kFrame),
+                           frame_conditions, Options());
+  ASSERT_FALSE(session.Dispatch(frame_ticket, base::DoNothing()));
+  const auto presented = session.WaitForApplied(frame_ticket, frame_conditions);
+  EXPECT_EQ(AppliedResultKind::kApplied, presented.kind)
+      << presented.ToString();
+  EXPECT_EQ(0, page_wakes);
+  // 다른 조건이 바뀐 같은 표본에서는 고정된 geometry도 순간 AND에 참여한다.
+  auto observed_page = current_page;
+  observed_page.mode = AppliedEvaluationMode::kObservedSinceDispatch;
+  observed_page.observation_group = 813;
+  AppliedCondition observed_motion{
+      animation_owner, AnimationMatches{812, true, .1, .9},
+      AppliedFreshness::kNewObservation,
+      AppliedEvaluationMode::kObservedSinceDispatch, 813};
+  observed_motion.coordinates = GetAppliedViewCoordinates(*decoration);
+  const AppliedConditions composite{observed_page, observed_motion};
+  const auto composite_ticket =
+      session.BeginRequest(Intent(composite), composite, Options());
+  ASSERT_FALSE(session.Dispatch(
+      composite_ticket, base::BindLambdaForTesting([&] {
+        SetHorizontalTabGroupCapsuleCollapsed(*decoration, false);
+      })));
+  const auto observed = session.WaitForApplied(composite_ticket, composite);
+  ASSERT_EQ(AppliedResultKind::kApplied, observed.kind) << observed.ToString();
+  ASSERT_TRUE(observed.diagnostics.conditions[0].observed);
+  ASSERT_TRUE(observed.diagnostics.conditions[1].observed);
+  EXPECT_EQ(observed.diagnostics.conditions[0].observed->sample_id,
+            observed.diagnostics.conditions[1].observed->sample_id);
+  EXPECT_EQ(0, page_wakes);
 }
 
 class AppliedLayoutDelegate
@@ -751,15 +847,14 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
   const auto ticket =
       session.BeginRequest(Intent({observed}), {observed}, Options());
   // parent·compositor가 없어 같은 task 안의 시작과 종료 외에는 깨움이 없다.
-  ASSERT_FALSE(session.Dispatch(
-      ticket, base::BindLambdaForTesting([&] {
-        auto child = std::make_unique<views::View>();
-        child->SetPreferredSize(gfx::Size(40, 20));
-        host.AddChildView(std::move(child));
-        ASSERT_TRUE(manager->is_animating());
-        manager->ResetLayout();
-        ASSERT_FALSE(manager->is_animating());
-      })));
+  ASSERT_FALSE(session.Dispatch(ticket, base::BindLambdaForTesting([&] {
+                                  auto child = std::make_unique<views::View>();
+                                  child->SetPreferredSize(gfx::Size(40, 20));
+                                  host.AddChildView(std::move(child));
+                                  ASSERT_TRUE(manager->is_animating());
+                                  manager->ResetLayout();
+                                  ASSERT_FALSE(manager->is_animating());
+                                })));
   const auto result = session.WaitForApplied(ticket, {observed});
   EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
   ASSERT_TRUE(result.diagnostics.conditions[0].observed);
@@ -1088,7 +1183,8 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
   expected.bounds = gfx::Rect(4, 5, 30, 20);
   AppliedCondition condition{.owner = owner,
                              .expected = expected,
-                             .coordinates = initial->coordinates};
+                             .coordinates = initial->coordinates,
+                             .match = AppliedMatch::kViewBounds};
   AppliedWaitSession session(source);
   const auto ticket =
       session.BeginRequest(Intent({condition}), {condition}, Options());
@@ -1132,12 +1228,17 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
   ASSERT_TRUE(tab_view);
   const auto origin = tab_view->GetBoundsInScreen().CenterPoint();
   const auto destination = origin + gfx::Vector2d(25, 0);
-  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(origin));
-  ASSERT_TRUE(
-      ui_test_utils::SendMouseEventsSync(ui_controls::LEFT, ui_controls::DOWN));
-  base::ScopedClosureRunner release(base::BindOnce([] {
-    ui_controls::SendMouseEvents(ui_controls::LEFT, ui_controls::UP);
-  }));
+  const auto native_window = context->GetWidget()->GetNativeWindow();
+  ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(origin, native_window));
+  auto allow_input = std::make_shared<bool>(true);
+  base::ScopedClosureRunner release(base::BindOnce(
+      [](std::shared_ptr<bool> allow_input, gfx::NativeWindow native_window) {
+        *allow_input = false;
+        // observer와 fixture가 살아 있을 때 실제 release ACK까지 받는다.
+        EXPECT_TRUE(ui_test_utils::SendMouseEventsSync(
+            ui_controls::LEFT, ui_controls::UP, native_window));
+      },
+      allow_input, native_window));
   bool creation_callback = false;
   context->SetDragControllerCallbackForTesting(base::BindLambdaForTesting(
       [&](TabDragController*) { creation_callback = true; }));
@@ -1166,13 +1267,38 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
       Intent(conditions, AppliedDomain::kDrag), conditions, options);
   ASSERT_FALSE(session.DispatchAsync(
       ticket, base::BindLambdaForTesting([&](DispatchDone done) {
-        ASSERT_TRUE(ui_controls::SendMouseMoveNotifyWhenDone(
-            destination.x(), destination.y(),
-            drag.InputAck(std::move(done), destination)));
+        // 생성부터 관측해야 하므로 press도 arm 이후 보낸다. 위치로 창을
+        // 다시 추측하지 않고 전용 모니터의 실제 대상 창에 입력한다.
+        auto [accepted, rejected] = base::SplitOnceCallback(std::move(done));
+        auto [press_rejected, move_rejected] =
+            base::SplitOnceCallback(std::move(rejected));
+        const bool pressed = ui_controls::SendMouseEventsNotifyWhenDone(
+            ui_controls::LEFT, ui_controls::DOWN,
+            base::BindLambdaForTesting(
+                [allow_input, native_window, destination,
+                 rejected = std::move(move_rejected),
+                 ack = drag.InputAck(std::move(accepted),
+                                     destination)]() mutable {
+                  if (!*allow_input) {
+                    std::move(rejected).Run(AppliedDispatchStatus::kRejected);
+                    return;
+                  }
+                  const bool moved = ui_controls::SendMouseMoveNotifyWhenDone(
+                      destination.x(), destination.y(), std::move(ack),
+                      native_window);
+                  if (!moved)
+                    std::move(rejected).Run(AppliedDispatchStatus::kRejected);
+                  ASSERT_TRUE(moved);
+                }),
+            0, native_window);
+        if (!pressed)
+          std::move(press_rejected).Run(AppliedDispatchStatus::kRejected);
+        ASSERT_TRUE(pressed);
       })));
   const auto result = session.WaitForApplied(ticket, conditions);
   EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
   EXPECT_FALSE(creation_callback);
+  release.RunAndReset();
 }
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,

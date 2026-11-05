@@ -11,7 +11,9 @@
 #include <string>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/functional/callback_forward.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/ui/views/yee/sidebar_presentation.h"
 #include "ui/gfx/geometry/point.h"
 
@@ -80,6 +82,19 @@ struct SidebarContextItem {
   bool account_name_is_placeholder = false;
   bool is_local_context = false;
 };
+
+// Footer가 소유하는 표시 적용값이다. Widget 포인터는 계약 밖에 둔다.
+struct SidebarFooterAppliedSnapshot {
+  base::UnguessableToken owner;
+  uint64_t apply_serial = 0;
+  bool menu_open = false;
+};
+SidebarFooterAppliedSnapshot GetSidebarFooterAppliedSnapshot(
+    const views::View& view);
+base::CallbackListSubscription SubscribeSidebarFooterApplied(
+    views::View& view,
+    base::RepeatingCallback<void(const SidebarFooterAppliedSnapshot&)>
+        callback);
 
 struct SidebarFooterModel {
   std::vector<SidebarContextItem> contexts;

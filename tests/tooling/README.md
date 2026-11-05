@@ -15,6 +15,15 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test
 일부 브랜딩 테스트는 `.local-build/chromium/src`의 도구를 읽는다.
 해당 소스가 없으면 테스트를 건너뛰므로 통과와 건너뜀을 구분해서 보고한다.
 
+`test_legacy_ui_waits.py`는 `browser/ui` 아래 Yee 테스트와 GN testonly target의
+`sources`·`public` 지원 코드(헤더 포함)의 `RunUntil`,
+`RunUntilIdle`, polling helper, sleep, delayed task, timer 시작 및 JS
+`setTimeout`·`setInterval`을 검사한다.
+`legacy_ui_wait_allowlist.json`은 mock-clock 자극, 정상 완료 callback,
+비UI task 전달과 일회 실패 deadline만 정확한 호출 위치·지문·사유로 분류한다.
+새 호출, 호출 내용 변경, 빈 사유와 삭제된 호출의 예외는 모두 실패한다.
+UI/model 상태의 완료를 기다리는 새 코드는 입력 전에 applied ticket을 등록한다.
+
 `test_chromium_version.py`는 공통 원본 핀, OS별 업데이트 조회와 Windows 개발 명령의
 사전 검사를 다룬다. `test_overlay_tools.py`는 별도 후보 원본에서 패치를 다시 만들 때의
 소유권 경계도 확인한다. macOS 개발 명령 검사는 zsh가 없으면 건너뛴다.

@@ -16,6 +16,7 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/startup/url_util.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -153,21 +154,17 @@ IN_PROC_BROWSER_TEST_F(InternalURLsBrowserTest,
   EXPECT_EQ(GURL("chrome://yee-settings/content-blocking"),
             Contents()->GetLastCommittedURL());
   EXPECT_EQ(base::UTF8ToUTF16(branded.spec()), Address());
-  EXPECT_EQ(true, content::EvalJs(Contents(), R"JS(
+  EXPECT_EQ(true,
+            content::EvalJs(Contents(), test::WaitForInternalPageScript(R"JS(
     (async () => {
       const {loadTimeData} = await import('chrome://resources/js/load_time_data.js');
-      for (let attempt = 0; attempt < 250; ++attempt) {
-        const title = document.getElementById('blocking-title');
-        if (title) {
-          return title.textContent === loadTimeData.getString('blockingTitle') &&
-              document.documentElement.lang === loadTimeData.getString('language') &&
-              document.documentElement.dir === loadTimeData.getString('textdirection');
-        }
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
-      return false;
+      const title = document.getElementById('blocking-title');
+      return !!title && title.textContent === loadTimeData.getString('blockingTitle') &&
+          document.documentElement.lang === loadTimeData.getString('language') &&
+          document.documentElement.dir === loadTimeData.getString('textdirection');
     })()
-  )JS"));
+  )JS")));
+
   EXPECT_EQ(false, content::EvalJs(
                        Contents(),
                        "document.getElementById('content-blocking').hidden"));

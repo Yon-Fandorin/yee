@@ -9,6 +9,7 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -28,6 +29,12 @@ class View;
 
 namespace yee {
 
+struct SiteControlsPopupAppliedSnapshot {
+  base::UnguessableToken owner = base::UnguessableToken::Create();
+  uint64_t apply_serial = 0;
+  bool showing = false;
+};
+
 // Yee 사이트 보호 팝업을 여는 주소창 버튼이다.
 // LocationBarView가 선택한 활성 WebContents의 helper만 관찰하며 탭 상태는
 // 소유하지 않는다.
@@ -44,6 +51,12 @@ class SiteControlsButton : public views::ImageButton,
   void Update(content::WebContents* contents, bool hide_for_omnibox_input);
   void SetSurfacePresentation(
       std::optional<BrowserSurfacePresentation> presentation);
+  SiteControlsPopupAppliedSnapshot GetPopupAppliedSnapshot() const;
+  base::CallbackListSubscription SubscribePopupApplied(
+      base::RepeatingCallback<void(const SiteControlsPopupAppliedSnapshot&)>
+          callback);
+  // 팝업 소유자가 실제 표시·파괴 후 적용값을 발행한다.
+  void PopupVisibilityApplied(bool showing);
 
  private:
   void OnPressed(const ui::Event& event);
@@ -62,6 +75,9 @@ class SiteControlsButton : public views::ImageButton,
   std::optional<BrowserSurfacePresentation> presentation_;
   size_t blocked_count_ = 0;
   bool bubble_was_open_on_mouse_press_ = false;
+  SiteControlsPopupAppliedSnapshot popup_applied_;
+  base::RepeatingCallbackList<void(const SiteControlsPopupAppliedSnapshot&)>
+      popup_callbacks_;
 };
 
 // Yee 보호 팝업을 연다. 사이트 정보 아이콘은 Chromium PageInfo를 사용한다.

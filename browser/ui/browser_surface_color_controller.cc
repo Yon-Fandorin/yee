@@ -13,6 +13,7 @@
 
 #include "base/atomic_sequence_num.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/task/bind_post_task.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
@@ -131,7 +132,8 @@ bool IsSurfaceChangingInteraction(const blink::WebInputEvent& event) {
 
 namespace yee {
 
-std::optional<SkColor> ResolveBrowserSurfaceColorSample(const SkBitmap& bitmap) {
+std::optional<SkColor> ResolveBrowserSurfaceColorSample(
+    const SkBitmap& bitmap) {
   if (bitmap.drawsNothing()) {
     return std::nullopt;
   }
@@ -248,6 +250,19 @@ void BrowserSurfaceColorController::ActivateFrom(
 const std::optional<BrowserSurfacePresentation>&
 BrowserSurfaceColorController::GetPresentation() const {
   return presentation_;
+}
+
+BrowserSurfaceColorController::SamplingSnapshot
+BrowserSurfaceColorController::GetSamplingSnapshot() const {
+  return {sampling_epoch_, pending_page_settling_samples_ == 0 &&
+                               !capture_in_flight_ &&
+                               !sample_timer_.IsRunning() &&
+                               late_page_sample_timer_.IsRunning()};
+}
+base::CallbackListSubscription
+BrowserSurfaceColorController::AddSamplingStateChangedCallback(
+    base::RepeatingCallback<void(SamplingSnapshot)> callback) {
+  return sampling_changed_callbacks_.Add(std::move(callback));
 }
 
 std::optional<SkColor> BrowserSurfaceColorController::GetColor() const {
@@ -512,6 +527,13 @@ void BrowserSurfaceColorController::CaptureTopStrip() {
 void BrowserSurfaceColorController::OnTopStripCaptured(
     uint64_t sampling_epoch,
     const content::CopyFromSurfaceResult& result) {
+  base::ScopedClosureRunner publish_sampling(base::BindOnce(
+      [](base::WeakPtr<BrowserSurfaceColorController> self) {
+        if (self)
+          self->sampling_changed_callbacks_.Notify(self->GetSamplingSnapshot());
+      },
+      weak_ptr_factory_.GetWeakPtr()));
+
   if (sampling_epoch != sampling_epoch_ || !web_contents()) {
     return;
   }
@@ -661,7 +683,8 @@ void BrowserSurfaceColorController::PublishPresentation(
 }
 
 void BrowserSurfaceColorController::OnColorProviderChanged() {
-  // 페이지 바탕이 같아도 단일·분할 Header와 열린 팝업에 현재 테마를 다시 반영한다.
+  // 페이지 바탕이 같아도 단일·분할 Header와 열린 팝업에 현재 테마를 다시
+  // 반영한다.
   if (presented_color_) {
     PublishPresentation(/*popup_policy_changed=*/true);
   }

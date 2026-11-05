@@ -1976,6 +1976,19 @@
       "site_controls_browsertests"
     ]
   },
+  "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.TabCollectionIdlePublishesSingleProgress": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
   "browser/ui/applied_wait_browsertest.cc::YeeAppliedWaitBrowserTest.TabModelUsesNativeHandlesAndPinnedState": {
     "os": [
       "Darwin",
@@ -2050,6 +2063,19 @@
     "tier": "B",
     "owner": "test-applied-wait.sh",
     "reason": "native observer의 동적 child identity와 sequence abort 수명을 실제 신호로 검사하며 headless background에서 실행한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ClosingWidgetReportsOwnerDestroyed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
     "binaries": [
       "yee_interactive_ui_tests"
     ]
@@ -2184,6 +2210,19 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LayoutManagerRemovalAfterEvaluationWakesWait": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LayoutManagerRemovalAndReplacementRetireOwner": {
     "os": [
       "Darwin",
@@ -2198,32 +2237,6 @@
     ]
   },
   "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LegacyAnimationSameTaskTransitionIsObserved": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-applied-wait.sh",
-    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.LayoutManagerRemovalAfterEvaluationWakesWait": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-applied-wait.sh",
-    "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.ClosingWidgetReportsOwnerDestroyed": {
     "os": [
       "Darwin",
       "Linux",
@@ -2312,6 +2325,19 @@
     ],
     "owner": "test-applied-wait.sh",
     "reason": "Views 관측 범위와 재진입 알림의 수명·표본을 실제 fixture에서 확인하며 OS 입력을 주입하지 않는다.",
+    "tier": "B"
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.SubscriptionReleaseStopsUnrelatedSnapshotReads": {
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "Views observer의 중복 구독·해제·재구독에서 활성 reader만 순간 표본에 참여하는지 직접 View 알림으로 검사한다.",
     "tier": "B"
   },
   "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.TwoHostsRequireBothApplies": {
@@ -2522,6 +2548,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DestinationNeedsANewCommittedEpochAndBoundFrame": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DestructionBeforeDispatchIsNotExpectedDestruction": {
     "os": [
       "Darwin",
@@ -2639,6 +2678,32 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.FrameGeometryKeepsIdentityCoordinatesAndClip": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "frame 지문이 실제 geometry·identity·DSF를 보존하고 View의 비geometry 상태와 serial을 제외하는지 창 없는 값으로 검사한다.",
+    "tier": "A"
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.FrameGeometrySurvivesUnobservedHoverAndFocusChanges": {
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ],
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "owner": "test-applied-wait.sh",
+    "reason": "frame 지문이 실제 geometry·identity·DSF를 보존하고 View의 비geometry 상태와 serial을 제외하는지 창 없는 값으로 검사한다.",
+    "tier": "A"
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.HandleReleaseAlsoDropsQueuedTerminalDelivery": {
     "os": [
       "Darwin",
@@ -2677,6 +2742,19 @@
     "owner": "test-applied-wait.sh",
     "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
     "tier": "A"
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.IncompatibleProjectionFailsBeforeSubscribing": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
   },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.InvalidBeginInputsAndNullDispatchAreRejected": {
     "os": [
@@ -2718,6 +2796,19 @@
     ]
   },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NewRequestSupersedesAnyOverlappingOwnerInSameDomain": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NewTabActiveRequiresUniqueInsertionAndPreservesExistingTabs": {
     "os": [
       "Darwin",
       "Linux",
@@ -2796,6 +2887,45 @@
     ]
   },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.OtherOwnersAndDomainsStayIndependent": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.PaneMatchSeparatesTargetParentsFromCardsAndExtentChanges": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.PartialVisibilityStillRequiresFreshApplyAndOwner": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.PopupGrowthCannotReuseEarlierRowBounds": {
     "os": [
       "Darwin",
       "Linux",
@@ -2964,6 +3094,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TabActiveMatchesNativeHandleAcrossIndexChanges": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.TerminalCallbackMayDestroySession": {
     "os": [
       "Darwin",
@@ -3080,6 +3223,19 @@
     "owner": "test-applied-wait.sh",
     "reason": "fake 신호와 mock time으로 미충족 사유·deadline·평가 task 배달을 검사하며 창을 만들지 않는다.",
     "tier": "A"
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.WebUiRowsFitCurrentNativeBounds": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
   },
   "browser/ui/bookmarks/bookmarks_browsertest.cc::BookmarksBrowserTest.EditPolicyAppliesToRendererAPIs": {
     "os": [
@@ -3421,6 +3577,20 @@
     "tier": "A",
     "owner": "test-header.sh",
     "reason": "L464: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/browser_surface_color_controller_unittest.cc::BrowserSurfaceColorControllerTest.SettlingSignalWaitsForCaptureCompletion": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-header.sh",
+    "reason": "L287: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
@@ -5344,6 +5514,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/projects/project_navigation_browsertest.cc::ProjectNavigationBrowserTest.AppliedOwnerEndsBeforeBrowserView": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-projects.sh",
+    "reason": "창 종료 시 ProjectNavigation 소유자 종료와 BrowserView 파괴 순서를 실제 observer로 확인한다. native 입력·활성 증거를 요구하지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
   "browser/ui/projects/project_navigation_browsertest.cc::ProjectNavigationBrowserTest.BlockedTabRevealsNativePage": {
     "os": [
       "Darwin",
@@ -5884,6 +6067,19 @@
     "tier": "B",
     "owner": "test-projects.sh",
     "reason": "L1968: 브라우저 모델·View callback·논리 focus·paint/저장 상태를 직접 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/sidebar_footer_browsertest.cc::SidebarFooterBrowserTest.AppliedProbeSurvivesBubbleConstructionAndNativeDestroy": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L219: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
     "binaries": [
       "site_controls_browsertests"
     ]

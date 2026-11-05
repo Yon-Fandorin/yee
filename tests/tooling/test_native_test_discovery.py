@@ -145,6 +145,22 @@ All/Param.
                 self.assertFalse(report['ok'])
                 self.assertEqual(report['active_tests'], 0)
 
+    def test_explicit_disabled_execution_keeps_filter_and_exclusions(self):
+        """opt-in 스위치가 있을 때만 비활성 이름을 선택하며 음수 필터도 유지한다."""
+        listing = ('YouTubeLiveBrowserTest.\n  DISABLED_MidrollObservation\n'
+                   'All/DISABLED_Suite.\n  Case/0\n  Case/1\n')
+        report = DISCOVERY.check_test_listing(
+            listing, 'YouTubeLiveBrowserTest.DISABLED_MidrollObservation',
+            also_run_disabled_tests=True)
+        self.assertTrue(report['ok'])
+        self.assertEqual(report['selected_tests'], 1)
+        self.assertEqual(report['pattern_counts'], {
+            'YouTubeLiveBrowserTest.DISABLED_MidrollObservation': 1})
+        report = DISCOVERY.check_test_listing(
+            listing, 'All/DISABLED_Suite.*-*/1', also_run_disabled_tests=True)
+        self.assertTrue(report['ok'])
+        self.assertEqual(report['selected_tests'], 1)
+
 
 class NativeTestDiscoveryCliTest(unittest.TestCase):
     def invoke(self, *arguments, listing=None):
@@ -180,6 +196,16 @@ class NativeTestDiscoveryCliTest(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertFalse(report['ok'])
         self.assertIn('error', report)
+
+    def test_cli_disabled_execution_requires_explicit_switch(self):
+        """CLI의 opt-in 여부가 실제 GTest 선택과 일치해야 한다."""
+        listing = 'Suite.\n  DISABLED_Case\n'
+        rejected = self.invoke('--filter=Suite.DISABLED_Case', listing=listing)
+        self.assertEqual(rejected.returncode, 1, rejected.stderr)
+        accepted = self.invoke('--filter=Suite.DISABLED_Case',
+                               '--gtest_also_run_disabled_tests', listing=listing)
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(json.loads(accepted.stdout)['selected_tests'], 1)
 
 
 @unittest.skipUnless(shutil.which('zsh'), 'zsh가 필요하다')
@@ -327,6 +353,21 @@ run_native_test_gate "$@"
         self.assertEqual(result.returncode, 23, result.stderr)
         self.assertNotIn('executed', self.events())
         self.assertEqual(self.events().count('call'), 1)
+
+    def test_opt_in_disabled_case_is_discovered_and_executed_once(self):
+        """기록 runner도 명시된 opt-in을 전달해 정확히 한 사례를 실행한다."""
+        self.listing.write_text(
+            'YouTubeLiveBrowserTest.\n  DISABLED_MidrollObservation\n', encoding='utf-8')
+        arguments = ['--gtest_filter=YouTubeLiveBrowserTest.DISABLED_MidrollObservation',
+                     '--gtest_also_run_disabled_tests']
+        result = self.invoke(*arguments)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.events().count('executed'), 1)
+        report = self.records()[0]['discovery']
+        self.assertTrue(report['ok'])
+        self.assertEqual(report['selected_tests'], 1)
+        self.assertEqual(report['pattern_counts'], {
+            'YouTubeLiveBrowserTest.DISABLED_MidrollObservation': 1})
 
     def test_empty_missing_and_disabled_only_listings_never_execute(self):
         """발견 검사 실패는 pipefail 경로에서 실제 실행 전에 전파된다."""

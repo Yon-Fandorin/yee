@@ -1029,6 +1029,15 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
     return !GetVisible() || !GetLocalBounds().Contains(point);
   }
 
+  SidebarFooterAppliedSnapshot applied_snapshot() const {
+    return applied_snapshot_;
+  }
+  base::CallbackListSubscription SubscribeApplied(
+      base::RepeatingCallback<void(const SidebarFooterAppliedSnapshot&)>
+          callback) {
+    return applied_callbacks_.Add(std::move(callback));
+  }
+
   views::View* GetMenuForTesting() { return bubble_tracker_.view(); }
 
  protected:
@@ -1367,8 +1376,18 @@ class YeeSidebarFooterView : public HoverButton, public views::WidgetObserver {
         bubble_tracker_.view() ? vector_icons::kKeyboardArrowDownIcon
                                : vector_icons::kKeyboardArrowUpIcon,
         ui::kColorIconSecondary, chevron_size));
+    ++applied_snapshot_.apply_serial;
+    // CreateBubble의 SetAnchorView가 UpdateSurface에 재진입할 수 있다.
+    // tracker만 설정된 생성 중 menu는 아직 Widget에 적용된 상태가 아니다.
+    applied_snapshot_.menu_open =
+        bubble_ && bubble_tracker_.view() && !bubble_->widget()->IsClosed();
+    applied_callbacks_.Notify(applied_snapshot_);
   }
 
+  SidebarFooterAppliedSnapshot applied_snapshot_{
+      .owner = base::UnguessableToken::Create()};
+  base::RepeatingCallbackList<void(const SidebarFooterAppliedSnapshot&)>
+      applied_callbacks_;
   SidebarFooterModel model_;
   size_t model_revision_ = 0;
   SidebarContextSelectedCallback context_callback_;
@@ -1421,6 +1440,20 @@ std::unique_ptr<views::View> CreateSidebarFooterView(
       NormalizeModel(std::move(model)), std::move(context_selected_callback),
       std::move(browser_action_callback), std::move(memory_changed_callback),
       std::move(acquire_popup_lock));
+}
+
+SidebarFooterAppliedSnapshot GetSidebarFooterAppliedSnapshot(
+    const views::View& view) {
+  CHECK_EQ(view.GetID(), kSidebarFooterViewId);
+  return static_cast<const YeeSidebarFooterView&>(view).applied_snapshot();
+}
+base::CallbackListSubscription SubscribeSidebarFooterApplied(
+    views::View& view,
+    base::RepeatingCallback<void(const SidebarFooterAppliedSnapshot&)>
+        callback) {
+  CHECK_EQ(view.GetID(), kSidebarFooterViewId);
+  return static_cast<YeeSidebarFooterView&>(view).SubscribeApplied(
+      std::move(callback));
 }
 
 void SetSidebarFooterModel(views::View& view, SidebarFooterModel model) {

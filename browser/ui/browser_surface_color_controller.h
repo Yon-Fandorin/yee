@@ -43,6 +43,14 @@ class BrowserSurfaceColorController
   base::CallbackListSubscription AddPresentationChangedCallback(
       base::RepeatingClosure callback);
 
+  // 초기 settling 캡처의 종료와 늦은 검증 대기 상태를 값으로 발행한다.
+  struct SamplingSnapshot {
+    uint64_t epoch;
+    bool settled;
+  };
+  SamplingSnapshot GetSamplingSnapshot() const;
+  base::CallbackListSubscription AddSamplingStateChangedCallback(
+      base::RepeatingCallback<void(SamplingSnapshot)> callback);
   void SetThemeFallbackColor(SkColor color);
 
   // Seeds a tab-switch transition from the color already on screen. Structural
@@ -106,6 +114,8 @@ class BrowserSurfaceColorController
   std::optional<SkColor> GetPageMetadataColor() const;
 
   base::RepeatingClosureList presentation_changed_callbacks_;
+  base::RepeatingCallbackList<void(SamplingSnapshot)>
+      sampling_changed_callbacks_;
   base::OneShotTimer sample_timer_;
   base::OneShotTimer late_page_sample_timer_;
   base::RepeatingTimer scroll_sample_timer_;

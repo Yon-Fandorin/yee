@@ -6,7 +6,9 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/test/scoped_run_loop_timeout.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -97,6 +99,7 @@ IN_PROC_BROWSER_TEST_F(YouTubeLiveBrowserTest, DISABLED_MidrollObservation) {
         window.__yeeLiveObservation = result;
         let previousTime = null, previousAudio = null, lastSignature = '',
             stalled = 0, seekIndex = 0;
+        // 1초 표본은 광고·음성 decode와 playback 통계를 측정한다.
         const timer = setInterval(() => {
           const video = document.querySelector('video');
           const player = document.getElementById('movie_player');
@@ -152,28 +155,23 @@ IN_PROC_BROWSER_TEST_F(YouTubeLiveBrowserTest, DISABLED_MidrollObservation) {
             result.stalled = stalled > 30;
             result.last = state;
             result.done = true; clearInterval(timer);
+            window.dispatchEvent(new Event('yee-live-observation-done'));
           }
         }, 1000);
       })();
     )",
                                                      video_id, seconds, seek)));
-    bool done = false;
-    for (int tick = 0; tick < seconds / 20 + 3; ++tick) {
-      done = content::EvalJs(contents, R"(
-        new Promise(resolve => {
-          let attempts = 0;
-          const poll = setInterval(() => {
-            if (window.__yeeLiveObservation.done || ++attempts >= 20) {
-              clearInterval(poll); resolve(window.__yeeLiveObservation.done);
-            }
-          }, 1000);
-        })
-      )")
-                 .ExtractBool();
-      if (done) {
-        break;
-      }
-    }
+    // 기존 20초 chunk 전체의 예산 안에서 관찰 종료 callback을 기다린다.
+    base::test::ScopedRunLoopTimeout observation_deadline(
+        FROM_HERE, base::Seconds((seconds / 20 + 3) * 20));
+    const bool done = content::EvalJs(contents, R"(
+      new Promise(resolve => {
+        if (window.__yeeLiveObservation.done) { resolve(true); return; }
+        window.addEventListener('yee-live-observation-done', () => resolve(true),
+                                {once: true});
+      })
+    )")
+                          .ExtractBool();
     EXPECT_TRUE(done);
     const auto result =
         content::EvalJs(contents, "JSON.stringify(window.__yeeLiveObservation)")

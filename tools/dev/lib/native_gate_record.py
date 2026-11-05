@@ -227,7 +227,9 @@ def run_gate(args):
         if record['interrupted']:
             record['exit_code'] = record['listing_exit_code']
             return record['exit_code'] or 130
-        report = check_test_listing(listing_stdout, filters[0])
+        report = check_test_listing(
+            listing_stdout, filters[0],
+            also_run_disabled_tests='--gtest_also_run_disabled_tests' in arguments)
         record['discovery'] = report
         print(json.dumps(report, ensure_ascii=False, separators=(',', ':')), flush=True)
         result = record['listing_exit_code'] or (0 if report['ok'] else 1)

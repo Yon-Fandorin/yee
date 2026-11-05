@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/browser/ui/webui/downloads/downloads_ui.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -79,18 +80,16 @@ class DownloadsBrowserTest : public InProcessBrowserTest {
   }
 
   bool WaitForRows(int count) {
-    return content::EvalJs(Contents(), content::JsReplace(R"JS(
-      (async () => {
-        for (let attempt = 0; attempt < 250; ++attempt) {
-          const list = document.querySelector('[data-download-list]');
-          if (list && list.closest('section').getAttribute('aria-busy') === 'false' &&
-              list.querySelectorAll('[data-download-id]').length === $1) return true;
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-        return false;
-      })()
-    )JS",
-                                                          count))
+    return content::EvalJs(Contents(), test::WaitForInternalPageScript(
+                                           content::JsReplace(R"JS(
+          (() => {
+            const list = document.querySelector('[data-download-list]');
+            return !!list &&
+                list.closest('section').getAttribute('aria-busy') === 'false' &&
+                list.querySelectorAll('[data-download-id]').length === $1;
+          })()
+        )JS",
+                                                              count)))
         .ExtractBool();
   }
 

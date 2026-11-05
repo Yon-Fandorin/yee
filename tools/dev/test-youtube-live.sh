@@ -34,7 +34,7 @@ run_tiered_native_test_gate --display "$YEE_OUT_DIR/site_controls_browsertests" 
   --test-launcher-jobs=1 --test-launcher-retry-limit=0 \
   --test-launcher-timeout=2100000 \
   "--yee-live-youtube-mode=$MODE" \
-  "--yee-live-youtube-seconds=${YEE_LIVE_YOUTUBE_SECONDS:-180}" \
+  "--yee-live-youtube-seconds=${YEE_LIVE_YOUTUBE_SECONDS:-120}" \
   "--yee-live-youtube-min-content-seconds=${YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS:-60}" \
   "--yee-live-youtube-report=$REPORT_DIR/$REPORT_NAME.json" \
   "${EXPERIMENT_ARGS[@]}"

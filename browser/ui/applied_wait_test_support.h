@@ -39,6 +39,12 @@ struct PageHostsApplied {
   gfx::Rect clip;
   gfx::RoundedCornersF radii;
   gfx::Rect target;
+  gfx::Rect overlay;
+  gfx::Rect applied_bounds;
+  gfx::Rect applied_clip;
+  gfx::Rect applied_target;
+  gfx::Rect applied_overlay;
+  bool geometry_applied = false;
   bool operator==(const PageHostsApplied&) const = default;
 };
 
@@ -50,6 +56,13 @@ struct PaneLayoutMatches {
   gfx::Insets insets;
   gfx::Rect divider;
   std::vector<uint64_t> tab_handles;
+  gfx::Size start_parent_extent;
+  gfx::Size end_parent_extent;
+  gfx::Size start_container_extent;
+  gfx::Size end_container_extent;
+  bool geometry_matches_ratio = false;
+  std::optional<double> ratio_min;
+  std::optional<double> ratio_max;
   bool operator==(const PaneLayoutMatches&) const = default;
 };
 
@@ -61,6 +74,20 @@ struct ViewStateMatches {
   std::vector<AppliedOwnerToken> children;
   gfx::Vector2d scroll_offset;
   bool destroyed = false;
+  double opacity = 1;
+  bool hovered = false;
+  bool expanded_on_hover = false;
+  bool hover_animation_running = false;
+  bool scroll_animation_running = false;
+  bool refresh_pending = false;
+  bool popup_open = false;
+  bool editing = false;
+  gfx::Rect screen_bounds;
+  gfx::Rect visible_bounds;
+  gfx::Rect painted_bounds;
+  gfx::Rect contents_bounds_in_screen;
+  bool has_background = false;
+  int focus_change_reason = 0;
   bool operator==(const ViewStateMatches&) const = default;
 };
 
@@ -90,6 +117,10 @@ struct WidgetStateMatches {
   bool capture = false;
   ShowState show_state = ShowState::kNormal;
   bool closed = false;
+  bool active = false;
+  double opacity = 1;
+  bool visible_on_screen = false;
+  bool paint_as_active = false;
   bool operator==(const WidgetStateMatches&) const = default;
 };
 
@@ -131,6 +162,9 @@ struct TabModelMatches {
   std::vector<AppliedTabState> tabs;
   std::vector<AppliedSplitState> splits;
   uint64_t active_tab = 0;
+  uint64_t project_page = 0;
+  uint64_t project_title = 0;
+  uint64_t project_live_tab = 0;
   bool operator==(const TabModelMatches&) const = default;
 };
 
@@ -189,6 +223,18 @@ struct WebUiStateMatches {
   gfx::RectF rect;
   double opacity = 1;
   bool focused = false;
+  int hovered_index = -1;
+  int padding_top = 0;
+  int results_padding = 0;
+  bool forced_colors = false;
+  bool prefers_contrast_more = false;
+  bool focus_indicator_visible = false;
+  uint32_t hover_background = 0;
+  std::vector<gfx::RectF> row_bounds;
+  bool customization_ready = false;
+  int click_count = 0;
+  gfx::Rect native_view_bounds_in_screen;
+  gfx::Rect native_widget_bounds_in_screen;
   bool operator==(const WebUiStateMatches&) const = default;
 };
 
@@ -199,6 +245,9 @@ struct PresentationMatches {
   uint32_t foreground_color = 0;
   uint64_t icon_id = 0;
   bool use_native_theme = false;
+  uint64_t popup_revision = 0;
+  bool icon_ready = false;
+  bool sampling_settled = false;
   bool operator==(const PresentationMatches&) const = default;
 };
 
@@ -256,6 +305,77 @@ enum class AppliedFreshness {
 };
 enum class AppliedEvaluationMode { kCurrent, kObservedSinceDispatch };
 
+// 비동기 적용에서 요청한 필드만 비교한다. 임의 predicate는 받지 않는다.
+// kExact는 기존 전체 값 비교를 유지한다.
+enum class AppliedMatch {
+  kExact,
+  kPageIdentity,
+  kPageGeometry,
+  kPaneSplit,
+  kPaneSplitCurrentExtent,
+  kViewVisible,
+  kViewDrawn,
+  kViewBounds,
+  kViewSize,
+  kViewHeight,
+  kViewParent,
+  kViewParentDifferent,
+  kViewChildren,
+  kViewNonEmpty,
+  kViewCenterVisible,
+  kViewPointerFocus,
+  kViewDestroyed,
+  kViewOpacity,
+  kViewOpacityPositive,
+  kViewHovered,
+  kViewChildCount,
+  kSidebarHover,
+  kTabHoverIdle,
+  kViewScrollIdle,
+  kOmniboxPopup,
+  kOmniboxEditing,
+  kWidgetVisible,
+  kWidgetOpacity,
+  kWidgetBounds,
+  kWidgetClosed,
+  kWidgetCapture,
+  kWidgetActive,
+  kWidgetReady,
+  kWidgetShowState,
+  kWidgetSizeNear,
+  kFooterMenu,
+  kProjectRefreshed,
+  kProjectTitle,
+  kProjectLive,
+  kTabCount,
+  kTabActive,
+  kNewTabActive,
+  kPresentationRevision,
+  kPresentationRevisionChanged,
+  kPresentationIconChanged,
+  kPresentationIconReady,
+  kSamplingSettled,
+  kNativeActive,
+  kNativeFullscreen,
+  kPresentationColor,
+  kPresentationIcon,
+  kPresentationAlpha,
+  kPresentationDark,
+  kWebUiRowsAtLeast,
+  kWebUiRowsFitNativeBounds,
+  kWebUiSelection,
+  kWebUiOpacity,
+  kWebUiHover,
+  kWebUiPadding,
+  kWebUiResultsPadding,
+  kWebUiMedia,
+  kWebUiHoverColor,
+  kWebUiCustomizationReady,
+  kWebUiClickCount,
+  kSurfaceDestination,
+  kPresentedFrame,
+};
+
 struct AppliedCoordinates {
   enum class Space { kLocal, kParent, kScreen };
   enum class Units { kDip, kPixel };
@@ -274,9 +394,14 @@ struct AppliedCondition {
   // 같은 group의 순간 조건은 한 sample 전체에서 충족해야 한다.
   uint64_t observation_group = 0;
   AppliedCoordinates coordinates;
+  AppliedMatch match = AppliedMatch::kExact;
   bool operator==(const AppliedCondition&) const = default;
 };
 using AppliedConditions = std::vector<AppliedCondition>;
+bool IsAppliedMatchCompatible(const AppliedCondition& condition);
+
+bool AppliedValueMatches(const AppliedCondition& condition,
+                         const AppliedConditionValue& actual);
 
 enum class AppliedDomain {
   kLayout,
@@ -349,8 +474,15 @@ struct AppliedSnapshot {
   uint64_t sample_id = 0;
   std::optional<uint64_t> request_epoch;
   AppliedCoordinates coordinates;
+  // 어댑터의 신호 준비·전달 진단이며 조건 판정과 geometry 지문에는 쓰지 않는다.
+  std::string adapter_diagnostics;
   bool operator==(const AppliedSnapshot&) const = default;
 };
+
+// frame을 적용 geometry·identity·좌표계에 묶는다. View의 hover/focus 같은
+// 비geometry 상태는 각 조건으로 검사하며 frame의 geometry 지문에 넣지 않는다.
+uint64_t AppliedFrameGeometryDigest(
+    const std::vector<AppliedSnapshot>& snapshots);
 
 struct AppliedSignalSample {
   // 한 callback의 snapshots는 같은 순간을 나타내며 sample_id도 같아야 한다.

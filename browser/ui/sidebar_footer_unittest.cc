@@ -10,9 +10,11 @@
 
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ref.h"
 #include "base/run_loop.h"
-#include "base/test/run_until.h"
+#include "base/test/bind.h"
 #include "base/test/scoped_run_loop_timeout.h"
+#include "base/test/test_future.h"
 #include "base/time/time.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
@@ -43,6 +45,8 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/test/button_test_api.h"
+#include "ui/views/test/widget_activation_waiter.h"
+#include "ui/views/test/widget_test.h"
 #include "ui/views/view.h"
 #include "ui/views/view_tracker.h"
 #include "ui/views/widget/widget.h"
@@ -83,6 +87,31 @@ TEST(SidebarFooterPolicyTest, LocalFallbackDoesNotInventRemoteTenant) {
             l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
 }
 
+// Widget/Focus의 정상 완료 callback을 기다린다. 기존 upstream unit target은
+// Yee browser adapter에 의존하지 않으며 native window gate는 그대로 유지한다.
+class FooterFocusWaiter : public views::FocusChangeListener {
+ public:
+  explicit FooterFocusWaiter(views::View& target)
+      : target_(target), manager_(*target.GetFocusManager()) {
+    manager_->AddFocusChangeListener(this);
+  }
+  ~FooterFocusWaiter() override { manager_->RemoveFocusChangeListener(this); }
+  void OnWillChangeFocus(views::View*, views::View*) override {}
+  void OnDidChangeFocus(views::View*, views::View* now) override {
+    if (now == &target_.get() && !focused_.IsReady())
+      focused_.SetValue();
+  }
+  void Wait() {
+    if (!target_->HasFocus())
+      ASSERT_TRUE(focused_.Wait());
+  }
+
+ private:
+  raw_ref<views::View> target_;
+  raw_ref<views::FocusManager> manager_;
+  base::test::TestFuture<void> focused_;
+};
+
 class SidebarFooterViewTest : public ChromeViewsTestBase {
  public:
   void SetUp() override {
@@ -107,12 +136,25 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     CloseBubble();
     footer_ = nullptr;
     widget_.reset();
-    base::RunLoop().RunUntilIdle();
     EXPECT_EQ(0, popup_locks_);
     ChromeViewsTestBase::TearDown();
   }
 
  protected:
+  std::unique_ptr<views::test::WidgetDestroyedWaiter> menu_closed_;
+  void ArmMenuClose() {
+    if (footer_) {
+      if (auto* menu = GetSidebarFooterMenuForTesting(*footer_))
+        menu_closed_ = std::make_unique<views::test::WidgetDestroyedWaiter>(
+            menu->GetWidget());
+    }
+  }
+  void WaitForMenuClosed() {
+    if (menu_closed_) {
+      menu_closed_->Wait();
+      menu_closed_.reset();
+    }
+  }
   void Click(views::View* view) {
     ui::MouseEvent event(ui::EventType::kMouseReleased, gfx::Point(),
                          gfx::Point(), ui::EventTimeForNow(),
@@ -125,6 +167,7 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     // 실제 팝업·focus 계약을 검사할 때만 owner를 활성화한다.
     widget_->Show();
     Click(footer_);
+    ArmMenuClose();
     return GetSidebarFooterMenuForTesting(*footer_);
   }
 
@@ -134,9 +177,10 @@ class SidebarFooterViewTest : public ChromeViewsTestBase {
     }
     if (views::View* const menu = GetSidebarFooterMenuForTesting(*footer_)) {
       if (menu->GetWidget()) {
+        ArmMenuClose();
         menu->GetWidget()->Close();
       }
-      base::RunLoop().RunUntilIdle();
+      WaitForMenuClosed();
     }
   }
 
@@ -211,7 +255,7 @@ TEST_F(SidebarFooterViewTest, LocalProfileRenameUpdatesIdentityAndMenu) {
   ASSERT_TRUE(OpenBubble());
   SetSidebarFooterModel(
       *footer_, CreateLocalSidebarFooterModel(u"개인 & 검수", u"Yongjun Kim"));
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   auto* const trigger = static_cast<HoverButton*>(footer_.get());
   EXPECT_EQ(trigger->title()->GetText(), u"개인 & 검수");
@@ -233,7 +277,7 @@ TEST_F(SidebarFooterViewTest, LocalProfileRenameUpdatesIdentityAndMenu) {
             u"개인 & 검수");
   SetSidebarFooterModel(*footer_,
                         CreateLocalSidebarFooterModel({}, u"Yongjun Kim"));
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_EQ(trigger->title()->GetText(),
             l10n_util::GetStringUTF16(IDS_YEE_WEBUI_FOOTER_LOCAL_PROFILE));
 }
@@ -553,7 +597,7 @@ TEST_F(SidebarFooterViewTest, ContextSwitchPreservesOptionalAccountLabel) {
     ASSERT_TRUE(menu);
     Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
     Click(menu->children()[2 + index]);
-    base::RunLoop().RunUntilIdle();
+    WaitForMenuClosed();
     EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
     // 전환이 완료됐다는 provider 모델이 현재 context를 결정한다.
     model.selected_context_index = index;
@@ -594,7 +638,7 @@ TEST_F(SidebarFooterViewTest, SelectionRequestsDoNotChangeSourceIdentity) {
   ASSERT_TRUE(menu);
   Click(menu->GetViewByID(kSidebarFooterRootContextViewId));
   Click(menu->children()[3]);
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_EQ(requested, 1u);
   EXPECT_EQ(static_cast<HoverButton*>(footer_.get())->title()->GetText(),
             u"테스트용");
@@ -614,7 +658,7 @@ TEST_F(SidebarFooterViewTest, SelectionRequestsDoNotChangeSourceIdentity) {
   if (previous_row.view()) {
     Click(previous_row.view());
   }
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_FALSE(requested.has_value());
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_EQ(static_cast<HoverButton*>(footer_.get())->title()->GetText(),
@@ -631,7 +675,7 @@ TEST_F(SidebarFooterViewTest, TriggerReclickClosesTheSameBubble) {
   // 닫기 콜백 이후에도 실제 Widget을 삭제할 때까지 잠금을 유지한다.
   EXPECT_EQ(1, popup_locks_);
   widget()->ThemeChanged();
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   widget()->ThemeChanged();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_EQ(0, popup_locks_);
@@ -662,14 +706,15 @@ TEST_F(SidebarFooterViewTest,
   // 포커스를 요청하면 메뉴가 먼저 닫혀 저장 포커스를 검사할 수 없다.
   widget()->Show();
   widget()->Activate();
-  ASSERT_TRUE(base::test::RunUntil([&]() { return widget()->IsActive(); }));
+  views::test::WaitForWidgetActive(widget(), true);
+  ASSERT_TRUE(widget()->IsActive());
   footer_->RequestFocus();
   ASSERT_TRUE(footer_->HasFocus());
   views::View* menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_EQ(footer_, focus_manager->GetStoredFocusView());
   menu->GetWidget()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_FALSE(footer_->HasFocus());
   EXPECT_EQ(nullptr, focus_manager->GetStoredFocusView());
@@ -688,10 +733,12 @@ TEST_F(SidebarFooterViewTest,
     remaining_menu->GetWidget()->CloseWithReason(
         views::Widget::ClosedReason::kLostFocus);
   }
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   widget()->Activate();
-  ASSERT_TRUE(base::test::RunUntil(
-      [&]() { return widget()->IsActive() && focus_target->HasFocus(); }));
+  views::test::WaitForWidgetActive(widget(), true);
+  FooterFocusWaiter target_focus(*focus_target);
+  target_focus.Wait();
+  ASSERT_TRUE(widget()->IsActive() && focus_target->HasFocus());
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_FALSE(footer_->HasFocus());
@@ -702,22 +749,25 @@ TEST_F(SidebarFooterViewTest,
 
 TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
 #if !BUILDFLAG(IS_WIN)
-  // Windows MOCK_TIME은 이 지연 타이머로 native 활성화 메시지보다 먼저 만료된다.
+  // Windows MOCK_TIME은 이 지연 타이머로 native 활성화 메시지보다 먼저
+  // 만료된다.
   base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
 #endif
   views::View* const menu = OpenBubble();
   ASSERT_TRUE(menu);
   ASSERT_TRUE(menu->GetWidget());
   footer_->GetFocusManager()->SetFocusedView(nullptr);
+  FooterFocusWaiter restored_focus(*footer_);
   EXPECT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
       ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
-  ASSERT_TRUE(base::test::RunUntil([&]() {
-    return !GetSidebarFooterMenuForTesting(*footer_) && footer_->HasFocus() &&
-           footer_->GetFocusManager()->focus_change_reason() ==
-               views::FocusManager::FocusChangeReason::kFocusTraversal;
-  })) << "owner_active="
-      << widget()->IsActive() << " footer_focus=" << footer_->HasFocus()
-      << " focus_reason="
+  WaitForMenuClosed();
+  restored_focus.Wait();
+  ASSERT_TRUE(!GetSidebarFooterMenuForTesting(*footer_) &&
+              footer_->HasFocus() &&
+              footer_->GetFocusManager()->focus_change_reason() ==
+                  views::FocusManager::FocusChangeReason::kFocusTraversal)
+      << "owner_active=" << widget()->IsActive()
+      << " footer_focus=" << footer_->HasFocus() << " focus_reason="
       << static_cast<int>(footer_->GetFocusManager()->focus_change_reason());
 
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
@@ -735,7 +785,7 @@ TEST_F(SidebarFooterViewTest, EscapeDismissRestoresKeyboardTraversalFocus) {
   ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::Point(-1, -1),
                       gfx::Point(-1, -1), ui::EventTimeForNow(), 0, 0);
   footer_->OnMouseExited(exit);
-  base::RunLoop().RunUntilIdle();
+  // 이 경로의 native 입력·CloseNow/테마 setter는 반환 전에 적용한다.
   EXPECT_TRUE(footer_->HasFocus());
   EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
             footer_->GetFocusManager()->focus_change_reason());
@@ -770,9 +820,11 @@ TEST_F(SidebarFooterViewTest, EscapeRestoreIsCancelledWhenTriggerLeavesWidget) {
   auto detached = container->RemoveChildViewT(footer_.get());
   container->AddChildView(std::move(detached));
   focus_target->RequestFocus();
-  base::RunLoop().RunUntilIdle();
-  ASSERT_TRUE(base::test::RunUntil(
-      [&]() { return widget()->IsActive() && focus_target->HasFocus(); }));
+  WaitForMenuClosed();
+  views::test::WaitForWidgetActive(widget(), true);
+  FooterFocusWaiter target_focus(*focus_target);
+  target_focus.Wait();
+  ASSERT_TRUE(widget()->IsActive() && focus_target->HasFocus());
   EXPECT_TRUE(focus_target->HasFocus());
   EXPECT_FALSE(footer_->HasFocus());
 }
@@ -785,7 +837,7 @@ TEST_F(SidebarFooterViewTest, EscapeRestoreDoesNotRevealHiddenOwner) {
   ASSERT_TRUE(menu->GetFocusManager()->ProcessAccelerator(
       ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
   widget()->Hide();
-  base::RunLoop().RunUntilIdle();
+  WaitForMenuClosed();
   EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_FALSE(widget()->IsVisible());
 }
@@ -807,7 +859,7 @@ TEST_F(SidebarFooterViewTest, PointerExitAndReentryKeepNativePopupFocus) {
                          ui::EF_LEFT_MOUSE_BUTTON);
   footer_->OnMouseReleased(release);
   ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
-  base::RunLoop().RunUntilIdle();
+  // 이 경로의 native 입력·CloseNow/테마 setter는 반환 전에 적용한다.
   ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_EQ(1, popup_locks_);
 
@@ -816,7 +868,7 @@ TEST_F(SidebarFooterViewTest, PointerExitAndReentryKeepNativePopupFocus) {
                         gfx::Point(-80, -80), ui::EventTimeForNow(), 0, 0);
     footer_->OnMouseExited(exit);
     footer_->OnMouseEntered(enter);
-    base::RunLoop().RunUntilIdle();
+    // 이 경로의 native 입력·CloseNow/테마 setter는 반환 전에 적용한다.
     views::View* const menu = GetSidebarFooterMenuForTesting(*footer_);
     ASSERT_TRUE(menu);
     EXPECT_TRUE(menu->GetWidget()->IsVisible());
@@ -866,7 +918,7 @@ TEST_F(SidebarFooterViewTest,
       .NotifyClick(key);
   ASSERT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_EQ(1, popup_locks_);
-  base::RunLoop().RunUntilIdle();
+  // 이 경로의 native 입력·CloseNow/테마 setter는 반환 전에 적용한다.
   EXPECT_TRUE(GetSidebarFooterMenuForTesting(*footer_));
   EXPECT_EQ(1, popup_locks_);
   CloseBubble();
@@ -898,7 +950,7 @@ TEST_F(SidebarFooterViewTest, BrowserToolsDispatchOnlyCuratedActions) {
     Click(menu->GetViewByID(kSidebarFooterRootBrowserToolsViewId));
     ASSERT_EQ(menu->children().size(), 7u);
     Click(menu->children()[index + 2]);
-    base::RunLoop().RunUntilIdle();
+    WaitForMenuClosed();
     EXPECT_FALSE(GetSidebarFooterMenuForTesting(*footer_));
   }
 

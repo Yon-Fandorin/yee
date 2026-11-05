@@ -11,8 +11,9 @@
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
-#include "base/run_loop.h"
+#include "base/scoped_observation.h"
 #include "base/test/bind.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/ui/views/yee/brand.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -25,6 +26,7 @@
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/widget/widget_observer.h"
 #include "ui/views/window/dialog_delegate.h"
 
 namespace views {
@@ -57,6 +59,33 @@ bool ContainsText(const std::vector<std::u16string>& values,
   return std::ranges::find(values, expected) != values.end();
 }
 
+// 부모 표시 입력 전에 등록하는 실제 Widget visibility callback이다.
+class PointerVisibilityCallback : public WidgetObserver {
+ public:
+  PointerVisibilityCallback(Widget& widget, bool expected)
+      : expected_(expected) {
+    observation_.Observe(&widget);
+  }
+
+  bool Wait() { return changed_.Get(); }
+
+  void OnWidgetVisibilityChanged(Widget*, bool visible) override {
+    if (visible == expected_ && !changed_.IsReady())
+      changed_.SetValue(true);
+  }
+
+  void OnWidgetDestroying(Widget*) override {
+    observation_.Reset();
+    if (!changed_.IsReady())
+      changed_.SetValue(false);
+  }
+
+ private:
+  const bool expected_;
+  base::test::TestFuture<bool> changed_;
+  base::ScopedObservation<Widget, WidgetObserver> observation_{this};
+};
+
 class AgentBridgePromptTest : public ViewsTestBase {
  protected:
   void SetUp() override {
@@ -68,7 +97,6 @@ class AgentBridgePromptTest : public ViewsTestBase {
 
   void TearDown() override {
     CloseOwner();
-    base::RunLoop().RunUntilIdle();
     ViewsTestBase::TearDown();
   }
 
@@ -80,6 +108,12 @@ class AgentBridgePromptTest : public ViewsTestBase {
     }
   }
 
+  void ShowOwnerAndWaitForPointer(Widget& pointer) {
+    PointerVisibilityCallback changed(pointer, true);
+    owner_widget()->Show();
+    ASSERT_TRUE(changed.Wait());
+  }
+
   Widget* owner_widget() const { return owner_widget_.get(); }
   View* owner_view() const { return owner_view_; }
 
@@ -89,6 +123,7 @@ class AgentBridgePromptTest : public ViewsTestBase {
 };
 
 TEST_F(AgentBridgePromptTest, CloseNowRepliesDeniedOnce) {
+  base::test::TestFuture<void> replied;
   int callback_count = 0;
   bool accepted = true;
   std::string answer = "stale";
@@ -96,13 +131,15 @@ TEST_F(AgentBridgePromptTest, CloseNowRepliesDeniedOnce) {
       owner_view(), u"Approve this action?", true,
       base::BindLambdaForTesting([&](bool did_accept, std::string response) {
         ++callback_count;
+        replied.SetValue();
         accepted = did_accept;
         answer = std::move(response);
       }));
 
   ASSERT_TRUE(prompt);
   prompt->CloseNow();
-  base::RunLoop().RunUntilIdle();
+  // prompt 응답 callback을 기다린다. Widget 상태의 완료 대용이 아니다.
+  ASSERT_TRUE(replied.Wait());
 
   EXPECT_EQ(callback_count, 1);
   EXPECT_FALSE(accepted);
@@ -110,31 +147,36 @@ TEST_F(AgentBridgePromptTest, CloseNowRepliesDeniedOnce) {
 }
 
 TEST_F(AgentBridgePromptTest, EscapeRepliesDeniedOnce) {
+  base::test::TestFuture<void> replied;
   int callback_count = 0;
   bool accepted = true;
   Widget* prompt = ShowAgentBridgePrompt(
       owner_view(), u"Approve this action?", true,
       base::BindLambdaForTesting([&](bool did_accept, std::string) {
         ++callback_count;
+        replied.SetValue();
         accepted = did_accept;
       }));
 
   ASSERT_TRUE(prompt);
   ui::test::EventGenerator generator(GetContext(), prompt->GetNativeWindow());
   generator.PressKey(ui::VKEY_ESCAPE, 0);
-  base::RunLoop().RunUntilIdle();
+  // prompt 응답 callback을 기다린다. Widget 상태의 완료 대용이 아니다.
+  ASSERT_TRUE(replied.Wait());
 
   EXPECT_EQ(callback_count, 1);
   EXPECT_FALSE(accepted);
 }
 
 TEST_F(AgentBridgePromptTest, AcceptDialogRepliesAcceptedOnce) {
+  base::test::TestFuture<void> replied;
   int callback_count = 0;
   bool accepted = false;
   Widget* prompt = ShowAgentBridgePrompt(
       owner_view(), u"Continue?", true,
       base::BindLambdaForTesting([&](bool did_accept, std::string) {
         ++callback_count;
+        replied.SetValue();
         accepted = did_accept;
       }));
 
@@ -150,19 +192,22 @@ TEST_F(AgentBridgePromptTest, AcceptDialogRepliesAcceptedOnce) {
   EXPECT_EQ(delegate->GetDialogButtonLabel(ui::mojom::DialogButton::kCancel),
             u"Don't allow");
   test::AcceptDialog(prompt);
-  base::RunLoop().RunUntilIdle();
+  // prompt 응답 callback을 기다린다. Widget 상태의 완료 대용이 아니다.
+  ASSERT_TRUE(replied.Wait());
 
   EXPECT_EQ(callback_count, 1);
   EXPECT_TRUE(accepted);
 }
 
 TEST_F(AgentBridgePromptTest, InputAnswerIsReturnedAndInitiallyFocused) {
+  base::test::TestFuture<void> replied;
   int callback_count = 0;
   std::string answer;
   Widget* prompt = ShowAgentBridgePrompt(
       owner_view(), u"What should Yee do?", false,
       base::BindLambdaForTesting([&](bool accepted, std::string response) {
         ++callback_count;
+        replied.SetValue();
         EXPECT_TRUE(accepted);
         answer = std::move(response);
       }));
@@ -179,7 +224,8 @@ TEST_F(AgentBridgePromptTest, InputAnswerIsReturnedAndInitiallyFocused) {
   textfield->SetText(u"Use the second tab");
 
   test::AcceptDialog(prompt);
-  base::RunLoop().RunUntilIdle();
+  // prompt 응답 callback을 기다린다. Widget 상태의 완료 대용이 아니다.
+  ASSERT_TRUE(replied.Wait());
 
   EXPECT_EQ(callback_count, 1);
   EXPECT_EQ(answer, "Use the second tab");
@@ -207,7 +253,6 @@ TEST_F(AgentBridgePromptTest, LongApprovalKeepsFullTextInBoundedScrollArea) {
   EXPECT_FALSE(label->IsDisplayTextTruncated());
   EXPECT_LT(prompt->GetWindowBoundsInScreen().height(), 680);
   prompt->CloseNow();
-  base::RunLoop().RunUntilIdle();
 }
 
 TEST_F(AgentBridgePromptTest, ApprovalSeparatesRequestSiteActionsAndSafety) {
@@ -237,7 +282,6 @@ TEST_F(AgentBridgePromptTest, ApprovalSeparatesRequestSiteActionsAndSafety) {
       u"Only the request shown here is approved. You can decline safely."));
 
   prompt->CloseNow();
-  base::RunLoop().RunUntilIdle();
 }
 
 TEST_F(AgentBridgePromptTest, QuestionUsesPlainSecurityGuidance) {
@@ -264,7 +308,6 @@ TEST_F(AgentBridgePromptTest, QuestionUsesPlainSecurityGuidance) {
   EXPECT_TRUE(FindDescendant<Textfield>(delegate->GetContentsView()));
 
   prompt->CloseNow();
-  base::RunLoop().RunUntilIdle();
 }
 
 TEST(AgentBridgePointerGeometryTest, LabelWidthCanExceedTheMinimum) {
@@ -283,7 +326,6 @@ TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
   const gfx::Point screen_point(140, 140);
   Widget* pointer = ShowAgentBridgePointer(owner_view(), screen_point);
   ASSERT_TRUE(pointer);
-  base::RunLoop().RunUntilIdle();
 
   EXPECT_TRUE(pointer->IsVisible());
   EXPECT_FALSE(pointer->IsActive());
@@ -299,50 +341,41 @@ TEST_F(AgentBridgePromptTest, PointerHasVisibleContentAtRequestedBounds) {
   EXPECT_EQ(contents->size(), pointer->GetWindowBoundsInScreen().size());
 
   pointer->CloseNow();
-  base::RunLoop().RunUntilIdle();
 
   // 초기 표시·레이아웃 작업이 처리되기 전의 즉시 종료도 같은 수명 계약이다.
   Widget* immediate = ShowAgentBridgePointer(owner_view(), screen_point);
   ASSERT_TRUE(immediate);
   immediate->CloseNow();
-  base::RunLoop().RunUntilIdle();
 }
 
 TEST_F(AgentBridgePromptTest, PointerHidesAndClosesWithOwner) {
   Widget* pointer = ShowAgentBridgePointer(owner_view(), gfx::Point(140, 140));
   ASSERT_TRUE(pointer);
   auto weak_pointer = pointer->GetWeakPtr();
-  base::RunLoop().RunUntilIdle();
   ASSERT_TRUE(pointer->IsVisible());
 
   for (int cycle = 0; cycle < 2; ++cycle) {
     owner_widget()->Hide();
-    base::RunLoop().RunUntilIdle();
     EXPECT_FALSE(pointer->IsVisible());
 
     owner_widget()->Show();
-    base::RunLoop().RunUntilIdle();
     EXPECT_TRUE(pointer->IsVisible());
     EXPECT_FALSE(pointer->IsActive());
   }
 
   // 포인터가 먼저 닫힌 뒤의 부모 표시 변경은 닫힌 포인터를 되살리지 않는다.
   pointer->CloseNow();
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(weak_pointer);
   owner_widget()->Hide();
   pointer = ShowAgentBridgePointer(owner_view(), gfx::Point(140, 140));
   ASSERT_TRUE(pointer);
   weak_pointer = pointer->GetWeakPtr();
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(pointer->IsVisible());
-  owner_widget()->Show();
-  base::RunLoop().RunUntilIdle();
+  ShowOwnerAndWaitForPointer(*pointer);
   EXPECT_TRUE(pointer->IsVisible());
   EXPECT_FALSE(pointer->IsActive());
 
   CloseOwner();
-  base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(weak_pointer);
 }
 

@@ -1041,6 +1041,42 @@ TEST_F(AppliedWaitTest, TimeoutDiagnosticsRecomputeSatisfactionFromFinalRead) {
   }
 }
 
+TEST_F(AppliedWaitTest, FrameGeometrySurvivesUnobservedHoverAndFocusChanges) {
+  ViewStateMatches view{
+      .drawn = true, .visible = true, .bounds = gfx::Rect(0, 0, 300, 200)};
+  auto before = Snapshot(owner_, view);
+  const auto digest = AppliedFrameGeometryDigest({before});
+  view.hovered = true;
+  view.focus_change_reason = 3;
+  auto after = Snapshot(owner_, view, 2);
+  EXPECT_EQ(digest, AppliedFrameGeometryDigest({after}));
+  AppliedCondition hover{.owner = owner_,
+                         .expected = ViewStateMatches{.hovered = false},
+                         .match = AppliedMatch::kViewHovered};
+  EXPECT_FALSE(AppliedValueMatches(hover, after.value));
+  std::get<ViewStateMatches>(after.value).bounds.set_height(201);
+  EXPECT_NE(digest, AppliedFrameGeometryDigest({after}));
+}
+
+TEST_F(AppliedWaitTest, FrameGeometryKeepsIdentityCoordinatesAndClip) {
+  auto before = Snapshot(owner_, Page());
+  const auto digest = AppliedFrameGeometryDigest({before});
+  auto after = before;
+  after.owner = other_;
+  EXPECT_NE(digest, AppliedFrameGeometryDigest({after}));
+  after = before;
+  after.coordinates.device_scale_factor = 2;
+  EXPECT_NE(digest, AppliedFrameGeometryDigest({after}));
+  after = before;
+  std::get<PageHostsApplied>(after.value).clip.set_width(50);
+  EXPECT_NE(digest, AppliedFrameGeometryDigest({after}));
+  after = before;
+  ++after.serials.apply_serial;
+  ++after.sample_id;
+  after.adapter_diagnostics = "feedback_requests=2";
+  EXPECT_EQ(digest, AppliedFrameGeometryDigest({after}));
+}
+
 TEST_F(AppliedWaitTest, UnmetDiagnosticsExplainValueCoordinatesAndEpoch) {
   using Blocker = AppliedConditionBlocker;
   const auto blockers = std::to_array<Blocker>(
@@ -1059,6 +1095,7 @@ TEST_F(AppliedWaitTest, UnmetDiagnosticsExplainValueCoordinatesAndEpoch) {
     Dispatch(ticket, base::DoNothing());
     auto snapshot = Snapshot(owner_, Page(), 2);
     snapshot.request_epoch = 42;
+    snapshot.adapter_diagnostics = "adapter-source-probe";
     switch (i) {
       case 0:
         snapshot.value = Page(200);
@@ -1078,6 +1115,8 @@ TEST_F(AppliedWaitTest, UnmetDiagnosticsExplainValueCoordinatesAndEpoch) {
     EXPECT_NE(std::string::npos, result.ToString().find(labels[i]));
     EXPECT_NE(std::string::npos, result.ToString().find("high_water: apply="));
     EXPECT_NE(std::string::npos, result.ToString().find("event_high_water:"));
+    EXPECT_NE(std::string::npos,
+              result.ToString().find("adapter={adapter-source-probe}"));
   }
 }
 
@@ -1319,6 +1358,227 @@ AppliedConditionValue DifferentValue(AppliedConditionValue value) {
       },
       value);
   return value;
+}
+
+TEST_F(AppliedWaitTest, PartialVisibilityStillRequiresFreshApplyAndOwner) {
+  source_.Set(Snapshot(owner_, ViewStateMatches{.visible = false}));
+  auto condition = Condition(ViewStateMatches{.visible = true});
+  condition.match = AppliedMatch::kViewVisible;
+  const AppliedConditions conditions{condition};
+  const auto ticket = Begin(conditions);
+  Dispatch(ticket, base::DoNothing());
+  source_.Emit({Snapshot(other_, ViewStateMatches{.visible = true}, 2)});
+  // fake 신호의 예약 평가를 전달하는 mock TaskEnvironment 자극이다.
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(session_.GetDiagnostics(ticket)->conditions[0].satisfied);
+  source_.Emit({Snapshot(owner_, ViewStateMatches{.visible = true}, 1)});
+  // 같은 serial의 평가가 끝나도 freshness가 충족되지 않아야 한다.
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(session_.GetDiagnostics(ticket)->conditions[0].satisfied);
+  source_.Emit({Snapshot(
+      owner_,
+      ViewStateMatches{.visible = true, .bounds = gfx::Rect(3, 4, 80, 60)},
+      2)});
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kApplied, result.kind) << result.ToString();
+  EXPECT_EQ(
+      gfx::Rect(3, 4, 80, 60).ToString(),
+      std::get<ViewStateMatches>(result.diagnostics.conditions[0].last->value)
+          .bounds.ToString());
+}
+
+TEST_F(AppliedWaitTest, IncompatibleProjectionFailsBeforeSubscribing) {
+  auto condition = Condition(ViewStateMatches{});
+  condition.match = AppliedMatch::kNativeFullscreen;
+  const AppliedConditions conditions{condition};
+  const auto ticket = Begin(conditions);
+  const auto result = session_.WaitForApplied(ticket, conditions);
+  EXPECT_EQ(AppliedResultKind::kUnsupportedCondition, result.kind);
+  EXPECT_FALSE(source_.has_observers());
+  EXPECT_EQ(0u, result.diagnostics.evaluation_count);
+}
+
+TEST_F(AppliedWaitTest, DestinationNeedsANewCommittedEpochAndBoundFrame) {
+  SurfaceEpochCommitted expected{
+      .epoch = 4,
+      .committed_generation = 4,
+      .destination = SurfaceEpochCommitted::Destination::kWindowed};
+  AppliedCondition condition{.owner = owner_,
+                             .expected = expected,
+                             .match = AppliedMatch::kSurfaceDestination};
+  EXPECT_FALSE(AppliedValueMatches(condition, expected));
+  auto actual = expected;
+  actual.epoch = 7;
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+  actual.committed_generation = 7;
+  actual.phase = SurfaceEpochCommitted::Phase::kTransitioning;
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+  actual.phase = SurfaceEpochCommitted::Phase::kStable;
+  EXPECT_TRUE(AppliedValueMatches(condition, actual));
+  actual.destination = SurfaceEpochCommitted::Destination::kImmersive;
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+
+  PresentedAfterApply frame{.compositor = owner_, .applied_sample_id = 8};
+  condition.expected = frame;
+  condition.match = AppliedMatch::kPresentedFrame;
+  EXPECT_TRUE(AppliedValueMatches(condition, frame));
+  frame.compositor = other_;
+  EXPECT_FALSE(AppliedValueMatches(condition, frame));
+  frame.compositor = owner_;
+  frame.successful = false;
+  EXPECT_FALSE(AppliedValueMatches(condition, frame));
+}
+
+TEST_F(AppliedWaitTest, TabActiveMatchesNativeHandleAcrossIndexChanges) {
+  const TabModelMatches expected{.active_tab = 34};
+  const AppliedCondition condition{
+      .owner = owner_, .expected = expected, .match = AppliedMatch::kTabActive};
+  TabModelMatches value{.tabs = {{12}, {34}}, .active_tab = 34};
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  std::ranges::reverse(value.tabs);
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  value.active_tab = 12;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.active_tab = 0;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  EXPECT_FALSE(AppliedValueMatches({.owner = owner_,
+                                    .expected = TabModelMatches{},
+                                    .match = AppliedMatch::kTabActive},
+                                   value));
+}
+
+TEST_F(AppliedWaitTest,
+       NewTabActiveRequiresUniqueInsertionAndPreservesExistingTabs) {
+  const TabModelMatches expected{.tabs = {{12}, {34}}, .active_tab = 12};
+  const AppliedCondition condition{.owner = owner_,
+                                   .expected = expected,
+                                   .match = AppliedMatch::kNewTabActive};
+  for (int index : {0, 1, 2}) {
+    auto value = expected;
+    value.tabs.insert(value.tabs.begin() + index, AppliedTabState{56});
+    value.active_tab = 56;
+    EXPECT_TRUE(AppliedValueMatches(condition, value));
+    value.active_tab = 34;
+    EXPECT_FALSE(AppliedValueMatches(condition, value));
+  }
+  auto value = expected;
+  value.active_tab = 56;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.tabs = {{12}, {34}, {56}, {78}};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.tabs = {{34}, {12}, {56}};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.tabs = {{12, true}, {34}, {56}};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.tabs = {{12}, {78}, {56}};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+}
+
+TEST_F(AppliedWaitTest, WebUiRowsFitCurrentNativeBounds) {
+  const AppliedCondition condition{
+      .owner = owner_,
+      .expected = WebUiStateMatches{.document = other_, .popup_rows = {1, 2}},
+      .match = AppliedMatch::kWebUiRowsFitNativeBounds};
+  WebUiStateMatches value{
+      .document = other_,
+      .popup_rows = {1, 2},
+      .row_bounds = {gfx::RectF(0, 0, 200, 40), gfx::RectF(0, 40, 200, 40)},
+      .native_view_bounds_in_screen = gfx::Rect(10, 20, 200, 80),
+      .native_widget_bounds_in_screen = gfx::Rect(8, 18, 204, 84)};
+  ASSERT_TRUE(AppliedValueMatches(condition, value));
+  value.popup_rows.push_back(3);
+  value.row_bounds.push_back(gfx::RectF(0, 80, 200, 40.5));
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_view_bounds_in_screen.set_height(120);
+  value.native_widget_bounds_in_screen.set_height(124);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_view_bounds_in_screen.set_height(121);
+  value.native_widget_bounds_in_screen.set_height(122);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_widget_bounds_in_screen.set_height(125);
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  std::ranges::reverse(value.row_bounds);
+  value.native_view_bounds_in_screen.set_height(80);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_view_bounds_in_screen.set_height(121);
+  value.native_widget_bounds_in_screen = gfx::Rect();
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_widget_bounds_in_screen = gfx::Rect(8, 18, 204, 125);
+  value.native_view_bounds_in_screen.set_width(1);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.native_view_bounds_in_screen.set_width(200);
+  value.document = owner_;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.document = other_;
+  value.row_bounds.pop_back();
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+}
+
+TEST_F(AppliedWaitTest, PopupGrowthCannotReuseEarlierRowBounds) {
+  WebUiStateMatches value{
+      .document = other_,
+      .popup_rows = {1, 2},
+      .row_bounds = {gfx::RectF(0, 0, 200, 40), gfx::RectF(0, 40, 200, 40)},
+      .native_view_bounds_in_screen = gfx::Rect(10, 20, 200, 1),
+      .native_widget_bounds_in_screen = gfx::Rect(8, 18, 204, 125)};
+  source_.Set(Snapshot(owner_, value));
+  const AppliedConditions conditions{
+      {.owner = owner_,
+       .expected = WebUiStateMatches{.document = other_, .popup_rows = {1, 2}},
+       .freshness = AppliedFreshness::kCurrentAfterDispatch,
+       .match = AppliedMatch::kWebUiRowsFitNativeBounds}};
+  const auto ticket = Begin(conditions);
+  base::test::TestFuture<AppliedWaitResult> result;
+  auto observation =
+      session_.ObserveApplied(ticket, conditions, result.GetCallback());
+  Dispatch(ticket, base::BindLambdaForTesting([&] {
+             value.popup_rows.push_back(3);
+             value.row_bounds.push_back(gfx::RectF(0, 80, 200, 40));
+             value.native_view_bounds_in_screen.set_height(80);
+             Apply(value);
+           }));
+  // fake DOM/native 표본을 전달해 과거의 두 행 높이로 완료되지 않음을 확인한다.
+  tasks_.RunUntilIdle();
+  EXPECT_FALSE(result.IsReady());
+  value.native_view_bounds_in_screen.set_height(120);
+  Apply(value, 3);
+  EXPECT_EQ(AppliedResultKind::kApplied, result.Get().kind);
+}
+
+TEST_F(AppliedWaitTest,
+       PaneMatchSeparatesTargetParentsFromCardsAndExtentChanges) {
+  PaneLayoutMatches value{.split_id = 1,
+                          .parent_extent = gfx::Size(800, 600),
+                          .ratio = .5,
+                          .tab_handles = {12, 34},
+                          .start_parent_extent = gfx::Size(397, 557),
+                          .end_parent_extent = gfx::Size(397, 527),
+                          .start_container_extent = gfx::Size(399, 600),
+                          .end_container_extent = gfx::Size(399, 600),
+                          .geometry_matches_ratio = true};
+  AppliedCondition condition{owner_, value};
+  condition.match = AppliedMatch::kPaneSplit;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  auto changed = value;
+  changed.parent_extent = gfx::Size(1000, 600);
+  changed.start_container_extent = changed.end_container_extent =
+      gfx::Size(499, 600);
+  changed.start_parent_extent = gfx::Size(497, 557);
+  changed.end_parent_extent = gfx::Size(497, 527);
+  EXPECT_FALSE(AppliedValueMatches(condition, changed));
+  condition.match = AppliedMatch::kPaneSplitCurrentExtent;
+  EXPECT_TRUE(AppliedValueMatches(condition, changed));
+  changed.start_parent_extent.Enlarge(-1, 0);
+  EXPECT_FALSE(AppliedValueMatches(condition, changed));
+  changed.start_parent_extent.Enlarge(1, 0);
+  changed.end_parent_extent.Enlarge(0, -1);
+  EXPECT_FALSE(AppliedValueMatches(condition, changed));
+  changed.end_parent_extent.Enlarge(0, 1);
+  changed.tab_handles = {34, 12};
+  EXPECT_FALSE(AppliedValueMatches(condition, changed));
+  changed = value;
+  changed.geometry_matches_ratio = false;
+  EXPECT_FALSE(AppliedValueMatches(condition, changed));
 }
 
 TEST_F(AppliedWaitTest, ClosedSchemasMatchAndFormatEveryConditionKind) {

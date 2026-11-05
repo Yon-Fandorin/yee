@@ -354,6 +354,11 @@ ProjectNavigationController::ProjectNavigationController(
 }
 
 ProjectNavigationController::~ProjectNavigationController() {
+  // BrowserView보다 먼저 끝나는 소유자다. 복원 중 View 알림에 앞서 폐기한다.
+  weak_factory_.InvalidateWeakPtrs();
+  auto terminal = GetAppliedSnapshot();
+  terminal.destroyed = true;
+  applied_callbacks_.Notify(terminal);
   RestoreNativeViews();
 }
 
@@ -638,6 +643,9 @@ bool ProjectNavigationController::IsHubHeaderControlAt(
 }
 
 void ProjectNavigationController::AfterBrowserLayout() {
+  base::ScopedClosureRunner published(
+      base::BindOnce(&ProjectNavigationController::PublishApplied,
+                     weak_factory_.GetWeakPtr()));
   auto* view = browser_view();
   if (view) {
     SetSidebarExpandedPresentation(sidebar_expanded_);
@@ -828,6 +836,27 @@ bool ProjectNavigationController::IsInCurrentPageSurface(
          (active->GetSplit() && active->GetSplit() == tab->GetSplit());
 }
 
+ProjectNavigationAppliedSnapshot
+ProjectNavigationController::GetAppliedSnapshot() const {
+  auto snapshot = applied_snapshot_;
+  snapshot.showing_hub = showing_hub_;
+  snapshot.refresh_pending = refresh_pending_;
+  return snapshot;
+}
+base::WeakPtr<ProjectNavigationController>
+ProjectNavigationController::GetWeakPtr() {
+  return weak_factory_.GetWeakPtr();
+}
+base::CallbackListSubscription ProjectNavigationController::SubscribeApplied(
+    base::RepeatingCallback<void(const ProjectNavigationAppliedSnapshot&)>
+        callback) {
+  return applied_callbacks_.Add(std::move(callback));
+}
+void ProjectNavigationController::PublishApplied() {
+  ++applied_snapshot_.apply_serial;
+  applied_callbacks_.Notify(GetAppliedSnapshot());
+}
+
 void ProjectNavigationController::ScheduleRefresh() {
   if (refresh_pending_) {
     return;
@@ -839,6 +868,9 @@ void ProjectNavigationController::ScheduleRefresh() {
 }
 
 void ProjectNavigationController::Refresh() {
+  base::ScopedClosureRunner published(
+      base::BindOnce(&ProjectNavigationController::PublishApplied,
+                     weak_factory_.GetWeakPtr()));
   refresh_pending_ = false;
   if (!service_ || !tabs_)
     return;

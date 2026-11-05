@@ -44,6 +44,8 @@
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/layout_provider.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_tracker.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
 namespace yee {
@@ -87,6 +89,7 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
         url_(contents->GetVisibleURL()) {
     CHECK(!g_site_controls_bubble);
     g_site_controls_bubble = this;
+    anchor_.SetView(anchor);
 
     SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
     SetShowCloseButton(true);
@@ -118,6 +121,8 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     if (g_site_controls_bubble == this) {
       g_site_controls_bubble = nullptr;
     }
+    if (auto* button = views::AsViewClass<SiteControlsButton>(anchor_.view()))
+      button->PopupVisibilityApplied(false);
   }
 
  private:
@@ -217,6 +222,7 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     LocationBarBubbleDelegateView::WebContentsDestroyed();
   }
 
+  views::ViewTracker anchor_;
   const raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<content::WebContents> contents_;
   const GURL url_;
@@ -457,6 +463,8 @@ bool ShowSiteControlsBubble(views::View* anchor,
   auto* bubble = new SiteControlsBubble(anchor, browser, contents);
   views::BubbleDialogDelegateView::CreateBubble(bubble);
   bubble->ShowForReason(LocationBarBubbleDelegateView::USER_GESTURE);
+  if (auto* button = views::AsViewClass<SiteControlsButton>(anchor))
+    button->PopupVisibilityApplied(true);
   return true;
 }
 
@@ -468,6 +476,23 @@ void CloseSiteControlsBubble() {
 
 bool IsSiteControlsBubbleShowing() {
   return g_site_controls_bubble != nullptr;
+}
+
+SiteControlsPopupAppliedSnapshot SiteControlsButton::GetPopupAppliedSnapshot()
+    const {
+  return popup_applied_;
+}
+
+base::CallbackListSubscription SiteControlsButton::SubscribePopupApplied(
+    base::RepeatingCallback<void(const SiteControlsPopupAppliedSnapshot&)>
+        callback) {
+  return popup_callbacks_.Add(std::move(callback));
+}
+
+void SiteControlsButton::PopupVisibilityApplied(bool showing) {
+  popup_applied_.showing = showing;
+  ++popup_applied_.apply_serial;
+  popup_callbacks_.Notify(popup_applied_);
 }
 
 BEGIN_METADATA(SiteControlsButton)

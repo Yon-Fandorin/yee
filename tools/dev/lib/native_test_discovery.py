@@ -40,13 +40,14 @@ def is_disabled_test(name):
                for pattern in ('DISABLED_*', '*/DISABLED_*'))
 
 
-def check_test_listing(listing, gtest_filter):
-    """음수·비활성 사례를 제외한 뒤 모든 양수 패턴의 발견 수를 보고한다."""
+def check_test_listing(listing, gtest_filter, *, also_run_disabled_tests=False):
+    """GTest의 음수 필터와 명시적 비활성 실행 옵션을 적용해 발견 수를 보고한다."""
     positive, separator, negative = gtest_filter.partition('-')
     positive_patterns = (positive or '*').split(':') if separator else positive.split(':')
     negative_patterns = negative.split(':') if separator else []
     tests = parse_test_listing(listing)
-    active_tests = {name for name in tests if not is_disabled_test(name)}
+    active_tests = {name for name in tests
+                    if also_run_disabled_tests or not is_disabled_test(name)}
     eligible_tests = {name for name in active_tests
                       if not any(matches_pattern(name, pattern) for pattern in negative_patterns)}
     pattern_counts = {pattern: sum(matches_pattern(name, pattern) for name in eligible_tests)
@@ -68,6 +69,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('listing', nargs='?', default='-', help='목록 파일, 생략하거나 -이면 표준 입력')
     parser.add_argument('--filter', required=True, help='바이너리에 전달한 것과 같은 GTest 필터')
+    parser.add_argument('--gtest_also_run_disabled_tests', action='store_true',
+                        help='바이너리에도 전달한 명시적 비활성 사례 실행 옵션')
     args = parser.parse_args()
     try:
         listing = (sys.stdin.buffer.read().decode('utf-8-sig') if args.listing == '-'
@@ -75,7 +78,8 @@ def main():
     except (OSError, UnicodeError) as error:
         print(json.dumps({'ok': False, 'error': str(error)}, ensure_ascii=True))
         return 2
-    report = check_test_listing(listing, args.filter)
+    report = check_test_listing(
+        listing, args.filter, also_run_disabled_tests=args.gtest_also_run_disabled_tests)
     print(json.dumps(report, ensure_ascii=True, separators=(',', ':')))
     return 0 if report['ok'] else 1
 

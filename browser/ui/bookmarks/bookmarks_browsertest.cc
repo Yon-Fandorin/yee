@@ -9,6 +9,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/bookmarks/browser/bookmark_model.h"
@@ -49,17 +50,8 @@ class BookmarksBrowserTest : public InProcessBrowserTest {
   }
 
   bool WaitFor(const std::string& condition) {
-    return content::EvalJs(Contents(), std::string(R"JS(
-      (async () => {
-        for (let attempt = 0; attempt < 250; ++attempt) {
-          if (
-    )JS") + condition + R"JS(
-          ) return true;
-          await new Promise(resolve => setTimeout(resolve, 20));
-        }
-        return false;
-      })()
-    )JS")
+    return content::EvalJs(Contents(),
+                           test::WaitForInternalPageScript(condition))
         .ExtractBool();
   }
 

@@ -131,6 +131,7 @@ TEST_F(PageViewportAppliedStateTest,
   EXPECT_TRUE(snapshots.empty());
   ApplyPageViewportHostGeometry(*host, geometry);
   ApplyPageViewportHostGeometry(*host, geometry);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   ASSERT_EQ(2u, snapshots.size());
   EXPECT_EQ(1u, snapshots[0].apply_serial);
@@ -149,6 +150,7 @@ TEST_F(PageViewportAppliedStateTest,
   next_geometry.target_stack_in_container.Offset(7, 9);
   next_geometry.viewport_radii = gfx::RoundedCornersF(8);
   ApplyPageViewportHostGeometry(*host, next_geometry);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(3u, state->GetSnapshot().apply_serial);
   EXPECT_EQ(next_geometry, state->GetSnapshot().geometry);
@@ -168,10 +170,12 @@ TEST_F(PageViewportAppliedStateTest, SubscriptionAndWeakPtrFollowTheClipHost) {
   auto subscription = state->Subscribe(base::BindLambdaForTesting(
       [&](const PageViewportAppliedSnapshot&) { ++calls; }));
   ApplyPageViewportHostGeometry(*host, {});
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, calls);
   subscription = {};
   ApplyPageViewportHostGeometry(*host, {});
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, calls);
 
@@ -179,12 +183,14 @@ TEST_F(PageViewportAppliedStateTest, SubscriptionAndWeakPtrFollowTheClipHost) {
       [&](const PageViewportAppliedSnapshot&) { ++calls; }));
   ApplyPageViewportHostGeometry(*host, {});
   host.reset();
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_FALSE(weak);
   EXPECT_EQ(1, calls);
   host = CreatePageViewportHostTree();
   EXPECT_NE(owner, PageViewportAppliedState::From(*host)->GetSnapshot().owner);
   ApplyPageViewportHostGeometry(*host, {});
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, calls);
   subscription = {};
@@ -200,6 +206,7 @@ TEST_F(PageViewportAppliedStateTest, OwnerDeletionStopsRemainingNotifications) {
   auto later = state->Subscribe(base::BindLambdaForTesting(
       [&](const PageViewportAppliedSnapshot&) { ++later_calls; }));
   ApplyPageViewportHostGeometry(*host, {});
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_FALSE(weak);
   EXPECT_EQ(0, later_calls);
@@ -220,6 +227,7 @@ TEST_F(PageViewportAppliedStateTest, QueuedDeliveryHonorsSubscriptionBoundary) {
   canceled = {};
   ApplyPageViewportHostGeometry(*host, {});
   EXPECT_TRUE(serials.empty());
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(0, canceled_calls);
   EXPECT_EQ((std::vector<uint64_t>{2}), serials);
@@ -243,6 +251,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest, PublishesStartProgressAndEnd) {
       }));
   EXPECT_TRUE(snapshots.empty());
   SetCollapsed(state, false);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   ASSERT_EQ(1u, snapshots.size());
   EXPECT_TRUE(snapshots.back().running);
@@ -265,6 +274,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
   views::View decoration;
   auto& state = Attach(decoration, /*collapsed=*/false);
   SetCollapsed(state, true);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   task_environment_.FastForwardBy(base::Milliseconds(80));
   const auto shrinking = state.GetSnapshot();
@@ -272,6 +282,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
   ASSERT_GT(shrinking.expansion, 0);
   ASSERT_LT(shrinking.expansion, 1);
   SetCollapsed(state, false);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(shrinking.expansion, state.GetSnapshot().expansion);
   EXPECT_GT(state.GetSnapshot().apply_serial, shrinking.apply_serial);
@@ -286,6 +297,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
   views::View decoration;
   auto& state = Attach(decoration, /*collapsed=*/false);
   SetCollapsed(state, true);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   task_environment_.FastForwardBy(base::Milliseconds(80));
   const auto running = state.GetSnapshot();
@@ -297,6 +309,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
       }));
   auto reduced = gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
   SetCollapsed(state, true);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   // Reset의 cancel 알림과 최종 적용 알림이 모두 idle 값을 발행한다.
   ASSERT_EQ(2u, snapshots.size());
@@ -307,6 +320,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
     EXPECT_FALSE(snapshot.running);
   }
   SetCollapsed(state, false);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, state.GetSnapshot().expansion);
   EXPECT_FALSE(state.GetSnapshot().running);
@@ -325,6 +339,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
   auto subscription = state.Subscribe(base::BindLambdaForTesting(
       [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
   SetCollapsed(state, false);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   EXPECT_EQ(1, calls);
   subscription = {};
@@ -346,6 +361,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
       replacement.Subscribe(base::BindLambdaForTesting(
           [&](const HorizontalTabGroupCapsuleSnapshot&) { ++calls; }));
   SetCollapsed(replacement, false);
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   const int before_destruction = calls;
   decoration.reset();
@@ -373,6 +389,7 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
   SetCollapsed(state, true);
   EXPECT_FALSE(state.GetSnapshot().running);
   EXPECT_TRUE(early.empty());
+  // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을 전달한다.
   task_environment_.RunUntilIdle();
   ASSERT_EQ(3u, early.size());
   ASSERT_EQ(2u, late.size());
@@ -448,6 +465,8 @@ TEST_F(HorizontalTabGroupCapsuleStateTest,
         auto* dying_state = HorizontalTabGroupCapsuleState::From(view);
         ASSERT_TRUE(dying_state);
         EXPECT_FALSE(dying_state->GetWeakPtr());
+        // 창 없는 fixture의 TaskEnvironment에서 신호 callback/삭제 작업을
+        // 전달한다.
         task_environment_.RunUntilIdle();
         EXPECT_EQ(0, calls);
       }));
@@ -849,7 +868,7 @@ TEST_F(YeeRestingTextViewTest, HorizontalMinimumKeepsFaviconGap) {
 }
 
 TEST_F(YeeRestingTextViewTest, HorizontalGroupBoundaryHasOneOutsideSeparator) {
-  auto *view = widget_->SetContentsView(std::make_unique<views::View>());
+  auto* view = widget_->SetContentsView(std::make_unique<views::View>());
   const auto group = tab_groups::TabGroupId::GenerateNew();
   EXPECT_EQ(
       std::optional<bool>(true),

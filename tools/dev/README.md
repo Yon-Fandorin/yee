@@ -783,7 +783,8 @@ Windows에서 `node tools/dev/test-group-session-restore.mjs <Yee 실행 파일>
 
 `test-youtube-live.sh`의 기본 영상은 `5EzB_2Qcakw`, `uq14seOjILU`, `mfmdXPT7nAM`이다.
 `YEE_LIVE_YOUTUBE_VIDEO`로 이 중 하나를 선택하고 `YEE_LIVE_YOUTUBE_SECONDS`로
-영상별 상한 90~600초를 지정한다. `YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS`는
+영상별 상한 90~600초를 지정한다(기본 120초). 기본값은 광고가 60초 가까이 나와도
+최소 본편 시간을 채울 여유를 두면서 세 영상 관측을 약 6분에 끝낸다. `YEE_LIVE_YOUTUBE_MIN_CONTENT_SECONDS`는
 광고·탐색 이동을 제외한 최소 본편 시간이며 기본 60초다. `YEE_LIVE_YOUTUBE_SEEK=1`은
 40초·80초 뒤 중간 탐색을 추가한다. opt-in 결과는 선택한 `$LOCAL_BUILD_ROOT/youtube-live/`에 생성한다.
 

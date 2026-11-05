@@ -12,6 +12,7 @@
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/unguessable_token.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "ui/base/mojom/menu_source_type.mojom-forward.h"
@@ -39,6 +40,14 @@ class ProjectPicker;
 class ProjectService;
 class ProjectTabCoordinator;
 
+struct ProjectNavigationAppliedSnapshot {
+  base::UnguessableToken owner;
+  uint64_t apply_serial = 0;
+  bool showing_hub = false;
+  bool refresh_pending = false;
+  bool destroyed = false;
+};
+
 // 창의 페이지/허브 전환만 소유한다. TabStripModel과 URL 탐색은 Chromium에
 // 맡긴다.
 class ProjectNavigationController : public TabStripModelObserver {
@@ -60,6 +69,11 @@ class ProjectNavigationController : public TabStripModelObserver {
       ui::SimpleMenuModel& parent);
   std::unique_ptr<views::View> CreateSidebarView();
   void SetSidebarExpandedPresentation(bool expanded);
+  ProjectNavigationAppliedSnapshot GetAppliedSnapshot() const;
+  base::WeakPtr<ProjectNavigationController> GetWeakPtr();
+  base::CallbackListSubscription SubscribeApplied(
+      base::RepeatingCallback<void(const ProjectNavigationAppliedSnapshot&)>
+          callback);
   bool can_create_project() const;
   void AttachBrowserView(BrowserView* view);
   void AfterBrowserLayout();
@@ -81,6 +95,7 @@ class ProjectNavigationController : public TabStripModelObserver {
   void OnModalChanged(tabs::TabInterface* tab);
   bool IsInCurrentPageSurface(const tabs::TabInterface* tab) const;
   void ObserveTabDialogs();
+  void PublishApplied();
   void ScheduleRefresh();
   void Refresh();
   void InvalidateNativeTabLayouts();
@@ -111,6 +126,10 @@ class ProjectNavigationController : public TabStripModelObserver {
     bool visibility_changed;
   };
 
+  ProjectNavigationAppliedSnapshot applied_snapshot_{
+      .owner = base::UnguessableToken::Create()};
+  base::RepeatingCallbackList<void(const ProjectNavigationAppliedSnapshot&)>
+      applied_callbacks_;
   const raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<ProjectService> service_;
   raw_ptr<ProjectTabCoordinator> tabs_;

@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_support.h"
+#include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/interaction/interactive_test.h"
 #include "ui/base/interaction/state_observer.h"
@@ -67,6 +68,15 @@ class AppliedWaitInteractiveTestMixin : public T {
                        AppliedWaitSession& session,
                        AppliedTicket ticket,
                        AppliedConditions conditions) {
+    return ArmApplied(
+        id, session, [ticket] { return ticket; },
+        [conditions] { return conditions; });
+  }
+  template <class Ticket, class Conditions>
+  MultiStep ArmApplied(ui::test::StateIdentifier<AppliedStateObserver> id,
+                       AppliedWaitSession& session,
+                       Ticket ticket,
+                       Conditions conditions) {
     auto sequence = std::make_shared<base::WeakPtr<ui::InteractionSequence>>();
     auto context = std::make_shared<std::optional<ui::ElementContext>>();
     auto failed = std::make_shared<bool>(false);
@@ -85,19 +95,51 @@ class AppliedWaitInteractiveTestMixin : public T {
     return T::Steps(
         std::move(bind),
         this->ObserveState(
-            id, std::make_unique<AppliedStateObserver>(
-                    session, std::move(ticket), std::move(conditions),
-                    base::BindOnce(
-                        [](decltype(sequence) target, decltype(failed) failed) {
-                          *failed = true;
-                          if (*target) {
-                            (*target)->FailForTesting();
-                          }
-                        },
-                        sequence, failed))),
+            id, std::ref(session), std::move(ticket), std::move(conditions),
+            [sequence, failed]() -> base::OnceClosure {
+              return base::BindOnce(
+                  [](decltype(sequence) target, decltype(failed) failed) {
+                    *failed = true;
+                    if (*target) {
+                      (*target)->FailForTesting();
+                    }
+                  },
+                  sequence, failed);
+            }),
         T::Do([this, context, id] {
           applied_states_.push_back({id.identifier(), **context, true});
         }));
+  }
+  template <class Source, class Conditions, class Action>
+  MultiStep ApplyAndWait(AppliedTestContext<Source>& context,
+                         Conditions conditions,
+                         Action action,
+                         AppliedDomain domain = AppliedDomain::kLayout,
+                         bool no_op = false) {
+    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(AppliedStateObserver, kAppliedAction);
+    struct Request {
+      AppliedTicket ticket;
+      AppliedConditions conditions;
+    };
+    auto request = std::make_shared<Request>();
+    return T::Steps(
+        T::Do([&context, request, conditions = std::move(conditions), domain,
+               no_op]() mutable {
+          request->conditions = conditions();
+          request->ticket =
+              context.Begin(request->conditions, domain,
+                            TestTimeouts::action_timeout(), no_op);
+        }),
+        ArmApplied(
+            kAppliedAction, context.session(),
+            [request] { return request->ticket; },
+            [request] { return request->conditions; }),
+        T::Do([&context, request, action = std::move(action)]() mutable {
+          const auto error = context.session().Dispatch(
+              request->ticket, base::BindLambdaForTesting(std::move(action)));
+          EXPECT_FALSE(error) << (error ? error->ToString() : "");
+        }),
+        WaitForApplied(kAppliedAction));
   }
   MultiStep WaitForApplied(ui::test::StateIdentifier<AppliedStateObserver> id) {
     auto forget = T::Do([] {});
@@ -114,6 +156,42 @@ class AppliedWaitInteractiveTestMixin : public T {
     return T::Steps(T::WaitForState(id, testing::Ne(AppliedOutcome::kPending)),
                     T::CheckState(id, AppliedOutcome::kApplied),
                     this->StopObservingState(id), std::move(forget));
+  }
+  // Kombucha 입력 step이 반환할 때의 실제 입력 완료를 Dispatch ACK로 쓴다.
+  template <class Source, class Conditions>
+  MultiStep ApplyStepsAndWait(AppliedTestContext<Source>& context,
+                              Conditions conditions,
+                              MultiStep input) {
+    DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(AppliedStateObserver, kAppliedInput);
+    struct Request {
+      AppliedTicket ticket;
+      AppliedConditions conditions;
+      DispatchDone acknowledged;
+    };
+    auto request = std::make_shared<Request>();
+    return T::Steps(
+        T::Do(
+            [&context, request, conditions = std::move(conditions)]() mutable {
+              request->conditions = conditions();
+              request->ticket = context.Begin(request->conditions);
+            }),
+        ArmApplied(
+            kAppliedInput, context.session(),
+            [request] { return request->ticket; },
+            [request] { return request->conditions; }),
+        T::Do([&context, request] {
+          EXPECT_FALSE(context.session().DispatchAsync(
+              request->ticket,
+              base::BindLambdaForTesting([request](DispatchDone done) {
+                request->acknowledged = std::move(done);
+              })));
+        }),
+        std::move(input), T::Do([request] {
+          if (request->acknowledged)
+            std::move(request->acknowledged)
+                .Run(AppliedDispatchStatus::kAccepted);
+        }),
+        WaitForApplied(kAppliedInput));
   }
 
  private:
