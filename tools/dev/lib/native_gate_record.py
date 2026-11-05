@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
 from native_test_discovery import check_test_listing
-from background_test import BackgroundObserver, run_background_command
+from background_test import ACTIVITY_COUNTERS, BackgroundObserver, run_background_command
 
 
 XML_MISMATCH = 21
@@ -269,6 +269,10 @@ def run_gate(args):
                 record['observation'] = observer.finish()
                 for note in record['observation'].get('notes', []):
                     print(f'background observation note: {note}', file=sys.stderr)
+                for key in (*ACTIVITY_COUNTERS, 'key_window_changes'):
+                    if record['observation'].get(key):
+                        print(f'background observation note: {key}={record["observation"][key]}',
+                              file=sys.stderr)
                 if not record['observation']['passed']:
                     status = 'tests passed' if result == 0 else f'native gate failed ({result})'
                     print(f'{status}; {observation_failure(record["observation"])}', file=sys.stderr)

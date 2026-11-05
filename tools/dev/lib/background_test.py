@@ -16,10 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from browser_bundle_executables import process_arguments
 
 
-QUIET_COUNTERS = (
-    'max_visible_test_windows', 'frontmost_changes',
-    'cursor_changes', 'modifier_changes', 'modifier_injections', 'input_injections',
+INTERFERENCE_COUNTERS = (
+    'max_visible_test_windows', 'test_frontmost_samples',
+    'modifier_injections', 'input_injections',
     'unrelated_apps_lost', 'unrelated_windows_lost',
+)
+ACTIVITY_COUNTERS = (
+    'cursor_changes', 'modifier_changes', 'frontmost_changes',
+    'non_regular_apps_lost', 'non_regular_windows_lost',
+    'user_active_apps_lost', 'user_active_windows_lost',
 )
 
 
@@ -29,13 +34,14 @@ def read_observation(path):
     if (not isinstance(summary, dict) or type(summary.get('schema_version')) is not int
             or summary['schema_version'] != 1
             or any(type(summary.get(key)) is not int or summary[key] < 0
-                   for key in (*QUIET_COUNTERS, 'sample_count', 'frontmost_sample_count',
+                   for key in (*INTERFERENCE_COUNTERS, *ACTIVITY_COUNTERS,
+                               'sample_count', 'frontmost_sample_count',
                                'frontmost_read_gaps'))
             or type(summary.get('observation_complete')) is not bool):
         raise ValueError('잘못된 background observation JSON')
     summary['passed'] = (summary['observation_complete'] and summary['sample_count'] >= 2
                          and summary['frontmost_sample_count'] >= 2 and summary['frontmost_read_gaps'] == 0
-                         and all(summary[key] == 0 for key in QUIET_COUNTERS))
+                         and all(summary[key] == 0 for key in INTERFERENCE_COUNTERS))
     return summary
 
 

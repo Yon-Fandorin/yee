@@ -577,7 +577,9 @@ macOS의 `--observe-background`는 Swift helper를 캐시에 빌드하고 약 10
 관찰기가 `sysctl(KERN_PROC_PGRP)`로 그 root를 확인하고 준비 파일을 쓴 뒤에만 테스트를
 exec하므로 짧은 목록 조회에도 같은 순서를 적용한다. 매 표본에서 전용 그룹을 열거하고,
 전체 프로세스 목록의 root 자손과 이미 확인한 자식을 함께 추적한다.
-창 소유 PID가 그 집합에 있을 때만 검사 창으로 센다. 무관한 PID의 그룹·세션은 개별 조회하지 않는다.
+창 소유 PID가 그 집합에 있을 때만 검사 창으로 센다. 전면 앱 표본과 입력 이벤트는
+PID·시작 시각을 저장하고 같은 소유권 판정으로 검사 프로세스에 귀속한다.
+무관한 PID의 그룹·세션은 개별 조회하지 않는다.
 검사 창의 가시성은 모든 활성 display의 온스크린 목록으로 확인하고, 무관한 창의 생존은
 최소화·다른 Space 창을 포함한 전체 목록으로 비교하며 나중에 확인한 자체 helper도 제외한다.
 AX focused window 소유 PID는 참고 정보이며 변화나 읽기 실패가 합격을 막지 않는다.
@@ -593,30 +595,54 @@ AX·event tap을 읽지 못하면 `notes`에 남기며 권한을 자동 요청�
 실제 UI에서의 합격 여부는 검수자의 실행으로 확인한다.
 
 각 native 기록 폴더의 `observation.json`과 `record.json`의 `observation`에 요약을 남긴다.
-조용한 관찰 구간의 합격은 `observation_complete: true`, `sample_count >= 2`이며 다음 값이 모두 0이다.
+관찰 합격은 `observation_complete: true`, `sample_count >= 2`,
+`frontmost_sample_count >= 2`, `frontmost_read_gaps: 0`이며 다음 값이 모두 0이다.
 `record.json`의 `observation.passed: true`와 `gate_exit_code: 0`도 확인한다.
 
 - `max_visible_test_windows`: 동시에 관찰한 검사 소유 표시 창의 최댓값
-- `frontmost_changes`: 읽기 공백을 제외한 전면 앱 PID 전환 수
-- `cursor_changes`, `modifier_changes`: 연속한 유효 커서·modifier 표본 사이의 변화 수
+- `test_frontmost_samples`: 검사 소유 프로세스가 전면 앱인 유효 표본 수. 전면 앱이
+  바뀌지 않아도 검사 프로세스가 한 번이라도 전면이면 실패한다.
 - `input_injections`, `modifier_injections`: 검사 프로세스가 출처인 입력·modifier 이벤트 수
-- `unrelated_apps_lost`: 시작 시 있던 무관한 앱 identity 중 종료 시 없는 수. bundle ID,
+- `unrelated_apps_lost`: 시작 시 활성화 정책이 `NSApplication.ActivationPolicy.regular`인
+  무관한 앱 중 관측 동안 한 번도 전면이 아니었고 종료 시 없는 identity 수.
+  Dock에 표시되는 일반 앱만 해당한다. bundle ID,
   없으면 실행 파일 경로·이름 순으로 시작 시 캡처한다. 같은 프로세스의 후속 identity를
   읽지 못해도 저장한 값을 사용하며 같은 identity의 재실행은 손실이 아니다.
-- `unrelated_windows_lost`: 무관한 앱 identity별 일반 창(layer 0) 수의 감소분.
-  메뉴바·상태 창 등 다른 layer는 제외한다.
+- `unrelated_windows_lost`: 시작 시 regular였던 무관한 앱 identity별 일반 창(layer 0)
+  수의 감소분 중 관측 동안 한 번도 전면이 아니었던 앱의 손실. 메뉴바·상태 창 등 다른
+  layer는 제외한다. 이후 활성화 정책이 바뀌어도
+  시작 시 캡처한 비교 대상을 유지한다.
 
+`test_frontmost_samples`는 필수 비음수 정수이며 누락·형식 오류는 관측 실패다.
 `unrelated_apps_lost_details`·`unrelated_windows_lost_details`에는 손실 identity와
 전후 개수(`before`, `after`), 감소분(`lost`)을 기록한다.
 앱 identity를 요구하기 전에 검사 소유권과 종료 상태를 확인한다. 시작 후 나타난 무관한 앱은
 identity를 읽지 못하거나 곧 종료해도 앱 손실·관측 미완료로 세지 않는다. PID와 읽을 수 있는
 identity를 `notes`에 남기며, 읽지 못한 PID는 `application_identity_unreadable_pids`에 기록한다.
-시작 시 손실 비교 대상인 앱의 identity를 캡처하지 못하면 관측 미완료다.
+시작 시 regular 앱의 identity를 캡처하지 못하면 관측 미완료다.
+accessory·prohibited 앱의 identity 읽기 실패는 note로 남긴다.
 
-`key_window_changes`는 AX focused window 소유 PID 전환 수이며 참고값이다.
+다음 활동 지표는 기록만 하며 합격을 막지 않는다. 0보다 크면
+`background observation note: <지표>=<값>`을 출력한다.
 
-사용자가 앱·창을 바꾸거나 커서·modifier를 움직여도 변화가 기록되므로, 위 합격 판정에는
-입력 없는 관찰 구간을 쓴다. 사용자 활동 중의 변화만으로 검사 주입이라고 판정하지 않는다.
+- `cursor_changes`, `modifier_changes`: 연속한 유효 커서·modifier 표본 사이의 변화 수
+- `frontmost_changes`: 읽기 공백을 제외한 전면 앱 PID 전환 수. 무관한 앱 사이의 전환은
+  허용하며 검사 소유 앱의 전면 여부는 `test_frontmost_samples`로 판정한다.
+- `key_window_changes`: AX focused window 소유 PID 전환 수
+- `non_regular_apps_lost`: 시작 시 accessory·prohibited였던 앱 identity의 손실 수
+- `non_regular_windows_lost`: 시작 시 regular 앱에 속하지 않았던 일반 창 수의 감소분.
+  IME·XPC UI 서비스·background agent의 창 생성·소멸은 실패시키지 않는다.
+- `user_active_apps_lost`, `user_active_windows_lost`: 시작 시 regular였고 관측 중 한 번이라도
+  전면이었던 앱의 종료·일반 창 감소분. 이후 다른 앱이 전면이 되어도 note로 유지한다.
+  PID와 프로세스 시작 시각으로 전면 표본을 앱 identity에 연결하며, 같은 identity의 재실행도
+  같은 앱으로 취급한다. 검사 소유 앱의 전면화는 계속 `test_frontmost_samples`로 실패한다.
+
+`non_regular_*`·`user_active_*` 카운터도 필수 비음수 정수이며 누락·형식 오류는 관측 실패다.
+스키마 버전은 1이다. 각 `non_regular_*_lost_details`·`user_active_*_lost_details`에는 기존 손실 상세와 같은
+identity·전후 개수·감소분을 기록한다.
+
+사용자는 background 실행 중 다른 앱에서 계속 작업할 수 있다. 커서·modifier 변화와
+무관한 앱 사이의 전환과 사용자가 전면에서 쓰던 앱의 종료·창 감소로 검사 간섭을 판정하지 않는다.
 100ms 사이의 짧은 창·focus 변화나 출처 PID가 없는 입력은 이 관찰만으로 배제할 수 없다.
 headless의 논리 가시성·bounds·paint·popup 검사는 실제 화면의 픽셀·occlusion·Space·native
 활성화 검증을 대체하지 않는다. 실제 입력을 확인하는 C는 기존 foreground 동작을 유지한다.

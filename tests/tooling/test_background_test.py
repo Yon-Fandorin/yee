@@ -32,20 +32,26 @@ class BackgroundTest(unittest.TestCase):
     def summary(self, **changes):
         return dict(schema_version=1, observation_complete=True, sample_count=3,
                     frontmost_sample_count=3, frontmost_read_gaps=0,
-                    **{key: 0 for key in background_test.QUIET_COUNTERS}) | changes
+                    **{key: 0 for key in (*background_test.INTERFERENCE_COUNTERS,
+                                         *background_test.ACTIVITY_COUNTERS)}) | changes
 
-    def test_observation_json_requires_complete_zero_counters(self):
-        """sampling 부족과 모든 간섭 지표를 각각 실패로 판정한다."""
+    def test_observation_json_requires_complete_zero_interference_counters(self):
+        """사용자 활동은 허용하고 sampling 부족과 검사 간섭은 실패로 판정한다."""
         path = self.directory / 'observation.json'
         variants = [(self.summary(), True), (self.summary(accessibility_available=False,
                     notes=['AX focused window owner unavailable; optional detail']), True),
                     (self.summary(key_window_changes=4), True),
+                    (self.summary(cursor_changes=5, modifier_changes=3, frontmost_changes=2), True),
+                    (self.summary(non_regular_apps_lost=1, non_regular_windows_lost=2), True),
+                    (self.summary(user_active_apps_lost=1, user_active_windows_lost=2), True),
                     (self.summary(frontmost_sample_count=0), False),
                     (self.summary(frontmost_sample_count=1), False),
                     (self.summary(frontmost_read_gaps=1), False),
                     (self.summary(observation_complete=False), False),
                     (self.summary(sample_count=1), False)]
-        variants += [(self.summary(**{key: 1}), False) for key in background_test.QUIET_COUNTERS]
+        variants += [(self.summary(**{key: 1}), False) for key in (
+            'max_visible_test_windows', 'test_frontmost_samples', 'input_injections',
+            'modifier_injections', 'unrelated_apps_lost', 'unrelated_windows_lost')]
         for summary, passed in variants:
             with self.subTest(summary=summary):
                 path.write_text(json.dumps(summary))
@@ -63,6 +69,23 @@ class BackgroundTest(unittest.TestCase):
             path.write_text(payload)
             with self.assertRaises(ValueError):
                 background_test.read_observation(path)
+        for key in (*background_test.INTERFERENCE_COUNTERS, *background_test.ACTIVITY_COUNTERS):
+            for value in (True, -1, None, 1.5, '1'):
+                with self.subTest(counter=key, value=value):
+                    path.write_text(json.dumps(self.summary(**{key: value})))
+                    with self.assertRaises(ValueError):
+                        background_test.read_observation(path)
+            summary = self.summary()
+            summary.pop(key, None)
+            with self.subTest(missing=key):
+                path.write_text(json.dumps(summary))
+                with self.assertRaises(ValueError):
+                    background_test.read_observation(path)
+            for value in (None, True, -1, 1.0, '0'):
+                with self.subTest(key=key, value=value):
+                    path.write_text(json.dumps(self.summary(**{key: value})))
+                    with self.assertRaises(ValueError):
+                        background_test.read_observation(path)
 
     def test_display_exceptions_partition_without_changing_b_classification(self):
         manifest = {'test.cc::Fixture.Case': {'tier': 'B', 'os': ['Darwin', 'Linux'],
@@ -643,16 +666,26 @@ print('Fixture.\\n  Case', flush=True)
         self.assertLess(time.monotonic() - started, 5)
 
     def test_recorder_observes_discovery_execution_and_preserves_native_failure(self):
+        """사용자 활동은 note로 출력하고 검사 간섭과 native 실패 코드를 유지한다."""
         binary = self.directory / 'binary'
         binary.touch()
         args = Namespace(binary=binary, arguments=['--headless', '--yee-test-tier=background',
                          '--gtest_filter=Fixture.*'], build_root=self.directory, repo_root=ROOT,
                          out_dir=self.directory, out_name='test', pid=1, root_explicit='true',
                          out_explicit='true', tier='background', observe_background=True)
-        for exit_code, expected in ((0, 23), (7, 7)):
+        activity = dict(cursor_changes=5, modifier_changes=3, frontmost_changes=2, key_window_changes=4,
+                        non_regular_apps_lost=1, non_regular_windows_lost=2,
+                        user_active_apps_lost=1, user_active_windows_lost=2)
+        variants = [(activity, 0, 0), ({'test_frontmost_samples': 1}, 7, 7)]
+        variants += [({key: 1}, 0, 23) for key in (
+            'max_visible_test_windows', 'test_frontmost_samples', 'input_injections',
+            'modifier_injections', 'unrelated_apps_lost', 'unrelated_windows_lost')]
+        for changes, exit_code, expected in variants:
             calls = []
             observer = mock.Mock()
-            observer.finish.return_value = self.summary(frontmost_changes=1) | {'passed': False}
+            path = self.directory / 'observation.json'
+            path.write_text(json.dumps(self.summary(**changes)))
+            observer.finish.return_value = background_test.read_observation(path)
             def run(command, directory, interrupted, capture=False, observer=None):
                 self.assertIs(observer, sensor)
                 calls.append(command)
@@ -662,17 +695,31 @@ print('Fixture.\\n  Case', flush=True)
                 Path(xml).write_text('<testsuites tests="1" failures="0" errors="0"/>')
                 return exit_code, None
             sensor = observer
+            stderr = io.StringIO()
             with mock.patch.object(native_gate_record, 'source_identity', return_value={}), \
                  mock.patch.object(native_gate_record, 'binary_identity', return_value={}), \
                  mock.patch.object(native_gate_record, 'run_background_command', side_effect=run), \
                  mock.patch.object(native_gate_record, 'BackgroundObserver', return_value=observer) as start, \
-                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(native_gate_record.run_gate(args), expected)
+                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+                self.assertEqual(native_gate_record.run_gate(args), expected, stderr.getvalue())
             self.assertEqual(len(calls), 2)
             self.assertIn('--gtest_list_tests', calls[0])
             self.assertNotIn('--gtest_list_tests', calls[1])
             start.assert_called_once()
             observer.finish.assert_called_once()
+            records = sorted((self.directory / 'logs/native-gates').glob('*/record.json'))
+            record = json.loads(records[-1].read_text())
+            self.assertEqual(record['exit_code'], exit_code)
+            self.assertEqual(record['gate_exit_code'], expected)
+            self.assertEqual(record['observation']['passed'], expected == 0)
+            for key, value in changes.items():
+                self.assertEqual(record['observation'][key], value)
+            if changes == activity:
+                for key, value in activity.items():
+                    self.assertIn(f'background observation note: {key}={value}', stderr.getvalue())
+                self.assertNotIn('background interference observed', stderr.getvalue())
+            else:
+                self.assertIn('background interference observed', stderr.getvalue())
 
     def test_recorder_reports_sampling_failure_separately_from_optional_ax_detail(self):
         """AX 참고 정보는 성공을 막지 않고 필수 표본 부족은 원래 실패 코드와 구분한다."""
@@ -721,6 +768,7 @@ class BackgroundObserverLogicTest(unittest.TestCase):
             directory = Path(temporary)
             main = directory / 'fixture.swift'
             main.write_text(r'''
+import AppKit
 import ApplicationServices
 import Darwin
 import Foundation
@@ -843,19 +891,92 @@ import Foundation
             try data.write(to: URL(fileURLWithPath: CommandLine.arguments[1]).deletingLastPathComponent()
                 .appendingPathComponent("\(name).json"))
         }
-        func observed(sessionsFile: String = "unused") -> Observation {
+        func observed(sessionsFile: String = "unused", frontmostPIDs: [pid_t?] = [705, 705]) -> Observation {
             let observation = Observation(sessionsFile: sessionsFile)
             observation.ownership.sessions = [session]
             _ = observation.ownership.update(current, groups: [200: [200: root, 220: orphan]], excluding: 999)
-            observation.samples = 2
-            observation.frontmost.sample(705)
-            observation.frontmost.sample(705)
+            observation.samples = frontmostPIDs.count
+            for pid in frontmostPIDs { observation.sampleFrontmost(pid) }
             return observation
         }
-        func application(_ pid: pid_t, _ identity: String?, terminated: Bool = false) -> ApplicationSample {
-            ApplicationSample(owner: pid, terminated: terminated, tracksLoss: true, readIdentity: { identity })
+
+        let activity = observed(frontmostPIDs: [705, 900, 705])
+        activity.counters["cursor_changes"] = 5
+        activity.counters["modifier_changes"] = 3
+        for pid: pid_t in [705, 900, 705] { activity.keyOwner.sample(pid) }
+        try save("user-activity", activity)
+        let frontmostCases: [(String, [pid_t?])] = [
+            ("test-frontmost-root", [200, 200]), ("test-frontmost-helper", [220, 220]),
+            ("test-frontmost-detached", [705, 230, 705])]
+        for (name, pids) in frontmostCases {
+            try save(name, observed(frontmostPIDs: pids))
+        }
+
+        // 표본 이후 확인한 자식도 귀속하며, PID를 재사용한 무관한 앱은 제외한다.
+        let late = ProcessIdentity(parent: 1, started: 140)
+        let delayed = observed()
+        let withLate = current.merging([240: late]) { _, replacement in replacement }
+        _ = delayed.ownership.update(withLate, groups: [200: [200: root, 220: orphan]], excluding: 999)
+        delayed.sampleFrontmost(240)
+        _ = delayed.ownership.update(withLate, groups: [200: [200: root, 220: orphan, 240: late]], excluding: 999)
+        try save("test-frontmost-late-owned", delayed)
+        let reusedFront = observed()
+        _ = reusedFront.ownership.update([220: reused], groups: [200: [:]], excluding: 999)
+        reusedFront.sampleFrontmost(220)
+        reusedFront.sampleFrontmost(220)
+        try save("unrelated-frontmost-reused-pid", reusedFront)
+
+        let injectionCases: [(String, [(pid_t, ProcessIdentity?, Bool)])] = [
+            ("test-input", [(220, orphan, false)]), ("test-modifier", [(230, detached, true)]),
+            ("unrelated-input", [(900, unrelated, true), (220, reused, true)])]
+        for (name, events) in injectionCases {
+            let observation = observed()
+            observation.eventSources = events
+            try save(name, observation)
+        }
+
+        func application(_ pid: pid_t, _ identity: String?, terminated: Bool = false,
+                         policy: NSApplication.ActivationPolicy = .regular) -> ApplicationSample {
+            ApplicationSample(owner: pid, terminated: terminated, activationPolicy: policy, readIdentity: { identity })
         }
         let present = application(3000, agent)
+        // 전면에서 쓰던 일반 앱의 창 감소·종료는 note이며, 다른 앱의 손실은 계속 실패한다.
+        for (name, frontPID, gone) in [
+            ("user-active-window-loss", pid_t(3000), false),
+            ("user-active-app-loss", 3000, true),
+            ("never-frontmost-window-loss", 705, false),
+            ("never-frontmost-app-loss", 705, true)] {
+            let user = observed()
+            let first = user.sampleApplications([present])
+            user.initialWindows = desktopWindows([window(70, 3000), window(71, 3000)],
+                processes: user.currentProcesses, applications: first)!
+            user.sampleFrontmost(frontPID)
+            _ = user.sampleApplications([present])
+            user.sampleFrontmost(705)
+            let last = user.sampleApplications(gone ? [] : [present])
+            user.latestWindows = desktopWindows(gone ? [] : [window(71, 3000)],
+                processes: user.currentProcesses, applications: last)!
+            try save(name, user)
+        }
+        let initiallyActive = observed(frontmostPIDs: [3000, 3000])
+        _ = initiallyActive.sampleApplications([present])
+        initiallyActive.sampleFrontmost(705)
+        _ = initiallyActive.sampleApplications([])
+        try save("initial-frontmost-app-loss", initiallyActive)
+        let activeRelaunch = observed()
+        _ = activeRelaunch.sampleApplications([present])
+        _ = activeRelaunch.ownership.update([4000: reused], groups: [200: [:]], excluding: 999)
+        activeRelaunch.sampleFrontmost(4000)
+        _ = activeRelaunch.sampleApplications([application(4000, agent)])
+        activeRelaunch.sampleFrontmost(705)
+        _ = activeRelaunch.sampleApplications([])
+        try save("user-active-relaunched-app-loss", activeRelaunch)
+        let inactiveReused = observed()
+        _ = inactiveReused.sampleApplications([present])
+        _ = inactiveReused.ownership.update([3000: reused], groups: [200: [:]], excluding: 999)
+        inactiveReused.sampleFrontmost(3000)
+        _ = inactiveReused.sampleApplications([application(3000, "bundle:other.app")])
+        try save("other-frontmost-reused-pid-loss", inactiveReused)
         let transient = observed()
         _ = transient.sampleApplications([present])
         _ = transient.sampleApplications([present, application(6000, nil), application(6001, "name:transient")])
@@ -869,7 +990,7 @@ import Foundation
                 _ = helper.ownership.update([200: root], groups: [200: [200: root]], excluding: 999)
             }
             let applications = helper.sampleApplications([present,
-                ApplicationSample(owner: 220, terminated: terminated, tracksLoss: true, readIdentity: {
+                ApplicationSample(owner: 220, terminated: terminated, activationPolicy: .regular, readIdentity: {
                     precondition(!terminated, "종료 중인 자체 helper의 identity는 읽지 않는다")
                     return "bundle:test.helper"
                 })])
@@ -911,13 +1032,40 @@ import Foundation
         precondition(unreadableInitially.initialApps.map { $0.owner } == [6000])
         try save("initial-identity-unreadable", unreadableInitially)
 
+        // Dock 앱과 달리 시스템 helper의 종료·일반 창 감소는 note로만 남긴다.
+        for (name, policy, identity) in [
+            ("accessory", NSApplication.ActivationPolicy.accessory, "bundle:com.apple.accessibility.AXVisualSupportAgent"),
+            ("prohibited", .prohibited, "bundle:com.apple.TextInputUI.xpc.CursorUIViewService")] {
+            for gone in [false, true] {
+                let helper = observed()
+                let first = helper.sampleApplications([present, application(6000, identity, policy: policy)])
+                helper.initialWindows = desktopWindows([window(70, 6000), window(71, 6000)],
+                    processes: [:], applications: first)!
+                // 실행 중 regular로 바뀌어도 시작 시 helper였던 비교 대상은 유지한다.
+                let last = helper.sampleApplications(gone ? [present] :
+                    [present, application(6000, identity, policy: .regular)])
+                helper.latestWindows = desktopWindows(gone ? [] : [window(72, 6000)],
+                    processes: [:], applications: last)!
+                try save("\(name)-\(gone ? "loss" : "window-churn")", helper)
+            }
+            let anonymous = observed()
+            _ = anonymous.sampleApplications([present, application(6000, nil, policy: policy)])
+            _ = anonymous.sampleApplications([present])
+            try save("\(name)-identity-unreadable", anonymous)
+        }
+        let policyChanged = observed()
+        _ = policyChanged.sampleApplications([present])
+        _ = policyChanged.sampleApplications([application(3000, agent, policy: .accessory)])
+        _ = policyChanged.sampleApplications([])
+        try save("regular-policy-changed-loss", policyChanged)
+
         func record(_ name: String, apps: Set<DesktopItem>, latestApps: Set<DesktopItem>,
                     windows: Set<DesktopItem>, latestWindows: Set<DesktopItem>) throws {
             let observation = Observation(sessionsFile: "unused")
             observation.ownership = ownership
             observation.samples = 2
-            observation.frontmost.sample(705)
-            observation.frontmost.sample(705)
+            observation.sampleFrontmost(705)
+            observation.sampleFrontmost(705)
             observation.initialApps = apps
             observation.latestApps = latestApps
             observation.initialWindows = windows
@@ -963,7 +1111,7 @@ import Foundation
             let observation = Observation(sessionsFile: "unused")
             observation.ownership = ownership
             observation.samples = count
-            for _ in 0..<count { observation.frontmost.sample(705) }
+            for _ in 0..<count { observation.sampleFrontmost(705) }
             observation.maxGapMS = 5000
             let summary = observation.summary()
             precondition(summary["observation_complete"] as! Bool == (count >= 2))
@@ -973,7 +1121,7 @@ import Foundation
             let observation = Observation(sessionsFile: "unused")
             observation.ownership = ownership
             observation.samples = 3
-            for pid in pids { observation.frontmost.sample(pid) }
+            for pid in pids { observation.sampleFrontmost(pid) }
             let summary = observation.summary()
             precondition(summary["frontmost_source"] as! String == "launchservices")
             precondition(summary["observation_complete"] as! Bool == (pids == [705, 706, 705]))
@@ -1060,6 +1208,46 @@ import Foundation
             self.assertEqual(compile_result.returncode, 0, compile_result.stdout + compile_result.stderr)
             result = subprocess.run([str(binary), str(directory / 'sessions.json')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for scenario, test_frontmost, frontmost_changes, passed in (
+                    ('user-activity', 0, 2, True), ('test-frontmost-root', 2, 0, False),
+                    ('test-frontmost-helper', 2, 0, False), ('test-frontmost-detached', 1, 2, False),
+                    ('test-frontmost-late-owned', 1, 1, False), ('unrelated-frontmost-reused-pid', 0, 1, True)):
+                with self.subTest(scenario=scenario):
+                    summary = background_test.read_observation(directory / f'{scenario}.json')
+                    self.assertTrue(summary['observation_complete'])
+                    self.assertEqual(summary['test_frontmost_samples'], test_frontmost)
+                    self.assertEqual(summary['frontmost_changes'], frontmost_changes)
+                    self.assertEqual(summary['passed'], passed)
+                    if scenario == 'user-activity':
+                        self.assertEqual(summary['cursor_changes'], 5)
+                        self.assertEqual(summary['modifier_changes'], 3)
+                        self.assertEqual(summary['key_window_changes'], 2)
+            for scenario, inputs, modifiers in (('test-input', 1, 0), ('test-modifier', 1, 1),
+                                                ('unrelated-input', 0, 0)):
+                with self.subTest(scenario=scenario):
+                    summary = background_test.read_observation(directory / f'{scenario}.json')
+                    self.assertTrue(summary['observation_complete'])
+                    self.assertEqual(summary['input_injections'], inputs)
+                    self.assertEqual(summary['modifier_injections'], modifiers)
+                    self.assertEqual(summary['passed'], inputs == modifiers == 0)
+            for scenario, active, apps_lost, windows_lost in (
+                    ('user-active-window-loss', True, 0, 1), ('user-active-app-loss', True, 1, 2),
+                    ('never-frontmost-window-loss', False, 0, 1), ('never-frontmost-app-loss', False, 1, 2),
+                    ('initial-frontmost-app-loss', True, 1, 0),
+                    ('user-active-relaunched-app-loss', True, 1, 0),
+                    ('other-frontmost-reused-pid-loss', False, 1, 0)):
+                with self.subTest(scenario=scenario):
+                    summary = background_test.read_observation(directory / f'{scenario}.json')
+                    self.assertTrue(summary['observation_complete'])
+                    self.assertEqual(summary['passed'], active)
+                    self.assertEqual(summary['test_frontmost_samples'], 0)
+                    for category, count in (('apps', apps_lost), ('windows', windows_lost)):
+                        self.assertEqual(summary[f'user_active_{category}_lost'], count if active else 0)
+                        self.assertEqual(summary[f'unrelated_{category}_lost'], 0 if active else count)
+                        prefix = 'user_active' if active else 'unrelated'
+                        self.assertEqual(summary[f'{prefix}_{category}_lost_details'],
+                                         [dict(identity='bundle:test.exosphere', before=1 if category == 'apps' else 2,
+                                               after=0 if category == 'apps' else 2 - count, lost=count)] if count else [])
             for scenario, apps_lost, windows_lost in (
                     ('relaunch', 0, 0), ('menu-replacement', 0, 0),
                     ('normal-window-loss', 0, 1), ('app-loss', 1, 2)):
@@ -1089,7 +1277,28 @@ import Foundation
                     if scenario == 'transient-unrelated':
                         self.assertTrue(any('pid=6000 identity=unavailable' in note for note in summary['notes']))
                         self.assertTrue(any('pid=6001 identity=name:transient' in note for note in summary['notes']))
-            for scenario in ('initial-app-gone', 'initial-app-terminated', 'initial-pid-reused'):
+            for policy, identity in (
+                    ('accessory', 'bundle:com.apple.accessibility.AXVisualSupportAgent'),
+                    ('prohibited', 'bundle:com.apple.TextInputUI.xpc.CursorUIViewService')):
+                for event, apps_lost, windows_lost in (('loss', 1, 2), ('window-churn', 0, 1)):
+                    with self.subTest(policy=policy, event=event):
+                        summary = background_test.read_observation(directory / f'{policy}-{event}.json')
+                        self.assertTrue(summary['passed'])
+                        self.assertTrue(summary['observation_complete'])
+                        self.assertEqual(summary['unrelated_apps_lost'], 0)
+                        self.assertEqual(summary['unrelated_windows_lost'], 0)
+                        self.assertEqual(summary['non_regular_apps_lost'], apps_lost)
+                        self.assertEqual(summary['non_regular_windows_lost'], windows_lost)
+                        self.assertEqual(summary['non_regular_apps_lost_details'],
+                                         [dict(identity=identity, before=1, after=0, lost=1)] if apps_lost else [])
+                        self.assertEqual(summary['non_regular_windows_lost_details'],
+                                         [dict(identity=identity, before=2, after=2 - windows_lost, lost=windows_lost)])
+                summary = background_test.read_observation(directory / f'{policy}-identity-unreadable.json')
+                self.assertTrue(summary['passed'])
+                self.assertEqual(summary['application_identity_unreadable_pids'], [6000])
+                self.assertIn('initial non-regular application identity unavailable: pid=6000', summary['notes'])
+            for scenario in ('initial-app-gone', 'initial-app-terminated', 'initial-pid-reused',
+                             'regular-policy-changed-loss'):
                 with self.subTest(scenario=scenario):
                     summary = background_test.read_observation(directory / f'{scenario}.json')
                     self.assertFalse(summary['passed'])

@@ -207,7 +207,7 @@ func applicationIdentity(bundleIdentifier: String?, executablePath: String?, nam
 struct ApplicationSample {
     let owner: pid_t
     let terminated: Bool
-    let tracksLoss: Bool
+    let activationPolicy: NSApplication.ActivationPolicy
     let readIdentity: () -> String?
 }
 
@@ -284,6 +284,9 @@ final class Observation {
     var ownership = ProcessOwnership()
     var currentProcesses: [pid_t: ProcessIdentity] { ownership.current }
     var eventSources: [(pid_t, ProcessIdentity?, Bool)] = []
+    var frontmostSources: [(pid_t, ProcessIdentity?)] = []
+    var currentFrontmost: (pid_t, ProcessIdentity?)?
+    var userActiveApplications: Set<String> = []
     var incompleteReasons: Set<String> = []
     var notes: Set<String> = []
     var counters: [String: Int] = [
@@ -297,6 +300,7 @@ final class Observation {
     var firstFlags: UInt64?
     var lastFlags: UInt64?
     var initialApps: Set<DesktopItem> = []
+    var initialHelperApps: Set<DesktopItem> = []
     var initialAppsCaptured = false
     var unreadableApplicationPIDs: Set<pid_t> = []
     var initialWindows: Set<DesktopItem> = []
@@ -380,7 +384,7 @@ final class Observation {
                 }
                 continue
             }
-            var initial = initialApps.first { $0.owner == pid
+            var initial = initialApps.union(initialHelperApps).first { $0.owner == pid
                 && ($0.identity == nil || process == nil || $0.identity == process) }
             // 시작 시 있던 앱의 종료는 저장한 identity로 손실을 판정한다.
             if app.terminated && initial != nil { continue }
@@ -402,10 +406,18 @@ final class Observation {
             let item = DesktopItem(owner: pid, identity: process, application: application,
                                    window: nil, layer: nil)
             apps.insert(item)
-            if !initialAppsCaptured && app.tracksLoss {
-                initialApps.insert(item)
-                if application == nil {
-                    incompleteReasons.insert("initial application identity unavailable")
+            rememberUserActiveApplication(item)
+            if !initialAppsCaptured {
+                if app.activationPolicy == .regular {
+                    initialApps.insert(item)
+                    if application == nil {
+                        incompleteReasons.insert("initial application identity unavailable")
+                    }
+                } else {
+                    initialHelperApps.insert(item)
+                    if application == nil {
+                        notes.insert("initial non-regular application identity unavailable: pid=\(pid)")
+                    }
                 }
             }
         }
@@ -414,13 +426,31 @@ final class Observation {
         return applications
     }
 
+    func sampleFrontmost(_ pid: pid_t?) {
+        frontmost.sample(pid)
+        currentFrontmost = nil
+        guard let pid = pid, pid > 0 else { return }
+        let source = (pid, currentProcesses[pid])
+        currentFrontmost = source
+        frontmostSources.append(source)
+        for app in latestApps { rememberUserActiveApplication(app) }
+    }
+
+    func rememberUserActiveApplication(_ app: DesktopItem) {
+        guard let (pid, process) = currentFrontmost, app.owner == pid,
+              app.identity == process, let application = app.application,
+              pid != ownPID, !ownership.owns(pid, process) else { return }
+        // PID 재사용은 시작 시각으로 구분하고, 확인한 앱 identity를 끝까지 보존한다.
+        userActiveApplications.insert(application)
+    }
+
     func sample() {
         let now = ProcessInfo.processInfo.systemUptime
         if let previous = lastSample { maxGapMS = max(maxGapMS, (now - previous) * 1000) }
         lastSample = now
         guard let owned = updateTree() else { return }
         let front = frontmostApplicationPID()
-        frontmost.sample(front)
+        sampleFrontmost(front)
         keyOwner.sample(focusedWindowOwner(frontmost: front))
         if let event = CGEvent(source: nil) {
             let cursor = event.location
@@ -441,7 +471,7 @@ final class Observation {
         }
         let applications = sampleApplications(NSWorkspace.shared.runningApplications.map { app in
             ApplicationSample(owner: app.processIdentifier, terminated: app.isTerminated,
-                tracksLoss: app.activationPolicy != .prohibited, readIdentity: {
+                activationPolicy: app.activationPolicy, readIdentity: {
                     applicationIdentity(bundleIdentifier: app.bundleIdentifier,
                         executablePath: app.executableURL?.path, name: app.localizedName)
                 })
@@ -464,13 +494,38 @@ final class Observation {
 
     func summary() -> [String: Any] {
         counters["frontmost_changes"] = frontmost.changes
+        counters["test_frontmost_samples"] = frontmostSources.filter { ownership.owns($0.0, $0.1) }.count
         counters["key_window_changes"] = keyOwner.changes
         counters["input_injections"] = eventSources.filter { ownership.owns($0.0, $0.1) }.count
         counters["modifier_injections"] = eventSources.filter { ownership.owns($0.0, $0.1) && $0.2 }.count
-        let appsLost = unrelatedLosses(initialApps, latestApps, ownership: ownership, observer: ownPID)
-        let windowsLost = unrelatedLosses(initialWindows, latestWindows, ownership: ownership, observer: ownPID)
+        // 시작 시 regular였던 앱 identity만 창 손실의 실패 대상으로 고정한다.
+        let regularApplications = Set(initialApps.compactMap { $0.application })
+        let activeApplications = regularApplications.intersection(userActiveApplications)
+        let activeApps = initialApps.filter {
+            $0.application.map { activeApplications.contains($0) } ?? false
+        }
+        let appsLost = unrelatedLosses(initialApps.subtracting(activeApps), latestApps,
+                                       ownership: ownership, observer: ownPID)
+        let activeAppsLost = unrelatedLosses(activeApps, latestApps, ownership: ownership, observer: ownPID)
+        let regularWindows = initialWindows.filter {
+            $0.application.map { regularApplications.contains($0) } ?? false
+        }
+        let activeWindows = regularWindows.filter {
+            $0.application.map { activeApplications.contains($0) } ?? false
+        }
+        let windowsLost = unrelatedLosses(regularWindows.subtracting(activeWindows), latestWindows,
+                                          ownership: ownership, observer: ownPID)
+        let activeWindowsLost = unrelatedLosses(activeWindows, latestWindows,
+                                                ownership: ownership, observer: ownPID)
+        let helperAppsLost = unrelatedLosses(initialHelperApps, latestApps, ownership: ownership, observer: ownPID)
+        let helperWindowsLost = unrelatedLosses(initialWindows.subtracting(regularWindows), latestWindows,
+                                                ownership: ownership, observer: ownPID)
         counters["unrelated_apps_lost"] = appsLost.reduce(0) { $0 + $1.count }
         counters["unrelated_windows_lost"] = windowsLost.reduce(0) { $0 + $1.count }
+        counters["user_active_apps_lost"] = activeAppsLost.reduce(0) { $0 + $1.count }
+        counters["user_active_windows_lost"] = activeWindowsLost.reduce(0) { $0 + $1.count }
+        counters["non_regular_apps_lost"] = helperAppsLost.reduce(0) { $0 + $1.count }
+        counters["non_regular_windows_lost"] = helperWindowsLost.reduce(0) { $0 + $1.count }
         if !ownership.complete {
             incompleteReasons.insert("test process group unavailable")
         }
@@ -491,6 +546,10 @@ final class Observation {
         var result: [String: Any] = counters
         result["unrelated_apps_lost_details"] = appsLost.map { $0.json }
         result["unrelated_windows_lost_details"] = windowsLost.map { $0.json }
+        result["user_active_apps_lost_details"] = activeAppsLost.map { $0.json }
+        result["user_active_windows_lost_details"] = activeWindowsLost.map { $0.json }
+        result["non_regular_apps_lost_details"] = helperAppsLost.map { $0.json }
+        result["non_regular_windows_lost_details"] = helperWindowsLost.map { $0.json }
         result["schema_version"] = 1
         result["sample_count"] = samples
         result["interval_ms"] = 100
