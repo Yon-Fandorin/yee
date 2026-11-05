@@ -19,6 +19,7 @@
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
+#include "components/tabs/public/tab_interface.h"
 #include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/page.h"
@@ -97,6 +98,18 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
     set_fixed_width(kPanelWidth);
     set_close_on_deactivate(true);
     SetLayoutManager(std::make_unique<views::FillLayout>());
+
+    // 분할 탭은 비활성화되어도 보이고, 창 이동 중에도 WebContents는 살아 있다.
+    // 팝업은 이전 활성 탭·창의 사이트 정보를 가진 채 남지 않아야 한다.
+    auto* tab = tabs::TabInterface::GetFromContents(contents);
+    tab_deactivation_subscription_ = tab->RegisterWillDeactivate(
+        base::BindRepeating([](SiteControlsBubble* bubble,
+                               tabs::TabInterface*) { bubble->CloseBubble(); },
+                            base::Unretained(this)));
+    tab_detach_subscription_ = tab->RegisterWillDetach(base::BindRepeating(
+        [](SiteControlsBubble* bubble, tabs::TabInterface*,
+           tabs::TabInterface::DetachReason) { bubble->CloseBubble(); },
+        base::Unretained(this)));
 
     yee::content_blocking::ContentBlockingTabHelper::CreateForWebContents(
         contents_);
@@ -231,6 +244,8 @@ class SiteControlsBubble : public LocationBarBubbleDelegateView {
   raw_ptr<views::Label> blocked_label_ = nullptr;
   base::CallbackListSubscription helper_subscription_;
   base::CallbackListSubscription service_subscription_;
+  base::CallbackListSubscription tab_deactivation_subscription_;
+  base::CallbackListSubscription tab_detach_subscription_;
 };
 
 }  // namespace

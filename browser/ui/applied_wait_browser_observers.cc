@@ -78,6 +78,7 @@
 #include "content/public/browser/render_frame_metadata_provider.h"
 #include "content/public/browser/render_widget_host_observer.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/visibility.h"
 #include "content/public/browser/weak_document_ptr.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -219,6 +220,31 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     raw_ref<Impl> owner;
     raw_ptr<content::RenderWidgetHost> host;
     AppliedOwnerToken token = AppliedOwnerToken::Create();
+  };
+
+  struct ContentsVisibilityWatch : content::WebContentsObserver {
+    ContentsVisibilityWatch(Impl& owner, content::WebContents& contents)
+        : content::WebContentsObserver(&contents), owner(owner) {}
+    void OnVisibilityChanged(content::Visibility) override {
+      ++serial;
+      owner->signals.Notify();
+    }
+    void WebContentsDestroyed() override {
+      owner->signals.OwnerDestroyed(token);
+    }
+    std::optional<AppliedSnapshot> Read() const {
+      if (!web_contents()) {
+        return std::nullopt;
+      }
+      return Snapshot(
+          token,
+          ViewStateMatches{.visible = web_contents()->GetVisibility() !=
+                                      content::Visibility::HIDDEN},
+          serial);
+    }
+    raw_ref<Impl> owner;
+    AppliedOwnerToken token = AppliedOwnerToken::Create();
+    uint64_t serial = 0;
   };
 
   struct OmniboxWatch : AutocompleteController::Observer {
@@ -1027,6 +1053,7 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
   std::vector<std::unique_ptr<FaviconWatch>> favicons;
   std::vector<std::unique_ptr<OmniboxWatch>> omniboxes;
   std::vector<std::unique_ptr<RenderWidgetWatch>> render_widgets;
+  std::vector<std::unique_ptr<ContentsVisibilityWatch>> contents_visibility;
   std::vector<std::unique_ptr<Lifetime>> lifetimes;
   std::vector<std::unique_ptr<PaneBinding>> panes;
   std::vector<std::unique_ptr<RendererWatch>> renderers;
@@ -2032,6 +2059,19 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveRendererBackground(
       ptr->token, AppliedConditionKind::kPresentationMatches,
       base::BindRepeating(&Impl::ColorWatch::Read, base::Unretained(ptr)));
   impl_->colors.push_back(std::move(watch));
+  return ptr->token;
+}
+
+AppliedOwnerToken AppliedBrowserObservers::ObserveWebContentsVisibility(
+    content::WebContents& contents) {
+  auto watch =
+      std::make_unique<Impl::ContentsVisibilityWatch>(*impl_, contents);
+  auto* ptr = watch.get();
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kViewStateMatches,
+      base::BindRepeating(&Impl::ContentsVisibilityWatch::Read,
+                          base::Unretained(ptr)));
+  impl_->contents_visibility.push_back(std::move(watch));
   return ptr->token;
 }
 

@@ -66,6 +66,9 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
   };
   AppliedOwnerToken ObserveUiState(views::View& view, UiProbe probe);
   AppliedOwnerToken ObserveRendererBackground(content::WebContents& contents);
+  // TabInterface::IsVisible와 같은 HIDDEN이 아닌 상태를 읽는다.
+  AppliedOwnerToken ObserveWebContentsVisibility(
+      content::WebContents& contents);
   AppliedOwnerToken ObserveProjectNavigation(BrowserView& view);
   AppliedOwnerToken ObserveProjectPage(BrowserView& view, std::string page_id);
   AppliedOwnerToken ObserveOmnibox(LocationBarView& view);

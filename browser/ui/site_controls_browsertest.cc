@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "base/command_line.h"
 #include "base/files/file_util.h"
@@ -18,6 +19,7 @@
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/split_tab_metrics.h"
@@ -25,6 +27,7 @@
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
@@ -42,6 +45,7 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/test/browser_test.h"
@@ -59,6 +63,7 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/snapshot/snapshot.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/focus_ring.h"
@@ -606,6 +611,88 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, WindowClosesWithControlsOpen) {
   ASSERT_TRUE(OpenControls(second));
   CloseBrowserSynchronously(second);
   EXPECT_FALSE(IsSiteControlsBubbleShowing());
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       SwitchingVisibleSplitPaneClosesControls) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* first = Contents();
+  chrome::AddTabAt(browser(), FixtureURL("other.yee-fixture.test"), -1, true);
+  ASSERT_TRUE(content::WaitForLoadStop(Contents()));
+  auto* second = Contents();
+  auto* model = browser()->tab_strip_model();
+  model->ActivateTabAt(0);
+  ASSERT_EQ(first, model->GetWebContentsAt(0));
+  ASSERT_EQ(second, model->GetWebContentsAt(1));
+  auto* panes =
+      BrowserView::GetBrowserViewForBrowser(browser())->multi_contents_view();
+  const uint64_t first_handle =
+      model->GetTabAtIndex(0)->GetHandle().raw_value();
+  const uint64_t second_handle =
+      model->GetTabAtIndex(1)->GetHandle().raw_value();
+  yee::test::AppliedConditions split_ready;
+  for (auto* contents : {first, second}) {
+    const uint64_t handle = contents == first ? first_handle : second_handle;
+    const uint64_t peer = contents == first ? second_handle : first_handle;
+    auto host = applied_.Condition(
+        applied_.source().ExpectPageHosts(*browser(), *panes, handle, handle,
+                                          true, peer),
+        yee::test::PageHostsApplied{.pane_id = handle, .tab_handle = handle},
+        yee::test::AppliedMatch::kPageIdentity,
+        yee::test::AppliedFreshness::kNewApply);
+    host.coordinates = yee::test::GetAppliedViewCoordinates(
+        *panes, yee::test::AppliedCoordinates::Space::kParent);
+    split_ready.push_back(std::move(host));
+    split_ready.push_back(applied_.Condition(
+        applied_.source().ObserveWebContentsVisibility(*contents),
+        yee::test::ViewStateMatches{.visible = true},
+        yee::test::AppliedMatch::kViewVisible));
+  }
+  // 인덱스 하나를 넘기면 활성 탭 0을 pivot으로 탭 1과 묶는다.
+  ASSERT_TRUE(applied_.Run(std::move(split_ready), [&] {
+    model->AddToNewSplit({1}, split_tabs::SplitTabVisualData(),
+                         split_tabs::SplitTabCreatedSource::kToolbarButton);
+  }));
+  ASSERT_TRUE(model->GetTabAtIndex(0)->IsVisible());
+  ASSERT_TRUE(model->GetTabAtIndex(1)->IsVisible());
+  ASSERT_EQ(first, Contents());
+  auto* popup = OpenControls();
+  ASSERT_TRUE(popup);
+  // 창 비활성화의 자동 닫힘과 분리해 탭 소유권의 닫힘을 검사한다.
+  auto* delegate = popup->widget_delegate()->AsBubbleDialogDelegate();
+  ASSERT_TRUE(delegate);
+  delegate->set_close_on_deactivate(false);
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*popup, {.closed = true},
+                       yee::test::AppliedMatch::kWidgetClosed)},
+      [&] { chrome::SelectNextTab(browser()); },
+      yee::test::AppliedDomain::kWidget));
+  EXPECT_EQ(second, Contents());
+  EXPECT_TRUE(model->GetTabAtIndex(0)->IsVisible());
+  EXPECT_TRUE(model->GetTabAtIndex(1)->IsVisible());
+  EXPECT_FALSE(IsSiteControlsBubbleShowing());
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       MovingOwnerTabToOtherWindowClosesControls) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* owner = Contents();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  BrowserWindowInterface* destination = CreateBrowser(browser()->GetProfile());
+  auto* popup = OpenControls();
+  ASSERT_TRUE(popup);
+  auto* delegate = popup->widget_delegate()->AsBubbleDialogDelegate();
+  ASSERT_TRUE(delegate);
+  delegate->set_close_on_deactivate(false);
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*popup, {.closed = true},
+                       yee::test::AppliedMatch::kWidgetClosed)},
+      [&] { chrome::MoveTabsToExistingWindow(browser(), destination, {0}); },
+      yee::test::AppliedDomain::kWidget));
+  EXPECT_EQ(-1, browser()->tab_strip_model()->GetIndexOfWebContents(owner));
+  EXPECT_EQ(owner, destination->GetTabStripModel()->GetActiveWebContents());
+  EXPECT_FALSE(IsSiteControlsBubbleShowing());
+  CloseBrowserSynchronously(destination);
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
