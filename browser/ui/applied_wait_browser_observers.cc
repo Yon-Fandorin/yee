@@ -30,6 +30,7 @@
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/omnibox/omnibox_controller.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
+#include "chrome/browser/ui/omnibox/omnibox_popup_state_manager.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
 #include "chrome/browser/ui/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -44,6 +45,7 @@
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/infobars/infobar_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_aim_presenter.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
@@ -54,6 +56,7 @@
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab_container_impl.h"
 #include "chrome/browser/ui/views/tabs/tab_style_views.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation_binding.h"
 #include "chrome/browser/ui/views/yee/browser_surface_transition.h"
@@ -74,6 +77,7 @@
 #include "content/public/browser/page.h"
 #include "content/public/browser/render_frame_metadata_provider.h"
 #include "content/public/browser/render_widget_host_observer.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/weak_document_ptr.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -169,12 +173,71 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     base::ScopedObservation<views::View, views::ViewObserver> observation{this};
   };
 
+  struct RenderWidgetWatch : content::RenderWidgetHostObserver {
+    RenderWidgetWatch(Impl& owner, content::RenderWidgetHost& host)
+        : owner(owner), host(&host) {
+      host.AddObserver(this);
+    }
+    ~RenderWidgetWatch() override {
+      if (host)
+        host->RemoveObserver(this);
+    }
+    void RenderWidgetHostVisibilityChanged(content::RenderWidgetHost*,
+                                           bool) override {
+      owner->signals.Notify();
+    }
+    void RenderWidgetHostDidUpdateVisualProperties(
+        content::RenderWidgetHost*) override {
+      owner->signals.Notify();
+    }
+    void RenderWidgetHostDestroyed(content::RenderWidgetHost* dying) override {
+      dying->RemoveObserver(this);
+      host = nullptr;
+      owner->signals.OwnerDestroyed(token);
+    }
+    std::optional<AppliedSnapshot> ReadWidget() const {
+      if (!host)
+        return std::nullopt;
+      auto* view = host->GetView();
+      return Snapshot(token,
+                      WidgetStateMatches{
+                          .visible = view && view->IsShowing(),
+                          .bounds = view ? view->GetViewBounds() : gfx::Rect{},
+                          .closed = !view || !view->IsShowing()},
+                      0, {.space = AppliedCoordinates::Space::kScreen});
+    }
+    std::optional<AppliedSnapshot> ReadFocus() const {
+      if (!host)
+        return std::nullopt;
+      auto* view = host->GetView();
+      return Snapshot(
+          token, FocusMatches{.kind = FocusMatches::Kind::kRendererDocument,
+                              .target = token,
+                              .document = token,
+                              .focused = view && view->HasFocus()});
+    }
+    raw_ref<Impl> owner;
+    raw_ptr<content::RenderWidgetHost> host;
+    AppliedOwnerToken token = AppliedOwnerToken::Create();
+  };
+
   struct OmniboxWatch : AutocompleteController::Observer {
-    OmniboxWatch(Impl& owner, LocationBarView& view)
+    OmniboxWatch(Impl& owner, LocationBarView& view, bool aim = false)
         : owner(owner),
           view(&view),
+          aim(aim),
           controller(view.GetOmniboxController()->autocomplete_controller()) {
       controller->AddObserver(this);
+      popup_state =
+          view.GetOmniboxController()
+              ->popup_state_manager()
+              ->AddPopupStateChangedCallback(base::BindRepeating(
+                  [](OmniboxWatch* self, OmniboxPopupState, OmniboxPopupState) {
+                    ++self->serial;
+                    self->owner->signals.Notify();
+                  },
+                  base::Unretained(this)));
+      owner.signals.ObserveWidget(*view.GetWidget());
       BindPopup();
     }
     ~OmniboxWatch() override {
@@ -185,6 +248,10 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
       auto* location = static_cast<const LocationBarView*>(view.view());
       if (!location)
         return nullptr;
+      if (aim) {
+        auto* presenter = location->GetOmniboxPopupAimPresenter();
+        return presenter ? presenter->get_widget_for_testing() : nullptr;
+      }
       auto* popup =
           const_cast<LocationBarView*>(location)->GetOmniboxPopupView();
       if (!popup)
@@ -194,7 +261,8 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
       return static_cast<OmniboxPopupViewViews*>(popup)->GetWidget();
     }
     void BindPopup() {
-      if (auto* popup = Popup()) {
+      if (auto* popup = Popup(); popup && popup != bound_popup.get()) {
+        bound_popup = popup->GetWeakPtr();
         owner->signals.ObserveWidget(*popup);
         owner->signals.ObserveView(*popup->GetRootView());
       }
@@ -219,12 +287,35 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
           token,
           ViewStateMatches{
               .visible = popup && popup->IsVisible(),
-              .popup_open = omni->IsPopupOpen(),
-              .editing = omni->edit_model()->user_input_in_progress()},
+              .popup_open = aim ? omni->popup_state_manager()->popup_state() ==
+                                      OmniboxPopupState::kAim
+                                : omni->IsPopupOpen(),
+              .editing = omni->edit_model()->user_input_in_progress(),
+              .popup_transition = location->in_popup_state_transition(),
+              .autocomplete_empty = controller->result().empty(),
+              .presenter_shown =
+                  aim && location->GetOmniboxPopupAimPresenter() &&
+                  location->GetOmniboxPopupAimPresenter()->IsShown()},
+          serial, GetAppliedViewCoordinates(*location));
+    }
+    std::optional<AppliedSnapshot> ReadPresentation() const {
+      auto* location = static_cast<const LocationBarView*>(view.view());
+      auto* presenter =
+          location ? location->GetOmniboxPopupAimPresenter() : nullptr;
+      if (!presenter)
+        return std::nullopt;
+      return Snapshot(
+          token,
+          PresentationMatches{
+              .presentation_id = static_cast<uint64_t>(
+                  presenter->GetCompactShellProviderRebuildCountForTesting())},
           serial, GetAppliedViewCoordinates(*location));
     }
     raw_ref<Impl> owner;
     views::ViewTracker view;
+    bool aim;
+    base::WeakPtr<views::Widget> bound_popup;
+    base::CallbackListSubscription popup_state;
     raw_ptr<AutocompleteController> controller;
     AppliedOwnerToken token = AppliedOwnerToken::Create();
     uint64_t serial = 0;
@@ -846,6 +937,8 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
     }
   }
   void OnNativeWake() {
+    for (const auto& omnibox : omniboxes)
+      omnibox->BindPopup();
     RetireChangedPanes();
     ScheduleBindings();
   }
@@ -933,6 +1026,7 @@ class AppliedBrowserObservers::Impl : public BrowserCollectionObserver {
   std::vector<std::unique_ptr<ColorWatch>> colors;
   std::vector<std::unique_ptr<FaviconWatch>> favicons;
   std::vector<std::unique_ptr<OmniboxWatch>> omniboxes;
+  std::vector<std::unique_ptr<RenderWidgetWatch>> render_widgets;
   std::vector<std::unique_ptr<Lifetime>> lifetimes;
   std::vector<std::unique_ptr<PaneBinding>> panes;
   std::vector<std::unique_ptr<RendererWatch>> renderers;
@@ -1372,6 +1466,22 @@ AppliedCondition AppliedBrowserObservers::ExpectRendererViewport(
   condition.coordinates.rtl = base::i18n::IsRTL();
   return condition;
 }
+AppliedOwnerToken AppliedBrowserObservers::ObserveRenderWidgetHost(
+    content::RenderWidgetHost& host) {
+  auto watch = std::make_unique<Impl::RenderWidgetWatch>(*impl_, host);
+  auto* ptr = watch.get();
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kWidgetStateMatches,
+      base::BindRepeating(&Impl::RenderWidgetWatch::ReadWidget,
+                          base::Unretained(ptr)));
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kFocusMatches,
+      base::BindRepeating(&Impl::RenderWidgetWatch::ReadFocus,
+                          base::Unretained(ptr)));
+  impl_->render_widgets.push_back(std::move(watch));
+  return ptr->token;
+}
+
 AppliedOwnerToken AppliedBrowserObservers::InstallWebUiObserver(
     content::RenderFrameHost& frame,
     WebUiAppliedSelectors selectors,
@@ -1480,6 +1590,10 @@ AppliedOwnerToken AppliedBrowserObservers::InstallWebUiObserver(
           customizationReady = !!(layout && toggle && collapse && radio?.selected &&
               shortcuts.querySelector('#radioSelection cr-radio-button') &&
               collapse.classList.contains(toggle.checked ? 'collapse-opened' : 'collapse-closed'));
+        } else if (probe === 4) {
+          const app = document.querySelector('customize-chrome-app')?.shadowRoot;
+          customizationReady = !!app?.querySelector('yee-tab-layout')?.shadowRoot
+              ?.querySelector('#layout:not(:disabled)');
         }
         const watch = node => {
           if (!node) return;
@@ -1630,6 +1744,22 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveOmnibox(
   return ptr->token;
 }
 
+AppliedOwnerToken AppliedBrowserObservers::ObserveOmniboxAim(
+    LocationBarView& view) {
+  auto watch = std::make_unique<Impl::OmniboxWatch>(*impl_, view, true);
+  auto* ptr = watch.get();
+  impl_->Life(view).Own(ptr->token);
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kViewStateMatches,
+      base::BindRepeating(&Impl::OmniboxWatch::Read, base::Unretained(ptr)));
+  impl_->signals.RegisterSignal(
+      ptr->token, AppliedConditionKind::kPresentationMatches,
+      base::BindRepeating(&Impl::OmniboxWatch::ReadPresentation,
+                          base::Unretained(ptr)));
+  impl_->omniboxes.push_back(std::move(watch));
+  return ptr->token;
+}
+
 AppliedOwnerToken AppliedBrowserObservers::ObserveFavicon(
     content::WebContents& contents) {
   auto watch = std::make_unique<Impl::FaviconWatch>(*impl_, contents);
@@ -1769,6 +1899,14 @@ AppliedOwnerToken AppliedBrowserObservers::ObserveUiState(views::View& view,
             auto* view = life->view.view();
             if (!view)
               return std::nullopt;
+            if (probe == UiProbe::kToolbarMenu) {
+              auto* button = views::AsViewClass<ToolbarButton>(view);
+              if (!button)
+                return std::nullopt;
+              return Snapshot(
+                  token, ViewStateMatches{.visible = button->IsMenuShowing()},
+                  0, GetAppliedViewCoordinates(*view));
+            }
             if (probe == UiProbe::kSidebarCollapsed) {
               auto* browser_view = views::AsViewClass<BrowserView>(view);
               if (!browser_view)

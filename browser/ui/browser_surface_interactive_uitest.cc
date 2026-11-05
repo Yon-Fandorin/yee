@@ -4283,6 +4283,27 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   const gfx::Rect viewport =
       container->GetPageViewportGeometry().current_viewport_in_screen;
 
+  // hover flag는 animation 배치보다 먼저 바뀐다. 같은 대기에서 위치·크기와
+  // 표시 opacity도 확인해 뒤의 Flyout assertion보다 일찍 완료되지 않게 한다.
+  const auto sidebar_hover_layout = [&](bool expanded) {
+    using namespace yee::test;
+    const int top = yee::kSidebarMetrics.titlebar_height +
+                    (expanded ? yee::kSidebarMetrics.content_gutter : 0);
+    const int bottom = expanded ? yee::kSidebarMetrics.sidebar_flyout_inset
+                                : yee::kSidebarMetrics.content_gutter;
+    const int width = expanded ? region->uncollapsed_width()
+                               : yee::kSidebarMetrics.collapsed_width;
+    return AppliedConditions{
+        SidebarHover(*region, expanded),
+        applied_.View(
+            *region,
+            {.bounds = gfx::Rect(0, top, width,
+                                 browser_view->height() - top - bottom)},
+            AppliedMatch::kViewBounds),
+        applied_.View(*region, {.opacity = expanded ? 1.0 : 0.0},
+                      AppliedMatch::kViewOpacity)};
+  };
+
   ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(browser_view->GetWidget()->IsActive());
   ASSERT_TRUE(browser_view->GetWidget()->ShouldPaintAsActive());
@@ -4324,7 +4345,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
     capture("collapsed");
   }
   ASSERT_TRUE(applied_.Run(
-      {SidebarHover(*region, true)},
+      sidebar_hover_layout(true),
       [&] {
         ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
             region->GetBoundsInScreen().CenterPoint(), native_window));
@@ -4641,8 +4662,10 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   }
 
   // 페이지를 실제로 누르면 팝업 잠금이 해제되어 원래 접힘 상태로 돌아간다.
+  auto close_popup_conditions = sidebar_hover_layout(false);
+  close_popup_conditions.push_back(FooterMenuState(*footer, false));
   ASSERT_TRUE(applied_.Run(
-      {FooterMenuState(*footer, false), SidebarHover(*region, false)},
+      std::move(close_popup_conditions),
       [&] {
         ASSERT_TRUE(ui_test_utils::SendMouseEventsSync(
             ui_controls::LEFT, ui_controls::DOWN | ui_controls::UP));
@@ -4709,7 +4732,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   auto expand_lock =
       region->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepExpanded);
   ASSERT_TRUE(applied_.Run(
-      {SidebarHover(*region, true)}, [&] { state->RequestCollapse(true); },
+      sidebar_hover_layout(true), [&] { state->RequestCollapse(true); },
       yee::test::AppliedDomain::kLayout, TestTimeouts::action_timeout()));
   ASSERT_TRUE(([&]() {
     return region->is_expanded_on_hover() &&
@@ -4724,7 +4747,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   expect_revealed();
   browser_view->GetFocusManager()->ClearFocus();
   ASSERT_TRUE(applied_.Run(
-      {SidebarHover(*region, false)}, [&] { expand_lock.reset(); },
+      sidebar_hover_layout(false), [&] { expand_lock.reset(); },
       yee::test::AppliedDomain::kLayout, TestTimeouts::action_timeout()));
   ASSERT_TRUE(([&]() { return !region->is_expanded_on_hover(); })());
   ApplyScheduledLayout();

@@ -1450,6 +1450,7 @@ std::vector<AppliedConditionValue> AllValues(AppliedOwnerToken token) {
       WebUiStateMatches{token, {41, 42}, 1, gfx::RectF(1, 2, 3, 4), 0.5, true},
       PresentationMatches{4, 5, 0xff123456, 0xffabcdef, 6, true},
       PresentedAfterApply{token, 123, 99, true},
+      NativeFrameMatches{.opaque = true, .toolbar_revealed = true},
   };
 }
 
@@ -1471,6 +1472,8 @@ AppliedConditionValue DifferentValue(AppliedConditionValue value) {
           state.capture = false;
         } else if constexpr (std::is_same_v<T, FocusMatches>) {
           state.kind = FocusMatches::Kind::kNativeKeyWindow;
+        } else if constexpr (std::is_same_v<T, NativeFrameMatches>) {
+          state.opaque = false;
         } else if constexpr (std::is_same_v<T, NativeWindowMatches>) {
           state.on_active_space = false;
         } else if constexpr (std::is_same_v<T, TabModelMatches>) {
@@ -1714,6 +1717,37 @@ TEST_F(AppliedWaitTest,
   changed = value;
   changed.geometry_matches_ratio = false;
   EXPECT_FALSE(AppliedValueMatches(condition, changed));
+}
+
+TEST_F(AppliedWaitTest, NativeToolbarWaitRejectsUnmovedAndClippedHost) {
+  AppliedCondition condition{.owner = owner_,
+                             .expected = NativeFrameMatches{},
+                             .match = AppliedMatch::kNativeToolbarMode};
+  NativeFrameMatches value{.toolbar_offscreen = true};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.toolbar_host_ready = true;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  value.menu_bar_reveal = 0.5;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.menu_bar_reveal = 0;
+  value.toolbar_revealed = true;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  condition.expected = NativeFrameMatches{.toolbar_revealed = true};
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.toolbar_fully_visible = true;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  condition.match = AppliedMatch::kNativeMenuRevealed;
+  value.menu_bar_reveal = 0.999;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.menu_bar_reveal = 1;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  condition.expected =
+      NativeFrameMatches{.toolbar_bounds = gfx::Rect(0, 20, 0, 0)};
+  condition.match = AppliedMatch::kNativeToolbarY;
+  value.toolbar_bounds = gfx::Rect(100, 21, 200, 40);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.toolbar_bounds.set_y(20);
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
 }
 
 TEST_F(AppliedWaitTest, ClosedSchemasMatchAndFormatEveryConditionKind) {

@@ -91,6 +91,9 @@ struct ViewStateMatches {
   bool handling_drag = false;
   bool collapsed = false;
   bool vertical_drag_only = false;
+  bool popup_transition = false;
+  bool autocomplete_empty = true;
+  bool presenter_shown = false;
   bool operator==(const ViewStateMatches&) const = default;
 };
 
@@ -143,6 +146,21 @@ struct NativeWindowMatches {
   bool fullscreen = false;
   bool fullscreen_transition_complete = false;
   bool operator==(const NativeWindowMatches&) const = default;
+};
+
+// macOS 프레임의 적용값이다. 외부 Toolbar의 AppKit 표시와 Yee 배치를
+// 함께 읽되, 관측 중 창 생성·재배치·포인터 입력을 수행하지 않는다.
+struct NativeFrameMatches {
+  bool opaque = false;
+  bool glass_eligible = false;
+  bool toolbar_revealed = false;
+  double menu_bar_reveal = 0;
+  bool toolbar_host_ready = false;
+  bool toolbar_on_active_space = false;
+  bool toolbar_fully_visible = false;
+  bool toolbar_offscreen = false;
+  gfx::Rect toolbar_bounds;
+  bool operator==(const NativeFrameMatches&) const = default;
 };
 
 struct AppliedTabState {
@@ -279,7 +297,8 @@ using AppliedConditionValue = std::variant<PageHostsApplied,
                                            RendererViewportMatches,
                                            WebUiStateMatches,
                                            PresentationMatches,
-                                           PresentedAfterApply>;
+                                           PresentedAfterApply,
+                                           NativeFrameMatches>;
 enum class AppliedConditionKind {
   kPageHostsApplied,
   kPaneLayoutMatches,
@@ -297,6 +316,7 @@ enum class AppliedConditionKind {
   kWebUiStateMatches,
   kPresentationMatches,
   kPresentedAfterApply,
+  kNativeFrameMatches,
 };
 AppliedConditionKind GetAppliedConditionKind(
     const AppliedConditionValue& value);
@@ -321,6 +341,10 @@ enum class AppliedMatch {
   kViewDrawn,
   kViewBounds,
   kViewSize,
+  kViewWidth,
+  kViewFullyVisible,
+  kViewScreenBounds,
+  kViewScreenBoundsDifferent,
   kViewHeight,
   kViewParent,
   kViewParentDifferent,
@@ -341,15 +365,20 @@ enum class AppliedMatch {
   kViewGroupDrag,
   kOmniboxPopup,
   kOmniboxEditing,
+  kOmniboxIdle,
+  kOmniboxTransitionComplete,
+  kOmniboxShown,
   kWidgetVisible,
   kWidgetOpacity,
   kWidgetBounds,
   kWidgetClosed,
   kWidgetCapture,
   kWidgetActive,
+  kWidgetPaintActive,
   kWidgetReady,
   kWidgetShowState,
   kWidgetSizeNear,
+  kWidgetSize,
   kFooterMenu,
   kProjectRefreshed,
   kProjectTitle,
@@ -367,6 +396,13 @@ enum class AppliedMatch {
   kSamplingSettled,
   kNativeActive,
   kNativeFullscreen,
+  kNativeFrameOpaque,
+  kNativeFrameGlassEligible,
+  kNativeToolbarRevealed,
+  kNativeMenuRevealed,
+  kNativeToolbarMode,
+  kNativeToolbarY,
+  kNativeToolbarActiveSpace,
   kPresentationColor,
   kPresentationIcon,
   kPresentationAlpha,

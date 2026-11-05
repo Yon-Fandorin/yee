@@ -29,7 +29,7 @@
 namespace yee::test {
 namespace {
 
-constexpr std::array<const char*, 16> kConditionNames = {
+constexpr std::array<const char*, 17> kConditionNames = {
     "PageHostsApplied",
     "PaneLayoutMatches",
     "ViewStateMatches",
@@ -46,6 +46,7 @@ constexpr std::array<const char*, 16> kConditionNames = {
     "WebUiStateMatches",
     "PresentationMatches",
     "PresentedAfterApply",
+    "NativeFrameMatches",
 };
 static_assert(std::size(kConditionNames) ==
               std::variant_size_v<AppliedConditionValue>);
@@ -137,6 +138,14 @@ const char* MatchName(AppliedMatch match) {
       return "kViewBounds";
     case AppliedMatch::kViewSize:
       return "kViewSize";
+    case AppliedMatch::kViewWidth:
+      return "kViewWidth";
+    case AppliedMatch::kViewFullyVisible:
+      return "kViewFullyVisible";
+    case AppliedMatch::kViewScreenBounds:
+      return "kViewScreenBounds";
+    case AppliedMatch::kViewScreenBoundsDifferent:
+      return "kViewScreenBoundsDifferent";
     case AppliedMatch::kViewHeight:
       return "kViewHeight";
     case AppliedMatch::kViewParent:
@@ -171,6 +180,12 @@ const char* MatchName(AppliedMatch match) {
       return "kOmniboxPopup";
     case AppliedMatch::kOmniboxEditing:
       return "kOmniboxEditing";
+    case AppliedMatch::kOmniboxIdle:
+      return "kOmniboxIdle";
+    case AppliedMatch::kOmniboxTransitionComplete:
+      return "kOmniboxTransitionComplete";
+    case AppliedMatch::kOmniboxShown:
+      return "kOmniboxShown";
     case AppliedMatch::kWidgetVisible:
       return "kWidgetVisible";
     case AppliedMatch::kWidgetOpacity:
@@ -183,12 +198,16 @@ const char* MatchName(AppliedMatch match) {
       return "kWidgetCapture";
     case AppliedMatch::kWidgetActive:
       return "kWidgetActive";
+    case AppliedMatch::kWidgetPaintActive:
+      return "kWidgetPaintActive";
     case AppliedMatch::kWidgetReady:
       return "kWidgetReady";
     case AppliedMatch::kWidgetShowState:
       return "kWidgetShowState";
     case AppliedMatch::kWidgetSizeNear:
       return "kWidgetSizeNear";
+    case AppliedMatch::kWidgetSize:
+      return "kWidgetSize";
     case AppliedMatch::kFooterMenu:
       return "kFooterMenu";
     case AppliedMatch::kProjectRefreshed:
@@ -217,6 +236,20 @@ const char* MatchName(AppliedMatch match) {
       return "kNativeActive";
     case AppliedMatch::kNativeFullscreen:
       return "kNativeFullscreen";
+    case AppliedMatch::kNativeFrameOpaque:
+      return "kNativeFrameOpaque";
+    case AppliedMatch::kNativeFrameGlassEligible:
+      return "kNativeFrameGlassEligible";
+    case AppliedMatch::kNativeToolbarRevealed:
+      return "kNativeToolbarRevealed";
+    case AppliedMatch::kNativeMenuRevealed:
+      return "kNativeMenuRevealed";
+    case AppliedMatch::kNativeToolbarMode:
+      return "kNativeToolbarMode";
+    case AppliedMatch::kNativeToolbarY:
+      return "kNativeToolbarY";
+    case AppliedMatch::kNativeToolbarActiveSpace:
+      return "kNativeToolbarActiveSpace";
     case AppliedMatch::kPresentationColor:
       return "kPresentationColor";
     case AppliedMatch::kPresentationIcon:
@@ -896,6 +929,10 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kViewVisible:
     case AppliedMatch::kViewDrawn:
     case AppliedMatch::kViewBounds:
+    case AppliedMatch::kViewWidth:
+    case AppliedMatch::kViewFullyVisible:
+    case AppliedMatch::kViewScreenBounds:
+    case AppliedMatch::kViewScreenBoundsDifferent:
     case AppliedMatch::kViewSize:
     case AppliedMatch::kViewHeight:
     case AppliedMatch::kViewParent:
@@ -916,6 +953,9 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kViewScrolledDown:
     case AppliedMatch::kViewGroupDrag:
     case AppliedMatch::kOmniboxPopup:
+    case AppliedMatch::kOmniboxIdle:
+    case AppliedMatch::kOmniboxTransitionComplete:
+    case AppliedMatch::kOmniboxShown:
     case AppliedMatch::kOmniboxEditing:
     case AppliedMatch::kFooterMenu:
     case AppliedMatch::kProjectRefreshed:
@@ -925,9 +965,11 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kWidgetBounds:
     case AppliedMatch::kWidgetClosed:
     case AppliedMatch::kWidgetCapture:
+    case AppliedMatch::kWidgetPaintActive:
     case AppliedMatch::kWidgetActive:
     case AppliedMatch::kWidgetReady:
     case AppliedMatch::kWidgetShowState:
+    case AppliedMatch::kWidgetSize:
     case AppliedMatch::kWidgetSizeNear:
       return kind == AppliedConditionKind::kWidgetStateMatches;
     case AppliedMatch::kProjectTitle:
@@ -953,6 +995,14 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kNativeActive:
     case AppliedMatch::kNativeFullscreen:
       return kind == AppliedConditionKind::kNativeWindowMatches;
+    case AppliedMatch::kNativeFrameOpaque:
+    case AppliedMatch::kNativeFrameGlassEligible:
+    case AppliedMatch::kNativeToolbarRevealed:
+    case AppliedMatch::kNativeMenuRevealed:
+    case AppliedMatch::kNativeToolbarMode:
+    case AppliedMatch::kNativeToolbarActiveSpace:
+    case AppliedMatch::kNativeToolbarY:
+      return kind == AppliedConditionKind::kNativeFrameMatches;
     case AppliedMatch::kWebUiRowsAtLeast:
     case AppliedMatch::kWebUiRowsFitNativeBounds:
     case AppliedMatch::kWebUiSelection:
@@ -1036,6 +1086,15 @@ bool AppliedValueMatches(const AppliedCondition& condition,
               return expected.drawn == value.drawn;
             case AppliedMatch::kViewBounds:
               return expected.bounds == value.bounds;
+            case AppliedMatch::kViewWidth:
+              return expected.bounds.width() == value.bounds.width();
+            case AppliedMatch::kViewFullyVisible:
+              return !value.bounds.IsEmpty() &&
+                     value.visible_bounds == gfx::Rect(value.bounds.size());
+            case AppliedMatch::kViewScreenBounds:
+              return expected.screen_bounds == value.screen_bounds;
+            case AppliedMatch::kViewScreenBoundsDifferent:
+              return expected.screen_bounds != value.screen_bounds;
             case AppliedMatch::kViewSize:
               return expected.bounds.size() == value.bounds.size();
             case AppliedMatch::kViewHeight:
@@ -1074,6 +1133,12 @@ bool AppliedValueMatches(const AppliedCondition& condition,
             case AppliedMatch::kOmniboxPopup:
               return expected.popup_open == value.popup_open &&
                      (!expected.popup_open || value.visible);
+            case AppliedMatch::kOmniboxIdle:
+              return value.autocomplete_empty && !value.popup_open;
+            case AppliedMatch::kOmniboxTransitionComplete:
+              return !value.popup_transition;
+            case AppliedMatch::kOmniboxShown:
+              return expected.presenter_shown == value.presenter_shown;
             case AppliedMatch::kOmniboxEditing:
               return expected.editing == value.editing;
             case AppliedMatch::kViewScrollOffset:
@@ -1108,16 +1173,43 @@ bool AppliedValueMatches(const AppliedCondition& condition,
               return expected.capture == value.capture;
             case AppliedMatch::kWidgetActive:
               return expected.active == value.active;
+            case AppliedMatch::kWidgetPaintActive:
+              return expected.paint_as_active == value.paint_as_active;
             case AppliedMatch::kWidgetReady:
               return value.visible_on_screen && value.active &&
                      value.paint_as_active;
             case AppliedMatch::kWidgetShowState:
               return expected.show_state == value.show_state;
+            case AppliedMatch::kWidgetSize:
+              return expected.bounds.size() == value.bounds.size();
             case AppliedMatch::kWidgetSizeNear:
               return std::abs(expected.bounds.width() - value.bounds.width()) <=
                          1 &&
                      std::abs(expected.bounds.height() -
                               value.bounds.height()) <= 1;
+            default:
+              return false;
+          }
+        } else if constexpr (std::is_same_v<T, NativeFrameMatches>) {
+          switch (condition.match) {
+            case AppliedMatch::kNativeFrameOpaque:
+              return expected.opaque == value.opaque;
+            case AppliedMatch::kNativeFrameGlassEligible:
+              return expected.glass_eligible == value.glass_eligible;
+            case AppliedMatch::kNativeToolbarRevealed:
+              return expected.toolbar_revealed == value.toolbar_revealed;
+            case AppliedMatch::kNativeMenuRevealed:
+              return value.menu_bar_reveal == 1 && value.toolbar_revealed;
+            case AppliedMatch::kNativeToolbarMode:
+              return value.toolbar_host_ready && value.menu_bar_reveal == 0 &&
+                     expected.toolbar_revealed == value.toolbar_revealed &&
+                     (expected.toolbar_revealed ? value.toolbar_fully_visible
+                                                : value.toolbar_offscreen);
+            case AppliedMatch::kNativeToolbarActiveSpace:
+              return expected.toolbar_on_active_space ==
+                     value.toolbar_on_active_space;
+            case AppliedMatch::kNativeToolbarY:
+              return expected.toolbar_bounds.y() == value.toolbar_bounds.y();
             default:
               return false;
           }
@@ -1332,6 +1424,9 @@ uint64_t AppliedFrameGeometryDigest(
       view->handling_drag = false;
       view->collapsed = false;
       view->vertical_drag_only = false;
+      view->popup_transition = false;
+      view->autocomplete_empty = true;
+      view->presenter_shown = false;
     }
     geometry += snapshot.owner.ToString() + FormatAppliedValue(value) +
                 FormatCoordinates(snapshot.coordinates);
@@ -1396,7 +1491,10 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("focus_change_reason", state.focus_change_reason)
               .Add("handling_drag", state.handling_drag)
               .Add("collapsed", state.collapsed)
-              .Add("vertical_drag_only", state.vertical_drag_only);
+              .Add("vertical_drag_only", state.vertical_drag_only)
+              .Add("popup_transition", state.popup_transition)
+              .Add("autocomplete_empty", state.autocomplete_empty)
+              .Add("presenter_shown", state.presenter_shown);
         } else if constexpr (std::is_same_v<T, AnimationMatches>) {
           fields.Add("group", state.group_id)
               .Add("running", state.running)
@@ -1424,6 +1522,16 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("target", state.target)
               .Add("document", state.document)
               .Add("focused", state.focused);
+        } else if constexpr (std::is_same_v<T, NativeFrameMatches>) {
+          fields.Add("opaque", state.opaque)
+              .Add("glass_eligible", state.glass_eligible)
+              .Add("toolbar_revealed", state.toolbar_revealed)
+              .Add("menu_bar_reveal", state.menu_bar_reveal)
+              .Add("toolbar_host_ready", state.toolbar_host_ready)
+              .Add("toolbar_on_active_space", state.toolbar_on_active_space)
+              .Add("toolbar_fully_visible", state.toolbar_fully_visible)
+              .Add("toolbar_offscreen", state.toolbar_offscreen)
+              .Add("toolbar_bounds", state.toolbar_bounds);
         } else if constexpr (std::is_same_v<T, NativeWindowMatches>) {
           fields.Add("active", state.active)
               .Add("onActiveSpace", state.on_active_space)

@@ -181,6 +181,14 @@ class YeeDetachToBrowserTabDragControllerTest
   }
 
  protected:
+  void StopAnimating(TabStrip* strip) {
+    TabDragControllerTest::StopAnimating(strip);
+#if BUILDFLAG(IS_WIN)
+    // 모드 전환 뒤 Header 예약 폭도 적용한 다음 입력 좌표를 읽는다.
+    strip->GetWidget()->LayoutRootViewIfNecessary();
+    TabDragControllerTest::StopAnimating(strip);
+#endif
+  }
   bool BeginPress(TabSlotView& slot) {
     const auto ready = PrepareNativeDragInput(applied_, *browser());
     if (!ready) {

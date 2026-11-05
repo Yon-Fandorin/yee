@@ -25,6 +25,7 @@ namespace content {
 class RenderFrameHost;
 class WebContents;
 class RenderFrameMetadataProvider;
+class RenderWidgetHost;
 }  // namespace content
 namespace yee {
 class BrowserSurfacePresentationBinding;
@@ -38,7 +39,7 @@ struct WebUiAppliedSelectors {
   std::string root;
   std::string rows;
   std::string selected;
-  enum class Probe { kRoot, kOmnibox, kCustomization, kInput };
+  enum class Probe { kRoot, kOmnibox, kCustomization, kInput, kTabLayout };
   Probe probe = Probe::kRoot;
 };
 
@@ -60,13 +61,15 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
     kFooterInkHidden,
     kSiteControlsPopup,
     kSidePanelEntry,
-    kSidebarCollapsed
+    kSidebarCollapsed,
+    kToolbarMenu
   };
   AppliedOwnerToken ObserveUiState(views::View& view, UiProbe probe);
   AppliedOwnerToken ObserveRendererBackground(content::WebContents& contents);
   AppliedOwnerToken ObserveProjectNavigation(BrowserView& view);
   AppliedOwnerToken ObserveProjectPage(BrowserView& view, std::string page_id);
   AppliedOwnerToken ObserveOmnibox(LocationBarView& view);
+  AppliedOwnerToken ObserveOmniboxAim(LocationBarView& view);
   AppliedOwnerToken ObserveFavicon(content::WebContents& contents);
   AppliedOwnerToken ObserveDocumentTitle(content::WebContents& contents);
   AppliedViewsObservers& views();
@@ -108,6 +111,7 @@ class AppliedBrowserObservers final : public AppliedSignalSource {
   AppliedOwnerToken ObserveTabCollectionAnimations(BrowserView& root,
                                                    uint64_t group_id);
   AppliedOwnerToken ObserveRendererViewport(content::WebContents& contents);
+  AppliedOwnerToken ObserveRenderWidgetHost(content::RenderWidgetHost& host);
   // 미래 surface는 목표 viewport/scale의 첫 activation에 한 번 bind한다.
   // next_document이면 다음 primary document/RFH에도 같은 규칙을 적용한다.
   AppliedCondition ExpectRendererViewport(content::WebContents& contents,

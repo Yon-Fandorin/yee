@@ -289,6 +289,11 @@ source_set("applied_wait_browser_test_support") {
   testonly = true
   public = [ "applied_wait_browser_observers.h" ]
   sources = [ "applied_wait_browser_observers.cc" ]
+  if (is_mac) {
+    public += [ "native_frame_applied_test_support_mac.h" ]
+    sources += [ "native_frame_applied_test_support_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  }
   public_deps = [ ":applied_wait_views_test_support" ]
   deps = [
     ":project_navigation",
@@ -301,6 +306,7 @@ source_set("applied_wait_browser_test_support") {
     "//chrome/browser/ui/views/frame:browser_view_header",
     "//chrome/browser/ui/views/frame:contents_container_view",
     "//chrome/browser/ui/views/frame:contents_web_view",
+    "//chrome/browser/ui/views/frame:glass_frame_service",
     "//chrome/browser/ui/views/frame:multi_contents_resize_area",
     "//chrome/browser/ui/views/frame:multi_contents_view",
     "//chrome/browser/ui/views/frame:vertical_tab_strip_region_view",
@@ -319,6 +325,13 @@ source_set("applied_wait_browser_test_support") {
     "//content/test:test_support",
     "//ui/views",
   ]
+  if (is_mac) {
+    deps += [
+      "//chrome/browser/ui/views/frame:immersive_mode_controller_mac",
+      "//chrome/browser/ui/views/frame:top_container_view",
+      "//ui/display",
+    ]
+  }
 }
 
 source_set("applied_wait_kombucha") {
@@ -536,6 +549,7 @@ test("site_controls_browsertests") {
     "projects/project_navigation_browsertest.cc",
     "sidebar_footer_browsertest.cc",
     "site_controls_browsertest.cc",
+    "yee_tab_strip_collection_controller_browsertest.cc",
     "youtube_live_browsertest.cc",
   ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -556,6 +570,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/autocomplete",
     "//chrome/browser/download:impl",
     "//chrome/browser/extensions:test_support",
+    "//chrome/browser/favicon",
     "//chrome/browser/history",
     "//chrome/browser/media/webrtc",
     "//chrome/browser/performance_manager",
@@ -568,13 +583,17 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui:browser_commands",
     "//chrome/browser/ui:browser_tabstrip",
     "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui:recently_audible_helper",
+    "//chrome/browser/ui:tab_ui_helper",
     "//chrome/browser/ui:ui_features",
     "//chrome/browser/ui/animation",
     "//chrome/browser/ui/bookmarks",
+    "//chrome/browser/ui/browser_ui_controller",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/color:color_headers",
     "//chrome/browser/ui/startup",
     "//chrome/browser/ui/tabs",
+    "//chrome/browser/ui/tabs:tab_menu",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/tabs/saved_tab_groups:test_support",
     "//chrome/browser/ui/thumbnails",
@@ -591,6 +610,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/views/test:test_support",
     "//chrome/browser/ui/webui/metrics_reporter:test_support",
     "//chrome/browser/ui/webui/tab_search",
+    "//chrome/browser/ui/window_metadata",
     "//chrome/browser/yee_content_blocking:browser",
     "//chrome/browser/yee_projects:browser",
     "//chrome/renderer",
@@ -723,6 +743,8 @@ if (!is_chromeos_device) {
       "interactive_ui_tests_main.cc",
       "split_pane_interactive_uitest.cc",
       "vertical_tab_drag_interactive_uitest.cc",
+      "yee_omnibox_popup_view_webui_interactive_uitest.cc",
+      "yee_tab_strip_collection_controller_interactive_uitest.cc",
     ]
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
     configs += [ "//build/config:precompiled_headers" ]
@@ -828,6 +850,8 @@ if (!is_chromeos_device) {
       sources += [
         "//chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm",
         "//chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm",
+        "yee_browser_native_widget_mac_interactive_uitest.mm",
+        "yee_immersive_mode_controller_mac_interactive_uitest.mm",
       ]
       deps += [
         ":background_browser_test_support",
@@ -844,6 +868,8 @@ if (!is_chromeos_device) {
       sources += [
         "//chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc",
         "//chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc",
+        "yee_customize_chrome_interactive_uitest.cc",
+        "yee_vertical_tab_strip_region_view_interactive_uitest.cc",
       ]
       deps += [
         "//chrome/browser/ui/views/frame:browser_caption_button_container_win",

@@ -19,6 +19,7 @@ namespace yee::test {
 
 class AppliedBrowserObservers;
 class DragAppliedObserver;
+class NativeFrameAppliedObserver;
 
 AppliedCoordinates GetAppliedViewCoordinates(
     const views::View& view,
@@ -81,6 +82,7 @@ class AppliedViewsObservers final : public AppliedSignalSource {
  private:
   friend class AppliedBrowserObservers;
   friend class DragAppliedObserver;
+  friend class NativeFrameAppliedObserver;
   using Reader = base::RepeatingCallback<std::optional<AppliedSnapshot>()>;
   void RegisterSignal(AppliedOwnerToken owner,
                       AppliedConditionKind kind,

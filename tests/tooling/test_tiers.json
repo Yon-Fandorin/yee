@@ -2847,6 +2847,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NativeToolbarWaitRejectsUnmovedAndClippedHost": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "native Toolbar의 host 준비·메뉴 노출량·clip·Y 좌표 조건을 값으로 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.NewRequestSupersedesAnyOverlappingOwnerInSameDomain": {
     "os": [
       "Darwin",
@@ -8196,6 +8209,265 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.ActiveInactiveTintOpacity": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "glass view의 geometry를 검사하며 BringToFront는 setup이다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ],
+    "needs_display": {
+      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. 창 준비 호출을 보존하므로 기존 runner에 남긴다."
+    }
+  },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.MultipleProfilesTintOpacity": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.PaintAsActiveLockMaintainsActiveTint": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.TabFullscreenWindowIsOpaque": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_customize_chrome_interactive_uitest.cc::YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "실제 native popup·포인터 이동/입력과 focus 유지가 계약이다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_immersive_mode_controller_mac_interactive_uitest.mm::YeeImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_immersive_mode_controller_mac_interactive_uitest.mm::YeeImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_immersive_mode_controller_mac_interactive_uitest.mm::YeeImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeOmniboxPopupAimShadowGeometryTest.YeeAimShadowFitsWidgetAndKeepsHostTransparent": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "popup Widget·autocomplete/geometry를 직접 갱신하며 OS 입력은 없다.",
+    "parameters": [
+      [
+        "Shadow",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ],
+    "needs_display": {
+      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. 창 준비 호출을 보존하므로 기존 runner에 남긴다.",
+      "Linux": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. 창 준비 호출을 보존하므로 기존 runner에 남긴다.",
+      "Windows": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. 창 준비 호출을 보존하므로 기존 runner에 남긴다."
+    }
+  },
+  "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeOmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "popup Widget·autocomplete/geometry를 직접 갱신하며 OS 입력은 없다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeOmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "복수 native 창의 활성 전환으로 autocomplete 재시작을 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeOmniboxPopupViewWebUITest.YeeAimPopupOpensAndDismissesAfterClosedThemeChanges": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "popup의 native 활성 상태를 기다리고 SendKeyPressToWindowSync(Escape)·SendMouseMoveSync·ui_controls::SendMouseEvents로 닫는다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_tab_collection_animating_layout_manager_unittest.cc::YeeTabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "parameters": [
+      [
+        "All",
+        null
+      ]
+    ],
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_collection_animating_layout_manager_unittest.cc::YeeTabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "parameters": [
+      [
+        "All",
+        null
+      ]
+    ],
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_collection_animating_layout_manager_unittest.cc::YeeTabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "parameters": [
+      [
+        "All",
+        null
+      ]
+    ],
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
   "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons": {
     "os": [
       "Darwin",
@@ -8211,6 +8483,196 @@
     "needs_display": {
       "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
     }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.YeeDisabledShellKeepsNativeVerticalHeaderOnHover": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.YeeEphemeralGroupKeepsNativeColorsDuringHoverAndPress": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.YeeHorizontalNativeThemeKeepsNativeChipOnHover": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ],
+    "needs_display": {
+      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
+    }
+  },
+  "browser/ui/yee_tab_strip_collection_controller_browsertest.cc::YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "Vertical",
+          "Horizontal"
+        ]
+      ]
+    ],
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_tab_strip_collection_controller_interactive_uitest.cc::YeeTabStripCollectionControllerInteractiveUiTest.YeeClosingTabCanReattachWithoutModel": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "모델 변경·View 재부착으로 border/수명 계약을 검사하며 실제 입력은 없다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "Vertical",
+          "Horizontal"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_tab_strip_collection_controller_interactive_uitest.cc::YeeTabStripCollectionControllerInteractiveUiTest.YeeDragPreviewFollowsStripOrientation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "MoveMouse/DragMouse 또는 native context menu tracking loop를 사용한다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "Vertical",
+          "Horizontal"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_tab_strip_collection_controller_interactive_uitest.cc::YeeTabStripCollectionControllerInteractiveUiTest.YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "MoveMouse/DragMouse 또는 native context menu tracking loop를 사용한다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "Vertical",
+          "Horizontal"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_tab_strip_collection_controller_interactive_uitest.cc::YeeTabStripCollectionControllerInteractiveUiTest.YeePinnedSplitBorderFollowsStripOrientation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "모델 변경·View 재부착으로 border/수명 계약을 검사하며 실제 입력은 없다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "Vertical",
+          "Horizontal"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
   },
   "browser/ui/yee_ui_unittest.cc::BrowserSurfacePresentationResolverTest.ExhaustiveGrayAndChromaticContrastContract": {
     "os": [
@@ -8973,6 +9435,17 @@
     "binaries": [
       "yee_header_unittests",
       "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_vertical_tab_strip_region_view_interactive_uitest.cc::YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "실제 native popup·포인터 이동/입력과 focus 유지가 계약이다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
     ]
   },
   "browser/ui/youtube_live_browsertest.cc::YouTubeLiveBrowserTest.DISABLED_MidrollObservation": {
@@ -9843,75 +10316,6 @@
       "site_controls_browsertests"
     ]
   },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.ActiveInactiveTintOpacity": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L225: macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L482: macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.GlassViewGeometryMatchesShellPolicy": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L397: glass view의 geometry를 검사하며 BringToFront는 setup이다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ],
-    "needs_display": {
-      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다."
-    }
-  },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.MultipleProfilesTintOpacity": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L628: macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.PaintAsActiveLockMaintainsActiveTint": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L304: macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/browser_native_widget_mac_interactive_uitest.mm::BrowserNativeWidgetMacGlassTest.TabFullscreenWindowIsOpaque": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L546: macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
   "chrome/browser/ui/views/frame/browser_view_browsertest.cc::BrowserViewTest.CloseWidgetWithTabsNoCrash": {
     "os": [
       "Darwin",
@@ -9927,39 +10331,6 @@
     "needs_display": {
       "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
     }
-  },
-  "chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm::ImmersiveModeControllerMacInteractiveTest.ContentFullscreenChildren": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1207: 실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm::ImmersiveModeControllerMacInteractiveTest.HandlesOverlayWidgetDestruction": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1242: 실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/immersive_mode_controller_mac_interactive_uitest.mm::ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L445: 실제 fullscreen과 메뉴막대 포인터 warp·native Widget 수명을 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
   },
   "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.ContentPanelCapAndVerticalFirstFlexUseContentColumn": {
     "os": [
@@ -10117,81 +10488,6 @@
       "yee_layout_unittests"
     ]
   },
-  "chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc::VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L199: 실제 native popup·포인터 이동/입력과 focus 유지가 계약이다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc::OmniboxPopupAimShadowGeometryTest.YeeAimShadowFitsWidgetAndKeepsHostTransparent": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L514: popup Widget·autocomplete/geometry를 직접 갱신하며 OS 입력은 없다.",
-    "parameters": [
-      [
-        "Shadow",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ],
-    "needs_display": {
-      "Darwin": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다.",
-      "Linux": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다.",
-      "Windows": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. upstream 본문을 보존하며 기존 runner에 남긴다."
-    }
-  },
-  "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc::OmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L395: popup Widget·autocomplete/geometry를 직접 갱신하며 OS 입력은 없다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc::OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L423: 복수 native 창의 활성 전환으로 autocomplete 재시작을 검사한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui_interactive_uitest.cc::OmniboxPopupViewWebUITest.YeeAimPopupOpensAndDismissesAfterClosedThemeChanges": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L316: popup의 native 활성 상태를 기다리고 SendKeyPressToWindowSync(Escape)·SendMouseMoveSync·ui_controls::SendMouseEvents로 닫는다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
   "chrome/browser/ui/views/sad_tab_split_view_browsertest.cc::SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView": {
     "os": [
       "Darwin",
@@ -10223,289 +10519,6 @@
     "needs_display": {
       "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
     }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L782: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "parameters": [
-      [
-        "All",
-        null
-      ]
-    ],
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L483: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "parameters": [
-      [
-        "All",
-        null
-      ]
-    ],
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager_unittest.cc::TabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L512: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "parameters": [
-      [
-        "All",
-        null
-      ]
-    ],
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L205: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeDisabledShellKeepsNativeVerticalHeaderOnHover": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L482: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeEphemeralGroupKeepsNativeColorsDuringHoverAndPress": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L350: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeHorizontalNativeThemeKeepsNativeChipOnHover": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L424: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L280: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L237: Widget의 mock clock·직접 EventGenerator 또는 논리 FocusManager를 검사한다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ],
-    "needs_display": {
-      "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_browsertest.cc::TabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L129: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "Vertical",
-          "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc::TabStripCollectionControllerInteractiveUiTest.YeeClosingTabCanReattachWithoutModel": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L1110: 모델 변경·View 재부착으로 border/수명 계약을 검사하며 실제 입력은 없다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "Vertical",
-          "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc::TabStripCollectionControllerInteractiveUiTest.YeeDragPreviewFollowsStripOrientation": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L498: MoveMouse/DragMouse 또는 native context menu tracking loop를 사용한다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "Vertical",
-          "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc::TabStripCollectionControllerInteractiveUiTest.YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L703: MoveMouse/DragMouse 또는 native context menu tracking loop를 사용한다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "Vertical",
-          "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc::TabStripCollectionControllerInteractiveUiTest.YeePinnedSplitBorderFollowsStripOrientation": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L678: 모델 변경·View 재부착으로 border/수명 계약을 검사하며 실제 입력은 없다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "Vertical",
-          "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_interactive_uitest.cc::CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L312: 실제 native popup·포인터 이동/입력과 focus 유지가 계약이다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
   },
   "chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc::TabSearchPageHandlerTest.RemoveSplit_NTP": {
     "os": [

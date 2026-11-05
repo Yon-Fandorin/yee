@@ -19,7 +19,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
     chrome/browser/ui/views/yee:site_controls_browsertests
 fi
 
-FILTER='SiteControlsBrowserTest.*:SidebarFooterBrowserTest.*:DisclosureArrowTest.*:SessionStartupPrefTest.*:TabDataObserverBrowserTest.FaviconAndIconFlags:All/TabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*:All/TabSearchPageHandlerTest.RemoveSplit_NTP/*'
+FILTER='SiteControlsBrowserTest.*:SidebarFooterBrowserTest.*:DisclosureArrowTest.*:SessionStartupPrefTest.*:TabDataObserverBrowserTest.FaviconAndIconFlags:All/YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*:All/TabSearchPageHandlerTest.RemoveSplit_NTP/*'
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*) FILTER+=':UiaApplicationExitBrowserTest.*' ;;
 esac
