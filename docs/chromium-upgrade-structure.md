@@ -1,24 +1,20 @@
 # Chromium 버전 이식 구조와 패치 래칫
 
-153→157 Stable 이식에서는 Chromium 테스트 파일의 충돌 해결과 약 3일의
-런타임·테스트 안정화에 시간이 많이 들었다. 컴파일 오류 해결이 주된 비용은 아니었다.
-다음 이식에서는 원본 테스트 변경을 줄이고, Yee 상태의 수명과 Chromium 연결 경계를
-명확히 한다. 패치 래칫과 테스트 이전 1단계를 구현하고 macOS에서 검증했다.
-Windows 검증과 나머지 구조 변경은 후속 작업이다.
+Yee 소유 코드와 테스트는 overlay에서 관리하고, Chromium 원본의 변경은 `0001`에 둔다.
+패치 래칫은 원본 파일에 남는 Yee 연결과 상태의 증가를 경로별로 제한한다.
 
 ## 현재 패치 구성
 
-테스트 이전 1단계, PNC 생성 이동과 `yee_ui.h` 분리 뒤
-`0001-integrate-yee-shell.patch`의 래칫 측정 결과다.
+`0001-integrate-yee-shell.patch`에 포함된 변경이다. overlay 소스 전체의 크기는
+이 표에 포함하지 않는다.
 
 | 구분 | 파일 | 추가 줄 | 삭제 줄 |
 | --- | ---: | ---: | ---: |
-| 수정한 제품 파일(GN 연결 포함) | 296 | 12,377 | 1,655 |
-| 수정한 Chromium 테스트 파일 | 31 | 5,631 | 120 |
-| 새 파일 | 5 | 1,152 | 0 |
+| 수정한 제품 파일(GN 연결 포함) | 296 | 12,363 | 1,656 |
+| 수정한 Chromium 테스트 파일(GN 연결 포함) | 9 | 507 | 40 |
+| 새 파일 | 4 | 792 | 0 |
 
-줄 수는 결합 정도의 근사치다. 실제 이식 비용은 충돌과 빌드·gate 소요 시간을
-함께 기록해 판단한다.
+줄 수는 결합 정도의 근사치이며, 패치 크기 자체는 래칫의 통과 조건이 아니다.
 
 ## 구조 원칙
 
@@ -85,35 +81,29 @@ foreground는 upstream 초기화·전면화 동작을 유지하고, background�
 `site_controls_browsertests`도 Yee 소유 `browser/ui/browser_tests_main.cc`를 사용한다.
 두 main은 macOS background에서만 테스트 전용 target의 NSApplication 활성화 차단을
 설치한다. Chromium 원본 main과 Widget의 창 표시 경로는 수정하지 않는다.
-`chrome/test/BUILD.gn`의 `captured_sites_interactive_tests`와
-`accessibility_live_site_tests`가 같은 main을 쓰는 선례다. 오버레이에는 이미
-[`browser/ui/BUILD.gn`](../browser/ui/BUILD.gn)의 `site_controls_browsertests`처럼
-전체 테스트 목록과 독립된 실행 파일이 있다. macOS에서 실행 파일만 다시 만든 순수 링크
-시간은 새 실행 파일 121–133초, `interactive_ui_tests` 125–128초로 차이가 없었다.
-둘 다 브라우저 전체를 링크하므로 이 실행 파일의 이점은 링크 시간이 아니라
-원본 테스트 파일 변경을 없애는 데 있다.
+[`browser/ui/BUILD.gn`](../browser/ui/BUILD.gn)은 Yee 소유 실행 파일과 테스트 지원
+target을 정의한다. 브라우저 테스트 실행 파일은 Chromium 브라우저 의존성도 링크하므로
+소스 목록을 분리해도 브라우저 전체의 링크 비용은 남는다.
 
 공통 대기 API는 `WaitForApplied(ticket, conditions)`로 두고 Chromium observer와
 결합한다. 새 Yee 시나리오는 upstream 테스트 파일에 추가하지 않는다.
-이전한 upstream 테스트 파일은 pristine upstream으로 복원한다.
+이전한 macOS·공용 테스트 원본은 pristine으로 복원했다.
 Yee 셸을 켰을 때 실패하는 원본 테스트는 실행 filter로 제외하고 원본을 수정하지 않는다.
 
-`.sh` gate는 Yee 실행 파일 하나만 빌드한다. 이 실행 파일은 이전한 Yee 테스트와 함께
-gate가 고르는 원본 테스트 파일을 그대로 컴파일한다. 1단계에서 복원한 두 파일은 pristine
-원본이고, drag·omnibox popup·Mac immersive 등 2단계 대상 파일은 아직 `0001`이 수정한
-상태로 들어간다. 원본 테스트 중 Yee 셸에서 실패하는 것은 filter에서 빼고, 같은 시나리오를
-Yee 셸 기준으로 고친 Yee 복사본을 실행한다. 예를 들어 원본
+`.sh` gate는 선택한 범위에 필요한 실행 파일을 빌드한다. Yee 테스트는 소유 fixture에서,
+원본 guard는 pristine 소스를 그대로 컴파일해 실행한다. 원본 테스트 중 Yee 셸에서
+실패하는 것은 filter에서 빼고, 같은 시나리오를 Yee 셸 기준으로 고친 복사본을 선택한다.
+예를 들어 원본
 `BrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`는 제외하고
 `YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest`를 실행한다.
 
-Sidebar의 원본 `TabGroupHeaderViewTest.FocusModeVisibility` 본문도 pristine으로
-복원했다. Yee 셸에서 쓰지 않는 compact rail 너비를 강제하는 원본은 필터에서
-제외하고, 확장 헤더의 focus mode 검사는 overlay의
+Sidebar에서 Yee 셸이 쓰지 않는 compact rail 너비를 강제하는 원본
+`TabGroupHeaderViewTest.FocusModeVisibility`는 필터에서 제외한다.
+확장 헤더의 focus mode 검사는 overlay의
 `YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons`로 실행한다.
 
-`0001`은 단일 패치 파일로 유지한다. 별도 유지보수 checkout에서 관심사별 commit
-series로 관리한 뒤 `0001`로 export한다. 콘텐츠 차단 배포 코드의 패치 분리는 첫 범위
-이후로 미루며, 그전에는 유지보수 커밋만 관심사별로 나눈다.
+`0001`은 Chromium 연결을 담는 단일 패치 파일로 유지한다. Yee 소유 코드는
+[`build/overlay.json`](../build/overlay.json)의 경로 매핑으로 동기화한다.
 
 ## 테스트 gate 누락 방지
 
@@ -123,12 +113,11 @@ checkout의 테스트 선언 범위와 hunk 변경 줄을 대조한다. checkout
 검사만 이유를 출력하고 건너뛴다. overlay 검사는 계속 수행한다.
 원본 fixture는 그대로 두며 새 Yee 시나리오는 계속 overlay에 작성한다.
 
-브라우저 수준 favicon·그룹 rename 접근성·Tab Search split 사례는 기존
-`site_controls_browsertests`에 원본 소스 세 개를 더해 실행한다. Service Worker의
-factory wrapping 사례는 `yee_service_worker_unittests`, Aura의 layer 위치 guard는
-`is_win && use_aura`에서만 만드는 `yee_aura_unittests`로 실행한다.
-선택하는 원본 Aura 사례의 선언은 `IS_WIN` 안에 있다. 대형 upstream 바이너리를
-새로 요구하지 않는다. 기존 명시적 layout `browser` tier는 유지한다.
+브라우저 수준 favicon·그룹 rename 접근성·Tab Search split 사례는 Yee 소유 소스로
+`site_controls_browsertests`에 연결한다. layout의 `browser` 범위는 Yee 소유
+Side Panel·selection 사례를 같은 실행 파일에서, 나머지 원본 guard를 `browser_tests`에서
+실행한다. Service Worker의 factory wrapping 사례는 `yee_service_worker_unittests`,
+Windows Aura의 layer 위치 guard는 `is_win && use_aura`의 `yee_aura_unittests`에 연결한다.
 전체 gate와 Windows 소유 예외는 [개발 도구](../tools/dev/README.md#변경-후-테스트)와
 [tooling 안내](../tests/tooling/README.md#yee-테스트-gate-누락-검사)를 따른다.
 
@@ -153,10 +142,10 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 | 지표 | 세는 내용 | 현재 합계 |
 | --- | --- | ---: |
-| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 5,631 |
-| `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 61 |
-| `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 30 |
-| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 240 |
+| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 507 |
+| `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 52 |
+| `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 17 |
+| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 222 |
 | `yee_members` | 수정한 헤더의 Yee 이름·타입 멤버 선언(여러 줄 선언은 하나로 합침) | 55 |
 
 [`build/patch-ratchet.json`](../build/patch-ratchet.json)은 `schema_version: 1`과
@@ -179,99 +168,90 @@ python3 tools/overlay/check-patch-ratchet.py --update
 래칫 실패 시 저장한 패치를 유지하며 non-zero로 끝난다. 해당 role의 기준선이 없으면
 재생성 단계의 래칫 검사만 건너뛴다. 독립 검사 명령은 기준선 누락을 설정 오류로 처리한다.
 
-## 첫 작업 범위와 순서
+## 구현된 소유 경계
 
-### 1. 래칫과 측정 기준선
+### 1. 래칫과 기준선
 
-범위는 위의 도구·기준선과 패치 재생성 연결이다. 이 단계는 구현되어 있다.
+패치 재생성은 경로별 기준선과 검토한 예외를 검사한다. 원본에서 제거한 변경은
+`--update`로 낮은 값에 잠그며, 증가에는 경로별 검토가 필요하다.
 
-- 완료 기준: 현재 패치의 지표·크기를 기록하고 읽기 전용 검사가 통과한다.
-  초기 합계는 `14661 / 72 / 71 / 219 / 55`이며 검사 통과를 확인했다.
-- 기대 효과: 연결 증가를 검토 대상으로 드러내고, 줄어든 값을 다시 늘리지 못하게 잠근다.
+### 2. 테스트 소유권
 
-### 2. 테스트 이전
+macOS·공용 범위의 Yee 사례와 셸 적응 guard는 `browser/ui`,
+`browser/content_blocking`, `components/branding` 등 소유 코드 곁의 fixture에 있다.
+이전 대상 Chromium 테스트 원본은 pristine으로 복원했다. 원본 fixture가 `.cc` 내부에
+있는 사례는 공개 기반과 필요한 helper로 재조립했다.
 
-1단계는 독립 fixture가 있거나 작은 helper를 복사할 수 있는 suite부터 옮긴다.
-`browser_view_tabbed_layout_impl_interactive_uitest.cc`에는 Yee 테스트 36개와
-추가 줄 7,437개가 있고 upstream fixture도 수정한다.
-`multi_contents_view_interactive_uitest.cc`에는 Yee 테스트 11개가 있다.
-필요한 helper를 Yee 소유 fixture로 복사해 원본 fixture 변경을 없앤다.
+| 검사 범위 | 실행 파일 |
+| --- | --- |
+| BrowserView·split pane·drag·Omnibox·Mac immersive/glass | `yee_interactive_ui_tests` |
+| 시작 설정·favicon·Tab Search·Side Panel·selection·Customize Chrome·UIA | `site_controls_browsertests` |
+| native geometry·animation | `yee_layout_unittests` |
+| Service Worker factory wrapping | `yee_service_worker_unittests` |
+| macOS 설치 정책·임시 DMG | `install_sh_test` |
 
-1단계의 코드 이전은 완료했다. 추가·수정된 테스트를 모두 포함해
-`browser/ui/browser_surface_interactive_uitest.cc`에 41개,
-`browser/ui/split_pane_interactive_uitest.cc`에 17개를 두며 fixture 이름은 `Yee`로 시작한다.
-두 원본 파일과 `chrome/test/BUILD.gn`은 pristine으로 복원했다.
-`.sh` gate는 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`를 빌드·실행한다.
-래칫 합계는 `5664 / 61 / 30 / 206 / 55`로 낮췄다.
-2026-11-04 macOS에서 새 실행 파일을 빌드했고 header·레이아웃 interactive gate의 모든 단계가
-통과했다.
-Windows `.ps1` 전환과 검증은 후속 작업이다.
+native geometry unittest는 `new_glue`에서 제거하고
+`browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc`로 옮겼다.
+Mac trace와 소유 창의 focus 준비는 Yee test support가 맡는다.
 
-2단계는 Yee 테스트 26개가 있는 `tab_drag_interactive_uitest.cc`와
-`tab_drag_controller_interactive_uitest.cc`의 drag suite다.
-`VerticalTabDragTest`와 `DetachToBrowserTabDragControllerTest`는 `.cc` 안에 정의되어
-다른 실행 파일에서 상속할 수 없다. 이 중 헤더에 선언된 기반 fixture는
-`TabDragControllerTest`뿐이다. 대기 API로 다시 작성할 때까지 drag 변경은 현재
-기준선에 남긴다. 1단계 이전은 5번의 대기 API 작업을 기다리지 않는다.
+원본 테스트·지원 경로에 남은 추가 줄은 다음과 같다. Windows 경로는 이전을 기다리는
+기준선이며, Service Worker fake와 Content GN 연결은 검토한 예외다.
 
-- 완료 기준: 이전한 upstream 파일을 원본으로 복원하고, 감소한 `upstream_test_lines`를
-  `--update`로 잠근다. `chrome/test/BUILD.gn`의 약 40개 deps 추가 hunk가 사라진다.
-  선택형 실행 파일과 `interactive_ui_tests`의 링크 시간을 같은 조건에서 측정한다.
-  gate의 원본 guard 테스트를 보존하고 이전한 Yee 시나리오를 새 실행 파일에서 실행한다.
-- 기대 효과: 테스트 충돌 범위를 줄인다. 1단계에서 Chromium 테스트 파일의 추가 줄이
-  14,661에서 5,664로 줄었다. 측정 결과 링크 시간은 줄지 않았다.
+| Chromium 경로 | 추가 줄 | 유지 이유 |
+| --- | ---: | --- |
+| `chrome/test/base/interactive_test_utils_win.cc` | 211 | Windows 세션에서 이전 |
+| `ui/base/test/ui_controls_internal_win.cc` | 6 | Windows 세션에서 이전 |
+| `chrome/installer/setup/install_unittest.cc` | 11 | Windows 세션에서 이전 |
+| `chrome/installer/setup/taskbar_util_unittest.cc` | 157 | Windows 세션에서 이전 |
+| `ui/aura/window_unittest.cc` | 54 | Windows 세션에서 이전 |
+| `chrome/test/base/interactive_test_utils.h` | 22 | 남아 있는 Windows 구현의 선언·include |
+| `content/renderer/service_worker/service_worker_provider_context_unittest.cc` | 9 | client capability와 IPC 수명 보존 |
+| `content/renderer/service_worker/service_worker_subresource_loader_unittest.cc` | 9 | client capability와 IPC 수명 보존 |
+| `content/test/BUILD.gn` | 28 | Content 내부 fixture를 허용된 testonly 경계에서 컴파일 |
 
-### 3. ProjectNavigationController 생성 이동
+Windows 전용 경로 439줄, 공용 header의 Windows 선언 22줄, SW fake 18줄과
+Content GN 연결 28줄이 `upstream_test_lines`의 507줄을 이룬다.
+SW fake의 `WrapSubresourceLoaderFactory`를 별도 IPC로 분리하려면 client capability,
+Clone→Wrap→Connector 순서, browser의 sandbox·StorageKey 검사와 disconnect 수명을
+함께 재설계해야 한다. Content testonly 연결은 소형 실행 파일 하나만 소비하며
+private header의 visibility를 넓히지 않는다.
 
-코드 이전을 완료했다. 생성·소유·정리를 embedder root로 옮기고 BrowserView 연결은
-`InitPostBrowserViewConstruction`에서 수행한다. `browser_window_features.{h,cc}`는
-pristine으로 복원했고 `browser_view.cc`의 attach hunk를 제거했다.
-157 원본 기준으로 이동 뒤에도 Chromium 파일 11개에
-`ProjectNavigationController::` 참조 21개(`From()`, `IsHubShowing*()`,
-`ShouldShowNativeTab()`, `kSidebarViewId`)가 남는다.
-이 이동은 조립 패턴을 먼저 적용하는 단계이며 충돌 감소 범위는 작다.
+Customize Chrome 탭 배치는 Yee 소유 `TabLayoutHandler`를 `CustomizeChromeUI`에만
+바인딩한다. `DocumentService`가 문서와 양쪽 pipe의 수명을 연결하고 기존 설정 helper가
+권한을 검사한다. 원본 Customize Chrome Mojo와 mock은 수정하지 않는다.
+이 endpoint 등록에 필요한 `chrome_browser_interface_binders_webui.cc`의 owned Mojom
+include 1줄도 경로별 예외다.
 
-생성은 `BrowserWindowFeatures::Init` 마지막으로 이동해 `TabStripModel` observer
-등록 순서가 바뀌었다. 초기에는 허브가 닫혀 있어 명령 override가 없으므로 생성 뒤
-명령 상태 갱신은 필요 없다. 래칫 합계는 `5664 / 61 / 30 / 206 / 55`로 같으며,
-embedder 경로의 증가 세 건은 승인한 조립 지점 예외로 기록하고 기존 경로의 감소를 잠갔다.
-2026-11-04 macOS에서 header·sidebar·레이아웃 interactive gate와 프로젝트 browser test가
-통과했고, 실제 앱에서 프로젝트 hub·명령·세션 복원을 확인했다.
+### 3. ProjectNavigationController 조립
 
-- 기대 효과: Chromium 공통 feature 소유자에서 Yee 조립을 분리한다. 남은 호출 지점은
-  이 단계에서 정리하지 않는다.
+`ProjectNavigationController`의 생성·소유·정리는 embedder root가 맡는다.
+생성은 `BrowserWindowFeatures::Init` 마지막에, BrowserView 연결은
+`InitPostBrowserViewConstruction`에서 수행한다.
+`browser_window_features.{h,cc}`는 pristine이며 `browser_view.cc`의 별도 attach
+코드는 제거했다. 명령·표시 여부를 조회하는 Chromium 호출 지점은 좁은 API를 사용한다.
 
-### 4. yee_ui.h 분리
+### 4. 헤더별 계약
 
-분리를 완료했다. `sidebar_metrics.h`는 `SidebarMetrics`·`kSidebarMetrics`·
-검증식·View ID를, `shell_policy.h`는 Sidebar·Favorites 정책을,
-`yee_colors.h`는 SkColor 기반 순수 색상 계약을 맡고, `yee_ui.h`에는 Views·테마
-helper만 남겼다. `yee_ui.h`는 분리한 헤더를 재노출하지 않는다.
+| 헤더 | 책임 |
+| --- | --- |
+| `sidebar_metrics.h` | `SidebarMetrics`·`kSidebarMetrics`·검증식·View ID |
+| `shell_policy.h` | Sidebar·Favorites 정책 |
+| `yee_colors.h` | SkColor 기반 순수 색상 계약 |
+| `yee_ui.h` | Views·테마 helper |
 
-헤더 변경 시 재컴파일 단위는 다음처럼 줄었다(macOS 의존 기록 기준).
+각 소비자는 필요한 계약의 헤더를 직접 include한다. `yee_ui.h`는 다른 계약을
+재노출하지 않는다.
 
-| 변경 계약 | 분리 전 | 분리 후 헤더 | 분리 후 |
-| --- | ---: | --- | ---: |
-| metrics·View ID | 84 | `sidebar_metrics.h` | 68 |
-| 정책 | 84 | `shell_policy.h` | 18 |
-| 순수 색상 | 84 | `yee_colors.h` | 7 |
-| Views·테마 | 84 | `yee_ui.h` | 51 |
+### 5. 대기 API
 
-기존 includer 76곳 중 41곳은 여러 계약을 함께 쓰므로 헤더가 2개 이상 필요하다.
-이 증가는 검토한 래칫 예외 27건으로 받아들였고 합계는 `5666 / 61 / 30 / 240 / 55`다.
-2026-11-04 macOS에서 앱 빌드와 header·sidebar·레이아웃 interactive gate, 프로젝트
-browser test가 통과했다. Windows 컴파일 확인은 후속 작업이다.
+`WaitForApplied(ticket, conditions)`와 Chromium observer를 Yee UI 테스트 전반과
+drag 테스트에 적용했다. fixture가 세션·observer 연결을 소유하며, 제품 소유자는
+적용값과 구독을 제공한다. 적용 상태를 기다리는 테스트는 입력 전에 ticket을 등록하고
+해당 요청의 조건이 충족됐는지 판정한다. 원본 guard와 이전한 사례의
+tier·OS·parameter 연결은 유지한다.
 
-### 5. 대기 API 기반
-
-`WaitForApplied(ticket, conditions)`와 Chromium observer의 연결 기반만 마련한다.
-drag suite 전체 재작성은 이 단계의 완료 조건에 넣지 않는다.
-
-- 완료 기준: 대표 적용 대기에서 요청 ticket과 conditions 충족을 observer와 함께
-  판정하며 기존 gate 동작을 유지한다.
-- 기대 효과: 후속 테스트 이전과 런타임 안정화에서 같은 적용 완료 조건을 재사용한다.
-
-전체 상태 이전, View 트리 변경, 콘텐츠 차단 배포 코드의 패치 분리는 첫 범위에서 제외한다.
+관측 read, Kombucha 시퀀스의 평가 시점, 상태·배치 조건과 정상 콜백 대기는
+[UI 테스트 작성 규칙](../tools/dev/README.md#ui-테스트-작성과-applied-wait)을 따른다.
 
 ## 업그레이드 기록과 남은 결정
 
@@ -285,4 +265,12 @@ drag suite 전체 재작성은 이 단계의 완료 조건에 넣지 않는다.
 새 Beta/Stable마다 유지보수 checkout에서 rebase를 예행해 네 milestone을 한 번에
 넘기는 일을 피할지는 아직 결정하지 않았다.
 
-각 단계의 기대 효과는 검증 결과가 아니며 다음 업그레이드에서 측정한다.
+각 구조 변경의 기대 효과는 검증 결과가 아니며 다음 업그레이드에서 측정한다.
+
+## 검증과 후속 작업
+
+macOS에서 전체 gate(`--tier=all`)가 통과했다.
+
+Windows 전용 테스트·지원 코드 이전, `.ps1` gate의 실행 파일·필터 전환과 검증은
+후속 작업이다. SW IPC 분리, 전체 상태 이전, View 트리 재설계와 콘텐츠 차단 배포 코드의
+패치 분리도 별도 설계 대상으로 남긴다.

@@ -22,7 +22,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test
 `legacy_ui_wait_allowlist.json`은 mock-clock 자극, 정상 완료 callback,
 비UI task 전달과 일회 실패 deadline만 정확한 호출 위치·지문·사유로 분류한다.
 새 호출, 호출 내용 변경, 빈 사유와 삭제된 호출의 예외는 모두 실패한다.
-UI/model 상태의 완료를 기다리는 새 코드는 입력 전에 applied ticket을 등록한다.
+UI/model의 적용 상태를 기다리는 새 코드는 입력 전에 비어 있지 않은 조건으로 applied
+ticket을 등록한다. mock 완료 콜백만 기다리는 `TestFuture`는 정상 콜백 대기이며 polling이
+아니다. 관측 read와 조건 구성은 [UI 테스트 작성 규칙](../../tools/dev/README.md#ui-테스트-작성과-applied-wait)을 따른다.
 
 `test_chromium_version.py`는 공통 원본 핀, OS별 업데이트 조회와 Windows 개발 명령의
 사전 검사를 다룬다. `test_overlay_tools.py`는 별도 후보 원본에서 패치를 다시 만들 때의
@@ -105,9 +107,9 @@ Grok cohort의 경로·최신성 검사도 선택 가드 뒤에 실행되는지 
 항상 검사한다. upstream 부분은 `YEE_LOCAL_BUILD_ROOT/chromium/src`, 환경 변수 미지정 시
 `.local-build/*/chromium/src`와 `.local-build/chromium/src`에서 checkout을 찾는다.
 checkout이 없으면 upstream 사례·GN 검사만 skip하고 이유를 출력한다. overlay 검사는
-계속 실행하며, checkout 없이 확인할 수 없는 기존 native Header·Sidebar GN 연결에는
-현재 소유한 overlay 소스 8개의 명시적 대응을 쓴다. checkout이 있으면 실제 GN 파일로
-그 연결도 확인한다.
+계속 실행하며, checkout 없이 확인할 수 없는 native Header·Sidebar·layout·설치·Content
+test GN 연결에는 소유한 overlay 소스의 명시적 대응을 쓴다. checkout이 있으면 실제
+GN 파일로 그 연결도 확인한다.
 
 `0001`의 기본 3줄 문맥을 유지한 채 hunk의 변경 줄 범위와 checkout의 `TEST` 선언부터
 닫는 괄호까지의 범위를 대조한다. 주석·문자열의 괄호는 가리고 포맷·주석만 바뀐 블록은
@@ -142,6 +144,8 @@ A/B/C, 소유 gate, 실행 바이너리와 짧은 근거를 둔다. `binaries`�
 대조하며 같은 이름 패턴을 쓰는 다른 바이너리의 사례가 섞이지 않게 한다.
 매개변수 선언은 `parameters`에 실제
 `INSTANTIATE_*`의 prefix·suffix를 기록하며 coverage 파서와 대조한다.
+이전한 사례는 Yee 소유 경로와 fixture 이름으로 기록한다. tier·OS·parameter와
+`needs_display` 분류를 보존하고, 실행 파일이 바뀌면 `binaries`와 gate 필터를 함께 갱신한다.
 wildcard tier 기본값은 없다. allowlist 항목에도 tier가 필요하며 manifest와 같아야 한다.
 `needs_display`는 B를 기존 foreground 실행기에 남길 OS별 사유를 담는다.
 예를 들어 `{"Darwin": "기존 Widget runner를 유지하는 근거"}`이며, B 외의 tier나

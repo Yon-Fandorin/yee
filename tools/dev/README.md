@@ -461,12 +461,12 @@ C++ UI를 바꿨다면 변경 범위에 맞는 테스트를 선택한다.
   `browser`는 선택한 tier의 프로젝트 사례와 TabStripUnification 전용 사례를 순서대로 실행
 - `test-macos-install.sh`: macOS의 `install_sh_test`에서 임시 DMG 4개·가짜 updater 1개만 선택
 - `test-content-blocking-native.sh`: 기존 두 단위 바이너리와 소형
-  `yee_service_worker_unittests`의 `WrapSubresourceLoaderFactory_*` 3개 실행
+  `yee_service_worker_unittests`의 `YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_*` 실행
 
 새 gate도 `--no-build`를 지원한다. `test-internal-pages.sh` 기본 필터는
 `InternalURLsBrowserTest.*` 전체를 선택하고 macOS에서는 `mac_identity_unittests`도 실행한다.
-`test-site-controls.sh`는 Footer·DisclosureArrow·SessionStartupPref 전체와 favicon·그룹 이름
-접근성·Tab Search split guard를 같은 소형 브라우저 실행 파일에서 선택한다.
+`test-site-controls.sh`는 Footer·DisclosureArrow와 Yee 소유 시작 설정·favicon·그룹 이름
+접근성·Tab Search split·Customize Chrome Mojo 사례를 `site_controls_browsertests`에서 선택한다.
 Sidebar unit은 Group Header의 hover·focus guard를, interactive는 gesture double-tap을
 추가한다. layout interactive는 native Toolbar·최소 Side Panel 창 크기와 Mac glass의 Yee guard 6개를
 포함한다. Windows의 layout fast는 `yee_aura_unittests`도 선택한다.
@@ -474,14 +474,35 @@ Sidebar unit은 Group Header의 hover·focus guard를, interactive는 gesture do
 [gate coverage 검사](../../tests/tooling/README.md#yee-테스트-gate-누락-검사)는 소스·타깃·필터의
 누락을 tooling unittest에서 차단한다. 목록 발견은 실행 통과와 구분한다.
 
-세 `.sh` gate의 `interactive`와 `horizontal` 모드는
+Header·Sidebar의 `interactive`와 layout의 `horizontal`·`interactive` 모드는
 `//chrome/browser/ui/views/yee:yee_interactive_ui_tests`만 빌드하고
-`out/<선택한 이름>/yee_interactive_ui_tests`를 실행한다. Yee 테스트는
-`browser/ui/browser_surface_interactive_uitest.cc`와
-`browser/ui/split_pane_interactive_uitest.cc`에 있으며 fixture 이름은 `Yee`로 시작한다.
-같은 실행 파일에 원본 guard와 아직 이전하지 않은 drag·Omnibox·플랫폼 테스트를
-선택해 넣는다. 모든 필수 필터의 실제 사례 발견 검사는 그대로 적용한다.
+`out/<선택한 이름>/yee_interactive_ui_tests`를 실행한다. BrowserView·split pane·drag·
+Omnibox·Mac immersive/glass의 Yee fixture는 `browser/ui`의 소유 테스트 파일에 있다.
+원본 guard는 pristine 소스를 그대로 컴파일하고 실행 필터로 선택한다.
+layout의 `browser` 범위는 Yee 소유 Side Panel·selection 사례를 `site_controls_browsertests`에서,
+나머지 원본 guard를 `browser_tests`에서 실행한다. 모든 필수 필터에 실제 사례 발견 검사를 적용한다.
 Windows `.ps1` gate의 실행 파일·필터 전환은 후속 작업이다.
+
+### UI 테스트 작성과 applied-wait
+
+UI/model의 적용 상태를 기다릴 때는 입력 전에 ticket을 등록하고
+`WaitForApplied(ticket, conditions)`로 해당 요청의 완료를 판정한다.
+fixture는 [AppliedTestContext](../../browser/ui/applied_wait_test_util.h)로 세션과 observer를
+소유하고, Kombucha 시퀀스는 [applied-wait 연결](../../browser/ui/applied_wait_kombucha.h)을 쓴다.
+새 상태 대기에 polling·idle·고정 지연을 추가하지 않는다.
+
+- 관측 read는 현재 상태만 읽는다. View 생성·hierarchy 변경·강제 layout을 하지 않는다.
+  호출한 getter의 layout 경로가 같은 read로 돌아오면 무한 재귀가 생길 수 있다.
+- Kombucha 시퀀스를 조립할 때 모델과 기대값을 평가하지 않는다. 필요한 단계의 실행
+  callback에서 계산하며, 입력 전 기준값이 필요하면 앞선 `Do`에서 캡처한다.
+- 원본이 기다리던 상태보다 강한 조건을 추가하지 않는다. 첫 누름이 입력 ACK만 보장하면
+  drag 시작이나 최종 배치 완료까지 요구하지 않는다.
+- 상태 flag와 배치가 따로 바뀌면 assertion이 읽는 bounds·opacity도 같은 완료 조건에
+  넣는다. hover flag가 먼저 바뀌어도 배치가 적용되기 전에 검사가 진행되지 않아야 한다.
+- Mac Omnibox 팝업은 성공 presentation을 받지 못하므로 팝업 commit과 현재 DOM/native
+  상태를 확인하는 대체 조건을 쓴다. commit만으로 성공 presentation을 받았다고 판정하지 않는다.
+- 빈 조건으로 `Begin`한 ticket은 dispatch가 거부된다. mock의 `TabUnsplit`처럼 완료
+  콜백만 기다리는 검사는 `base::test::TestFuture`를 쓴다. 정상 콜백 대기는 polling이 아니다.
 
 ### Background와 foreground tier
 
@@ -493,6 +514,8 @@ native `.sh` gate는 `--tier=background|foreground|all`, `--print-filters`,
 - 기본 `background`: A와 해당 OS에 `needs_display`가 없는 B를 선택한다.
 - `foreground`: C와 해당 OS에 `needs_display`가 있는 B를 선택한다.
 - `--tier=all`: 해당 범위의 A/B/C를 기존 표시형 실행기로 실행한다.
+
+macOS에서 gate를 오래 무인 실행할 때는 시스템 잠자기(Maintenance Sleep)에 따른 사례 시간 초과와 화면 꺼짐 시 background view snapshot 누락을 막도록 `caffeinate -dimsu <gate 명령>`을 쓴다(빌드 스크립트는 이미 사용).
 
 macOS background의 브라우저·interactive 실행에는 Chromium의 `--headless`와
 `--yee-test-tier=background`를 전달한다. headless 화면은 `--screen-info={1920x1080}`,
@@ -518,14 +541,16 @@ Chromium 자식이 별도의 process group을 만들어도 같은 세션이나 �
 `needs_display`는 OS별 사유를 담은 manifest 필드다. macOS에서는 세 Views unit 바이너리의
 B를 기존 runner에 남긴다. fixture마다 활성화 정책을 Regular로 바꾸며 기존 fake-focus와
 headless의 swizzle 수명·paint 동등성을 확인하지 못했기 때문이다. 강제 전면화를 호출하는
-upstream glass geometry·Omnibox shadow 두 사례도 같은 예외다. YouTube opt-in은 표시형
+Yee glass geometry·Omnibox shadow 사례도 같은 예외다. YouTube opt-in은 표시형
 재생·광고 관찰을 유지한다. 이 사례들은 `--tier=foreground`에서 빠짐없이 실행한다.
 `InternalURLsBrowserTest.ExternalLaunchUsesCanonicalPolicy`도 foreground에서 실행한다.
 background의 `--headless --allow-chrome-scheme-url`은 외부 `version` URL을 허용하므로
 표시형 launch policy를 검증하는 기존 assertion과 실행 조건이 다르다.
-macOS의 upstream `browser_tests`에 남아 있는 B 10개도 foreground에서 실행한다.
+macOS의 upstream `browser_tests`에 남아 있는 B도 foreground에서 실행한다.
 그 main에는 Yee의 활성화 차단이 없고 headless의 Widget 표시도 NSApp 활성화를 요청한다.
 `test-browser-surface-layout.sh all --tier=background`에서도 이 바이너리는 `cases=none`이다.
+Yee 소유 fixture로 옮긴 Side Panel·selection 사례는 `site_controls_browsertests`에서
+실행하며, macOS의 기존 foreground 분류를 유지한다.
 Omnibox 접근성은 전부 C이므로 기본값은 `cases=none`이다.
 
 ```sh
@@ -730,7 +755,7 @@ Windows의 native UI 픽셀 검사는 `--enable-pixel-output-in-tests`를 사용
 Windows는 실제 앱 종료 때 UI 스레드가 살아 있는 동안 외부 UIA 연결을 정리한다.
 다른 창이 남아 있는 일반 창 닫기는 접근성을 유지한다. 접근성 기능과 COM 누수
 검사를 유지한 채 정리하며, Windows의 `test-site-controls.sh`는
-외부 접근성 클라이언트를 연결한 `UiaApplicationExitBrowserTest.*`도 실행해
+외부 접근성 클라이언트를 연결한 `YeeUiaApplicationExitBrowserTest.*`도 실행해
 일반 창 닫기·앱 종료·마지막 창이 먼저 닫힌 종료를 확인한다.
 
 계산·색상·직접 callback 검사는 background에서 실행한다. native popup·focus 단위 검사의
