@@ -193,6 +193,45 @@ struct DesktopItem: Hashable {
     let application: String?
     let window: Int?
     let layer: Int?
+    var bounds: CGRect? = nil
+    var alpha: Double? = nil
+    var onScreen: Bool? = nil
+
+    // 이동·최소화로 표시 상태가 달라져도 같은 창으로 추적한다.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.owner == rhs.owner && lhs.identity == rhs.identity && lhs.application == rhs.application
+            && lhs.window == rhs.window && lhs.layer == rhs.layer
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(owner)
+        hasher.combine(identity)
+        hasher.combine(application)
+        hasher.combine(window)
+        hasher.combine(layer)
+    }
+
+    var isStandardWindow: Bool {
+        guard window != nil, layer == 0, let bounds = bounds else { return false }
+        // 작은 hover card·tooltip·상태 팝업을 제외하는 화면 좌표 기준 최소 크기다.
+        return bounds.width >= 300 && bounds.height >= 200
+    }
+
+    var isVisibleStandardWindow: Bool {
+        isStandardWindow && onScreen == true && (alpha ?? 0) > 0
+    }
+
+    var windowJSON: [String: Any] {
+        var result: [String: Any] = ["pid": owner, "window_id": window ?? 0]
+        result["layer"] = layer
+        if let bounds = bounds {
+            result["bounds"] = ["x": bounds.origin.x, "y": bounds.origin.y,
+                                "width": bounds.width, "height": bounds.height]
+        }
+        result["alpha"] = alpha
+        result["on_screen"] = onScreen
+        return result
+    }
 }
 
 func applicationIdentity(bundleIdentifier: String?, executablePath: String?, name: String?) -> String? {
@@ -222,8 +261,13 @@ func desktopWindows(_ windows: [[String: Any]], processes: [pid_t: ProcessIdenti
             executablePath: nil, name: window[kCGWindowOwnerName as String] as? String)
         // 일반 창의 identity는 필수이며, 제외 layer는 없어도 된다.
         guard layer != 0 || application != nil else { return nil }
+        let bounds = (window[kCGWindowBounds as String] as? [String: Any]).flatMap {
+            CGRect(dictionaryRepresentation: $0 as CFDictionary)
+        }
         result.insert(DesktopItem(owner: pid, identity: processes[pid], application: application,
-                                  window: number, layer: layer))
+                                  window: number, layer: layer, bounds: bounds,
+                                  alpha: window[kCGWindowAlpha as String] as? Double,
+                                  onScreen: window[kCGWindowIsOnscreen as String] as? Bool))
     }
     return result
 }
@@ -236,33 +280,53 @@ struct DesktopLoss {
     let application: String
     let before: Int
     let after: Int
+    let windowsBefore: [DesktopItem]
+    let windowsAfter: [DesktopItem]
 
     var count: Int { before - after }
     var json: [String: Any] {
         ["identity": application, "before": before, "after": after, "lost": count]
     }
+
+    var windowJSON: [String: Any] {
+        var result = json
+        for (key, windows) in [("windows_before", windowsBefore), ("windows_after", windowsAfter)] {
+            result[key] = windows.sorted {
+                ($0.owner, $0.window ?? 0) < ($1.owner, $1.window ?? 0)
+            }.map { $0.windowJSON }
+        }
+        return result
+    }
 }
 
 func unrelatedLosses(_ initial: Set<DesktopItem>, _ latest: Set<DesktopItem>,
-                     ownership: ProcessOwnership, observer: pid_t) -> [DesktopLoss] {
+                     ownership: ProcessOwnership, observer: pid_t,
+                     includingOtherLayers: Bool = false) -> [DesktopLoss] {
+    func comparable(_ items: Set<DesktopItem>) -> Set<DesktopItem> {
+        // 나중에 소유권이 확인된 helper도 양쪽 표본에서 제외한다.
+        items.filter { $0.owner != observer && !ownership.owns($0.owner, $0.identity)
+            && $0.application != nil && ($0.window == nil || $0.layer == 0 || includingOtherLayers) }
+    }
     func counts(_ items: Set<DesktopItem>) -> [String: Int] {
         var result: [String: Int] = [:]
-        // 나중에 소유권이 확인된 helper도 양쪽 표본에서 제외한다.
-        for item in items where item.owner != observer && !ownership.owns(item.owner, item.identity) {
-            guard let application = item.application else { continue }
+        for item in items {
+            let application = item.application!
             if item.window == nil {
                 result[application] = 1
-            } else if item.layer == 0 {
+            } else {
                 result[application, default: 0] += 1
             }
         }
         return result
     }
-    let before = counts(initial), after = counts(latest)
+    let initialItems = comparable(initial), latestItems = comparable(latest)
+    let before = counts(initialItems), after = counts(latestItems)
     return before.keys.sorted().compactMap { application in
         let remaining = after[application, default: 0]
         guard before[application]! > remaining else { return nil }
-        return DesktopLoss(application: application, before: before[application]!, after: remaining)
+        return DesktopLoss(application: application, before: before[application]!, after: remaining,
+            windowsBefore: initialItems.filter { $0.application == application && $0.window != nil }.map { $0 },
+            windowsAfter: latestItems.filter { $0.application == application && $0.window != nil }.map { $0 })
     }
 }
 
@@ -304,6 +368,9 @@ final class Observation {
     var initialAppsCaptured = false
     var unreadableApplicationPIDs: Set<pid_t> = []
     var initialWindows: Set<DesktopItem> = []
+    var stableInitialWindows: Set<DesktopItem> = []
+    var initialWindowSampleTime: TimeInterval?
+    var initialWindowsConfirmed = false
     var latestApps: Set<DesktopItem> = []
     var latestWindows: Set<DesktopItem> = []
     var lastSample: TimeInterval?
@@ -444,6 +511,20 @@ final class Observation {
         userActiveApplications.insert(application)
     }
 
+    func sampleWindows(_ snapshot: Set<DesktopItem>, at time: TimeInterval) {
+        latestWindows = snapshot
+        guard !initialWindowsConfirmed else { return }
+        guard let first = initialWindowSampleTime else {
+            initialWindows = snapshot
+            initialWindowSampleTime = time
+            return
+        }
+        guard time - first >= 1 else { return }
+        let standard = snapshot.filter { $0.isVisibleStandardWindow }
+        stableInitialWindows = initialWindows.filter { $0.isVisibleStandardWindow && standard.contains($0) }
+        initialWindowsConfirmed = true
+    }
+
     func sample() {
         let now = ProcessInfo.processInfo.systemUptime
         if let previous = lastSample { maxGapMS = max(maxGapMS, (now - previous) * 1000) }
@@ -469,6 +550,7 @@ final class Observation {
             incompleteReasons.insert("window enumeration unavailable")
             return
         }
+        let windowSampleTime = ProcessInfo.processInfo.systemUptime
         let applications = sampleApplications(NSWorkspace.shared.runningApplications.map { app in
             ApplicationSample(owner: app.processIdentifier, terminated: app.isTerminated,
                 activationPolicy: app.activationPolicy, readIdentity: {
@@ -481,12 +563,9 @@ final class Observation {
             incompleteReasons.insert("window enumeration or application identity unavailable")
             return
         }
-        latestWindows = snapshot
+        sampleWindows(snapshot, at: windowSampleTime)
         let visible = visibleTestWindows(onScreen, owned: owned)
         visibleOwners.formUnion(visible.map { $0.owner })
-        if samples == 0 {
-            initialWindows = latestWindows
-        }
         counters["max_visible_test_windows"] = max(counters["max_visible_test_windows"]!, visible.count)
         samples += 1
         acknowledgeSessions()
@@ -513,8 +592,17 @@ final class Observation {
         let activeWindows = regularWindows.filter {
             $0.application.map { activeApplications.contains($0) } ?? false
         }
-        let windowsLost = unrelatedLosses(regularWindows.subtracting(activeWindows), latestWindows,
+        let inactiveWindows = regularWindows.subtracting(activeWindows)
+        let durableWindows = inactiveWindows.intersection(stableInitialWindows)
+        // 시작 창은 이후 숨겨져도 생존한다. 재실행·교체된 표준 창도 앱별 개수에 포함한다.
+        let latestDurableWindows = latestWindows.filter {
+            stableInitialWindows.contains($0) || (!initialWindows.contains($0) && $0.isStandardWindow)
+        }
+        let windowsLost = unrelatedLosses(durableWindows, latestDurableWindows,
                                           ownership: ownership, observer: ownPID)
+        let transientWindowsLost = unrelatedLosses(inactiveWindows.subtracting(durableWindows),
+            latestWindows.subtracting(latestDurableWindows), ownership: ownership, observer: ownPID,
+            includingOtherLayers: true)
         let activeWindowsLost = unrelatedLosses(activeWindows, latestWindows,
                                                 ownership: ownership, observer: ownPID)
         let helperAppsLost = unrelatedLosses(initialHelperApps, latestApps, ownership: ownership, observer: ownPID)
@@ -522,6 +610,7 @@ final class Observation {
                                                 ownership: ownership, observer: ownPID)
         counters["unrelated_apps_lost"] = appsLost.reduce(0) { $0 + $1.count }
         counters["unrelated_windows_lost"] = windowsLost.reduce(0) { $0 + $1.count }
+        counters["transient_windows_lost"] = transientWindowsLost.reduce(0) { $0 + $1.count }
         counters["user_active_apps_lost"] = activeAppsLost.reduce(0) { $0 + $1.count }
         counters["user_active_windows_lost"] = activeWindowsLost.reduce(0) { $0 + $1.count }
         counters["non_regular_apps_lost"] = helperAppsLost.reduce(0) { $0 + $1.count }
@@ -545,7 +634,8 @@ final class Observation {
         }
         var result: [String: Any] = counters
         result["unrelated_apps_lost_details"] = appsLost.map { $0.json }
-        result["unrelated_windows_lost_details"] = windowsLost.map { $0.json }
+        result["unrelated_windows_lost_details"] = windowsLost.map { $0.windowJSON }
+        result["transient_windows_lost_details"] = transientWindowsLost.map { $0.windowJSON }
         result["user_active_apps_lost_details"] = activeAppsLost.map { $0.json }
         result["user_active_windows_lost_details"] = activeWindowsLost.map { $0.json }
         result["non_regular_apps_lost_details"] = helperAppsLost.map { $0.json }
@@ -601,6 +691,12 @@ struct BackgroundObserverMain {
         observation.installEventTap()
         observation.sample()
         do {
+            // 첫 표본과 1초 이상 떨어진 시작 표본을 확보한 뒤 실행기를 준비시킨다.
+            while !observation.initialWindowsConfirmed && observation.incompleteReasons.isEmpty
+                && !FileManager.default.fileExists(atPath: stop) && kill(runner, 0) == 0 {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+                observation.sample()
+            }
             try Data().write(to: URL(fileURLWithPath: ready), options: .atomic)
             while !FileManager.default.fileExists(atPath: stop) && kill(runner, 0) == 0 {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.1))

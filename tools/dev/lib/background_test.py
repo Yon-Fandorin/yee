@@ -25,6 +25,7 @@ ACTIVITY_COUNTERS = (
     'cursor_changes', 'modifier_changes', 'frontmost_changes',
     'non_regular_apps_lost', 'non_regular_windows_lost',
     'user_active_apps_lost', 'user_active_windows_lost',
+    'transient_windows_lost',
 )
 
 

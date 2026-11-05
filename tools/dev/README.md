@@ -582,6 +582,15 @@ PID·시작 시각을 저장하고 같은 소유권 판정으로 검사 프로�
 무관한 PID의 그룹·세션은 개별 조회하지 않는다.
 검사 창의 가시성은 모든 활성 display의 온스크린 목록으로 확인하고, 무관한 창의 생존은
 최소화·다른 Space 창을 포함한 전체 목록으로 비교하며 나중에 확인한 자체 helper도 제외한다.
+실행기에 준비 완료를 알리기 전에 1초 이상 초기 표본을 수집한다. 첫 표본과 1초 이상
+떨어진 확인 표본에서 같은 PID·프로세스 시작 시각·앱 identity·창 번호·layer로 보인 창만
+시작 시 안정적인 창으로 분류한다. 두 표본 모두 온스크린이고 alpha > 0, layer 0,
+너비 300pt·높이 200pt 이상이어야 한다. 이 크기는 작은 hover card·tooltip·상태 팝업을
+일반 작업 창의 비교 대상에서 제외하기 위한 하한이며, 그 이상인 일시적인 창은 초기 표본의
+시간 간격 조건도 만족해야 한다. bounds·alpha·온스크린 정보를 읽지 못한 창도 실패 대상에서 제외한다.
+이후 최소화·Space 이동·크기 변경으로 표시 상태가 달라져도 같은 창이 전체 목록에 있으면
+생존으로 센다. 같은 앱 identity의 재실행·창 교체는 새 표준 창의 개수로 비교한다.
+교체 창도 layer 0·300×200pt 이상이면 최소화·다른 Space·alpha 0 상태에서 생존으로 센다.
 AX focused window 소유 PID는 참고 정보이며 변화나 읽기 실패가 합격을 막지 않는다.
 AX·event tap을 읽지 못하면 `notes`에 남기며 권한을 자동 요청하지 않는다.
 필수 관측은 fail-closed다. 유효 표본이 2개 미만이거나 창 목록 조회에 실패하거나,
@@ -608,14 +617,17 @@ AX·event tap을 읽지 못하면 `notes`에 남기며 권한을 자동 요청�
   Dock에 표시되는 일반 앱만 해당한다. bundle ID,
   없으면 실행 파일 경로·이름 순으로 시작 시 캡처한다. 같은 프로세스의 후속 identity를
   읽지 못해도 저장한 값을 사용하며 같은 identity의 재실행은 손실이 아니다.
-- `unrelated_windows_lost`: 시작 시 regular였던 무관한 앱 identity별 일반 창(layer 0)
-  수의 감소분 중 관측 동안 한 번도 전면이 아니었던 앱의 손실. 메뉴바·상태 창 등 다른
-  layer는 제외한다. 이후 활성화 정책이 바뀌어도
-  시작 시 캡처한 비교 대상을 유지한다.
+- `unrelated_windows_lost`: 시작 시 regular였고 관측 동안 한 번도 전면이 아니었던 무관한 앱의
+  안정적인 표준 창 수 감소분. 위의 초기 표본·표시 상태·최소 크기 조건을 모두 만족해야 한다.
+  이후 활성화 정책이 바뀌어도 시작 시 캡처한 비교 대상을 유지한다.
 
 `test_frontmost_samples`는 필수 비음수 정수이며 누락·형식 오류는 관측 실패다.
 `unrelated_apps_lost_details`·`unrelated_windows_lost_details`에는 손실 identity와
 전후 개수(`before`, `after`), 감소분(`lost`)을 기록한다.
+`unrelated_windows_lost_details`에는 비교한 창의 `windows_before`·`windows_after`도 기록한다.
+각 항목은 PID·창 번호·layer와 읽을 수 있는 bounds(`x`, `y`, `width`, `height`, 단위 pt),
+`alpha`·`on_screen`을 포함한다. 앱별 개수로 비교하므로 두 목록의 창 번호가 모두 바뀌어도
+같은 identity의 표준 창 수가 유지되면 손실이 아니다.
 앱 identity를 요구하기 전에 검사 소유권과 종료 상태를 확인한다. 시작 후 나타난 무관한 앱은
 identity를 읽지 못하거나 곧 종료해도 앱 손실·관측 미완료로 세지 않는다. PID와 읽을 수 있는
 identity를 `notes`에 남기며, 읽지 못한 PID는 `application_identity_unreadable_pids`에 기록한다.
@@ -632,12 +644,17 @@ accessory·prohibited 앱의 identity 읽기 실패는 note로 남긴다.
 - `non_regular_apps_lost`: 시작 시 accessory·prohibited였던 앱 identity의 손실 수
 - `non_regular_windows_lost`: 시작 시 regular 앱에 속하지 않았던 일반 창 수의 감소분.
   IME·XPC UI 서비스·background agent의 창 생성·소멸은 실패시키지 않는다.
+- `transient_windows_lost`: 한 번도 전면이 아니었던 regular 앱의 시작 창 중 초기 표본·표시 상태·
+  layer·최소 크기 조건을 만족하지 못한 창 수의 감소분. 한 초기 표본에만 있던 창도 여기에
+  포함하며 실패시키지 않는다. `transient_windows_lost_details`에 identity·전후 개수·감소분과
+  `windows_before`·`windows_after`의 bounds·alpha·온스크린 상태를 같은 형식으로 남긴다.
 - `user_active_apps_lost`, `user_active_windows_lost`: 시작 시 regular였고 관측 중 한 번이라도
   전면이었던 앱의 종료·일반 창 감소분. 이후 다른 앱이 전면이 되어도 note로 유지한다.
   PID와 프로세스 시작 시각으로 전면 표본을 앱 identity에 연결하며, 같은 identity의 재실행도
   같은 앱으로 취급한다. 검사 소유 앱의 전면화는 계속 `test_frontmost_samples`로 실패한다.
 
-`non_regular_*`·`user_active_*` 카운터도 필수 비음수 정수이며 누락·형식 오류는 관측 실패다.
+`non_regular_*`·`user_active_*`·`transient_windows_lost` 카운터도 필수 비음수 정수이며
+누락·형식 오류는 관측 실패다.
 스키마 버전은 1이다. 각 `non_regular_*_lost_details`·`user_active_*_lost_details`에는 기존 손실 상세와 같은
 identity·전후 개수·감소분을 기록한다.
 

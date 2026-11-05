@@ -44,6 +44,7 @@ class BackgroundTest(unittest.TestCase):
                     (self.summary(cursor_changes=5, modifier_changes=3, frontmost_changes=2), True),
                     (self.summary(non_regular_apps_lost=1, non_regular_windows_lost=2), True),
                     (self.summary(user_active_apps_lost=1, user_active_windows_lost=2), True),
+                    (self.summary(transient_windows_lost=2), True),
                     (self.summary(frontmost_sample_count=0), False),
                     (self.summary(frontmost_sample_count=1), False),
                     (self.summary(frontmost_read_gaps=1), False),
@@ -675,7 +676,7 @@ print('Fixture.\\n  Case', flush=True)
                          out_explicit='true', tier='background', observe_background=True)
         activity = dict(cursor_changes=5, modifier_changes=3, frontmost_changes=2, key_window_changes=4,
                         non_regular_apps_lost=1, non_regular_windows_lost=2,
-                        user_active_apps_lost=1, user_active_windows_lost=2)
+                        user_active_apps_lost=1, user_active_windows_lost=2, transient_windows_lost=3)
         variants = [(activity, 0, 0), ({'test_frontmost_samples': 1}, 7, 7)]
         variants += [({key: 1}, 0, 23) for key in (
             'max_visible_test_windows', 'test_frontmost_samples', 'input_injections',
@@ -834,14 +835,19 @@ import Foundation
         _ = neverEnumerated.update(current, groups: [:], excluding: 999)
         precondition(!neverEnumerated.complete)
 
-        func window(_ id: Int, _ pid: Int32, _ layer: Int = 0) -> [String: Any] {
+        func window(_ id: Int, _ pid: Int32, _ layer: Int = 0, width: Double = 800, height: Double = 600,
+                    alpha: Double = 1, onScreen: Bool = true, x: Double = 10) -> [String: Any] {
             [kCGWindowNumber as String: id, kCGWindowOwnerPID as String: pid,
-             kCGWindowLayer as String: layer, kCGWindowOwnerName as String: "app-\(pid)"]
+             kCGWindowLayer as String: layer, kCGWindowOwnerName as String: "app-\(pid)",
+             kCGWindowBounds as String: ["X": x, "Y": 20.0, "Width": width, "Height": height],
+             kCGWindowAlpha as String: alpha, kCGWindowIsOnscreen as String: onScreen]
         }
         let visible = window(1, 1000), minimized = window(2, 1001), otherSpace = window(3, 1002)
         let onScreen = desktopWindows([visible, window(4, 220)], processes: [:])!
         precondition(visibleTestWindows(onScreen, owned: [220]).count == 1)
         precondition(visibleTestWindows(onScreen, owned: [200]).isEmpty)
+        let tinyTestWindow = desktopWindows([window(5, 220, 25, width: 1, height: 1, alpha: 0)], processes: [:])!
+        precondition(visibleTestWindows(tinyTestWindow, owned: [220]).count == 1)
         // 프로세스 시작 시각을 읽지 못해도 앱 identity로 창 수를 비교한다.
         let initial = desktopWindows([visible, minimized, otherSpace, window(4, 220), window(5, 999)],
                                      processes: [220: orphan])!
@@ -948,15 +954,85 @@ import Foundation
             ("never-frontmost-app-loss", 705, true)] {
             let user = observed()
             let first = user.sampleApplications([present])
-            user.initialWindows = desktopWindows([window(70, 3000), window(71, 3000)],
+            let start = desktopWindows([window(70, 3000), window(71, 3000)],
                 processes: user.currentProcesses, applications: first)!
+            user.sampleWindows(start, at: 0)
+            user.sampleWindows(start, at: 1)
             user.sampleFrontmost(frontPID)
             _ = user.sampleApplications([present])
             user.sampleFrontmost(705)
             let last = user.sampleApplications(gone ? [] : [present])
-            user.latestWindows = desktopWindows(gone ? [] : [window(71, 3000)],
-                processes: user.currentProcesses, applications: last)!
+            user.sampleWindows(desktopWindows(gone ? [] : [window(71, 3000)],
+                processes: user.currentProcesses, applications: last)!, at: 2)
             try save(name, user)
+        }
+
+        // 작은 창·숨겨진 창·표시 정보가 없는 창은 두 시작 표본에 있어도 note다.
+        var noBounds = window(90, 3000)
+        noBounds.removeValue(forKey: kCGWindowBounds as String)
+        var noAlpha = window(90, 3000)
+        noAlpha.removeValue(forKey: kCGWindowAlpha as String)
+        var noOnScreen = window(90, 3000)
+        noOnScreen.removeValue(forKey: kCGWindowIsOnscreen as String)
+        for (name, firstWindow) in [
+            ("transient-small", window(90, 3000, width: 299, height: 199)),
+            ("transient-narrow", window(90, 3000, width: 299)),
+            ("transient-short", window(90, 3000, height: 199)),
+            ("transient-transparent", window(90, 3000, alpha: 0)),
+            ("transient-offscreen", window(90, 3000, onScreen: false)),
+            ("transient-layer", window(90, 3000, 25)),
+            ("transient-no-bounds", noBounds), ("transient-no-alpha", noAlpha),
+            ("transient-no-onscreen", noOnScreen),
+            ("durable-threshold", window(90, 3000, width: 300, height: 200))] {
+            let observation = observed()
+            let applications = observation.sampleApplications([present])
+            let start = desktopWindows([firstWindow], processes: [:], applications: applications)!
+            observation.sampleWindows(start, at: 10)
+            observation.sampleWindows(start, at: 10.999)
+            precondition(!observation.initialWindowsConfirmed && observation.stableInitialWindows.isEmpty)
+            observation.sampleWindows(start, at: 11)
+            precondition(observation.initialWindowsConfirmed)
+            precondition(observation.stableInitialWindows.count == (name == "durable-threshold" ? 1 : 0))
+            observation.sampleWindows([], at: 12)
+            try save(name, observation)
+        }
+        // 1초 전에만 보였거나, 두 번째 시작 표본에서 숨겨진 창도 안정적인 창이 아니다.
+        for (name, confirmation) in [
+            ("transient-single-sample", [[String: Any]]()),
+            ("transient-hidden-at-confirmation", [window(90, 3000, onScreen: false)]),
+            ("transient-alpha-at-confirmation", [window(90, 3000, alpha: 0)]),
+            ("transient-small-at-confirmation", [window(90, 3000, width: 299)])] {
+            let observation = observed()
+            let applications = observation.sampleApplications([present])
+            let start = desktopWindows([window(90, 3000)], processes: [:], applications: applications)!
+            observation.sampleWindows(start, at: 0)
+            if name != "transient-single-sample" { observation.sampleWindows(start, at: 0.1) }
+            observation.sampleWindows(desktopWindows(confirmation, processes: [:], applications: applications)!, at: 1)
+            precondition(observation.stableInitialWindows.isEmpty)
+            // 준비 이후 재등장해도 시작 시 안정적인 창으로 승격하지 않는다.
+            observation.sampleWindows(start, at: 2)
+            observation.sampleWindows([], at: 3)
+            try save(name, observation)
+        }
+        // 같은 앱의 transient 창이 표준 창 손실을 가리거나 그 반대가 되지 않는다.
+        for (name, surviving) in [
+            ("durable-with-transient-loss", [window(90, 3000)]),
+            ("durable-loss-with-transient", [window(91, 3000, width: 200, height: 100)]),
+            ("durable-minimized", [window(90, 3000, onScreen: false)]),
+            ("durable-resized", [window(90, 3000, width: 100, height: 100)]),
+            ("durable-small-replacement", [window(92, 4000, width: 200, height: 100)])] {
+            let observation = observed()
+            let applications = observation.sampleApplications([present])
+            let start = desktopWindows([window(90, 3000), window(91, 3000, width: 200, height: 100)],
+                processes: [:], applications: applications)!
+            observation.sampleWindows(start, at: 0)
+            let moved = desktopWindows([window(90, 3000, x: 250), window(91, 3000, width: 200, height: 100)],
+                processes: [:], applications: applications)!
+            observation.sampleWindows(moved, at: 1)
+            precondition(observation.stableInitialWindows.count == 1)
+            observation.sampleWindows(desktopWindows(surviving, processes: [:],
+                applications: [3000: agent, 4000: agent])!, at: 2)
+            try save(name, observation)
         }
         let initiallyActive = observed(frontmostPIDs: [3000, 3000])
         _ = initiallyActive.sampleApplications([present])
@@ -1039,13 +1115,13 @@ import Foundation
             for gone in [false, true] {
                 let helper = observed()
                 let first = helper.sampleApplications([present, application(6000, identity, policy: policy)])
-                helper.initialWindows = desktopWindows([window(70, 6000), window(71, 6000)],
-                    processes: [:], applications: first)!
+                helper.sampleWindows(desktopWindows([window(70, 6000), window(71, 6000)],
+                    processes: [:], applications: first)!, at: 0)
                 // 실행 중 regular로 바뀌어도 시작 시 helper였던 비교 대상은 유지한다.
                 let last = helper.sampleApplications(gone ? [present] :
                     [present, application(6000, identity, policy: .regular)])
-                helper.latestWindows = desktopWindows(gone ? [] : [window(72, 6000)],
-                    processes: [:], applications: last)!
+                helper.sampleWindows(desktopWindows(gone ? [] : [window(72, 6000)],
+                    processes: [:], applications: last)!, at: 1)
                 try save("\(name)-\(gone ? "loss" : "window-churn")", helper)
             }
             let anonymous = observed()
@@ -1068,8 +1144,9 @@ import Foundation
             observation.sampleFrontmost(705)
             observation.initialApps = apps
             observation.latestApps = latestApps
-            observation.initialWindows = windows
-            observation.latestWindows = latestWindows
+            observation.sampleWindows(windows, at: 0)
+            observation.sampleWindows(windows, at: 1)
+            observation.sampleWindows(latestWindows, at: 2)
             try save(name, observation)
         }
         // PID·시작 시각·창 번호가 바뀌어도 같은 앱 identity와 창 수가 남으면 손실이 아니다.
@@ -1079,6 +1156,16 @@ import Foundation
                                              applications: [4000: agent])!
         try record("relaunch", apps: [app(3000, agent), app(3001, agent)], latestApps: [app(4000, agent)],
                    windows: relaunchedBefore, latestWindows: relaunchedAfter)
+        let hiddenRelaunch = desktopWindows([window(20, 4000, alpha: 0, onScreen: false),
+                                             window(21, 4000, onScreen: false)], processes: [:],
+                                            applications: [4000: agent])!
+        try record("relaunch-hidden", apps: [app(3000, agent), app(3001, agent)], latestApps: [app(4000, agent)],
+                   windows: relaunchedBefore, latestWindows: hiddenRelaunch)
+        let hiddenReplacement = desktopWindows([window(20, 3000, alpha: 0, onScreen: false),
+                                                 window(21, 3000, onScreen: false)], processes: [:],
+                                                applications: [3000: agent])!
+        try record("replacement-hidden", apps: [app(3000, agent)], latestApps: [app(3000, agent)],
+                   windows: relaunchedBefore, latestWindows: hiddenReplacement)
         for identity in ["executable:/agent", "name:Exosphere UA"] {
             precondition(unrelatedLosses([app(3000, identity)], [app(4000, identity)],
                                          ownership: ownership, observer: 999).isEmpty)
@@ -1208,6 +1295,11 @@ import Foundation
             self.assertEqual(compile_result.returncode, 0, compile_result.stdout + compile_result.stderr)
             result = subprocess.run([str(binary), str(directory / 'sessions.json')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            def window_detail(number, pid, *, width=800, height=600, alpha=1, on_screen=True, layer=0, x=10):
+                return dict(pid=pid, window_id=number, layer=layer,
+                            bounds=dict(x=x, y=20, width=width, height=height), alpha=alpha, on_screen=on_screen)
+
             for scenario, test_frontmost, frontmost_changes, passed in (
                     ('user-activity', 0, 2, True), ('test-frontmost-root', 2, 0, False),
                     ('test-frontmost-helper', 2, 0, False), ('test-frontmost-detached', 1, 2, False),
@@ -1245,11 +1337,59 @@ import Foundation
                         self.assertEqual(summary[f'user_active_{category}_lost'], count if active else 0)
                         self.assertEqual(summary[f'unrelated_{category}_lost'], 0 if active else count)
                         prefix = 'user_active' if active else 'unrelated'
+                        expected = [dict(identity='bundle:test.exosphere', before=1 if category == 'apps' else 2,
+                                         after=0 if category == 'apps' else 2 - count, lost=count)] if count else []
+                        if expected and not active and category == 'windows':
+                            expected[0].update(windows_before=[window_detail(70, 3000), window_detail(71, 3000)],
+                                               windows_after=[window_detail(71, 3000)] if count == 1 else [])
                         self.assertEqual(summary[f'{prefix}_{category}_lost_details'],
-                                         [dict(identity='bundle:test.exosphere', before=1 if category == 'apps' else 2,
-                                               after=0 if category == 'apps' else 2 - count, lost=count)] if count else [])
+                                         expected)
+            for scenario, attributes, missing in (
+                    ('transient-small', dict(width=299, height=199), None),
+                    ('transient-narrow', dict(width=299), None),
+                    ('transient-short', dict(height=199), None),
+                    ('transient-transparent', dict(alpha=0), None),
+                    ('transient-offscreen', dict(on_screen=False), None),
+                    ('transient-layer', dict(layer=25), None),
+                    ('transient-no-bounds', {}, 'bounds'), ('transient-no-alpha', {}, 'alpha'),
+                    ('transient-no-onscreen', {}, 'on_screen'),
+                    ('transient-single-sample', {}, None),
+                    ('transient-hidden-at-confirmation', {}, None),
+                    ('transient-alpha-at-confirmation', {}, None),
+                    ('transient-small-at-confirmation', {}, None),
+                    ('durable-threshold', dict(width=300, height=200), None)):
+                with self.subTest(scenario=scenario):
+                    summary = background_test.read_observation(directory / f'{scenario}.json')
+                    durable = scenario == 'durable-threshold'
+                    self.assertTrue(summary['observation_complete'])
+                    self.assertEqual(summary['passed'], not durable)
+                    self.assertEqual(summary['unrelated_apps_lost'], 0)
+                    self.assertEqual(summary['unrelated_windows_lost'], int(durable))
+                    self.assertEqual(summary['transient_windows_lost'], int(not durable))
+                    detail = window_detail(90, 3000, **attributes)
+                    if missing:
+                        detail.pop(missing)
+                    prefix = 'unrelated' if durable else 'transient'
+                    self.assertEqual(summary[f'{prefix}_windows_lost_details'],
+                                     [dict(identity='bundle:test.exosphere', before=1, after=0, lost=1,
+                                           windows_before=[detail], windows_after=[])])
+            for scenario, durable_lost, transient_lost in (
+                    ('durable-with-transient-loss', 0, 1), ('durable-loss-with-transient', 1, 0),
+                    ('durable-minimized', 0, 1), ('durable-resized', 0, 1),
+                    ('durable-small-replacement', 1, 0)):
+                with self.subTest(scenario=scenario):
+                    summary = background_test.read_observation(directory / f'{scenario}.json')
+                    self.assertTrue(summary['observation_complete'])
+                    self.assertEqual(summary['passed'], durable_lost == 0)
+                    self.assertEqual(summary['unrelated_windows_lost'], durable_lost)
+                    self.assertEqual(summary['transient_windows_lost'], transient_lost)
+                    if durable_lost:
+                        self.assertEqual(summary['unrelated_windows_lost_details'],
+                                         [dict(identity='bundle:test.exosphere', before=1, after=0, lost=1,
+                                               windows_before=[window_detail(90, 3000)], windows_after=[])])
             for scenario, apps_lost, windows_lost in (
-                    ('relaunch', 0, 0), ('menu-replacement', 0, 0),
+                    ('relaunch', 0, 0), ('relaunch-hidden', 0, 0), ('replacement-hidden', 0, 0),
+                    ('menu-replacement', 0, 0),
                     ('normal-window-loss', 0, 1), ('app-loss', 1, 2)):
                 with self.subTest(scenario=scenario):
                     summary = background_test.read_observation(directory / f'{scenario}.json')
@@ -1262,7 +1402,9 @@ import Foundation
                                      if apps_lost else [])
                     self.assertEqual(summary['unrelated_windows_lost_details'],
                                      [dict(identity='bundle:test.exosphere', before=2,
-                                           after=2 - windows_lost, lost=windows_lost)]
+                                           after=2 - windows_lost, lost=windows_lost,
+                                           windows_before=[window_detail(10, 3000), window_detail(11, 3001)],
+                                           windows_after=[window_detail(22, 4000)] if windows_lost == 1 else [])]
                                      if windows_lost else [])
             for scenario, unreadable in (
                     ('transient-unrelated', [6000]), ('terminating-own-helper', []),
