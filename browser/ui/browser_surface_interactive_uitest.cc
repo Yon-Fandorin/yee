@@ -8344,8 +8344,22 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
           yee::test::AppliedFreshness::kNewApply));
       // 닫기와 마찬가지로 최종 layout과 중간 animation 요청의 domain을 나눈다.
       const auto capsule_ticket = applied_.Begin(capsule_idle);
-      yee::test::AppliedConditions width_mid;
-      std::optional<yee::test::AppliedTicket> width_ticket;
+      auto height_motion =
+          applied_.Condition(capsule,
+                             yee::test::AnimationMatches{.group_id = 50,
+                                                         .running = true,
+                                                         .progress_min = .1,
+                                                         .progress_max = .9},
+                             yee::test::AppliedMatch::kExact,
+                             yee::test::AppliedFreshness::kNewObservation);
+      height_motion.mode =
+          yee::test::AppliedEvaluationMode::kObservedSinceDispatch;
+      auto current_height_motion = height_motion;
+      current_height_motion.freshness =
+          yee::test::AppliedFreshness::kCurrentAfterDispatch;
+      current_height_motion.mode = yee::test::AppliedEvaluationMode::kCurrent;
+      yee::test::AppliedConditions capsule_mid{height_motion,
+                                               current_height_motion};
       if (!legacy) {
         auto width_motion = GroupAnimations(header(), true).front();
         auto& range =
@@ -8359,10 +8373,13 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
         current_width_motion.freshness =
             yee::test::AppliedFreshness::kCurrentAfterDispatch;
         current_width_motion.mode = yee::test::AppliedEvaluationMode::kCurrent;
-        width_mid = {width_motion, current_width_motion};
-        width_ticket =
-            applied_.Begin(width_mid, yee::test::AppliedDomain::kAnimation);
+        capsule_mid.push_back(width_motion);
+        capsule_mid.push_back(current_width_motion);
       }
+      const auto capsule_mid_ticket =
+          applied_.Begin(capsule_mid, yee::test::AppliedDomain::kAnimation);
+      scoped_refptr<gfx::AnimationContainer> capsule_clock;
+      base::TimeDelta capsule_frame_delta;
       const auto change_capsule = [&] {
         ASSERT_FALSE(applied_.session().Dispatch(
             capsule_ticket, base::BindLambdaForTesting([&] {
@@ -8370,6 +8387,24 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
                   group, tab_groups::TabGroupVisualData(
                              u"Group motion",
                              tab_groups::TabGroupColorId::kBlue, collapsed));
+              ASSERT_TRUE(marker());
+              auto* state =
+                  yee::HorizontalTabGroupCapsuleState::From(*marker());
+              ASSERT_TRUE(state);
+              ASSERT_TRUE(state->GetSnapshot().running);
+              const auto height_duration =
+                  state->GetAnimationDurationForTesting();
+              ASSERT_GT(height_duration, base::TimeDelta());
+              capsule_clock = state->GetAnimationContainerForTesting();
+              ASSERT_TRUE(capsule_clock);
+              capsule_frame_delta =
+                  height_duration *
+                  gfx::ScopedAnimationDurationScaleMode::duration_multiplier() /
+                  16;
+              // 높이는 폭과 별도 시계를 쓴다. 첫 compositor 프레임 전에
+              // native 중간 높이를 만들고 표본 검사 동안 유지한다.
+              gfx::AnimationContainerTestApi(capsule_clock.get())
+                  .IncrementTime(capsule_frame_delta * 4);
               if (!legacy) {
                 ApplyScheduledLayout();
                 auto* manager =
@@ -8386,17 +8421,8 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
               }
             })));
       };
-      if (width_ticket) {
-        ASSERT_FALSE(applied_.session().Dispatch(
-            *width_ticket, base::BindLambdaForTesting(change_capsule)));
-      } else {
-        change_capsule();
-      }
-      if (width_ticket) {
-        ASSERT_TRUE(applied_.Wait(*width_ticket, width_mid));
-        ASSERT_TRUE(marker());
-        sampled_widths.insert(marker()->width());
-      }
+      ASSERT_FALSE(applied_.session().Dispatch(
+          capsule_mid_ticket, base::BindLambdaForTesting(change_capsule)));
       if (collapsed &&
           views::IsViewClass<TabContainerImpl>(header()->parent())) {
         // 자식 layout을 전파하지 않는 classic 부모의 첫 tick 전 상태도
@@ -8413,7 +8439,17 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
         check_immediate_icon(check_immediate_icon,
                              GetTabAnchorForModelIndex(view, first_member));
       }
+      ASSERT_TRUE(applied_.Wait(capsule_mid_ticket, capsule_mid));
+      ASSERT_TRUE(marker());
+      sampled_heights.insert(painted_capsule_bounds().height());
+      if (!legacy) {
+        sampled_widths.insert(marker()->width());
+      }
       for (int i = 0; i < 20; ++i) {
+        if (i > 0) {
+          gfx::AnimationContainerTestApi(capsule_clock.get())
+              .IncrementTime(capsule_frame_delta);
+        }
         if (!legacy && i > 0) {
           // fixture 시계 자극이다. 실제 native layout을 적용한 뒤 paint를 본다.
           gfx::AnimationContainerTestApi(close_clock.get())
@@ -8459,6 +8495,9 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
             .IncrementTime(close_frame_delta * 16);
         ApplyScheduledLayout();
       }
+      // TestApi는 runner를 복구하지 않는다. 기존 표본의 native tick으로
+      // 높이를 끝내 container를 비우면 다음 Start가 실시간으로 돌아간다.
+      ASSERT_FALSE(capsule_clock->is_running());
       ASSERT_TRUE(applied_.Wait(capsule_ticket, capsule_idle));
       ASSERT_TRUE((layout_settled)());
       if (!legacy) {

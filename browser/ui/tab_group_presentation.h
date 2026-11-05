@@ -8,12 +8,16 @@
 
 #include "base/callback_list.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "base/unguessable_token.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "ui/gfx/geometry/insets.h"
 
 class TabGroup;
+namespace gfx {
+class AnimationContainer;
+}
 namespace tabs {
 class TabInterface;
 }
@@ -90,6 +94,8 @@ class HorizontalTabGroupCapsuleState {
   // 초기 알림은 없으며 owner 파괴 시 대기 중 알림도 무효화한다.
   base::CallbackListSubscription Subscribe(Callback callback);
   base::WeakPtr<HorizontalTabGroupCapsuleState> GetWeakPtr();
+  gfx::AnimationContainer* GetAnimationContainerForTesting();
+  base::TimeDelta GetAnimationDurationForTesting() const;
 
  private:
   friend class HorizontalTabGroupCapsuleStateTest;

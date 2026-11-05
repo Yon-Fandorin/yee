@@ -109,7 +109,22 @@ class HorizontalTabGroupCapsuleState::Impl : public gfx::AnimationDelegate,
     return weak_factory_.GetWeakPtr();
   }
 
+  gfx::AnimationContainer* GetAnimationContainerForTesting() {
+    return animation_.container();
+  }
+
+  base::TimeDelta GetAnimationDurationForTesting() const {
+    return animation_.GetSlideDuration();
+  }
+
  private:
+  // 기존 native container를 관측할 수 있도록 접근 범위만 넓힌다.
+  class CapsuleAnimation : public gfx::SlideAnimation {
+   public:
+    using gfx::Animation::container;
+    using gfx::SlideAnimation::SlideAnimation;
+  };
+
   void OnViewHierarchyWillBeDeleted(views::View*) override { Shutdown(); }
 
   void Shutdown() {
@@ -147,7 +162,7 @@ class HorizontalTabGroupCapsuleState::Impl : public gfx::AnimationDelegate,
 
   raw_ptr<views::View> decoration_;
   bool collapsed_;
-  gfx::SlideAnimation animation_;
+  CapsuleAnimation animation_;
   bool shutting_down_ = false;
   base::ScopedObservation<views::View, views::ViewObserver>
       decoration_observation_{this};
@@ -189,6 +204,16 @@ void HorizontalTabGroupCapsuleState::NotifySubscribers(
 base::WeakPtr<HorizontalTabGroupCapsuleState>
 HorizontalTabGroupCapsuleState::GetWeakPtr() {
   return impl_->GetWeakPtr();
+}
+
+gfx::AnimationContainer*
+HorizontalTabGroupCapsuleState::GetAnimationContainerForTesting() {
+  return impl_->GetAnimationContainerForTesting();
+}
+
+base::TimeDelta HorizontalTabGroupCapsuleState::GetAnimationDurationForTesting()
+    const {
+  return impl_->GetAnimationDurationForTesting();
 }
 
 void HorizontalTabGroupCapsuleState::SetCollapsed(bool collapsed) {
