@@ -2015,6 +2015,19 @@
       "site_controls_browsertests"
     ]
   },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitDragInteractiveTest.DragReadsDoNotCreateSlotsOrReenterHierarchy": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-applied-wait.sh",
+    "reason": "실제 controller 시작의 native 창 hit-test가 필요하다. read 전후 hierarchy·bounds·pending flag와 재진입 알림의 불변을 확인한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitDragInteractiveTest.ObservedStartedSurvivesReleaseBeforeInputAck": {
     "os": [
       "Darwin",
@@ -2180,6 +2193,19 @@
     "tier": "B",
     "owner": "test-applied-wait.sh",
     "reason": "native observer·적용 신호와 논리 상태를 headless background에서도 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/applied_wait_interactive_uitest.cc::YeeAppliedWaitInteractiveTest.HorizontalReadsKeepPendingLayoutAndCapsuleState": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-applied-wait.sh",
+    "reason": "실제 입력 없이 구성한 drag/idle 상태에서 read가 hierarchy·bounds·pending flag를 바꾸거나 재진입 알림을 내지 않는지 확인한다.",
     "binaries": [
       "yee_interactive_ui_tests"
     ]
@@ -2626,6 +2652,32 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DragOrderPreservesHandlesAndGroupBoundaries": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-applied-wait.sh",
+    "reason": "창 없는 fake signal로 drag 입력 ACK·step·handle 순서·그룹 경계·preview 적용값의 결합을 검증한다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DragStepRequiresInputModelAndAppliedPreviewTogether": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-applied-wait.sh",
+    "reason": "창 없는 fake signal로 drag 입력 ACK·step·handle 순서·그룹 경계·preview 적용값의 결합을 검증한다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
   "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.DuplicateConsumersAreInvalidAndFirstCallbackSurvives": {
     "os": [
       "Darwin",
@@ -2947,6 +2999,19 @@
     "tier": "A",
     "owner": "test-browser-surface-layout.sh",
     "reason": "fake 신호와 mock time으로 ticket·조건·수명·진단을 검사하며 창을 만들지 않는다.",
+    "binaries": [
+      "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/applied_wait_test_support_unittest.cc::AppliedWaitTest.PressAckDoesNotClaimControllerCreation": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-applied-wait.sh",
+    "reason": "창 없이 press ACK와 controller 생성/실제 attach 조건을 구분하고 step·source·좌표 불일치를 거부한다.",
     "binaries": [
       "multi_contents_geometry_unittests"
     ]
@@ -7249,6 +7314,888 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L408: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L437: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L480: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L507: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L559: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L605: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L631: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L667: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L708: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L746: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L774: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L853: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1037: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "parameters": [
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ],
+      [
+        "TabDragging",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.CancelDragWithinUnpinnedContainer": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1024: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.CancelFavoriteToGroupDragRestoresSource": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1058: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragCollapsedGroupOverExpandedGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1166: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragCollapsedGroupStaysCollapsed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1205: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteAfterCollapsedGroupStaysTopLevel": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1241: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteBeforeFirstTabCommitsFirst": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1272: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteBelowLastTabCommitsLast": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1306: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteCanRetargetWithinExpandedGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1332: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteIntoTabList": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1397: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteOnGroupHeaderStaysTopLevel": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1449: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteToExpandedGroupFirstSlot": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1493: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragFavoriteToExpandedGroupLastSlot": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1523: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragGroupHeader": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1558: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragMultipleTabs": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1620: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragMultipleTabsInGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1651: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragOutOfGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L1713: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragOverSplit": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1898: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragOverSplitInGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L1971: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragSplitTabs": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2030: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragTabAfterExistingFavoriteCommitsPin": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2076: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragTabBeforeExistingFavoriteCommitsPin": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2102: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragToScroll": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2128: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragWithinGroup": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2207: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.DragWithinUnpinnedContainer": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2276: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.FullFavoritesRejectsWithoutNativeReorder": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2324: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.LoneTabCanPinAndUnpinInsideItsOwnSidebar": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2409: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeProjectHiddenGroupRowsKeepFavoriteDropAnchor": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2442: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeProjectHiddenSplitGroupRowsKeepFavoriteDropAnchor": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2487: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarDraggingOneOfTwoFavoritesKeepsDock": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2555: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarEmptyFavoritesDropZoneLifecycle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2591: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarExpandedGroupUsesSharedRowMetrics": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "L2635: AddTabsToNewGroup·CollapseGroup으로 모델을 바꾸고 행 높이·위치·가시성을 확인한다. 실제 입력·OS 활성화는 필요 없다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarExpandedSectionsFollowMetrics": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "L2673: PinTabAt의 SetTabPinned 직접 호출과 RunScheduledLayout 뒤 영역 위치·행 높이·가시성을 확인한다. 실제 입력·OS 활성화는 필요 없다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarFavoriteCommandHonorsCapacityAndUnpin": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-sidebar.sh",
+    "reason": "L2722: PinTab·PinKeyboardFocusedTab을 직접 호출하고 RequestFocus·HasKeyboardFocusedTab으로 논리 View focus를 확인한다. 실제 입력·OS 활성화는 필요 없다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarGroupHeaderDragHasNoFavoriteAffordance": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2764: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarGroupedTabCanBecomeFavorite": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2787: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarLastFavoriteDropZoneSurvivesUntilCancel": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2827: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarSingleFavoriteDragReordersWithinDock": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2873: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L2910: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/vertical_tab_drag_interactive_uitest.cc::YeeVerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddleFromBelow": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-sidebar.sh",
+    "reason": "L2915: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons": {
     "os": [
       "Darwin",
@@ -9343,513 +10290,6 @@
       "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
     }
   },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.CancelDragWithinUnpinnedContainer": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1302: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.CancelFavoriteToGroupDragRestoresSource": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2281: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragCollapsedGroupOverExpandedGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L2502: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragCollapsedGroupStaysCollapsed": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2469: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteAfterCollapsedGroupStaysTopLevel": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L2258: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteBeforeFirstTabCommitsFirst": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1965: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteBelowLastTabCommitsLast": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1992: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteCanRetargetWithinExpandedGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L2010: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteIntoTabList": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1820: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteOnGroupHeaderStaysTopLevel": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L2061: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteToExpandedGroupFirstSlot": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2209: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragFavoriteToExpandedGroupLastSlot": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2232: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragGroupHeader": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2363: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragMultipleTabs": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1459: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragMultipleTabsInGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1482: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragOutOfGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1572: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragOverSplit": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1361: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragOverSplitInGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1417: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragSplitTabs": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1327: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragTabAfterExistingFavoriteCommitsPin": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1872: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragTabBeforeExistingFavoriteCommitsPin": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1855: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragToScroll": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L2539: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragWithinGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1528: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.DragWithinUnpinnedContainer": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1150: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.FullFavoritesRejectsWithoutNativeReorder": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1889: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.LoneTabCanPinAndUnpinInsideItsOwnSidebar": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1946: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeProjectHiddenGroupRowsKeepFavoriteDropAnchor": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2099: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeProjectHiddenSplitGroupRowsKeepFavoriteDropAnchor": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2144: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarDraggingOneOfTwoFavoritesKeepsDock": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1050: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarEmptyFavoritesDropZoneLifecycle": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L694: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarExpandedGroupUsesSharedRowMetrics": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L1079: AddTabsToNewGroup·CollapseGroup으로 모델을 바꾸고 행 높이·위치·가시성을 확인한다. 실제 입력·OS 활성화는 필요 없다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarExpandedSectionsFollowMetrics": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L645: PinTabAt의 SetTabPinned 직접 호출과 RunScheduledLayout 뒤 영역 위치·행 높이·가시성을 확인한다. 실제 입력·OS 활성화는 필요 없다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarFavoriteCommandHonorsCapacityAndUnpin": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-sidebar.sh",
-    "reason": "L1008: PinTab·PinKeyboardFocusedTab을 직접 호출하고 RequestFocus·HasKeyboardFocusedTab으로 논리 View focus를 확인한다. 실제 입력·OS 활성화는 필요 없다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarGroupHeaderDragHasNoFavoriteAffordance": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L775: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarGroupedTabCanBecomeFavorite": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L794: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarLastFavoriteDropZoneSurvivesUntilCancel": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L735: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarSingleFavoriteDragReordersWithinDock": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1117: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L997: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc::VerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddleFromBelow": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-sidebar.sh",
-    "reason": "L1002: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
   "chrome/browser/ui/views/tabs/common/tab_group_header_view_unittest.cc::TabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover": {
     "os": [
       "Darwin",
@@ -10049,381 +10489,6 @@
         [
           "Vertical",
           "Horizontal"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L5350: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2383: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1856: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1889: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1947: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2120: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L5228: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L5267: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1643: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2311: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L4968: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1682: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "yee_interactive_ui_tests"
-    ]
-  },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "C",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1994: native mouse drag helper와 실제 창/포인터 상태를 사용한다.",
-    "parameters": [
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
-        ]
-      ],
-      [
-        "TabDragging",
-        [
-          "0",
-          "1"
         ]
       ]
     ],

@@ -53,7 +53,7 @@
     "reason": "Windows native popup 포인터 동작 전용이다. 해당 OS에서만 소스와 필터를 포함한다.",
     "tier": "C"
   },
-  "chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc::DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch": {
+  "browser/ui/tab_drag_controller_interactive_uitest.cc::YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch": {
     "kind": "windows",
     "owner": "Windows session: test-browser-surface-layout.sh interactive",
     "reason": "IS_WIN 전용 사례다. 기존 Windows 필터를 보존하며 macOS에서 컴파일·발견·실행할 수 없다.",

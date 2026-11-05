@@ -1098,15 +1098,20 @@ AppliedOwnerToken AppliedViewsObservers::ObservePreview(views::View& preview,
   }
   auto* source_watch = impl_->view_by_address.at(&source);
   auto convert = base::BindRepeating(
-      [](Impl::ViewWatch* source, uint64_t handle, uint64_t tab,
-         const FavoritesDragPreviewAppliedSnapshot& s) {
+      [](Impl::ViewWatch* source, Impl::ViewWatch* preview, uint64_t handle,
+         uint64_t tab, const FavoritesDragPreviewAppliedSnapshot& s) {
         const auto bounds = source->tracker.view()
                                 ? source->tracker.view()->GetBoundsInScreen()
                                 : gfx::Rect();
         auto snapshot = Snapshot(
             s.owner,
-            PreviewApplied{handle, tab, s.visible, s.running, s.screen_bounds,
-                           bounds.x(), bounds.width()},
+            PreviewApplied{
+                handle, tab, s.visible, s.running, s.screen_bounds, bounds.x(),
+                bounds.width(),
+                preview->tracker.view() &&
+                    s.visible == preview->tracker.view()->GetVisible() &&
+                    s.screen_bounds ==
+                        preview->tracker.view()->GetBoundsInScreen()},
             s.apply_serial, 0,
             source->tracker.view()
                 ? GetAppliedViewCoordinates(*source->tracker.view(),
@@ -1114,7 +1119,9 @@ AppliedOwnerToken AppliedViewsObservers::ObservePreview(views::View& preview,
                 : AppliedCoordinates{});
         return snapshot;
       },
-      base::Unretained(source_watch), source_handle, tab_handle);
+      base::Unretained(source_watch),
+      base::Unretained(impl_->view_by_address.at(&preview)), source_handle,
+      tab_handle);
   auto& signal = impl_->Register(
       token, AppliedConditionKind::kPreviewApplied,
       base::BindRepeating(

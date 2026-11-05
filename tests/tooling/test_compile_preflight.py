@@ -398,7 +398,9 @@ else:
     def test_manifest_timestamp_is_used_when_stamp_is_missing(self):
         """stamp가 없는 기존 graph는 build.ninja의 mtime으로 최신 여부를 확인한다."""
         (self.out / 'build.ninja.stamp').unlink()
-        generated_at = (self.src / 'BUILD.gn').stat().st_mtime_ns + 1_000_000
+        # 소유 BUILD.gn은 루트보다 나중에 생성되므로 모든 의존 파일 뒤로 맞춘다.
+        generated_at = max((self.src / path).stat().st_mtime_ns for path in (
+            'BUILD.gn', 'chrome/browser/ui/views/yee/BUILD.gn')) + 1_000_000
         os.utime(self.out / 'build.ninja', ns=(generated_at, generated_at))
         listed = self.run_check('--list')
         self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)

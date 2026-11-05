@@ -339,9 +339,17 @@ source_set("drag_interactive_test_support") {
   sources = [ "drag_interactive_test_support.cc" ]
   public_deps = [ ":applied_wait_browser_test_support" ]
   deps = [
+    ":yee_ui",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/views/frame:browser_view_header",
+    "//chrome/browser/ui/views/tabs:tab_container",
+    "//chrome/browser/ui/views/tabs:tab_strip",
+    "//chrome/browser/ui/views/tabs/common:impl",
     "//chrome/browser/ui/views/tabs/dragging",
+    "//chrome/test:test_support_ui",
     "//components/tabs:public",
+    "//testing/gtest",
+    "//ui/display",
     "//ui/views",
   ]
 }
@@ -657,6 +665,50 @@ test("site_controls_browsertests") {
 # 목록과 독립시킨다. 1단계에서 복원한 원본 두 파일도
 # 그대로 컴파일한다.
 if (!is_chromeos_device) {
+  # 원본과 같은 basename의 Yee TU를 별도 object 경로로
+  # 컴파일한다. 공개 기반의 구현은 아래 실행 파일의 원본 D
+  # TU에서 링크한다.
+  source_set("yee_tab_drag_interactive_tests") {
+    testonly = true
+    defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+    sources = [
+      "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.h",
+      "tab_drag_controller_interactive_uitest.cc",
+    ]
+    deps = [
+      ":drag_interactive_test_support",
+      ":yee_ui",
+      "//base",
+      "//base/test:test_support",
+      "//chrome/browser",
+      "//chrome/browser/ui:ui_features",
+      "//chrome/browser/ui/browser_window",
+      "//chrome/browser/ui/tabs:tab_strip",
+      "//chrome/browser/ui/views/frame:browser_frame_view",
+      "//chrome/browser/ui/views/frame:browser_view_header",
+      "//chrome/browser/ui/views/frame:browser_widget",
+      "//chrome/browser/ui/views/tabs:tab_container",
+      "//chrome/browser/ui/views/tabs:tab_group",
+      "//chrome/browser/ui/views/tabs:tab_strip",
+      "//chrome/browser/ui/views/tabs/dragging",
+      "//chrome/browser/ui/views/tabs/dragging:tab_drag_controller_interactive_test_mixin",
+      "//chrome/browser/ui/views/tabs/tab",
+      "//chrome/test:test_support",
+      "//chrome/test:test_support_ui",
+      "//components/prefs",
+      "//components/tabs:public",
+      "//content/test:test_support",
+      "//testing/gmock",
+      "//testing/gtest",
+      "//ui/base:test_support",
+      "//ui/compositor:test_support",
+      "//ui/events:gesture_detection",
+      "//ui/native_theme:test_support",
+      "//ui/snapshot",
+      "//ui/views:test_support",
+    ]
+  }
+
   test("yee_interactive_ui_tests") {
     use_xvfb = use_xvfb_in_this_config
     sources = [
@@ -666,11 +718,11 @@ if (!is_chromeos_device) {
       "//chrome/browser/ui/views/tabs/common/tab_drag_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/common/tab_strip_collection_controller_interactive_uitest.cc",
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc",
-      "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.h",
       "applied_wait_interactive_uitest.cc",
       "browser_surface_interactive_uitest.cc",
       "interactive_ui_tests_main.cc",
       "split_pane_interactive_uitest.cc",
+      "vertical_tab_drag_interactive_uitest.cc",
     ]
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
     configs += [ "//build/config:precompiled_headers" ]
@@ -683,6 +735,7 @@ if (!is_chromeos_device) {
       ":drag_interactive_test_support",
       ":page_viewport_geometry",
       ":page_viewport_migration",
+      ":yee_tab_drag_interactive_tests",
       ":yee_ui",
       "//base",
       "//base/test:test_support",

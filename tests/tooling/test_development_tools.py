@@ -318,7 +318,7 @@ if [[ "$listing" == true ]]; then
     if [[ "$YEE_TEST_PLATFORM" == Darwin &&
           ( "$pattern" == *YeeWindows* ||
             "$pattern" == CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost ||
-            "$pattern" == TabDragging/DetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0 ||
+            "$pattern" == TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0 ||
             "$pattern" == VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus ) ]]; then
       continue
     fi

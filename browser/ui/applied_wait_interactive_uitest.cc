@@ -8,6 +8,7 @@
 #include <memory>
 #include <new>
 #include <set>
+#include <tuple>
 
 #include "base/command_line.h"
 #include "base/functional/callback_helpers.h"
@@ -17,14 +18,24 @@
 #include "base/test/test_timeouts.h"
 #include "build/build_config.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+#include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
+#include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
+#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/tabs/dragging/tab_drag_context.h"
 #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
+#include "chrome/browser/ui/views/tabs/tab_container.h"
+#include "chrome/browser/ui/views/tabs/tab_group_underline.h"
 #include "chrome/browser/ui/views/tabs/tab_slot_view.h"
+#include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/drag_interactive_test_support.h"
 #include "chrome/browser/ui/views/yee/favorites.h"
@@ -34,12 +45,14 @@
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "chrome/test/interaction/interactive_browser_test.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/interaction/interactive_test_internal.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
+#include "ui/events/event.h"
 #include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/scroll_view.h"
@@ -100,8 +113,26 @@ AppliedCondition PageCondition(AppliedViewsObservers& source,
           .coordinates = snapshot->coordinates};
 }
 
+using ProbeViewTree = std::vector<
+    std::tuple<const views::View*, const views::View*, gfx::Rect, bool, bool>>;
+
+ProbeViewTree SnapshotProbeViewTree(const views::View& root) {
+  ProbeViewTree result;
+  const auto visit = [&](auto&& self, const views::View& view) -> void {
+    result.emplace_back(&view, view.parent(), view.bounds(), view.GetVisible(),
+                        view.needs_layout());
+    for (const auto& child : view.children())
+      self(self, *child);
+  };
+  visit(visit, root);
+  return result;
+}
+
 class YeeAppliedWaitInteractiveTest
     : public AppliedWaitInteractiveTestMixin<InteractiveBrowserTest> {};
+
+class YeeAppliedWaitDragInteractiveTest : public YeeAppliedWaitInteractiveTest {
+};
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
                        RealApplyCallbackBeforeWaitAndSameValueReapply) {
@@ -924,6 +955,142 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
   widget.reset();
 }
 
+// 실제 controller를 시작하면 native 창 hit-test를 하므로 C로 분류한다.
+// 관측 read 전후 hierarchy·bounds·pending flag와 재진입 알림의 불변을 본다.
+IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
+                       DragReadsDoNotCreateSlotsOrReenterHierarchy) {
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  auto* model = browser()->GetTabStripModel();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  const auto group = model->AddToNewGroup({1, 2});
+  model->ActivateTabAt(0);
+  auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* state = tabs::VerticalTabStripStateController::From(browser());
+  if (!state->ShouldDisplayVerticalTabs())
+    state->SetVerticalTabsEnabled(true);
+  AppliedTestContext<AppliedBrowserObservers> ready;
+  ASSERT_TRUE(PrepareNativeDragInput(ready, *browser()));
+  views::test::RunScheduledLayout(browser_view);
+  auto* root = browser_view->vertical_tab_strip_region_view_for_testing()
+                   ->root_node_for_testing();
+  const auto handle = model->GetTabAtIndex(0)->GetHandle();
+  auto* node = root->GetNodeForHandle(handle);
+  ASSERT_TRUE(node);
+  auto* context = browser_view->tab_strip_view()->GetDragContext();
+  auto* handler = static_cast<TabDragHandlerImpl*>(context);
+  ui::MouseEvent press(
+      ui::EventType::kMousePressed,
+      gfx::PointF(node->view()->GetLocalBounds().CenterPoint()),
+      gfx::PointF(node->view()->GetLocalBounds().CenterPoint()),
+      base::TimeTicks::Now(), ui::EF_LEFT_MOUSE_BUTTON,
+      ui::EF_LEFT_MOUSE_BUTTON);
+  handler->InitializeDrag(
+      *node, model->selection_model().GetListSelectionModel(), press);
+  base::ScopedClosureRunner cancel(base::BindLambdaForTesting(
+      [&] { handler->EndDrag(EndDragReason::kCancel); }));
+  auto* controller = context->GetDragController();
+  ASSERT_TRUE(controller);
+  auto destination = node->view()->GetBoundsInScreen().CenterPoint() +
+                     gfx::Vector2d(0, kSidebarMetrics.tab_row_height);
+  views::View::ConvertPointFromScreen(node->view(), &destination);
+  ui::MouseEvent move(ui::EventType::kMouseDragged, gfx::PointF(destination),
+                      gfx::PointF(destination), base::TimeTicks::Now(),
+                      ui::EF_LEFT_MOUSE_BUTTON, 0);
+  ASSERT_TRUE(handler->ContinueDrag(*node->view(), move));
+  controller = context->GetDragController();
+  ASSERT_TRUE(controller);
+  ASSERT_EQ(context, controller->attached_context());
+  ASSERT_TRUE(controller->started_drag());
+
+  AppliedBrowserObservers source;
+  DragAppliedObserver drag(source, *context, *browser(), handle.raw_value(), 95,
+                           1);
+  const auto phase = drag.ObservePhase(DragPhaseMatches::Phase::kStarted);
+  auto* strip = browser_view->vertical_tab_strip_region_view_for_testing()
+                    ->GetTabStripView();
+  const auto preview = drag.ObserveVerticalPreview(*strip);
+  auto* preview_view = strip->GetViewByID(kSidebarFavoritesDragPreviewViewId);
+  ASSERT_TRUE(preview_view);
+  const auto aligned = source.views().ObservePreview(
+      *preview_view, *root->GetNodeForHandle(handle)->view(),
+      handle.raw_value(), handle.raw_value());
+  auto* group_view =
+      root->GetNodeForHandle(
+              model->group_model()->GetTabGroup(group)->GetCollectionHandle())
+          ->view();
+  const auto group_owner = drag.ObserveGroupDrag(*group_view);
+  const std::vector<AppliedSignalKey> keys{
+      {phase, AppliedConditionKind::kDragPhaseMatches},
+      {preview, AppliedConditionKind::kPreviewApplied},
+      {aligned, AppliedConditionKind::kPreviewApplied},
+      {group_owner, AppliedConditionKind::kViewStateMatches}};
+  int notifications = 0;
+  auto subscription = source.Subscribe(
+      keys, base::BindLambdaForTesting(
+                [&](const AppliedSignalSample&) { ++notifications; }));
+  const auto before = SnapshotProbeViewTree(*browser_view);
+  const auto outside = browser_view->GetBoundsInScreen().bottom_right() +
+                       gfx::Vector2d(100, 100);
+  for (const auto& data : controller->GetSessionData().tab_drag_data_)
+    ASSERT_FALSE(data.attached_view->GetBoundsInScreen().Contains(outside));
+  drag.InputAck(base::BindOnce([](AppliedDispatchStatus status) {
+                  EXPECT_EQ(AppliedDispatchStatus::kAccepted, status);
+                }),
+                outside)
+      .Run();
+  EXPECT_EQ(before, SnapshotProbeViewTree(*browser_view));
+  const int after_ack = notifications;
+  for (int i = 0; i < 3; ++i) {
+    for (const auto& key : keys)
+      ASSERT_TRUE(source.Read(key));
+    EXPECT_EQ(before, SnapshotProbeViewTree(*browser_view));
+    EXPECT_EQ(after_ack, notifications);
+  }
+  const auto value = std::get<DragPhaseMatches>(source.Read(keys[0])->value);
+  EXPECT_EQ(0u, value.target_handle);
+}
+
+IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
+                       HorizontalReadsKeepPendingLayoutAndCapsuleState) {
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  auto* model = browser()->GetTabStripModel();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  const auto group = model->AddToNewGroup({0});
+  auto* state = tabs::VerticalTabStripStateController::From(browser());
+  if (state->ShouldDisplayVerticalTabs())
+    state->SetVerticalTabsEnabled(false);
+  auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
+  views::test::RunScheduledLayout(browser_view);
+  auto* strip = browser_view->horizontal_tab_strip_for_testing();
+  ASSERT_TRUE(strip);
+  auto* slot = strip->tab_at(0);
+  auto* decoration =
+      strip->tab_container_for_testing()->GetGroupViews(group)->underline();
+  AppliedBrowserObservers source;
+  const auto handle = model->GetTabAtIndex(0)->GetHandle();
+  DragAppliedObserver drag(source, *strip->GetDragContext(), *browser(),
+                           handle.raw_value(), 96, 1);
+  const auto preview = drag.ObserveHorizontalPreview(*strip, *slot);
+  const auto theme = drag.ObserveCapsuleTheme(*decoration);
+  slot->InvalidateLayout();
+  ASSERT_TRUE(slot->needs_layout());
+  const auto before = SnapshotProbeViewTree(*browser_view);
+  for (int i = 0; i < 3; ++i) {
+    const auto snapshot =
+        source.Read({preview, AppliedConditionKind::kPreviewApplied});
+    ASSERT_TRUE(snapshot);
+    const auto& value = std::get<PreviewApplied>(snapshot->value);
+    EXPECT_FALSE(value.visible);
+    EXPECT_TRUE(value.geometry_applied);
+    ASSERT_TRUE(
+        source.Read({theme, AppliedConditionKind::kPresentationMatches}));
+    EXPECT_EQ(before, SnapshotProbeViewTree(*browser_view));
+  }
+}
+
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
                        DragLoopEndDoesNotCarryAcrossSteps) {
   auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
@@ -1213,9 +1380,6 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitInteractiveTest,
       Do([&] { ASSERT_FALSE(session.Dispatch(next, base::DoNothing())); }),
       WaitForApplied(kAbortApplied)));
 }
-
-class YeeAppliedWaitDragInteractiveTest : public YeeAppliedWaitInteractiveTest {
-};
 
 IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
                        VerticalEmptyCreationCallbackUsesRealInputAck) {

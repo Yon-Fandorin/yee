@@ -88,6 +88,9 @@ struct ViewStateMatches {
   gfx::Rect contents_bounds_in_screen;
   bool has_background = false;
   int focus_change_reason = 0;
+  bool handling_drag = false;
+  bool collapsed = false;
+  bool vertical_drag_only = false;
   bool operator==(const ViewStateMatches&) const = default;
 };
 
@@ -202,6 +205,7 @@ struct PreviewApplied {
   gfx::Rect screen_bounds;
   int source_screen_x = 0;
   int source_screen_width = 0;
+  bool geometry_applied = true;
   bool operator==(const PreviewApplied&) const = default;
 };
 
@@ -332,6 +336,9 @@ enum class AppliedMatch {
   kSidebarHover,
   kTabHoverIdle,
   kViewScrollIdle,
+  kViewScrollOffset,
+  kViewScrolledDown,
+  kViewGroupDrag,
   kOmniboxPopup,
   kOmniboxEditing,
   kWidgetVisible,
@@ -348,6 +355,9 @@ enum class AppliedMatch {
   kProjectTitle,
   kProjectLive,
   kTabCount,
+  kTabOrder,
+  kPinnedTabOrder,
+  kTabMembership,
   kTabActive,
   kNewTabActive,
   kPresentationRevision,
@@ -374,6 +384,11 @@ enum class AppliedMatch {
   kWebUiClickCount,
   kSurfaceDestination,
   kPresentedFrame,
+  kDragPhase,
+  kPreviewSettled,
+  kPreviewAligned,
+  kCapsuleTheme,
+  kDragInputAcknowledged,
 };
 
 struct AppliedCoordinates {

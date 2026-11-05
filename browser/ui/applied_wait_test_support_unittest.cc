@@ -1280,6 +1280,141 @@ TEST_F(AppliedWaitTest, EvaluationQueueDelayIsReported) {
             result.ToString().find("max_evaluation_delay_ms=3000"));
 }
 
+TEST_F(AppliedWaitTest, DragStepRequiresInputModelAndAppliedPreviewTogether) {
+  const DragPhaseMatches phase{.session = 8,
+                               .step = 2,
+                               .source_handle = 43,
+                               .phase = DragPhaseMatches::Phase::kAttached,
+                               .attached_browser = owner_,
+                               .input_acknowledged = true};
+  const TabModelMatches model{.tabs = {{.handle = 42}, {.handle = 43}}};
+  PreviewApplied preview{.source_handle = 43,
+                         .visible = true,
+                         .screen_bounds = gfx::Rect(20, 30, 200, 32)};
+  source_.Set(Snapshot(owner_, DragPhaseMatches{}));
+  source_.Set(Snapshot(owner_, TabModelMatches{}));
+  source_.Set(Snapshot(other_, preview));
+  auto drag = Condition(phase);
+  drag.match = AppliedMatch::kDragPhase;
+  auto order = Condition(model);
+  order.match = AppliedMatch::kTabOrder;
+  auto visual = Condition(preview, other_);
+  visual.match = AppliedMatch::kPreviewSettled;
+  drag.freshness = order.freshness = AppliedFreshness::kCurrentAfterDispatch;
+  visual.freshness = AppliedFreshness::kNewApply;
+  const AppliedConditions conditions{drag, order, visual};
+  const auto ticket = Begin(conditions, AppliedDomain::kDrag);
+  base::test::TestFuture<AppliedWaitResult> completed;
+  auto observation =
+      session_.ObserveApplied(ticket, conditions, completed.GetCallback());
+  DispatchDone acknowledge;
+  ASSERT_FALSE(session_.DispatchAsync(
+      ticket, base::BindLambdaForTesting(
+                  [&](DispatchDone done) { acknowledge = std::move(done); })));
+  const auto evaluate = [&] {
+    base::test::TestFuture<void> turn;
+    tasks_.GetMainThreadTaskRunner()->PostTask(FROM_HERE, turn.GetCallback());
+    return turn.Wait();
+  };
+  source_.Emit({Snapshot(owner_, phase, 2), Snapshot(owner_, model, 2),
+                Snapshot(other_, preview, 1)});
+  ASSERT_TRUE(evaluate());
+  EXPECT_FALSE(completed.IsReady());
+  preview.geometry_applied = false;
+  source_.Emit({Snapshot(other_, preview, 3)});
+  std::move(acknowledge).Run(AppliedDispatchStatus::kAccepted);
+  ASSERT_TRUE(evaluate());
+  EXPECT_FALSE(completed.IsReady());
+  preview.geometry_applied = true;
+  preview.source_handle = 42;
+  source_.Emit({Snapshot(other_, preview, 4)});
+  ASSERT_TRUE(evaluate());
+  EXPECT_FALSE(completed.IsReady());
+  preview.source_handle = 43;
+  auto stale = phase;
+  stale.step = 1;
+  source_.Emit({Snapshot(owner_, stale, 3), Snapshot(other_, preview, 5)});
+  ASSERT_TRUE(evaluate());
+  EXPECT_FALSE(completed.IsReady());
+  source_.Emit({Snapshot(owner_, phase, 4)});
+  ASSERT_TRUE(completed.Wait());
+  EXPECT_EQ(AppliedResultKind::kApplied, completed.Get().kind);
+}
+
+TEST_F(AppliedWaitTest, PressAckDoesNotClaimControllerCreation) {
+  auto condition =
+      Condition(DragPhaseMatches{.session = 12,
+                                 .step = 1,
+                                 .source_handle = 42,
+                                 .last_input_screen = gfx::Point(30, 40)});
+  condition.match = AppliedMatch::kDragInputAcknowledged;
+  DragPhaseMatches value{.session = 12,
+                         .step = 1,
+                         .source_handle = 42,
+                         .phase = DragPhaseMatches::Phase::kInactive,
+                         .input_acknowledged = true,
+                         .last_input_screen = gfx::Point(30, 40)};
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  value.phase = DragPhaseMatches::Phase::kCreated;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+  value.input_acknowledged = false;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.input_acknowledged = true;
+  ++value.step;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  --value.step;
+  ++value.source_handle;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  --value.source_handle;
+  value.last_input_screen = gfx::Point(31, 40);
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.last_input_screen = gfx::Point(30, 40);
+  condition.match = AppliedMatch::kDragPhase;
+  std::get<DragPhaseMatches>(condition.expected).phase =
+      DragPhaseMatches::Phase::kAttached;
+  EXPECT_FALSE(AppliedValueMatches(condition, value));
+  value.phase = DragPhaseMatches::Phase::kAttached;
+  EXPECT_TRUE(AppliedValueMatches(condition, value));
+}
+
+TEST_F(AppliedWaitTest, DragOrderPreservesHandlesAndGroupBoundaries) {
+  auto condition =
+      Condition(TabModelMatches{.tabs = {{.handle = 42, .group = owner_},
+                                         {.handle = 43, .group = owner_},
+                                         {.handle = 44}}});
+  condition.match = AppliedMatch::kTabOrder;
+  TabModelMatches actual{.tabs = {{.handle = 42, .group = other_},
+                                  {.handle = 43, .group = other_},
+                                  {.handle = 44}}};
+  EXPECT_TRUE(AppliedValueMatches(condition, actual));
+  actual.tabs[1].group = {};
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+  actual.tabs[1].group = other_;
+  std::swap(actual.tabs[0], actual.tabs[1]);
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+  condition.expected = TabModelMatches{.tabs = {{.handle = 43}}};
+  condition.match = AppliedMatch::kPinnedTabOrder;
+  actual.tabs[0].pinned = true;
+  EXPECT_TRUE(AppliedValueMatches(condition, actual));
+  actual.tabs[1].pinned = true;
+  EXPECT_FALSE(AppliedValueMatches(condition, actual));
+  condition.expected =
+      PreviewApplied{.source_handle = 43, .tab_handle = 42, .visible = true};
+  condition.match = AppliedMatch::kPreviewAligned;
+  PreviewApplied preview{.source_handle = 43,
+                         .tab_handle = 42,
+                         .visible = true,
+                         .screen_bounds = gfx::Rect(20, 30, 200, 32),
+                         .source_screen_x = 20,
+                         .source_screen_width = 200};
+  EXPECT_TRUE(AppliedValueMatches(condition, preview));
+  ++preview.source_screen_x;
+  EXPECT_FALSE(AppliedValueMatches(condition, preview));
+  --preview.source_screen_x;
+  ++preview.source_screen_width;
+  EXPECT_FALSE(AppliedValueMatches(condition, preview));
+}
+
 std::vector<AppliedConditionValue> AllValues(AppliedOwnerToken token) {
   return {
       Page(200),

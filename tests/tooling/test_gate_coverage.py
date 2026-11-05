@@ -99,13 +99,15 @@ def patch_changes(patch):
 
         def flush():
             if start is not None and code_without_spacing('\n'.join(removed)) != code_without_spacing('\n'.join(added)):
-                changed.append((start, max(start, cursor - 1)))
+                # 순수 삭제는 두 남은 줄 사이의 경계다. 다음 테스트 선언을
+                # 삭제한 본문으로 잘못 분류하지 않되 본문 안 삭제는 포함한다.
+                changed.append((start, cursor - 1))
 
         for line in section.splitlines():
-            hunk = re.match(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
+            hunk = re.match(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@', line)
             if hunk:
                 flush()
-                cursor, start = int(hunk.group(1)), None
+                cursor, start = int(hunk.group(1)) + (hunk.group(2) == '0'), None
                 removed, added = [], []
             elif cursor is not None and line.startswith(('+', '-')):
                 if start is None:
@@ -769,6 +771,23 @@ class GateCoverageTest(unittest.TestCase):
         self.assertNotEqual(code_without_spacing('"a b"'), code_without_spacing('"a  b"'))
         with self.assertRaises(ValueError):
             case_ranges('TEST_F(Fixture, Cut) { EXPECT_TRUE(true);')
+
+    def test_deleted_case_does_not_select_the_following_case(self):
+        old = ('TEST_F(Fixture, Moved) {\n  EXPECT_TRUE(true);\n}\n'
+               'TEST_F(Fixture, Retained) {\n  First();\n  Second();\n}\n')
+        for delete_body_line in (False, True):
+            new = old[old.index('TEST_F(Fixture, Retained)'):]
+            if delete_body_line:
+                new = new.replace('  First();\n', '')
+            patch = ('diff --git a/sample_unittest.cc b/sample_unittest.cc\n' + ''.join(
+                difflib.unified_diff(old.splitlines(True), new.splitlines(True),
+                                     fromfile='a/sample_unittest.cc',
+                                     tofile='b/sample_unittest.cc', n=0)))
+            with self.subTest(delete_body_line=delete_body_line), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / 'sample_unittest.cc').write_text(new)
+                expected = {('sample_unittest.cc', 'Fixture.Retained'): False} if delete_body_line else {}
+                self.assertEqual(upstream_inventory(root, patch), expected)
 
     def test_checkout_discovery_and_missing_checkout_skip(self):
         with tempfile.TemporaryDirectory() as directory:

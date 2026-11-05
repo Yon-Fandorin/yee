@@ -249,6 +249,28 @@ const char* MatchName(AppliedMatch match) {
       return "kWebUiClickCount";
     case AppliedMatch::kSurfaceDestination:
       return "kSurfaceDestination";
+    case AppliedMatch::kViewScrollOffset:
+      return "kViewScrollOffset";
+    case AppliedMatch::kViewScrolledDown:
+      return "kViewScrolledDown";
+    case AppliedMatch::kViewGroupDrag:
+      return "kViewGroupDrag";
+    case AppliedMatch::kTabOrder:
+      return "kTabOrder";
+    case AppliedMatch::kPinnedTabOrder:
+      return "kPinnedTabOrder";
+    case AppliedMatch::kTabMembership:
+      return "kTabMembership";
+    case AppliedMatch::kDragInputAcknowledged:
+      return "kDragInputAcknowledged";
+    case AppliedMatch::kDragPhase:
+      return "kDragPhase";
+    case AppliedMatch::kPreviewSettled:
+      return "kPreviewSettled";
+    case AppliedMatch::kPreviewAligned:
+      return "kPreviewAligned";
+    case AppliedMatch::kCapsuleTheme:
+      return "kCapsuleTheme";
     case AppliedMatch::kPresentedFrame:
       return "kPresentedFrame";
   }
@@ -890,6 +912,9 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kSidebarHover:
     case AppliedMatch::kTabHoverIdle:
     case AppliedMatch::kViewScrollIdle:
+    case AppliedMatch::kViewScrollOffset:
+    case AppliedMatch::kViewScrolledDown:
+    case AppliedMatch::kViewGroupDrag:
     case AppliedMatch::kOmniboxPopup:
     case AppliedMatch::kOmniboxEditing:
     case AppliedMatch::kFooterMenu:
@@ -908,6 +933,9 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kProjectTitle:
     case AppliedMatch::kProjectLive:
     case AppliedMatch::kTabCount:
+    case AppliedMatch::kTabOrder:
+    case AppliedMatch::kPinnedTabOrder:
+    case AppliedMatch::kTabMembership:
     case AppliedMatch::kTabActive:
     case AppliedMatch::kNewTabActive:
       return kind == AppliedConditionKind::kTabModelMatches;
@@ -920,6 +948,7 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
     case AppliedMatch::kPresentationIcon:
     case AppliedMatch::kPresentationAlpha:
     case AppliedMatch::kPresentationDark:
+    case AppliedMatch::kCapsuleTheme:
       return kind == AppliedConditionKind::kPresentationMatches;
     case AppliedMatch::kNativeActive:
     case AppliedMatch::kNativeFullscreen:
@@ -938,6 +967,12 @@ bool IsAppliedMatchCompatible(const AppliedCondition& condition) {
       return kind == AppliedConditionKind::kWebUiStateMatches;
     case AppliedMatch::kSurfaceDestination:
       return kind == AppliedConditionKind::kSurfaceEpochCommitted;
+    case AppliedMatch::kDragInputAcknowledged:
+    case AppliedMatch::kDragPhase:
+      return kind == AppliedConditionKind::kDragPhaseMatches;
+    case AppliedMatch::kPreviewSettled:
+    case AppliedMatch::kPreviewAligned:
+      return kind == AppliedConditionKind::kPreviewApplied;
     case AppliedMatch::kPresentedFrame:
       return kind == AppliedConditionKind::kPresentedAfterApply;
   }
@@ -1041,6 +1076,14 @@ bool AppliedValueMatches(const AppliedCondition& condition,
                      (!expected.popup_open || value.visible);
             case AppliedMatch::kOmniboxEditing:
               return expected.editing == value.editing;
+            case AppliedMatch::kViewScrollOffset:
+              return expected.scroll_offset == value.scroll_offset;
+            case AppliedMatch::kViewScrolledDown:
+              return value.scroll_offset.y() > expected.scroll_offset.y();
+            case AppliedMatch::kViewGroupDrag:
+              return expected.handling_drag == value.handling_drag &&
+                     expected.collapsed == value.collapsed &&
+                     expected.vertical_drag_only == value.vertical_drag_only;
             case AppliedMatch::kViewScrollIdle:
               return !value.scroll_animation_running;
             case AppliedMatch::kSidebarHover:
@@ -1102,12 +1145,51 @@ bool AppliedValueMatches(const AppliedCondition& condition,
             return expected.background_color ? alpha > 0 && alpha < 255
                                              : alpha == 0;
           }
-          if (condition.match == AppliedMatch::kPresentationDark)
+          if (condition.match == AppliedMatch::kPresentationDark ||
+              condition.match == AppliedMatch::kCapsuleTheme)
             return expected.use_native_theme == value.use_native_theme;
           return condition.match == AppliedMatch::kPresentationColor &&
                  expected.source_id == value.source_id &&
                  expected.background_color == value.background_color;
         } else if constexpr (std::is_same_v<T, TabModelMatches>) {
+          if (condition.match == AppliedMatch::kTabMembership) {
+            return std::ranges::all_of(expected.tabs, [&](const auto& tab) {
+              const auto found = std::ranges::find(value.tabs, tab.handle,
+                                                   &AppliedTabState::handle);
+              return found != value.tabs.end() && found->group == tab.group &&
+                     found->pinned == tab.pinned;
+            });
+          }
+          if (condition.match == AppliedMatch::kPinnedTabOrder) {
+            std::vector<uint64_t> handles;
+            for (const auto& tab : value.tabs) {
+              if (tab.pinned)
+                handles.push_back(tab.handle);
+            }
+            std::vector<uint64_t> wanted;
+            for (const auto& tab : expected.tabs)
+              wanted.push_back(tab.handle);
+            return handles == wanted;
+          }
+          if (condition.match == AppliedMatch::kTabOrder) {
+            if (expected.tabs.size() != value.tabs.size())
+              return false;
+            // 중첩 handle 목록의 그룹 경계를 보존하되 새 그룹의 token은
+            // 기존 URL 목록과 같은 의미로 비교한다.
+            for (size_t i = 0; i < expected.tabs.size(); ++i) {
+              const auto& a = expected.tabs[i];
+              const auto& b = value.tabs[i];
+              if (a.handle != b.handle ||
+                  a.group.is_empty() != b.group.is_empty())
+                return false;
+              for (size_t j = 0; j < i; ++j) {
+                if ((a.group == expected.tabs[j].group) !=
+                    (b.group == value.tabs[j].group))
+                  return false;
+              }
+            }
+            return true;
+          }
           if (condition.match == AppliedMatch::kTabCount)
             return expected.tabs.size() == value.tabs.size();
           if (condition.match == AppliedMatch::kTabActive)
@@ -1188,6 +1270,31 @@ bool AppliedValueMatches(const AppliedCondition& condition,
                  !value.compositor.is_empty() &&
                  expected.applied_sample_id == value.applied_sample_id &&
                  value.successful;
+        } else if constexpr (std::is_same_v<T, DragPhaseMatches>) {
+          return (condition.match == AppliedMatch::kDragPhase ||
+                  condition.match == AppliedMatch::kDragInputAcknowledged) &&
+                 expected.session == value.session &&
+                 expected.step == value.step &&
+                 expected.source_handle == value.source_handle &&
+                 (condition.match == AppliedMatch::kDragInputAcknowledged ||
+                  expected.phase == value.phase) &&
+                 value.input_acknowledged &&
+                 (expected.attached_browser.is_empty() ||
+                  expected.attached_browser == value.attached_browser) &&
+                 (!expected.last_input_screen ||
+                  expected.last_input_screen == value.last_input_screen);
+        } else if constexpr (std::is_same_v<T, PreviewApplied>) {
+          const bool settled =
+              expected.source_handle == value.source_handle &&
+              expected.visible == value.visible && value.geometry_applied &&
+              (!value.visible ||
+               (!value.animation_running && !value.screen_bounds.IsEmpty()));
+          if (condition.match == AppliedMatch::kPreviewSettled)
+            return settled;
+          return condition.match == AppliedMatch::kPreviewAligned && settled &&
+                 expected.tab_handle == value.tab_handle &&
+                 value.screen_bounds.x() == value.source_screen_x &&
+                 value.screen_bounds.width() == value.source_screen_width;
         } else if constexpr (std::is_same_v<T, SurfaceEpochCommitted>) {
           return condition.match == AppliedMatch::kSurfaceDestination &&
                  value.phase == SurfaceEpochCommitted::Phase::kStable &&
@@ -1222,6 +1329,9 @@ uint64_t AppliedFrameGeometryDigest(
       view->popup_open = false;
       view->editing = false;
       view->focus_change_reason = 0;
+      view->handling_drag = false;
+      view->collapsed = false;
+      view->vertical_drag_only = false;
     }
     geometry += snapshot.owner.ToString() + FormatAppliedValue(value) +
                 FormatCoordinates(snapshot.coordinates);
@@ -1283,7 +1393,10 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("painted_bounds", state.painted_bounds)
               .Add("contents_bounds_in_screen", state.contents_bounds_in_screen)
               .Add("has_background", state.has_background)
-              .Add("focus_change_reason", state.focus_change_reason);
+              .Add("focus_change_reason", state.focus_change_reason)
+              .Add("handling_drag", state.handling_drag)
+              .Add("collapsed", state.collapsed)
+              .Add("vertical_drag_only", state.vertical_drag_only);
         } else if constexpr (std::is_same_v<T, AnimationMatches>) {
           fields.Add("group", state.group_id)
               .Add("running", state.running)
@@ -1358,7 +1471,8 @@ std::string FormatAppliedValue(const AppliedConditionValue& value) {
               .Add("running", state.animation_running)
               .Add("screen_bounds", state.screen_bounds)
               .Add("source_x", state.source_screen_x)
-              .Add("source_width", state.source_screen_width);
+              .Add("source_width", state.source_screen_width)
+              .Add("geometry_applied", state.geometry_applied);
         } else if constexpr (std::is_same_v<T, RendererViewportMatches>) {
           fields.Add("web_contents", state.web_contents)
               .Add("RFH", state.render_frame)
