@@ -83,6 +83,7 @@ class AppliedViewsObservers final : public AppliedSignalSource {
   friend class AppliedBrowserObservers;
   friend class DragAppliedObserver;
   friend class NativeFrameAppliedObserver;
+  friend class SelectionOverlayAppliedObserver;
   using Reader = base::RepeatingCallback<std::optional<AppliedSnapshot>()>;
   void RegisterSignal(AppliedOwnerToken owner,
                       AppliedConditionKind kind,

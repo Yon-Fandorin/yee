@@ -4,29 +4,15 @@
     "shell": {
       "baseline": {
         "upstream_test_lines": {
-          "chrome/browser/accessibility/leaked_node_detection_browsertest.cc": 53,
-          "chrome/browser/glic/selection/selection_overlay_browsertest.cc": 79,
-          "chrome/browser/mac/install_test.cc": 280,
-          "chrome/browser/prefs/session_startup_pref_unittest.cc": 57,
-          "chrome/browser/ui/animation/browser_animation_controller_unittest.cc": 31,
-          "chrome/browser/ui/tabs/tab_data_browsertest.cc": 24,
-          "chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc": 15,
-          "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler_unittest.cc": 2,
-          "chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc": 20,
           "chrome/installer/setup/install_unittest.cc": 11,
           "chrome/installer/setup/taskbar_util_unittest.cc": 157,
           "chrome/test/base/interactive_test_utils.h": 22,
-          "chrome/test/base/interactive_test_utils_mac.mm": 93,
           "chrome/test/base/interactive_test_utils_win.cc": 211,
-          "content/browser/service_worker/service_worker_container_host_unittest.cc": 114,
-          "content/renderer/service_worker/service_worker_provider_context_unittest.cc": 9,
-          "content/renderer/service_worker/service_worker_subresource_loader_unittest.cc": 9,
           "ui/aura/window_unittest.cc": 54,
           "ui/base/test/ui_controls_internal_win.cc": 6
         },
         "shell_branches": {
           "chrome/browser/prefs/session_startup_pref.cc": 1,
-          "chrome/browser/prefs/session_startup_pref_unittest.cc": 1,
           "chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc": 3,
           "chrome/browser/ui/views/frame/browser_frame_view_mac.mm": 1,
           "chrome/browser/ui/views/frame/browser_frame_view_win.cc": 2,
@@ -57,7 +43,6 @@
           "chrome/browser/chrome_content_browser_client.cc": 6,
           "chrome/browser/content_settings/page_specific_content_settings_delegate.cc": 2,
           "chrome/browser/prefs/session_startup_pref.cc": 1,
-          "chrome/browser/prefs/session_startup_pref_unittest.cc": 1,
           "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc": 3,
           "chrome/browser/profiles/profile_io_data.cc": 1,
           "chrome/browser/sessions/session_service.cc": 1,
@@ -144,7 +129,6 @@
           "chrome/browser/ui/views/toolbar/toolbar_view.h": 1,
           "chrome/browser/ui/webui/chrome_web_ui_configs.cc": 5,
           "chrome/browser/ui/webui/settings/settings_ui.cc": 1,
-          "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc": 1,
           "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc": 1,
           "chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/customize_toolbar_handler.cc": 1,
           "chrome/common/chrome_content_client.cc": 1,
@@ -331,6 +315,30 @@
           "path": "chrome/browser/ui/views/toolbar/toolbar_view.cc",
           "allowed": 2,
           "reason": "yee_ui.h split, docs/chromium-upgrade-structure.md step 4"
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "content/renderer/service_worker/service_worker_provider_context_unittest.cc",
+          "allowed": 9,
+          "reason": "P4b 독립 검토: associated container host가 확정한 client capability와 Clone→Wrap→Connector 순서, browser 소유 sandbox·StorageKey origin/top/nonce/process 검사 및 primary disconnect 수명을 보존하려면 client별 owned IPC·content transport·세 provider 경로를 재설계해야 한다(예상 400–800줄/12–20파일). 현재 fake의 FusePipes forwarding 9줄을 유지하고 별도 checkpoint에서 이전한다."
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "content/renderer/service_worker/service_worker_subresource_loader_unittest.cc",
+          "allowed": 9,
+          "reason": "P4b 독립 검토: associated container host가 확정한 client capability와 Clone→Wrap→Connector 순서, browser 소유 sandbox·StorageKey origin/top/nonce/process 검사 및 primary disconnect 수명을 보존하려면 client별 owned IPC·content transport·세 provider 경로를 재설계해야 한다(예상 400–800줄/12–20파일). 현재 fake의 FusePipes forwarding 9줄을 유지하고 별도 checkpoint에서 이전한다."
+        },
+        {
+          "metric": "upstream_test_lines",
+          "path": "content/test/BUILD.gn",
+          "allowed": 28,
+          "reason": "P4b 독립 검토: Content 내부 fixture를 명시된 //content/test 경계 안에서만 컴파일하는 testonly source_set의 GN 연결 28줄이다. Chrome 소형 실행 파일 하나만 소비하며 component build는 기존 Content test 규칙을 따른다. private header visibility나 테스트 구현을 upstream에 추가하지 않는다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/chrome_browser_interface_binders_webui.cc",
+          "allowed": 1,
+          "reason": "P4b C12: 원본 CustomizeChrome Mojo의 필수 mock 메서드를 제거하기 위한 owned TabLayoutHandler를 CustomizeChromeUI 문서에만 등록한다. binder template은 생성 interface 정의가 필요하므로 owned Mojom 헤더 1개를 포함한다."
         }
       ]
     }

@@ -81,6 +81,7 @@
 #include "chrome/browser/ui/views/yee/applied_wait_kombucha.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/sidebar_footer.h"
@@ -825,7 +826,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 
 IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                        YeeMediaButtonTracksHeaderAndVisibility) {
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), embedded_test_server()->GetURL("/title1.html")));
   tab_strip_model()->GetActiveWebContents()->Focus();
@@ -908,7 +909,7 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                        YeePresentationFollowsSingleAndSplitSources) {
   ASSERT_TRUE(yee::IsShellEnabled());
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   const auto window_bounds =
       BrowserView::GetBrowserViewForBrowser(browser())->GetBoundsInScreen();
   // 분할 Header가 이동해도 Rest 색상 검사 중 커서가 Header 위에 놓이지 않게
@@ -1282,7 +1283,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
       }),
       Check([this]() {
         const bool brought_to_front =
-            ui_test_utils::BringBrowserWindowToFront(browser());
+            yee::test::BringBrowserWindowToFront(browser());
         auto* const widget = multi_contents_view()->GetWidget();
         RecordProperty("yee_inactive_header_brought_to_front",
                        brought_to_front);
@@ -1430,7 +1431,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 
 IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                        YeeOmniboxSuggestionsHaveBalancedInsets) {
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), embedded_test_server()->GetURL("/title1.html")));
   // 첫 표시 신호가 오기 전 준비된 WebUI 문서에도 같은 제안 목록 여백이

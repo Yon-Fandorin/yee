@@ -35,6 +35,7 @@
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/native_frame_applied_test_support_mac.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
@@ -159,7 +160,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
   NSView* content_view = [ns_window contentView];
 
   // Bring browser to front to ensure it is active.
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(widget->IsActive());
 
   auto [glass_view, tint_view, opaque_view] = GetGlassViews(content_view);
@@ -241,7 +242,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
   NSWindow* ns_window = widget->GetNativeWindow().GetNativeNSWindow();
   NSView* content_view = [ns_window contentView];
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
 
   EXPECT_FALSE([ns_window isOpaque]);
   auto [glass_view, tint_view, opaque_view] = GetGlassViews(content_view);
@@ -305,7 +306,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
   NSWindow* ns_window = widget->GetNativeWindow().GetNativeNSWindow();
   NSView* content_view = [ns_window contentView];
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
 
   auto [glass_view, tint_view, opaque_view] = GetGlassViews(content_view);
   ASSERT_NE(glass_view, nil);
@@ -398,7 +399,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
     return srgb_color.alphaComponent;
   };
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   const CGFloat single_profile_alpha = get_tint_alpha(browser());
 
   // Opening a second window in the same profile keeps the original opacity.
@@ -451,7 +452,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
   NSView* content_view = [ns_window contentView];
 
   // Bring browser to front to ensure it is active.
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(widget->IsActive());
 
   auto [glass_view, tint_view, opaque_view] = GetGlassViews(content_view);
@@ -547,7 +548,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserNativeWidgetMacGlassTest,
   NSWindow* ns_window = widget->GetNativeWindow().GetNativeNSWindow();
   NSView* content_view = [ns_window contentView];
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
 
   EXPECT_FALSE([ns_window isOpaque]);
   auto [glass_view, tint_view, opaque_view] = GetGlassViews(content_view);

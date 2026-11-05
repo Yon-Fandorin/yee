@@ -2,9 +2,13 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_YEE_CUSTOMIZATION_H_
 #define CHROME_BROWSER_UI_VIEWS_YEE_CUSTOMIZATION_H_
 
+#include "chrome/browser/ui/views/yee/webui/customization/tab_layout.mojom-forward.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
+
 namespace content {
 class WebUIDataSource;
 class WebContents;
+class RenderFrameHost;
 }  // namespace content
 
 namespace yee {
@@ -12,6 +16,10 @@ namespace yee {
 // 제공하지 않는다. 기본 shell로 돌아간 경우에만 이 편집기를 지원한다.
 bool SupportsToolbarCustomization();
 void ConfigureCustomizationDataSource(content::WebUIDataSource& source);
+// CustomizeChromeUI의 binder가 넘긴 문서에만 연결한다.
+void BindCustomizationTabLayout(
+    content::RenderFrameHost& frame,
+    mojo::PendingReceiver<mojom::TabLayoutHandler> receiver);
 struct CustomizationTabLayout {
   bool vertical;
   bool enabled;

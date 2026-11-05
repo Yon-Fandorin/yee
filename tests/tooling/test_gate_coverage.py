@@ -263,9 +263,16 @@ def gn_targets(root, patch, chromium=None):
                 ('yee_header_unittests', header_sources),
                 ('yee_layout_unittests', header_sources + ['favorites_unittest.cc', 'group_mark_signals_unittest.cc',
                                                           'yee_tab_group_header_view_unittest.cc',
-                                                          'yee_tab_collection_animating_layout_manager_unittest.cc'])):
+                                                          'yee_tab_collection_animating_layout_manager_unittest.cc',
+                                                          'yee_browser_animation_controller_unittest.cc',
+                                                          'yee_browser_view_tabbed_layout_native_geometry_unittest.cc'])):
             targets['chrome/browser/ui/views/tabs/common:' + target] = [
                 'chrome/browser/ui/views/yee/' + source for source in sources]
+    if chromium is None:
+        targets['chrome/browser/mac:install_sh_test'] = [
+            'components/yee_branding/yee_mac_install_unittest.cc']
+        targets['content/test:yee_service_worker_test_cases'] = [
+            'chrome/browser/yee_content_blocking/yee_service_worker_container_host_unittest.cc']
     for path, text in files.items():
         parent = PurePosixPath(path).parent
         text = strip_gn_comments(text)

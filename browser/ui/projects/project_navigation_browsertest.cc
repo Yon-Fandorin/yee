@@ -68,6 +68,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
 #include "chrome/browser/ui/views/yee/projects/project_hub_view.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
@@ -1312,7 +1313,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
 #else
   ui_controls::EnableUIControls();
 #endif
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   auto project = service()->CreateProject(u"선택 목적지");
   ASSERT_TRUE(project);
   auto* model = browser()->tab_strip_model();

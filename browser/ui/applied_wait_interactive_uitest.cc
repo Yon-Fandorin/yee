@@ -39,6 +39,7 @@
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/drag_interactive_test_support.h"
 #include "chrome/browser/ui/views/yee/favorites.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
@@ -1386,7 +1387,7 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
   auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* context = browser_view->tab_strip_view()->GetDragContext();
   ASSERT_TRUE(context);
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   auto* tab = browser()->tab_strip_model()->GetActiveTab();
   auto* tab_view = context->GetTabForContents(tab->GetContents());
   ASSERT_TRUE(tab_view);
@@ -1470,7 +1471,7 @@ IN_PROC_BROWSER_TEST_F(YeeAppliedWaitDragInteractiveTest,
   auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* context = browser_view->tab_strip_view()->GetDragContext();
   ASSERT_TRUE(context);
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   auto* tab = browser()->tab_strip_model()->GetActiveTab();
   auto* row = context->GetTabForContents(tab->GetContents());
   ASSERT_TRUE(row);

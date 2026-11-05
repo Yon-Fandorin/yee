@@ -23,8 +23,8 @@ case "$(uname -s)" in
     FAST_TARGETS+=(chrome/browser/ui/views/yee:yee_aura_unittests)
     ;;
 esac
-NATIVE_FAST_FILTER='BrowserAnimationControllerTest.*:BrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
-NATIVE_FAST_FILTER+=':PageViewportAppliedStateTest.*:FavoritesPreviewAppliedStateTest.*:HorizontalTabGroupCapsuleStateTest.*'
+NATIVE_FAST_FILTER='BrowserAnimationControllerTest.*:YeeBrowserViewTabbedLayoutNativeGeometryTest.*:YeeSurfaceGeometryTest.*:YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates:YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback'
+NATIVE_FAST_FILTER+=':PageViewportAppliedStateTest.*:FavoritesPreviewAppliedStateTest.*:HorizontalTabGroupCapsuleStateTest.*:YeeBrowserAnimationControllerTest.*-BrowserAnimationControllerTest.Reset_MidMotion_SameMotion'
 YEE_FAST_FILTER='AppliedWaitTest.*:BrowserSurfaceTransitionTest.*:MultiContentsGeometryTest.*:PageViewportGeometryTest.*:PageViewportMigrationTest.*'
 # 원본 TopContainerBackground는 Yee 셸에서 실패하므로 필수 목록에서 빼고,
 # 같은 시나리오를 Yee 셸 기준으로 고친 Yee 복사본만 선택한다.
@@ -78,7 +78,8 @@ RENDERER_LIFECYCLE_FILTER='Flyover/YeeRendererResizeUiTest.YeeResizeCollapseRelo
 INTERACTIVE_FILTER+=":$RENDERER_LIFECYCLE_FILTER"
 PHYSICAL_RESIZE_FILTER='YeeBrowserViewTabbedLayoutImplUiTest.YeeSidePanelGutterPhysicallyResizesBesideWebContents'
 INTERACTIVE_FILTER+=":$PHYSICAL_RESIZE_FILTER"
-BROWSER_FILTER='SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView:LensOverlayControllerBrowserTest.OverlayClosesIfRendererExits:LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab:SelectionOverlayBrowserTest.SelectionUsedFromController:SelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle:SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView:ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm:ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab:ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash:BrowserViewTest.CloseWidgetWithTabsNoCrash'
+OWNED_BROWSER_FILTER='YeeSidePanelCoordinatorTest.ShowFromAnimationReparentsContentView:YeeSelectionOverlayBrowserTest.SelectionUsedFromController:YeeSelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle'
+BROWSER_FILTER='LensOverlayControllerBrowserTest.OverlayClosesIfRendererExits:LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab:SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView:ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm:ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab:ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash:BrowserViewTest.CloseWidgetWithTabsNoCrash'
 
 if [[ "$SKIP_BUILD" == false ]]; then
   require_free_gib 10 "the Browser Surface layout ${MODE} gate"
@@ -90,7 +91,7 @@ if [[ "$SKIP_BUILD" == false ]]; then
   [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]] && \
     targets+=(chrome/browser/ui/views/yee:yee_interactive_ui_tests)
   [[ "$MODE" == "browser" || "$MODE" == "all" ]] && \
-    targets+=(browser_tests)
+    targets+=(browser_tests chrome/browser/ui/views/yee:site_controls_browsertests)
   build_regression_targets "Browser Surface layout ${MODE}" "${targets[@]}"
 fi
 
@@ -150,6 +151,10 @@ fi
 
 if [[ "$MODE" == "browser" || "$MODE" == "all" ]]; then
   print "Running the explicit browser-level Side Panel and overlay lifecycle gate."
+  run_tiered_native_test_gate --display "$YEE_OUT_DIR/site_controls_browsertests" \
+    --gtest_filter="$OWNED_BROWSER_FILTER" \
+    --test-launcher-jobs=1 \
+    --test-launcher-retry-limit=0
   run_tiered_native_test_gate --display "$YEE_OUT_DIR/browser_tests" \
     --gtest_filter="$BROWSER_FILTER" \
     --test-launcher-jobs=1 \

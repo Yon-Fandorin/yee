@@ -105,8 +105,7 @@
     "content/public/browser/websocket_policy.h",
     "chrome/installer/util/taskbar_util_internal.h",
     "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.cc",
-    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.h",
-    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc"
+    "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.h"
   ],
   "ignored_source_names": [
     ".DS_Store",

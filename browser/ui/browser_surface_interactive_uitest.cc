@@ -112,6 +112,7 @@
 #include "chrome/browser/ui/views/yee/applied_wait_kombucha.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation_binding.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
 #include "chrome/browser/ui/views/yee/page_viewport_migration.h"
@@ -1206,7 +1207,7 @@ IN_PROC_BROWSER_TEST_P(YeeWindowsCaptionInputUiTest,
       }));
   ASSERT_TRUE(([&]() { return widget->IsMaximized() == maximized; })());
   ApplyScheduledLayout();
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   const auto displays = display::Screen::Get()->GetAllDisplays();
   ASSERT_FALSE(displays.empty());
   const auto captures =
@@ -2067,7 +2068,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
     ASSERT_TRUE(styling);
     ASSERT_TRUE(group_marker());
     // 경계 구분선은 hover 때 사라지므로 이전 입력 위치의 영향을 제거한다.
-    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
     const auto window_bounds = view->GetBoundsInScreen();
     const auto not_hovered = [](const TabStyleViewDelegate* item) {
       return !item ||
@@ -2322,7 +2323,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
     if (!vertical) {
       auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
       const auto original_scheme = theme->GetBrowserColorScheme();
-      ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+      ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
       const auto native_window = view->GetWidget()->GetNativeWindow();
       for (bool dark : {false, true}) {
         SCOPED_TRACE(dark);
@@ -2426,7 +2427,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
     if (vertical) {
       // 장식용 아이콘의 native hover·클릭은 그룹 행으로 전달돼야 한다.
       ASSERT_TRUE(visible_preview);
-      ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+      ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
       const auto native_window = view->GetWidget()->GetNativeWindow();
       ASSERT_TRUE(
           input_geometry_ready(group_preview_target, vertical_group_header));
@@ -2591,7 +2592,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                         views::ElementTrackerViews::GetContextForView(view),
                         true);
               };
-              ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+              ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
               ASSERT_TRUE(
                   input_geometry_ready(current_new_tab, current_new_tab));
               const auto native_window = view->GetWidget()->GetNativeWindow();
@@ -3547,7 +3548,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
         ApplyScheduledLayout();
         auto* const tab =
             GetTabAnchorForModelIndex(view, split_indices.front());
-        ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+        ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
         const auto current_split_tab = [&]() {
           return GetTabAnchorForModelIndex(view, split_indices.front());
         };
@@ -3800,9 +3801,7 @@ IN_PROC_BROWSER_TEST_F(
       ASSERT_TRUE(applied_.Run(
           {applied_.Widget(*view->GetWidget(), {},
                            yee::test::AppliedMatch::kWidgetReady)},
-          [&] {
-            ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
-          },
+          [&] { ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser())); },
           yee::test::AppliedDomain::kNativeWindow, base::Seconds(5)));
       ASSERT_TRUE((native_window_ready)());
     }
@@ -3914,7 +3913,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
   auto* const state = tabs::VerticalTabStripStateController::From(browser());
   ASSERT_TRUE(widget && state);
   ASSERT_FALSE(view->IsFullscreen());
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   const gfx::Rect original = widget->GetWindowBoundsInScreen();
   gfx::Rect work_area = display::Screen::Get()
                             ->GetDisplayNearestWindow(widget->GetNativeWindow())
@@ -4304,7 +4303,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                       AppliedMatch::kViewOpacity)};
   };
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(browser_view->GetWidget()->IsActive());
   ASSERT_TRUE(browser_view->GetWidget()->ShouldPaintAsActive());
   const auto native_window = browser_view->GetWidget()->GetNativeWindow();
@@ -4341,7 +4340,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   if (!browser_view->GetWidget()->IsActive()) {
     // 캡처 중 다른 창으로 포커스가 이동했다면 실제 입력 직전에 한 번만
     // 활성화를 복구한다. 이후 hover·팝업 검사는 실제 창 상태를 그대로 따른다.
-    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
     capture("collapsed");
   }
   ASSERT_TRUE(applied_.Run(
@@ -4464,7 +4463,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   // 테스트 잠금 없이 사이드바와 anchor가 유지되어야 한다.
   // Mac의 논리 focus만으로는 native 키 전달을 보장하지 않으므로 입력 전에
   // 실제 창을 활성화한다. 팝업을 연 뒤에는 활성화 상태를 복구하지 않는다.
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   footer->RequestFocusWithReason(
       views::FocusManager::FocusChangeReason::kFocusTraversal);
   ASSERT_TRUE(footer->HasFocus())
@@ -5335,7 +5334,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                                      .current_viewport_in_screen.CenterPoint();
   const auto input_dom = ObserveDom(
       *web_contents, yee::test::WebUiAppliedSelectors::Probe::kInput);
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(click_point));
   ASSERT_TRUE(applied_.Run(
       {DomCondition(input_dom, {.click_count = 1},
@@ -5418,7 +5417,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
           browser_view->GetViewByID(yee::kSidePanelResizeGutterViewId);
       ASSERT_TRUE(gutter);
       ASSERT_TRUE(gutter->IsDrawn());
-      ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+      ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
       browser_view->GetWidget()->GetCompositor()->ScheduleFullRedraw();
       ASSERT_TRUE(applied_.WaitForPresentedFrame(*browser_view->GetWidget()));
       views::View* const marker = gutter->children().front();

@@ -19,9 +19,9 @@ if [[ "$SKIP_BUILD" == false ]]; then
     chrome/browser/ui/views/yee:site_controls_browsertests
 fi
 
-FILTER='SiteControlsBrowserTest.*:SidebarFooterBrowserTest.*:DisclosureArrowTest.*:SessionStartupPrefTest.*:TabDataObserverBrowserTest.FaviconAndIconFlags:All/YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*:All/TabSearchPageHandlerTest.RemoveSplit_NTP/*'
+FILTER='CustomizationMojoBrowserTest.*:SiteControlsBrowserTest.*:SidebarFooterBrowserTest.*:DisclosureArrowTest.*:YeeSessionStartupPrefTest.*:YeeTabDataObserverBrowserTest.FaviconAndIconFlags:All/YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*:All/YeeTabSearchPageHandlerTest.RemoveSplit_NTP/*'
 case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*) FILTER+=':UiaApplicationExitBrowserTest.*' ;;
+  MINGW*|MSYS*|CYGWIN*) FILTER+=':YeeUiaApplicationExitBrowserTest.*' ;;
 esac
 
 run_tiered_native_test_gate --display "$YEE_OUT_DIR/site_controls_browsertests" \

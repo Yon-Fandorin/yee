@@ -19,5 +19,5 @@ if [[ "$SKIP_BUILD" == false ]]; then
 fi
 # 실제 설치를 바꾸는 upstream Install은 선택하지 않는다.
 run_tiered_native_test_gate "$YEE_OUT_DIR/install_sh_test" \
-  --gtest_filter='DiskImageInstallTest.*:InstallShTest.UpdaterBuildFlagControlsElevatedSteps' \
+  --gtest_filter='YeeDiskImageInstallTest.*:YeeInstallShTest.UpdaterBuildFlagControlsElevatedSteps' \
   --test-launcher-jobs=1 --test-launcher-retry-limit=0

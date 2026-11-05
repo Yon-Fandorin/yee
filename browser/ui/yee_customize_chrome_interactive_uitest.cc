@@ -24,6 +24,7 @@
 #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/webui/test_support/webui_interactive_test_mixin.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
@@ -84,7 +85,7 @@ IN_PROC_BROWSER_TEST_F(YeeCustomizeChromeInteractiveTest,
       BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
   const auto original_z_order = browser_widget->GetZOrderLevel();
   browser_widget->SetZOrderLevel(ui::ZOrderLevel::kFloatingWindow);
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(embedded_test_server()->Start());
   // 패널 등록에 필요한 새 탐색을 로컬 페이지로 완료해 NTP 제공자에 의존하지
   // 않는다.

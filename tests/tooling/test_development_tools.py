@@ -305,7 +305,8 @@ done
         self.write_tool(self.bin / 'xcrun', 'exit 0\n')
         self.write_tool(self.bin / 'pgrep', 'exit 1\n')
         for binary in ('yee_layout_unittests', 'multi_contents_geometry_unittests',
-                       'yee_interactive_ui_tests', 'browser_tests', 'yee_aura_unittests'):
+                       'yee_interactive_ui_tests', 'browser_tests',
+                       'site_controls_browsertests', 'yee_aura_unittests'):
             self.write_tool(self.out / binary, '''listing=false
 filter=""
 for argument in "$@"; do
@@ -317,15 +318,15 @@ if [[ "$listing" == true ]]; then
     # native 소스의 IS_WIN 및 is_mac 컴파일 경계와 같은 목록의 부재를 흉내 낸다.
     if [[ "$YEE_TEST_PLATFORM" == Darwin &&
           ( "$pattern" == *YeeWindows* ||
-            "$pattern" == CustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost ||
+            "$pattern" == YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost ||
             "$pattern" == TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0 ||
-            "$pattern" == VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus ) ]]; then
+            "$pattern" == YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus ) ]]; then
       continue
     fi
     if [[ "$YEE_TEST_PLATFORM" != Darwin &&
-          ( "$pattern" == ImmersiveModeControllerMac* ||
-            "$pattern" == BrowserNativeWidgetMacGlassTest.* ||
-            "$pattern" == OmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState ||
+          ( "$pattern" == YeeImmersiveModeControllerMac* ||
+            "$pattern" == YeeBrowserNativeWidgetMacGlassTest.* ||
+            "$pattern" == YeeOmniboxPopupViewWebUITest.MultiWindowActivationRestartsAutocompleteWithoutStaleState ||
             "$pattern" == YeeBrowserViewTabbedLayoutImplRtlFractionalDsfUiTest.YeeFindBarUsesPixelStableBoundsAtMinimumWidth ) ]]; then
       continue
     fi
@@ -343,7 +344,7 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
             for name, mode, expected_runs in (
                     ('test-browser-surface-layout.sh', 'horizontal', 3),
                     ('test-browser-surface-layout.sh', 'interactive', 3),
-                    ('test-browser-surface-layout.sh', 'all', 6),
+                    ('test-browser-surface-layout.sh', 'all', 7),
                     ('test-sidebar.sh', 'interactive', 1),
                     ('test-sidebar.sh', 'all', 2)):
                 with self.subTest(platform=platform, script=name, mode=mode):
@@ -355,6 +356,10 @@ printf 'arg:%s\\n' "$@" >> "$YEE_TEST_LOG"
                     self.assertEqual(len(targets), 1)
                     self.assertIn('chrome/browser/ui/views/yee:yee_interactive_ui_tests', targets[0])
                     self.assertNotIn(' interactive_ui_tests', targets[0])
+                    if name == 'test-browser-surface-layout.sh' and mode == 'all':
+                        self.assertIn('chrome/browser/ui/views/yee:site_controls_browsertests',
+                                      targets[0])
+                        self.assertEqual(self.events().count('run:site_controls_browsertests'), 1)
                     filters = [event.removeprefix('arg:--gtest_filter=')
                                for event in self.events()
                                if event.startswith('arg:--gtest_filter=')]

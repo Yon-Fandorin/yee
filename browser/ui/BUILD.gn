@@ -94,7 +94,10 @@ source_set("side_panel_colors") {
 source_set("customization") {
   public = [ "customization.h" ]
   sources = [ "customization.cc" ]
-  public_deps = [ "//content/public/browser" ]
+  public_deps = [
+    "webui/customization:mojo_bindings",
+    "//content/public/browser",
+  ]
   deps = [
     ":shell_features",
     "webui:strings",
@@ -287,14 +290,30 @@ source_set("applied_wait_views_test_support") {
 
 source_set("applied_wait_browser_test_support") {
   testonly = true
-  public = [ "applied_wait_browser_observers.h" ]
-  sources = [ "applied_wait_browser_observers.cc" ]
+  public = [
+    "applied_wait_browser_observers.h",
+    "native_browser_test_support.h",
+  ]
+  sources = [
+    "applied_wait_browser_observers.cc",
+    "native_browser_test_support.cc",
+  ]
   if (is_mac) {
     public += [ "native_frame_applied_test_support_mac.h" ]
-    sources += [ "native_frame_applied_test_support_mac.mm" ]
-    frameworks = [ "AppKit.framework" ]
+    sources += [
+      "native_browser_test_support_mac.mm",
+      "native_frame_applied_test_support_mac.mm",
+    ]
+    frameworks = [
+      "AppKit.framework",
+      "Carbon.framework",
+      "Cocoa.framework",
+    ]
   }
-  public_deps = [ ":applied_wait_views_test_support" ]
+  public_deps = [
+    ":applied_wait_views_test_support",
+    "//ui/gfx:native_ui_types",
+  ]
   deps = [
     ":project_navigation",
     ":yee_ui",
@@ -318,11 +337,14 @@ source_set("applied_wait_browser_test_support") {
     "//chrome/browser/ui/views/tabs/common:impl",
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/yee_projects:browser",
+    "//chrome/test:test_support_ui",
     "//components/favicon/content",
     "//components/favicon/core",
     "//components/tabs:public",
     "//content/public/browser",
     "//content/test:test_support",
+    "//ui/base",
+    "//ui/base:test_support",
     "//ui/views",
   ]
   if (is_mac) {
@@ -539,6 +561,7 @@ test("site_controls_browsertests") {
     "applied_wait_browsertest.cc",
     "bookmarks/bookmarks_browsertest.cc",
     "browser_tests_main.cc",
+    "customization_mojo_browsertest.cc",
     "disclosure_arrow_unittest.cc",
     "downloads/downloads_browsertest.cc",
     "extensions/extensions_browsertest.cc",
@@ -549,12 +572,18 @@ test("site_controls_browsertests") {
     "projects/project_navigation_browsertest.cc",
     "sidebar_footer_browsertest.cc",
     "site_controls_browsertest.cc",
+    "yee_selection_overlay_browsertest.cc",
+    "yee_session_startup_pref_unittest.cc",
+    "yee_side_panel_coordinator_browsertest.cc",
+    "yee_tab_data_browsertest.cc",
+    "yee_tab_search_page_handler_browsertest.cc",
     "yee_tab_strip_collection_controller_browsertest.cc",
     "youtube_live_browsertest.cc",
   ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   deps = [
     ":applied_wait_browser_test_support",
+    ":customization",
     ":page_viewport_geometry",
     ":project_navigation",
     ":yee_ui",
@@ -571,6 +600,8 @@ test("site_controls_browsertests") {
     "//chrome/browser/download:impl",
     "//chrome/browser/extensions:test_support",
     "//chrome/browser/favicon",
+    "//chrome/browser/glic",
+    "//chrome/browser/glic/test_support",
     "//chrome/browser/history",
     "//chrome/browser/media/webrtc",
     "//chrome/browser/performance_manager",
@@ -599,9 +630,12 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/thumbnails",
     "//chrome/browser/ui/views/animations",
     "//chrome/browser/ui/views/frame:browser_view_header",
+    "//chrome/browser/ui/views/frame:browser_view_layout",
+    "//chrome/browser/ui/views/frame:browser_view_tabbed_layout_impl",
     "//chrome/browser/ui/views/infobars",
     "//chrome/browser/ui/views/omnibox",
     "//chrome/browser/ui/views/page_info",
+    "//chrome/browser/ui/views/side_panel",
     "//chrome/browser/ui/views/tabs:new_tab_button",
     "//chrome/browser/ui/views/tabs:tab_style_views",
     "//chrome/browser/ui/views/tabs/common:impl",
@@ -609,6 +643,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/views/tabs/tab",
     "//chrome/browser/ui/views/test:test_support",
     "//chrome/browser/ui/webui/metrics_reporter:test_support",
+    "//chrome/browser/ui/webui/side_panel/customize_chrome:customize_chrome_ui",
     "//chrome/browser/ui/webui/tab_search",
     "//chrome/browser/ui/window_metadata",
     "//chrome/browser/yee_content_blocking:browser",
@@ -671,6 +706,7 @@ test("site_controls_browsertests") {
   if (is_win) {
     sources += [
       "//chrome/browser/accessibility/leaked_node_detection_browsertest.cc",
+      "yee_uia_application_exit_browsertest.cc",
     ]
     deps += [
       "//chrome/browser/accessibility:test_support",

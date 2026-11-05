@@ -33,6 +33,7 @@
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
@@ -377,7 +378,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
 #else
   ui_controls::EnableUIControls();
 #endif
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* state = tabs::VerticalTabStripStateController::From(browser());
 #if BUILDFLAG(IS_WIN)
@@ -430,7 +431,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                             : "YeeHorizontalProtectionObservedUnreadyLayout",
                    observed_unready_layout ? 1 : 0);
     ASSERT_TRUE(layout_ready);
-    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
     view->GetWidget()->LayoutRootViewIfNecessary();
     auto* button = Button();
     ASSERT_TRUE(button);
@@ -721,7 +722,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest, RapidTabSwitchKeepsBadgeOwner) {
 #else
   ui_controls::EnableUIControls();
 #endif
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   auto* button = Button();
   auto* badge = FindView<views::Label>(button);
   const auto native_window = view->GetWidget()->GetNativeWindow();

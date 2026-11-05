@@ -65,19 +65,12 @@ test("yee_filtering_factory_unittests") {
   ]
 }
 
-# content_unittests 전체 목록 없이 원본 Service Worker fixture를
-# 실행한다.
+# Content 내부 fixture는 허용된 Content test target에서 컴파일한다.
+# 이 실행 파일과 gate는 기존 Yee 소형 target을 유지한다.
 test("yee_service_worker_unittests") {
-  sources = [ "//content/browser/service_worker/service_worker_container_host_unittest.cc" ]
   deps = [
-    "//base/test:test_support",
-    "//content/public/browser",
     "//content/test:run_all_unittests",
-    "//content/test:test_support",
-    "//mojo/public/cpp/bindings",
-    "//net:test_support",
-    "//services/network:test_support",
-    "//testing/gtest",
+    "//content/test:yee_service_worker_test_cases",
   ]
   data_deps = [ "//content:content_resources" ]
 }

@@ -42,6 +42,7 @@
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/drag_interactive_test_support.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -162,7 +163,7 @@ class YeeDetachToBrowserTabDragControllerTest
         std::numeric_limits<float>::max());
 #endif
 #if BUILDFLAG(IS_MAC)
-    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
 #endif
     browser()->GetProfile()->GetPrefs()->SetBoolean(
         prefs::kSplitViewDragAndDropEnabled, false);

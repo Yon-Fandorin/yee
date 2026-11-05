@@ -55,6 +55,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/native_frame_applied_test_support_mac.h"
 #include "chrome/browser/ui/views/yee/page_viewport_geometry.h"
 #include "chrome/browser/ui/views/yee/sidebar_footer.h"
@@ -206,9 +207,7 @@ class YeeImmersiveModeControllerMacInteractiveTest
          applied_.Condition(applied_.views().ObserveNativeWindow(widget),
                             NativeWindowMatches{true, true, true,
                                                 widget.IsFullscreen(), true})},
-        [&] {
-          ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
-        });
+        [&] { ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser())); });
   }
   testing::AssertionResult ToggleFullscreen(bool fullscreen) {
     return applied_.Run(

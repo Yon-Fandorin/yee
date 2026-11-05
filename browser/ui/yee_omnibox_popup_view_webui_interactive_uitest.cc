@@ -49,6 +49,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_handler.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
 #include "chrome/browser/ui/webui/searchbox/webui_omnibox_handler.h"
@@ -229,7 +230,7 @@ YeeOmniboxPopupViewWebUITest::BuildAimEligibilityService(
 class YeeOmniboxPopupViewWebUIFullV2Test : public YeeOmniboxPopupViewWebUITest {
  public:
   YeeOmniboxPopupViewWebUIFullV2Test() {
-    // interactive_ui_tests sets `ui_test_utils::BringBrowserWindowToFront()`
+    // interactive_ui_tests sets `yee::test::BringBrowserWindowToFront()`
     // for the setup function by default, which causes timeouts on Windows bots.
     // Unset it here as this test does not strictly require the window to be in
     // front to verify state isolation.
@@ -263,7 +264,7 @@ INSTANTIATE_TEST_SUITE_P(Shadow,
 
 IN_PROC_BROWSER_TEST_P(YeeOmniboxPopupAimShadowGeometryTest,
                        YeeAimShadowFitsWidgetAndKeepsHostTransparent) {
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(location_bar()->IsCompactShellMode());
   controller()->StopAutocomplete(/*clear_result=*/true);
   auto* const presenter_delegate = location_bar()->GetPresenterDelegate();
@@ -507,7 +508,7 @@ IN_PROC_BROWSER_TEST_F(
     YeeOmniboxPopupViewWebUITest,
     MultiWindowActivationRestartsAutocompleteWithoutStaleState) {
   ASSERT_TRUE(omnibox_view_views());
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   // 창 비활성화의 OnBlur 경로를 검사하려면 실제 주소 입력 focus가 필요하다.
   location_bar()->FocusLocation(/*is_user_initiated=*/true,
                                 /*clear_focus_if_failed=*/false);
@@ -539,7 +540,7 @@ IN_PROC_BROWSER_TEST_F(
       [&] {
         second_browser = CreateBrowser(browser()->GetProfile());
         ASSERT_TRUE(second_browser);
-        ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(second_browser));
+        ASSERT_TRUE(yee::test::BringBrowserWindowToFront(second_browser));
       }));
   EXPECT_FALSE(omnibox_view_views()->HasFocus());
   EXPECT_TRUE(controller()->autocomplete_controller()->result().empty());
@@ -547,7 +548,7 @@ IN_PROC_BROWSER_TEST_F(
             OmniboxPopupState::kNone);
   EXPECT_FALSE(controller()->IsPopupOpen());
 
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   location_bar()->FocusLocation(/*is_user_initiated=*/true,
                                 /*clear_focus_if_failed=*/false);
   edit_model()->SetUserText(u"after window activation");
@@ -574,7 +575,7 @@ IN_PROC_BROWSER_TEST_F(YeeOmniboxPopupViewWebUITest,
   const auto original_z_order = browser_widget->GetZOrderLevel();
   browser_widget->SetZOrderLevel(ui::ZOrderLevel::kFloatingWindow);
 #endif
-  ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(location_bar()->IsCompactShellMode());
   auto* const presenter_delegate = location_bar()->GetPresenterDelegate();
   ASSERT_TRUE(presenter_delegate);

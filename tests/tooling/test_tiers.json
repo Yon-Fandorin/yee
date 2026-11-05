@@ -1052,6 +1052,45 @@
       "yee_filtering_factory_unittests"
     ]
   },
+  "browser/content_blocking/yee_service_worker_container_host_unittest.cc::YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_ControlledWorkerAllowed": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-content-blocking-native.sh",
+    "reason": "L225: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_service_worker_unittests"
+    ]
+  },
+  "browser/content_blocking/yee_service_worker_container_host_unittest.cc::YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_ControlledWorkerWithAllowSameOrigin": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-content-blocking-native.sh",
+    "reason": "L231: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_service_worker_unittests"
+    ]
+  },
+  "browser/content_blocking/yee_service_worker_container_host_unittest.cc::YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_SandboxedDocumentRejected": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-content-blocking-native.sh",
+    "reason": "L199: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_service_worker_unittests"
+    ]
+  },
   "browser/projects/project_service_unittest.cc::ProjectServiceTest.DeleteOnlyOwnedReferences": {
     "os": [
       "Darwin",
@@ -4436,6 +4475,71 @@
     "reason": "L97: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
     "binaries": [
       "multi_contents_geometry_unittests"
+    ]
+  },
+  "browser/ui/customization_mojo_browsertest.cc::CustomizationMojoBrowserTest.BrowserAndShellAvailabilityGateWrites": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "C12: native 입력 없이 owned Mojo·controller 권한·managed 설정·문서와 양 pipe의 disconnect 및 설정 왕복을 확인한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/customization_mojo_browsertest.cc::CustomizationMojoBrowserTest.DisconnectAndNavigationDestroyBindings": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "C12: native 입력 없이 owned Mojo·controller 권한·managed 설정·문서와 양 pipe의 disconnect 및 설정 왕복을 확인한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/customization_mojo_browsertest.cc::CustomizationMojoBrowserTest.ManagedWritesRemainDisabled": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "C12: native 입력 없이 owned Mojo·controller 권한·managed 설정·문서와 양 pipe의 disconnect 및 설정 왕복을 확인한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/customization_mojo_browsertest.cc::CustomizationMojoBrowserTest.OnlyCustomizationControllerBindsCapability": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "C12: native 입력 없이 owned Mojo·controller 권한·managed 설정·문서와 양 pipe의 disconnect 및 설정 왕복을 확인한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/customization_mojo_browsertest.cc::CustomizationMojoBrowserTest.RoundTripsAndTracksExternalPref": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "C12: native 입력 없이 owned Mojo·controller 권한·managed 설정·문서와 양 pipe의 disconnect 및 설정 왕복을 확인한다.",
+    "binaries": [
+      "site_controls_browsertests"
     ]
   },
   "browser/ui/disclosure_arrow_unittest.cc::DisclosureArrowTest.ReducedMotionUsesFinalDirectionImmediately": {
@@ -8209,6 +8313,32 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/yee_browser_animation_controller_unittest.cc::YeeBrowserAnimationControllerTest.Reset_FromFinalProgressHasSingleEnd": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L165: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_animation_controller_unittest.cc::YeeBrowserAnimationControllerTest.Reset_MidMotion_SameMotion": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L140: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
   "browser/ui/yee_browser_native_widget_mac_interactive_uitest.mm::YeeBrowserNativeWidgetMacGlassTest.ActiveInactiveTintOpacity": {
     "os": [
       "Darwin"
@@ -8276,6 +8406,162 @@
     "reason": "macOS fullscreen·native key window·active/inactive tint 상태를 검사한다.",
     "binaries": [
       "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.ContentPanelCapAndVerticalFirstFlexUseContentColumn": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L105: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.ContentTransitionRoundsEdgesLikeNative157": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L304: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.ExplicitPanelRowsPreserveHeaderPlacementAcrossTypeAndWidth": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L84: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.FinalHeaderLocalToolbarUsesNormalizedReservationExactlyOnce": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L183: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.GrabHandleRevisionPrecedesContentColumnExclusionConversion": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L135: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.HorizontalThresholdUsesStrictLessThanAndAuthoritativeRowMode": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L28: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.PanelPaintClipContainsEveryPhysicalEdge": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L254: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.PanelRevealPreservesFloorRoundAndLocalClipConventions": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L212: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.PanelTypeTabModeAndVisibilityRemainIndependentInputs": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L47: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.SeparatorFactsFollowResolvedRowNotPanelType": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L152: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.SplitInsetAndUnderlapThresholdsAreLiteralCurrentBehavior": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L328: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
+    ]
+  },
+  "browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc::YeeBrowserViewTabbedLayoutNativeGeometryTest.TrailingPanelRevealAndContentProgressRemainIndependent": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L280: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "yee_layout_unittests"
     ]
   },
   "browser/ui/yee_customize_chrome_interactive_uitest.cc::YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost": {
@@ -8386,6 +8672,132 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/yee_selection_overlay_browsertest.cc::YeeSelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L199: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ],
+    "needs_display": {
+      "Darwin": "P4b 이전 전의 native 표시 경로를 유지한다. 새 owned main의 headless 표시·paint 동등성을 실행 검증하기 전까지 foreground에서 실행한다."
+    }
+  },
+  "browser/ui/yee_selection_overlay_browsertest.cc::YeeSelectionOverlayBrowserTest.SelectionUsedFromController": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L150: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ],
+    "needs_display": {
+      "Darwin": "P4b 이전 전의 native 표시 경로를 유지한다. 새 owned main의 headless 표시·paint 동등성을 실행 검증하기 전까지 foreground에서 실행한다."
+    }
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.DefaultStartupType": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L47: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.DisabledYeeKeepsNativeStartupDefault": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L130: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.URLListIsFixedUp": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L86: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.URLListManagedOverridesUser": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L140: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.YeeDefaultsToLastSessionAndKeepsOverrides": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L100: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_session_startup_pref_unittest.cc::YeeSessionStartupPrefTest.YeeKeepsExplicitStartupURLs": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-site-controls.sh",
+    "reason": "L119: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_side_panel_coordinator_browsertest.cc::YeeSidePanelCoordinatorTest.ShowFromAnimationReparentsContentView": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "L43: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ],
+    "needs_display": {
+      "Darwin": "P4b 이전 전의 native 표시 경로를 유지한다. 새 owned main의 headless 표시·paint 동등성을 실행 검증하기 전까지 foreground에서 실행한다."
+    }
+  },
   "browser/ui/yee_tab_collection_animating_layout_manager_unittest.cc::YeeTabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation": {
     "os": [
       "Darwin",
@@ -8451,6 +8863,19 @@
     "needs_display": {
       "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
     }
+  },
+  "browser/ui/yee_tab_data_browsertest.cc::YeeTabDataObserverBrowserTest.FaviconAndIconFlags": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L75: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
   },
   "browser/ui/yee_tab_group_header_view_unittest.cc::YeeTabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover": {
     "os": [
@@ -8563,6 +8988,28 @@
     "needs_display": {
       "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
     }
+  },
+  "browser/ui/yee_tab_search_page_handler_browsertest.cc::YeeTabSearchPageHandlerTest.RemoveSplit_NTP": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L204: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "parameters": [
+      [
+        "All",
+        [
+          "0",
+          "1"
+        ]
+      ]
+    ],
+    "binaries": [
+      "site_controls_browsertests"
+    ]
   },
   "browser/ui/yee_tab_strip_collection_controller_browsertest.cc::YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames": {
     "os": [
@@ -9437,6 +9884,39 @@
       "yee_layout_unittests"
     ]
   },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ApplicationExitReleasesClientReferences": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L46: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ClosingOneWindowKeepsAccessibilityAvailable": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L33: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ExitAfterLastWindowReleasesClientReferences": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "L60: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
   "browser/ui/yee_vertical_tab_strip_region_view_interactive_uitest.cc::YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus": {
     "os": [
       "Windows"
@@ -9465,204 +9945,6 @@
       "Linux": "opt-in 실재생·광고 관찰의 headless 오디오·전달 동등성을 검증하기 전까지 표시형 runner를 유지한다.",
       "Windows": "opt-in 실재생·광고 관찰의 headless 오디오·전달 동등성을 검증하기 전까지 표시형 runner를 유지한다."
     }
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ApplicationExitReleasesClientReferences": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L71: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ClosingOneWindowKeepsAccessibilityAvailable": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L57: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ExitAfterLastWindowReleasesClientReferences": {
-    "os": [
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L86: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/glic/selection/selection_overlay_browsertest.cc::SelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1360: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "browser_tests"
-    ],
-    "needs_display": {
-      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
-    }
-  },
-  "chrome/browser/glic/selection/selection_overlay_browsertest.cc::SelectionOverlayBrowserTest.SelectionUsedFromController": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L68: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "browser_tests"
-    ],
-    "needs_display": {
-      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
-    }
-  },
-  "chrome/browser/mac/install_test.cc::DiskImageInstallTest.EjectsAndTrashesOwnedImage": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "A",
-    "owner": "test-macos-install.sh",
-    "reason": "L185: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "install_sh_test"
-    ]
-  },
-  "chrome/browser/mac/install_test.cc::DiskImageInstallTest.OrdinaryBundleDoesNotTriggerInstallation": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "A",
-    "owner": "test-macos-install.sh",
-    "reason": "L179: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "install_sh_test"
-    ]
-  },
-  "chrome/browser/mac/install_test.cc::DiskImageInstallTest.ReadOnlyImageIsAnInstallSource": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "A",
-    "owner": "test-macos-install.sh",
-    "reason": "L162: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "install_sh_test"
-    ]
-  },
-  "chrome/browser/mac/install_test.cc::DiskImageInstallTest.WritableImageDoesNotTriggerInstallation": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "A",
-    "owner": "test-macos-install.sh",
-    "reason": "L171: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "install_sh_test"
-    ]
-  },
-  "chrome/browser/mac/install_test.cc::InstallShTest.UpdaterBuildFlagControlsElevatedSteps": {
-    "os": [
-      "Darwin"
-    ],
-    "tier": "A",
-    "owner": "test-macos-install.sh",
-    "reason": "L198: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "install_sh_test"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.DefaultStartupType": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L48: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.DisabledYeeKeepsNativeStartupDefault": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L135: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.URLListIsFixedUp": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L87: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.URLListManagedOverridesUser": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L146: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.YeeDefaultsToLastSessionAndKeepsOverrides": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L103: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
-  "chrome/browser/prefs/session_startup_pref_unittest.cc::SessionStartupPrefTest.YeeKeepsExplicitStartupURLs": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-site-controls.sh",
-    "reason": "L123: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
   },
   "chrome/browser/ui/animation/browser_animation_controller_unittest.cc::BrowserAnimationControllerTest.AddAnimationProvider": {
     "os": [
@@ -9911,19 +10193,6 @@
       "yee_layout_unittests"
     ]
   },
-  "chrome/browser/ui/animation/browser_animation_controller_unittest.cc::BrowserAnimationControllerTest.Reset_FromFinalProgressHasSingleEnd": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1300: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
   "chrome/browser/ui/animation/browser_animation_controller_unittest.cc::BrowserAnimationControllerTest.Reset_MidMotion_DifferentMotion": {
     "os": [
       "Darwin",
@@ -9946,19 +10215,6 @@
     "tier": "A",
     "owner": "test-browser-surface-layout.sh",
     "reason": "L1222: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/animation/browser_animation_controller_unittest.cc::BrowserAnimationControllerTest.Reset_MidMotion_SameMotion": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L1274: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
     "binaries": [
       "yee_layout_unittests"
     ]
@@ -10303,19 +10559,6 @@
       "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
     }
   },
-  "chrome/browser/ui/tabs/tab_data_browsertest.cc::TabDataObserverBrowserTest.FaviconAndIconFlags": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L159: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "site_controls_browsertests"
-    ]
-  },
   "chrome/browser/ui/views/frame/browser_view_browsertest.cc::BrowserViewTest.CloseWidgetWithTabsNoCrash": {
     "os": [
       "Darwin",
@@ -10332,162 +10575,6 @@
       "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
     }
   },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.ContentPanelCapAndVerticalFirstFlexUseContentColumn": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L105: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.ContentTransitionRoundsEdgesLikeNative157": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L304: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.ExplicitPanelRowsPreserveHeaderPlacementAcrossTypeAndWidth": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L84: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.FinalHeaderLocalToolbarUsesNormalizedReservationExactlyOnce": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L183: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.GrabHandleRevisionPrecedesContentColumnExclusionConversion": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L135: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.HorizontalThresholdUsesStrictLessThanAndAuthoritativeRowMode": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L28: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.PanelPaintClipContainsEveryPhysicalEdge": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L254: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.PanelRevealPreservesFloorRoundAndLocalClipConventions": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L212: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.PanelTypeTabModeAndVisibilityRemainIndependentInputs": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L47: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.SeparatorFactsFollowResolvedRowNotPanelType": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L152: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.SplitInsetAndUnderlapThresholdsAreLiteralCurrentBehavior": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L328: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
-  "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc::BrowserViewTabbedLayoutNativeGeometryTest.TrailingPanelRevealAndContentProgressRemainIndependent": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L280: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_layout_unittests"
-    ]
-  },
   "chrome/browser/ui/views/sad_tab_split_view_browsertest.cc::SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView": {
     "os": [
       "Darwin",
@@ -10503,44 +10590,6 @@
     "needs_display": {
       "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
     }
-  },
-  "chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc::SidePanelCoordinatorTest.ShowFromAnimationReparentsContentView": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-browser-surface-layout.sh",
-    "reason": "L2573: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "binaries": [
-      "browser_tests"
-    ],
-    "needs_display": {
-      "Darwin": "upstream browser_tests main에는 Yee의 NSApplication 활성화 차단이 없다. headless Widget::Show도 앱을 활성화하므로 기존 foreground runner를 유지한다."
-    }
-  },
-  "chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc::TabSearchPageHandlerTest.RemoveSplit_NTP": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "B",
-    "owner": "test-site-controls.sh",
-    "reason": "L1485: 브라우저/Widget의 모델·서비스·renderer/paint·직접 callback 수명을 검사하며 실제 OS 입력은 없다.",
-    "parameters": [
-      [
-        "All",
-        [
-          "0",
-          "1"
-        ]
-      ]
-    ],
-    "binaries": [
-      "site_controls_browsertests"
-    ]
   },
   "chrome/installer/setup/taskbar_util_unittest.cc::TaskbarPinningTest.AlreadyPinnedDoesNotRequestAgain": {
     "os": [
@@ -10743,6 +10792,61 @@
     "reason": "L11: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
     "binaries": [
       "mac_identity_unittests"
+    ]
+  },
+  "components/branding/yee_mac_install_unittest.cc::YeeDiskImageInstallTest.EjectsAndTrashesOwnedImage": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "A",
+    "owner": "test-macos-install.sh",
+    "reason": "L182: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "install_sh_test"
+    ]
+  },
+  "components/branding/yee_mac_install_unittest.cc::YeeDiskImageInstallTest.OrdinaryBundleDoesNotTriggerInstallation": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "A",
+    "owner": "test-macos-install.sh",
+    "reason": "L176: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "install_sh_test"
+    ]
+  },
+  "components/branding/yee_mac_install_unittest.cc::YeeDiskImageInstallTest.ReadOnlyImageIsAnInstallSource": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "A",
+    "owner": "test-macos-install.sh",
+    "reason": "L159: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "install_sh_test"
+    ]
+  },
+  "components/branding/yee_mac_install_unittest.cc::YeeDiskImageInstallTest.WritableImageDoesNotTriggerInstallation": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "A",
+    "owner": "test-macos-install.sh",
+    "reason": "L168: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "install_sh_test"
+    ]
+  },
+  "components/branding/yee_mac_install_unittest.cc::YeeInstallShTest.UpdaterBuildFlagControlsElevatedSteps": {
+    "os": [
+      "Darwin"
+    ],
+    "tier": "A",
+    "owner": "test-macos-install.sh",
+    "reason": "L195: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
+    "binaries": [
+      "install_sh_test"
     ]
   },
   "components/content_blocking/baseline_list_store_unittest.cc::BaselineListPreprocessor.UsesBuildConditionsAndRejectsMalformedBranches": {
@@ -11757,45 +11861,6 @@
     "reason": "L72: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
     "binaries": [
       "yee_content_blocking_unittests"
-    ]
-  },
-  "content/browser/service_worker/service_worker_container_host_unittest.cc::ServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_ControlledWorkerAllowed": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-content-blocking-native.sh",
-    "reason": "L1259: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_service_worker_unittests"
-    ]
-  },
-  "content/browser/service_worker/service_worker_container_host_unittest.cc::ServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_ControlledWorkerWithAllowSameOrigin": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-content-blocking-native.sh",
-    "reason": "L1265: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_service_worker_unittests"
-    ]
-  },
-  "content/browser/service_worker/service_worker_container_host_unittest.cc::ServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_SandboxedDocumentRejected": {
-    "os": [
-      "Darwin",
-      "Linux",
-      "Windows"
-    ],
-    "tier": "A",
-    "owner": "test-content-blocking-native.sh",
-    "reason": "L1233: 값·정책·서비스/파일 fixture 또는 mock 시간 계산이며 native 최상위 창을 만들지 않는다.",
-    "binaries": [
-      "yee_service_worker_unittests"
     ]
   },
   "ui/aura/window_unittest.cc::WindowObserverTest.UnmanagedLayerKeepsScreenOriginAfterAncestorMoves": {

@@ -19,5 +19,5 @@ fi
 run_tiered_native_test_gate "$YEE_OUT_DIR/yee_content_blocking_unittests" --gtest_filter='*' --test-launcher-jobs=1
 run_tiered_native_test_gate "$YEE_OUT_DIR/yee_filtering_factory_unittests" --gtest_filter='*' --test-launcher-jobs=1
 run_tiered_native_test_gate "$YEE_OUT_DIR/yee_service_worker_unittests" \
-  --gtest_filter='ServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_*' \
+  --gtest_filter='YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_*' \
   --test-launcher-jobs=1 --test-launcher-retry-limit=0

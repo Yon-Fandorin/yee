@@ -23,6 +23,7 @@
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/favorites.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -546,7 +547,7 @@ testing::AssertionResult PrepareNativeDragInput(
       {applied.Widget(*widget, {.visible = true}, AppliedMatch::kWidgetVisible),
        applied.Widget(*widget, {.active = true}, AppliedMatch::kWidgetActive)},
       [&browser] {
-        ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(&browser));
+        ASSERT_TRUE(yee::test::BringBrowserWindowToFront(&browser));
       },
       AppliedDomain::kNativeWindow);
 }

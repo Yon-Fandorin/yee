@@ -1,0 +1,13 @@
+// Copyright 2026 The Yee Authors
+// Use of this source code is governed by a BSD-style license in LICENSE.
+
+module yee.mojom;
+
+interface TabLayoutPage {
+  SetTabLayout(bool vertical, bool enabled);
+};
+
+interface TabLayoutHandler {
+  Observe(pending_remote<TabLayoutPage> page);
+  SetTabLayout(bool vertical);
+};

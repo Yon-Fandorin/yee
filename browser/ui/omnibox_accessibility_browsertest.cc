@@ -28,6 +28,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/projects/project_navigation_controller.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -361,7 +362,7 @@ class OmniboxAccessibilityBrowserTest
 #else
     ui_controls::EnableUIControls();
 #endif
-    ASSERT_TRUE(ui_test_utils::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   }
 
   void TearDownOnMainThread() override {

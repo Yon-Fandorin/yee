@@ -14,6 +14,7 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/preloading/preloading_features.h"
 #include "chrome/browser/ssl/https_upgrades_navigation_throttle.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/test/base/chrome_test_launcher.h"
 #include "chrome/test/base/chrome_test_suite.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -222,7 +223,7 @@ int main(int argc, char** argv) {
 #endif
   } else {
     InProcessBrowserTest::set_global_browser_set_up_function(
-        &ui_test_utils::BringBrowserWindowToFront);
+        &yee::test::BringBrowserWindowToFront);
   }
 
 #if BUILDFLAG(IS_WIN)

@@ -35,6 +35,24 @@
     "reason": "IS_WIN 전용 사례다. 기존 Windows 필터를 보존하며 macOS에서 컴파일·발견·실행할 수 없다.",
     "tier": "C"
   },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ApplicationExitReleasesClientReferences": {
+    "kind": "windows",
+    "owner": "Windows session: test-site-controls.sh",
+    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
+    "tier": "B"
+  },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ClosingOneWindowKeepsAccessibilityAvailable": {
+    "kind": "windows",
+    "owner": "Windows session: test-site-controls.sh",
+    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
+    "tier": "B"
+  },
+  "browser/ui/yee_uia_application_exit_browsertest.cc::YeeUiaApplicationExitBrowserTest.ExitAfterLastWindowReleasesClientReferences": {
+    "kind": "windows",
+    "owner": "Windows session: test-site-controls.sh",
+    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
+    "tier": "B"
+  },
   "browser/ui/yee_vertical_tab_strip_region_view_interactive_uitest.cc::YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus": {
     "kind": "windows",
     "owner": "Windows session: test-sidebar.sh interactive",
@@ -45,24 +63,6 @@
     "kind": "opt-in",
     "owner": "test-youtube-live.sh off|on",
     "reason": "실제 YouTube 광고·본편 관찰에는 네트워크와 긴 실행 시간이 필요하다. 명시적 opt-in gate가 disabled 실행 옵션을 준다.",
-    "tier": "B"
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ApplicationExitReleasesClientReferences": {
-    "kind": "windows",
-    "owner": "Windows session: test-site-controls.sh",
-    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
-    "tier": "B"
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ClosingOneWindowKeepsAccessibilityAvailable": {
-    "kind": "windows",
-    "owner": "Windows session: test-site-controls.sh",
-    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
-    "tier": "B"
-  },
-  "chrome/browser/accessibility/leaked_node_detection_browsertest.cc::UiaApplicationExitBrowserTest.ExitAfterLastWindowReleasesClientReferences": {
-    "kind": "windows",
-    "owner": "Windows session: test-site-controls.sh",
-    "reason": "Windows UI Automation 전용이다. Windows gate의 필터·원본 소스 연결을 보존하며 macOS에서는 검증하지 않는다.",
     "tier": "B"
   },
   "chrome/installer/setup/taskbar_util_unittest.cc::TaskbarPinningTest.AlreadyPinnedDoesNotRequestAgain": {

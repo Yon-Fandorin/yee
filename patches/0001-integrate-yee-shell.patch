@@ -430,88 +430,6 @@ index c20dd4d041..ec03bff108 100644
          "//chrome/browser/ui/views/accessibility:uia_test_support",
        ]
      } else {
-diff --git a/chrome/browser/accessibility/leaked_node_detection_browsertest.cc b/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
-index 118dc6e733..dc79cd2741 100644
---- a/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
-+++ b/chrome/browser/accessibility/leaked_node_detection_browsertest.cc
-@@ -5,15 +5,19 @@
- #include <string>
- #include <tuple>
- 
-+#include "base/functional/bind.h"
- #include "base/functional/callback.h"
- #include "base/location.h"
- #include "base/task/sequenced_task_runner.h"
- #include "base/test/scoped_feature_list.h"
- #include "base/test/test_timeouts.h"
- #include "chrome/browser/accessibility/browser_test_with_ax_client.h"
-+#include "chrome/browser/lifetime/application_lifetime.h"
-+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
- #include "content/public/test/browser_test.h"
- #include "testing/gtest/include/gtest/gtest.h"
- #include "ui/accessibility/accessibility_features.h"
-+#include "ui/accessibility/platform/ax_platform.h"
- #include "ui/accessibility/platform/ax_platform_node_win.h"
- 
- namespace {
-@@ -42,8 +46,57 @@ LeakedNodeDetectionBrowsertest::LeakedNodeDetectionBrowsertest() {
-       features::kUiaDisconnectRootProviders);
- }
- 
-+class UiaApplicationExitBrowserTest : public BrowserTestWithAxClient {
-+ private:
-+  ClientApi GetClientApi() const override { return ClientApi::kUiAutomation; }
-+};
-+
- }  // namespace
- 
-+// 다른 창을 닫아도 살아 있는 창의 접근성 연결은 계속 사용할 수 있어야 한다.
-+IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
-+                       ClosingOneWindowKeepsAccessibilityAvailable) {
-+  BrowserWindowInterface* remaining = CreateBrowser(browser()->GetProfile());
-+  ASSERT_HRESULT_SUCCEEDED(InitializeClient(remaining));
-+  ASSERT_HRESULT_SUCCEEDED(FindAll());
-+
-+  CloseBrowserSynchronously(browser());
-+
-+  EXPECT_TRUE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
-+  EXPECT_GT(ui::AXPlatformNodeWin::GetCounts().live_nodes, 0U);
-+  EXPECT_HRESULT_SUCCEEDED(FindAll());
-+}
-+
-+// 외부 클라이언트가 노드를 보유해도 앱 종료가 연결과 노드를 정리해야 한다.
-+IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
-+                       ApplicationExitReleasesClientReferences) {
-+  ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
-+  ASSERT_HRESULT_SUCCEEDED(FindAll());
-+  ASSERT_GT(ui::AXPlatformNodeWin::GetCounts().live_nodes, 0U);
-+
-+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-+      FROM_HERE, base::BindOnce(&chrome::AttemptExit));
-+  RunUntilBrowserProcessQuits();
-+
-+  EXPECT_FALSE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
-+  WaitForNodeCounts({0U, 0U, 0U, 0U});
-+}
-+
-+// 마지막 창이 먼저 사라진 경우에도 종료 전 UIA 참조를 해제해야 한다.
-+IN_PROC_BROWSER_TEST_F(UiaApplicationExitBrowserTest,
-+                       ExitAfterLastWindowReleasesClientReferences) {
-+  ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
-+  ASSERT_HRESULT_SUCCEEDED(FindAll());
-+  CloseBrowserSynchronously(browser());
-+
-+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-+      FROM_HERE, base::BindOnce(&chrome::AttemptExit));
-+  RunUntilBrowserProcessQuits();
-+
-+  EXPECT_FALSE(ui::AXPlatform::GetInstance().IsUiaProviderEnabled());
-+  WaitForNodeCounts({0U, 0U, 0U, 0U});
-+}
-+
- IN_PROC_BROWSER_TEST_P(LeakedNodeDetectionBrowsertest, DetectGhostNodeLeaks) {
-   // Initialize the UI Automation client; giving it this window.
-   ASSERT_HRESULT_SUCCEEDED(InitializeClient(browser()));
 diff --git a/chrome/browser/browser_about_handler.cc b/chrome/browser/browser_about_handler.cc
 index 08949a6941..0e6810e730 100644
 --- a/chrome/browser/browser_about_handler.cc
@@ -543,6 +461,27 @@ index 08949a6941..0e6810e730 100644
    if (!IsNonNavigationAboutUrl(url)) {
      return false;
    }
+diff --git a/chrome/browser/chrome_browser_interface_binders_webui.cc b/chrome/browser/chrome_browser_interface_binders_webui.cc
+index 4ef3e944e5..3b2a4beb60 100644
+--- a/chrome/browser/chrome_browser_interface_binders_webui.cc
++++ b/chrome/browser/chrome_browser_interface_binders_webui.cc
+@@ -2,6 +2,7 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++#include "chrome/browser/ui/views/yee/webui/customization/tab_layout.mojom.h"
+ #include "chrome/browser/chrome_browser_interface_binders_webui.h"
+ 
+ #include "build/android_buildflags.h"
+@@ -324,6 +325,8 @@ void PopulateChromeWebUIFrameBindersPartsAllPlatforms(
+   content::RegisterWebUIControllerInterfaceBinder<
+       side_panel::mojom::CustomizeChromePageHandlerFactory, CustomizeChromeUI>(
+       map);
++  content::RegisterWebUIControllerInterfaceBinder<yee::mojom::TabLayoutHandler,
++      CustomizeChromeUI>(map);
+   if (base::FeatureList::IsEnabled(ntp_features::kNtpNextFeatures)) {
+     content::RegisterWebUIControllerInterfaceBinder<
+         action_chips::mojom::ActionChipsHandlerFactory, NewTabPageUI>(map);
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
 index 1defcfa514..153a7fe1b0 100644
 --- a/chrome/browser/chrome_content_browser_client.cc
@@ -821,115 +760,6 @@ index 548eefc04c..7281900f94 100644
      "//chrome/common:constants",
      "//chrome/test:test_interfaces",
      "//chrome/test:test_support",
-diff --git a/chrome/browser/glic/selection/selection_overlay_browsertest.cc b/chrome/browser/glic/selection/selection_overlay_browsertest.cc
-index ad87bc1112..cdce0b2288 100644
---- a/chrome/browser/glic/selection/selection_overlay_browsertest.cc
-+++ b/chrome/browser/glic/selection/selection_overlay_browsertest.cc
-@@ -22,6 +22,12 @@
- #include "chrome/browser/selection/features.h"
- #include "chrome/browser/selection/mojom/action.mojom.h"
- #include "chrome/browser/selection/suggestion_service.h"
-+#include "chrome/browser/ui/tabs/split_tab_metrics.h"
-+#include "chrome/browser/ui/tabs/tab_enums.h"
-+#include "chrome/browser/ui/tabs/tab_strip_model.h"
-+#include "chrome/browser/ui/views/frame/browser_view.h"
-+#include "chrome/browser/ui/views/frame/contents_container_view.h"
-+#include "chrome/browser/ui/views/frame/contents_web_view.h"
- #include "chrome/common/chrome_features.h"
- #include "chrome/test/base/search_test_utils.h"
- #include "chrome/test/mojom/echo.test-mojom.h"
-@@ -31,6 +37,7 @@
- #include "components/search_engines/template_url.h"
- #include "components/search_engines/template_url_data.h"
- #include "components/search_engines/template_url_service.h"
-+#include "components/split_tabs/split_tab_visual_data.h"
- #include "components/tabs/public/tab_interface.h"
- #include "content/public/browser/web_contents.h"
- #include "content/public/test/browser_test.h"
-@@ -43,6 +50,7 @@
- #include "mojo/public/cpp/test_support/test_utils.h"
- #include "testing/gtest/include/gtest/gtest.h"
- #include "ui/gfx/geometry/rect.h"
-+#include "ui/views/controls/webview/webview.h"
- 
- namespace glic {
- 
-@@ -1349,4 +1357,75 @@ IN_PROC_BROWSER_TEST_F(ExplainSuggestionBrowserTest, AskGeminiOpensGlic) {
-             SelectionOverlayController::State::kOff);
- }
- 
-+IN_PROC_BROWSER_TEST_F(SelectionOverlayBrowserTest,
-+                       SelectionStaysScopedThroughSplitLifecycle) {
-+  tabs::TabInterface* sibling_tab = CreateAndActivateTab(GetSimpleTestUrl());
-+  tabs::TabInterface* selection_tab = CreateAndActivateTab(GetSimpleTestUrl());
-+  TabStripModel* const tab_strip_model = GetBrowser()->GetTabStripModel();
-+  ASSERT_TRUE(sibling_tab);
-+  ASSERT_TRUE(selection_tab);
-+
-+  tab_strip_model->AddToNewSplit(
-+      {tab_strip_model->GetIndexOfTab(sibling_tab)},
-+      split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kSideBySide),
-+      split_tabs::SplitTabCreatedSource::kToolbarButton);
-+  ASSERT_TRUE(sibling_tab->IsSplit());
-+  ASSERT_TRUE(selection_tab->IsSplit());
-+  ASSERT_TRUE(selection_tab->IsActivated());
-+
-+  ASSERT_OK(OpenGlicForActiveTab());
-+  auto* const controller = SelectionOverlayController::FromTabWebContents(
-+      selection_tab->GetContents());
-+  ASSERT_TRUE(controller);
-+  controller->Show(/*options=*/nullptr);
-+  ASSERT_OK(RunUntilEqual(
-+      [&]() { return controller->state(); },
-+      SelectionOverlayController::State::kOverlay,
-+      "Timeout waiting for SelectionOverlayController state to be kOverlay"));
-+
-+  BrowserView* const browser_view =
-+      BrowserView::GetBrowserViewForBrowser(GetBrowser());
-+  ASSERT_TRUE(browser_view);
-+  views::WebView* const overlay = controller->GetOverlayWebViewForTesting();
-+  ASSERT_TRUE(overlay);
-+  const auto overlay_matches_owning_pane = [&]() {
-+    auto* const container =
-+        browser_view->GetContentsContainerViewFor(selection_tab->GetContents());
-+    auto* const host = controller->GetOverlayViewForTesting();
-+    return container && host &&
-+           controller->GetOverlayWebViewForTesting() == overlay &&
-+           overlay->parent() == host && overlay->IsDrawn() &&
-+           overlay->GetBoundsInScreen() ==
-+               container->contents_view()->GetBoundsInScreen();
-+  };
-+  ASSERT_OK(RunUntilEqual(overlay_matches_owning_pane, true,
-+                          "Selection overlay did not match its owning pane"));
-+
-+  tab_strip_model->ReverseTabsInSplit(selection_tab->GetSplit().value());
-+  ASSERT_OK(RunUntilEqual(overlay_matches_owning_pane, true,
-+                          "Selection overlay lost its pane after reversal"));
-+
-+  tab_strip_model->ActivateTabAt(tab_strip_model->GetIndexOfTab(sibling_tab));
-+  EXPECT_TRUE(overlay_matches_owning_pane());
-+  tab_strip_model->ActivateTabAt(tab_strip_model->GetIndexOfTab(selection_tab));
-+  EXPECT_TRUE(overlay_matches_owning_pane());
-+
-+  tab_strip_model->CloseWebContentsAt(
-+      tab_strip_model->GetIndexOfTab(sibling_tab), TabCloseTypes::CLOSE_NONE);
-+  ASSERT_OK(RunUntilEqual([&]() { return selection_tab->IsSplit(); }, false,
-+                          "Selection tab did not leave split view"));
-+  ASSERT_OK(RunUntilEqual(overlay_matches_owning_pane, true,
-+                          "Selection overlay did not expand with its tab"));
-+
-+  controller->Close();
-+  ASSERT_OK(RunUntilEqual(
-+      [&]() { return controller->state(); },
-+      SelectionOverlayController::State::kOff,
-+      "Timeout waiting for SelectionOverlayController state to be kOff"));
-+  EXPECT_TRUE(
-+      browser_view->GetContentsContainerViewFor(selection_tab->GetContents())
-+          ->contents_view()
-+          ->GetEnabled());
-+}
-+
- }  // namespace glic
 diff --git a/chrome/browser/glic/selection/selection_overlay_controller.cc b/chrome/browser/glic/selection/selection_overlay_controller.cc
 index be7eed5eb0..930fbc1d73 100644
 --- a/chrome/browser/glic/selection/selection_overlay_controller.cc
@@ -1002,7 +832,7 @@ index e63935632d..74ea99403f 100644
    // and windows created by Ash (launcher, background, etc).
  
 diff --git a/chrome/browser/mac/BUILD.gn b/chrome/browser/mac/BUILD.gn
-index 031f1606ca..aef6def95d 100644
+index 031f1606ca..f27a9b3265 100644
 --- a/chrome/browser/mac/BUILD.gn
 +++ b/chrome/browser/mac/BUILD.gn
 @@ -4,14 +4,21 @@
@@ -1027,9 +857,15 @@ index 031f1606ca..aef6def95d 100644
      "BROWSER_PRODUCT_NAME=\"$browser_product_name\"",
      "-e",
      "UPDATER_PRODUCT_NAME=\"$updater_product_full_name\"",
-@@ -32,11 +39,14 @@ test("install_sh_test") {
+@@ -30,13 +37,19 @@ process_version("install") {
+ # other commonly-run targets.
+ test("install_sh_test") {
    testonly = true
-   sources = [ "install_test.cc" ]
+-  sources = [ "install_test.cc" ]
++  sources = [
++    "//components/yee_branding/yee_mac_install_unittest.cc",
++    "install_test.cc",
++  ]
    deps = [
 +    ":impl",
 +    ":mac",
@@ -1109,316 +945,6 @@ index b822ec667f..4cb1582924 100644
      LOG(ERROR) << "MediaResidesOnDiskImage";
      return;
    }
-diff --git a/chrome/browser/mac/install_test.cc b/chrome/browser/mac/install_test.cc
-index e557c973b8..04e9a345ac 100644
---- a/chrome/browser/mac/install_test.cc
-+++ b/chrome/browser/mac/install_test.cc
-@@ -3,7 +3,12 @@
- // found in the LICENSE file.
- 
- #include <string>
-+#include <utility>
-+#include <vector>
- 
-+#include "base/apple/bundle_locations.h"
-+#include "base/apple/foundation_util.h"
-+#include "base/apple/scoped_cftyperef.h"
- #include "base/base_paths.h"
- #include "base/command_line.h"
- #include "base/files/file_path.h"
-@@ -12,10 +17,13 @@
- #include "base/functional/bind.h"
- #include "base/path_service.h"
- #include "base/process/launch.h"
-+#include "base/strings/string_util.h"
-+#include "base/strings/sys_string_conversions.h"
- #include "base/test/launcher/unit_test_launcher.h"
- #include "base/test/test_suite.h"
- #include "build/branding_buildflags.h"
- #include "build/build_config.h"
-+#include "chrome/browser/mac/install_from_dmg.h"
- #include "testing/gtest/include/gtest/gtest.h"
- 
- // WARNING! Running these tests may alter or destroy a current installation of
-@@ -23,6 +31,278 @@
- 
- namespace {
- 
-+class DiskImageInstallTest : public testing::Test {
-+ protected:
-+  void SetUp() override {
-+    ASSERT_TRUE(temporary_.CreateUniqueTempDir());
-+    source_ = temporary_.GetPath().AppendASCII("source");
-+    bundle_ = source_.AppendASCII("YeeDiskImageTest.app");
-+    ASSERT_TRUE(base::CreateDirectory(bundle_.AppendASCII("Contents")));
-+    ASSERT_TRUE(base::WriteFile(
-+        bundle_.AppendASCII("Contents/Info.plist"),
-+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-+        "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">"
-+        "<plist version=\"1.0\"><dict>"
-+        "<key>CFBundleIdentifier</key><string>org.yee.disk-image-test</string>"
-+        "<key>CFBundlePackageType</key><string>APPL</string>"
-+        "</dict></plist>"));
-+  }
-+
-+  void TearDown() override {
-+    base::apple::SetOverrideOuterBundlePath(base::FilePath());
-+    if (!image_.empty()) {
-+      EXPECT_TRUE(DetachOwnedImage());
-+    }
-+  }
-+
-+  bool MountImage(bool read_only) {
-+    image_ = base::MakeAbsoluteFilePath(temporary_.GetPath())
-+                 .AppendASCII("fixture with spaces.dmg");
-+    if (!RunHdiutil({"create", "-fs", "HFS+", "-format", "UDRW", "-volname",
-+                     "YeeDiskImageTest", "-srcfolder", source_.value(),
-+                     image_.value()})) {
-+      return false;
-+    }
-+    mount_ = temporary_.GetPath().AppendASCII("volume");
-+    if (!base::CreateDirectory(mount_)) {
-+      return false;
-+    }
-+    std::vector<std::string> arguments = {"attach", "-nobrowse", "-noautoopen"};
-+    if (read_only) {
-+      arguments.push_back("-readonly");
-+    }
-+    arguments.insert(arguments.end(),
-+                     {"-mountpoint", mount_.value(), image_.value()});
-+    const bool mounted = RunHdiutil(arguments);
-+    if (mounted) {
-+      bundle_ = mount_.AppendASCII("YeeDiskImageTest.app");
-+    }
-+    return mounted;
-+  }
-+
-+  bool DetachOwnedImage() {
-+    // 추출 실패로 마운트 지점만 사라져도, 현재 검사 파일의 연결을 찾아
-+    // 정리한다.
-+    std::string output;
-+    if (!RunHdiutil({"info", "-plist"}, &output)) {
-+      return false;
-+    }
-+    base::apple::ScopedCFTypeRef<CFDataRef> data(CFDataCreate(
-+        nullptr, reinterpret_cast<const UInt8*>(output.data()), output.size()));
-+    base::apple::ScopedCFTypeRef<CFPropertyListRef> plist(
-+        CFPropertyListCreateWithData(
-+            nullptr, data.get(), kCFPropertyListImmutable, nullptr, nullptr));
-+    auto root = base::apple::CFCast<CFDictionaryRef>(plist.get());
-+    auto images = root ? base::apple::CFCast<CFArrayRef>(
-+                             CFDictionaryGetValue(root, CFSTR("images")))
-+                       : nullptr;
-+    if (!images) {
-+      return false;
-+    }
-+    for (CFIndex i = 0; i < CFArrayGetCount(images); ++i) {
-+      auto image = base::apple::CFCast<CFDictionaryRef>(
-+          CFArrayGetValueAtIndex(images, i));
-+      if (!image) {
-+        continue;
-+      }
-+      auto path = base::apple::CFCast<CFStringRef>(
-+          CFDictionaryGetValue(image, CFSTR("image-path")));
-+      if (!path || base::SysCFStringRefToUTF8(path) != image_.value()) {
-+        continue;
-+      }
-+      auto entities = base::apple::CFCast<CFArrayRef>(
-+          CFDictionaryGetValue(image, CFSTR("system-entities")));
-+      if (!entities) {
-+        return false;
-+      }
-+      for (CFIndex j = 0; j < CFArrayGetCount(entities); ++j) {
-+        auto entity = base::apple::CFCast<CFDictionaryRef>(
-+            CFArrayGetValueAtIndex(entities, j));
-+        auto device =
-+            entity ? base::apple::CFCast<CFStringRef>(
-+                         CFDictionaryGetValue(entity, CFSTR("dev-entry")))
-+                   : nullptr;
-+        if (device) {
-+          return RunHdiutil({"detach", base::SysCFStringRefToUTF8(device)});
-+        }
-+      }
-+      return false;
-+    }
-+    return true;
-+  }
-+
-+  bool RunHdiutil(const std::vector<std::string>& arguments,
-+                  std::string* captured_output = nullptr) {
-+    base::CommandLine command(base::FilePath("/usr/bin/hdiutil"));
-+    for (const auto& argument : arguments) {
-+      command.AppendArg(argument);
-+    }
-+    std::string output;
-+    int exit_code = -1;
-+    const bool launched =
-+        base::GetAppOutputWithExitCode(command, &output, &exit_code);
-+    if (!launched || exit_code != 0) {
-+      ADD_FAILURE() << "hdiutil failed (" << exit_code << "): " << output;
-+      return false;
-+    }
-+    if (captured_output) {
-+      *captured_output = std::move(output);
-+    }
-+    return true;
-+  }
-+
-+  base::ScopedTempDir temporary_;
-+  base::FilePath source_;
-+  base::FilePath bundle_;
-+  base::FilePath mount_;
-+  base::FilePath image_;
-+};
-+
-+TEST_F(DiskImageInstallTest, ReadOnlyImageIsAnInstallSource) {
-+  // hdiutil의 실제 IOMedia 조상을 통해 설치 디스크를 인식해야 한다.
-+  ASSERT_TRUE(MountImage(/*read_only=*/true));
-+  base::apple::SetOverrideOuterBundlePath(bundle_);
-+  auto result = IsAppRunningFromReadOnlyDiskImage();
-+  EXPECT_EQ(result.status, DiskImageStatus::kRunningFromDiskImage);
-+  EXPECT_FALSE(result.dmg_bsd_device_name.empty());
-+}
-+
-+TEST_F(DiskImageInstallTest, WritableImageDoesNotTriggerInstallation) {
-+  // 편집 중인 쓰기 가능한 이미지에서는 설치를 제안하지 않는다.
-+  ASSERT_TRUE(MountImage(/*read_only=*/false));
-+  base::apple::SetOverrideOuterBundlePath(bundle_);
-+  EXPECT_EQ(IsAppRunningFromReadOnlyDiskImage().status,
-+            DiskImageStatus::kNotRunningFromDiskImage);
-+}
-+
-+TEST_F(DiskImageInstallTest, OrdinaryBundleDoesNotTriggerInstallation) {
-+  base::apple::SetOverrideOuterBundlePath(bundle_);
-+  EXPECT_EQ(IsAppRunningFromReadOnlyDiskImage().status,
-+            DiskImageStatus::kNotRunningFromDiskImage);
-+}
-+
-+TEST_F(DiskImageInstallTest, EjectsAndTrashesOwnedImage) {
-+  // 실제 image-path를 읽어 검사에서 만든 이미지 하나만 추출하고 휴지통으로
-+  // 옮긴다.
-+  ASSERT_TRUE(MountImage(/*read_only=*/true));
-+  base::apple::SetOverrideOuterBundlePath(bundle_);
-+  auto result = IsAppRunningFromReadOnlyDiskImage();
-+  ASSERT_EQ(result.status, DiskImageStatus::kRunningFromDiskImage);
-+  ASSERT_FALSE(result.dmg_bsd_device_name.empty());
-+  EjectAndTrashDiskImage(result.dmg_bsd_device_name);
-+  EXPECT_FALSE(base::PathExists(bundle_));
-+  EXPECT_FALSE(base::PathExists(image_));
-+}
-+
-+TEST(InstallShTest, UpdaterBuildFlagControlsElevatedSteps) {
-+  // 실제 템플릿을 렌더하되 EUID 판정과 시스템 명령만 임시 fixture로 바꾼다.
-+  // 권한 승격이나 /Applications·/Library·LaunchServices 변경은 하지 않는다.
-+  base::FilePath source_root;
-+  ASSERT_TRUE(
-+      base::PathService::Get(base::DIR_SRC_TEST_DATA_ROOT, &source_root));
-+  for (bool updater_enabled : {false, true}) {
-+    SCOPED_TRACE(updater_enabled);
-+    base::ScopedTempDir temporary;
-+    ASSERT_TRUE(temporary.CreateUniqueTempDir());
-+    const auto root = temporary.GetPath();
-+    const auto commands = root.AppendASCII("commands");
-+    ASSERT_TRUE(base::CreateDirectory(commands));
-+    const auto spy = commands.AppendASCII("spy");
-+    ASSERT_TRUE(base::WriteFile(spy, R"script(#!/bin/bash
-+set -eu
-+name="$(basename "$0")"
-+printf '%s\n' "$name $*" >> "$YEE_INSTALL_TEST_LOG"
-+if [[ "$name" == "defaults" && "$1" == "read" ]]; then
-+  case "${@: -1}" in
-+    KSProductID) echo org.yee.install-fixture ;;
-+    KSVersion) echo 1 ;;
-+    KSChannelID) echo stable ;;
-+  esac
-+fi
-+)script"));
-+    ASSERT_TRUE(base::SetPosixFilePermissions(spy, 0755));
-+    for (const char* name :
-+         {"defaults", "chown", "xattr", "lsregister", "ksadmin"}) {
-+      ASSERT_TRUE(base::CreateSymbolicLink(spy, commands.AppendASCII(name)));
-+    }
-+    const auto source = root.AppendASCII("source with spaces.app");
-+    ASSERT_TRUE(base::CreateDirectory(source.AppendASCII("Contents")));
-+    ASSERT_TRUE(
-+        base::WriteFile(source.AppendASCII("Contents/Info.plist"), "fixture"));
-+    if (updater_enabled) {
-+      const auto updater = source.AppendASCII(
-+          "Contents/Frameworks/Yee Fixture Framework.framework/Helpers/"
-+          "FixtureUpdater.app/Contents/MacOS/FixtureUpdater");
-+      ASSERT_TRUE(base::CreateDirectory(updater.DirName()));
-+      ASSERT_TRUE(base::CopyFile(spy, updater));
-+      ASSERT_TRUE(base::SetPosixFilePermissions(updater, 0755));
-+    }
-+    const auto script = root.AppendASCII("install.sh");
-+    base::CommandLine render(base::FilePath("/usr/bin/python3"));
-+    // 중첩 인터프리터의 옵션이 script 경로 앞으로 재배치되지 않게 한다.
-+    for (const auto& argument : std::vector<std::string>{
-+             source_root.AppendASCII("build/util/version.py").value(), "-e",
-+             "SHEBANGGUARD=''", "-e",
-+             updater_enabled ? "ENABLE_UPDATER=1" : "ENABLE_UPDATER=0", "-e",
-+             "BROWSER_PRODUCT_NAME='Yee Fixture'", "-e",
-+             "UPDATER_PRODUCT_NAME='FixtureUpdater'", "-e",
-+             "UPDATER_COMPANY_SHORT_NAME='YeeFixture'", "-e",
-+             "KEYSTONE_APP_NAME='FixtureKeystone'", "-i",
-+             source_root.AppendASCII("chrome/browser/mac/install.sh.in")
-+                 .value(),
-+             "-o", script.value()}) {
-+      render.AppendArg(argument);
-+    }
-+    std::string output;
-+    int exit_code = -1;
-+    ASSERT_TRUE(base::GetAppOutputWithExitCode(render, &output, &exit_code));
-+    ASSERT_EQ(0, exit_code) << output;
-+    std::string contents;
-+    ASSERT_TRUE(base::ReadFileToString(script, &contents));
-+    ASSERT_EQ(std::string::npos, contents.find("@ENABLE_UPDATER@"));
-+    for (const char* token :
-+         {"${EUID}", "export PATH=\"/usr/bin:/usr/sbin:/bin:/sbin\"",
-+          "${LAUNCHSERVICES}/Support/lsregister",
-+          "/Library/YeeFixture/FixtureKeystone/FixtureKeystone.bundle/Contents/"
-+          "MacOS/ksadmin"}) {
-+      ASSERT_NE(std::string::npos, contents.find(token));
-+    }
-+    base::ReplaceSubstringsAfterOffset(&contents, 0, "${EUID}", "0");
-+    base::ReplaceSubstringsAfterOffset(
-+        &contents, 0, "export PATH=\"/usr/bin:/usr/sbin:/bin:/sbin\"",
-+        "export PATH=\"" + commands.value() +
-+            ":/usr/bin:/usr/sbin:/bin:/sbin\"");
-+    base::ReplaceSubstringsAfterOffset(
-+        &contents, 0, "${LAUNCHSERVICES}/Support/lsregister",
-+        commands.AppendASCII("lsregister").value());
-+    base::ReplaceSubstringsAfterOffset(
-+        &contents, 0,
-+        "/Library/YeeFixture/FixtureKeystone/FixtureKeystone.bundle/Contents/"
-+        "MacOS/ksadmin",
-+        commands.AppendASCII("ksadmin").value());
-+    ASSERT_TRUE(base::WriteFile(script, contents));
-+    const auto destination = root.AppendASCII("installed with spaces.app");
-+    const auto log = root.AppendASCII("commands.log");
-+    base::CommandLine install(base::FilePath("/usr/bin/env"));
-+    for (const auto& argument : std::vector<std::string>{
-+             "YEE_INSTALL_TEST_LOG=" + log.value(), "/bin/bash", "-p",
-+             script.value(), source.value(), destination.value()}) {
-+      install.AppendArg(argument);
-+    }
-+    ASSERT_TRUE(base::GetAppOutputWithExitCode(install, &output, &exit_code));
-+    EXPECT_EQ(0, exit_code) << output;
-+    EXPECT_TRUE(
-+        base::PathExists(destination.AppendASCII("Contents/Info.plist")));
-+    ASSERT_TRUE(base::ReadFileToString(log, &output));
-+    EXPECT_EQ(
-+        updater_enabled,
-+        output.find("FixtureUpdater --install --system") != std::string::npos);
-+    EXPECT_EQ(updater_enabled,
-+              output.find("ksadmin --register") != std::string::npos);
-+  }
-+}
-+
- // Chromium does not contain GoogleUpdater; this test only makes sense in
- // Chrome-branded builds.
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
 diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
 index f45f66f62c..89f2189cf5 100644
 --- a/chrome/browser/metrics/chrome_feature_list_creator.cc
@@ -1555,97 +1081,6 @@ index 72fc94f516..9c2b1e39d4 100644
    if (features::kSetDefaultToContinueSession.Get()) {
      return SessionStartupPref::LAST;
    }
-diff --git a/chrome/browser/prefs/session_startup_pref_unittest.cc b/chrome/browser/prefs/session_startup_pref_unittest.cc
-index c7ccf4415d..15e8643da3 100644
---- a/chrome/browser/prefs/session_startup_pref_unittest.cc
-+++ b/chrome/browser/prefs/session_startup_pref_unittest.cc
-@@ -6,8 +6,12 @@
- 
- #include <memory>
- 
-+#include "base/test/scoped_command_line.h"
-+#include "base/test/scoped_feature_list.h"
- #include "base/values.h"
- #include "build/build_config.h"
-+#include "chrome/browser/prefs/session_startup_pref.h"
-+#include "chrome/browser/ui/ui_features.h"
- #include "chrome/common/pref_names.h"
- #include "components/pref_registry/pref_registry_syncable.h"
- #include "components/sync_preferences/testing_pref_service_syncable.h"
-@@ -20,6 +24,10 @@
- #include "chrome/browser/flags/android/chrome_feature_list.h"
- #endif
- 
-+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
-+#include "chrome/browser/ui/views/yee/shell_features.h"
-+#endif
-+
- // Unit tests for SessionStartupPref.
- class SessionStartupPrefTest : public testing::Test {
-  public:
-@@ -66,6 +74,10 @@ TEST_F(SessionStartupPrefTest, DefaultStartupType) {
-             SessionStartupPref::GetDefaultStartupType());
- 
-   base::android::device_info::reset_is_desktop_for_testing();
-+#elif BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
-+  EXPECT_EQ(yee::IsShellEnabled() ? SessionStartupPref::LAST
-+                                  : SessionStartupPref::DEFAULT,
-+            SessionStartupPref::GetDefaultStartupType());
- #else
-   EXPECT_EQ(SessionStartupPref::DEFAULT,
-             SessionStartupPref::GetDefaultStartupType());
-@@ -86,6 +98,51 @@ TEST_F(SessionStartupPrefTest, URLListIsFixedUp) {
-   EXPECT_EQ("http://chromium.org/", result.urls[1].spec());
- }
- 
-+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
-+// 새 Yee 프로필은 이전 탭과 그룹을 복원하고 명시적 사용자·관리자 설정을 따른다.
-+TEST_F(SessionStartupPrefTest, YeeDefaultsToLastSessionAndKeepsOverrides) {
-+  EXPECT_EQ(SessionStartupPref::LAST,
-+            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
-+  EXPECT_TRUE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
-+
-+  pref_service_->SetInteger(prefs::kRestoreOnStartup,
-+                            SessionStartupPref::kPrefValueNewTab);
-+  EXPECT_EQ(SessionStartupPref::DEFAULT,
-+            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
-+  EXPECT_FALSE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
-+
-+  pref_service_->SetManagedPref(
-+      prefs::kRestoreOnStartup,
-+      base::Value(SessionStartupPref::kPrefValueURLs));
-+  EXPECT_EQ(SessionStartupPref::URLS,
-+            SessionStartupPref::GetStartupPref(pref_service_.get()).type);
-+  EXPECT_TRUE(SessionStartupPref::TypeIsManaged(pref_service_.get()));
-+}
-+
-+// 특정 시작 페이지를 고른 사용자에게는 이전 세션 복원을 강제하지 않는다.
-+TEST_F(SessionStartupPrefTest, YeeKeepsExplicitStartupURLs) {
-+  SessionStartupPref selected(SessionStartupPref::URLS);
-+  selected.urls.push_back(GURL("https://example.test/start"));
-+  SessionStartupPref::SetStartupPref(pref_service_.get(), selected);
-+
-+  const auto restored = SessionStartupPref::GetStartupPref(pref_service_.get());
-+  EXPECT_EQ(SessionStartupPref::URLS, restored.type);
-+  EXPECT_EQ(selected.urls, restored.urls);
-+  EXPECT_FALSE(SessionStartupPref::TypeIsDefault(pref_service_.get()));
-+}
-+
-+// Yee shell을 끄면 Chromium의 기본 시작 동작을 유지한다.
-+TEST_F(SessionStartupPrefTest, DisabledYeeKeepsNativeStartupDefault) {
-+  base::test::ScopedCommandLine command_line;
-+  command_line.GetProcessCommandLine()->AppendSwitch(
-+      "disable-yee-shell-scaffold");
-+  base::test::ScopedFeatureList features;
-+  features.InitAndDisableFeature(::features::kSessionRestoreInfobar);
-+  EXPECT_EQ(SessionStartupPref::DEFAULT,
-+            SessionStartupPref::GetDefaultStartupType());
-+}
-+#endif
-+
- TEST_F(SessionStartupPrefTest, URLListManagedOverridesUser) {
-   base::ListValue url_pref_list1;
-   url_pref_list1.Append("chromium.org");
 diff --git a/chrome/browser/profiles/BUILD.gn b/chrome/browser/profiles/BUILD.gn
 index f569264cf0..e90d8ae786 100644
 --- a/chrome/browser/profiles/BUILD.gn
@@ -1861,18 +1296,15 @@ index 7d84305c58..c53e55354b 100644
    color: var(--cr-link-color);
  }
 diff --git a/chrome/browser/resources/side_panel/customize_chrome/app.html.ts b/chrome/browser/resources/side_panel/customize_chrome/app.html.ts
-index f199efdebe..0eadbaaa19 100644
+index f199efdebe..a25082844e 100644
 --- a/chrome/browser/resources/side_panel/customize_chrome/app.html.ts
 +++ b/chrome/browser/resources/side_panel/customize_chrome/app.html.ts
-@@ -16,11 +16,23 @@ export function getHtml(this: AppElement) {
+@@ -16,11 +16,20 @@ export function getHtml(this: AppElement) {
        <sp-heading hide-back-button>
          <h2 slot="heading">$i18n{appearanceHeader}</h2>
        </sp-heading>
 +      ${this.yeeCustomization_ ? html`
-+        <yee-tab-layout .vertical="${this.yeeTabLayoutVertical_}"
-+            .disabled="${!this.yeeTabLayoutEnabled_}"
-+            @layout-change="${this.onYeeTabLayoutChange_}">
-+        </yee-tab-layout>
++        <yee-tab-layout></yee-tab-layout>
 +      ` : ''}
        <customize-chrome-appearance @edit-theme-click="${this.onEditThemeClick_}"
            @wallpaper-search-click="${this.onWallpaperSearchClick_}"
@@ -1888,7 +1320,7 @@ index f199efdebe..0eadbaaa19 100644
      <hr class="sp-cards-separator">
      ${this.toolbarCustomizationEnabled_ ? html`
        <cr-button id="toolbarButton" class="section sp-card"
-@@ -34,6 +46,7 @@ export function getHtml(this: AppElement) {
+@@ -34,6 +43,7 @@ export function getHtml(this: AppElement) {
          <cr-icon icon="cr:chevron-right" slot="suffix-icon"></cr-icon>
        </cr-button>
      ` : ''}
@@ -1896,7 +1328,7 @@ index f199efdebe..0eadbaaa19 100644
      ${this.ntpNextFeaturesEnabled_ && this.ntpNextDisablementEnabled_ &&
              this.aimPolicyEnabled_ && this.isSourceTabFirstPartyNtp_() ?
          html`
-@@ -119,7 +132,7 @@ export function getHtml(this: AppElement) {
+@@ -119,7 +129,7 @@ export function getHtml(this: AppElement) {
          page-name="wallpaper-search" id="wallpaperSearchPage">
      </customize-chrome-wallpaper-search>
    ` : ''}
@@ -1906,7 +1338,7 @@ index f199efdebe..0eadbaaa19 100644
          page-name="toolbar" id="toolbarPage">
      </customize-chrome-toolbar>
 diff --git a/chrome/browser/resources/side_panel/customize_chrome/app.ts b/chrome/browser/resources/side_panel/customize_chrome/app.ts
-index eb1c480ef3..48f56cef60 100644
+index eb1c480ef3..ef598441a4 100644
 --- a/chrome/browser/resources/side_panel/customize_chrome/app.ts
 +++ b/chrome/browser/resources/side_panel/customize_chrome/app.ts
 @@ -23,6 +23,8 @@ import {ColorChangeUpdater} from 'chrome://resources/cr_components/color_change_
@@ -1927,16 +1359,7 @@ index eb1c480ef3..48f56cef60 100644
    }
  
    override render() {
-@@ -79,6 +81,8 @@ export class AppElement extends AppElementBase {
-   static override get properties() {
-     return {
-       page_: {type: String},
-+      yeeTabLayoutVertical_: {type: Boolean},
-+      yeeTabLayoutEnabled_: {type: Boolean},
-       modulesEnabled_: {type: Boolean},
-       selectedCollection_: {type: Object},
-       extensionPolicyEnabled_: {type: Boolean},
-@@ -93,6 +97,8 @@ export class AppElement extends AppElementBase {
+@@ -93,6 +95,8 @@ export class AppElement extends AppElementBase {
        showFooter_: {type: Boolean},
        showFooterForManagedBrowser_: {type: Boolean},
        toolbarCustomizationEnabled_: {type: Boolean},
@@ -1945,7 +1368,7 @@ index eb1c480ef3..48f56cef60 100644
      };
    }
  
-@@ -120,15 +126,31 @@ export class AppElement extends AppElementBase {
+@@ -120,6 +124,10 @@ export class AppElement extends AppElementBase {
    protected accessor showFooterForManagedBrowser_: boolean = false;
    protected accessor toolbarCustomizationEnabled_: boolean =
        loadTimeData.getBoolean('toolbarCustomizationEnabled');
@@ -1956,36 +1379,7 @@ index eb1c480ef3..48f56cef60 100644
  
    private listenerIds_: number[] = [];
    private apiProxy_: CustomizeChromeApiProxy =
-       CustomizeChromeApiProxy.getInstance();
- 
-+  protected accessor yeeTabLayoutVertical_: boolean = false;
-+  protected accessor yeeTabLayoutEnabled_: boolean = false;
-+
-+  protected onYeeTabLayoutChange_(event: CustomEvent<{vertical: boolean}>) {
-+    this.apiProxy_.handler.setTabLayout(event.detail.vertical);
-+  }
-+
-   override connectedCallback() {
-     super.connectedCallback();
- 
-     this.listenerIds_ = [
-+      this.apiProxy_.callbackRouter.setTabLayout.addListener(
-+          (vertical, enabled) => {
-+            this.yeeTabLayoutVertical_ = vertical;
-+            this.yeeTabLayoutEnabled_ = enabled;
-+          }),
-       this.apiProxy_.callbackRouter.scrollToSection.addListener(
-           this.onScrollToSection_.bind(this)),
-       this.apiProxy_.callbackRouter.attachedTabStateUpdated.addListener(
-@@ -139,6 +161,7 @@ export class AppElement extends AppElementBase {
-           this.onSetFooterSettings_.bind(this)),
-     ];
- 
-+    this.apiProxy_.handler.updateTabLayout();
-     this.apiProxy_.handler.updateAttachedTabState();
-     this.apiProxy_.handler.updateFooterSettings();
- 
-@@ -219,7 +242,6 @@ export class AppElement extends AppElementBase {
+@@ -219,7 +227,6 @@ export class AppElement extends AppElementBase {
      element.scrollIntoView({behavior: 'auto'});
    }
  
@@ -1993,7 +1387,7 @@ index eb1c480ef3..48f56cef60 100644
    private onAttachedTabStateUpdated_(newTabPageType: NewTabPageType) {
      if (this.newTabPageType_ === newTabPageType) {
        return;
-@@ -249,7 +271,6 @@ export class AppElement extends AppElementBase {
+@@ -249,7 +256,6 @@ export class AppElement extends AppElementBase {
      this.extensionPolicyEnabled_ = extensionPolicyEnabled;
    }
  
@@ -2001,7 +1395,7 @@ index eb1c480ef3..48f56cef60 100644
    protected computeShowFooter_(): boolean {
      return this.footerEnabled_ &&
          ((this.extensionPolicyEnabled_ &&
-@@ -350,6 +371,10 @@ export class AppElement extends AppElementBase {
+@@ -350,6 +356,10 @@ export class AppElement extends AppElementBase {
    }
  
    private async openToolbarCustomizationPage() {
@@ -2247,48 +1641,6 @@ index e8b59e5765..bb0995fe44 100644
      OnAnimationEnded(params);
    }
  
-diff --git a/chrome/browser/ui/animation/browser_animation_controller_unittest.cc b/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
-index 13acd3bf1e..9eff768906 100644
---- a/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
-+++ b/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
-@@ -1289,6 +1289,37 @@ TEST_F(BrowserAnimationControllerTest, Reset_MidMotion_SameMotion) {
-                                                kTestAnimationSequence1));
-   EXPECT_EQ(0.0, controller()->GetCurrentValue(kTestAnimationGroup,
-                                                kTestAnimationSequence2));
-+  // Reset 후에도 원래 종료 시각을 지나 진행시키면 늦은 tick이 없어야 한다.
-+  FastForwardMs(600);
-+  EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
-+  EXPECT_EQ(1.0, controller()->GetCurrentValue(kTestAnimationGroup,
-+                                               kTestAnimationSequence1));
-+}
-+
-+// 마지막 progress 안에서 Reset해도 종료 알림과 이후 tick을 중복시키지 않는다.
-+TEST_F(BrowserAnimationControllerTest, Reset_FromFinalProgressHasSingleEnd) {
-+  SetProvider<ResetAnimationProvider>();
-+  UNCALLED_MOCK_CALLBACK(BrowserAnimationCallback, callback);
-+  const auto subscription =
-+      controller()->Subscribe(kTestAnimationGroup, callback.Get());
-+  bool reset = false;
-+  EXPECT_CALL(callback, Run(testing::_, BrowserAnimationUpdate::kStarted));
-+  EXPECT_CALL(callback, Run(testing::_, BrowserAnimationUpdate::kEnded))
-+      .Times(1);
-+  EXPECT_CALL(callback, Run(testing::_, BrowserAnimationUpdate::kProgressed))
-+      .WillRepeatedly(
-+          [&](const BrowserAnimationController*, BrowserAnimationUpdate) {
-+            if (!reset &&
-+                controller()->GetCurrentValue(kTestAnimationGroup,
-+                                              kTestAnimationSequence1) == 1.0) {
-+              reset = true;
-+              controller()->Reset(kTestAnimationGroup, kTestAnimationMotion1);
-+            }
-+          });
-+  controller()->Start(kTestAnimationGroup, kTestAnimationMotion1);
-+  FastForwardMs(1100);
-+  EXPECT_TRUE(reset);
-+  EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
- }
- 
- TEST_F(BrowserAnimationControllerTest, Reset_NoMotion_NoMotionSpecified) {
 diff --git a/chrome/browser/ui/bookmarks/BUILD.gn b/chrome/browser/ui/bookmarks/BUILD.gn
 index 0adef7640a..6a03e73494 100644
 --- a/chrome/browser/ui/bookmarks/BUILD.gn
@@ -3184,60 +2536,6 @@ index 0f1ee4f117..afdc891f6f 100644
    UpdateHighlight();
  }
  
-diff --git a/chrome/browser/ui/tabs/tab_data_browsertest.cc b/chrome/browser/ui/tabs/tab_data_browsertest.cc
-index 628c12ef99..9e0b3d0621 100644
---- a/chrome/browser/ui/tabs/tab_data_browsertest.cc
-+++ b/chrome/browser/ui/tabs/tab_data_browsertest.cc
-@@ -36,6 +36,7 @@
- #include "components/javascript_dialogs/app_modal_dialog_view.h"
- #include "components/tabs/public/tab_alert.h"
- #include "components/tabs/public/tab_interface.h"
-+#include "content/public/browser/favicon_status.h"
- #include "content/public/browser/navigation_controller.h"
- #include "content/public/browser/navigation_entry.h"
- #include "content/public/browser/web_contents.h"
-@@ -45,7 +46,9 @@
- #include "testing/gtest/include/gtest/gtest.h"
- #include "third_party/blink/public/common/mediastream/media_stream_request.h"
- #include "third_party/blink/public/mojom/mediastream/media_stream.mojom.h"
-+#include "third_party/skia/include/core/SkBitmap.h"
- #include "ui/base/window_open_disposition.h"
-+#include "ui/gfx/image/image.h"
- #include "ui/gfx/image/image_skia.h"
- #include "url/url_constants.h"
- 
-@@ -163,10 +166,30 @@ IN_PROC_BROWSER_TEST_F(TabDataObserverBrowserTest, FaviconAndIconFlags) {
-         ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
-     auto tab_data_observer = std::make_unique<TabDataObserver>(tab_interface);
-     const TabData& data = tab_data_observer->tab_data();
-+    ASSERT_FALSE(data.favicon.IsEmpty());
-     EXPECT_EQ(data.favicon, TabUIHelper::From(tab_interface)->GetFavicon());
--    EXPECT_FALSE(data.should_themify_favicon);
-+    EXPECT_TRUE(data.should_themify_favicon);
-     EXPECT_FALSE(data.is_monochrome_favicon);
-     EXPECT_TRUE(data.should_display_favicon);
-+
-+    // Native favicon driver가 유효하다고 판정한 사이트 아이콘은 원래 색을
-+    // 유지한다.
-+    auto* entry =
-+        tab_interface->GetContents()->GetController().GetLastCommittedEntry();
-+    ASSERT_NE(nullptr, entry);
-+    entry->SetURL(GURL("https://example.com/"));
-+    entry->SetVirtualURL(entry->GetURL());
-+    SkBitmap bitmap;
-+    bitmap.allocN32Pixels(16, 16);
-+    bitmap.eraseColor(SK_ColorBLUE);
-+    *bitmap.getAddr32(0, 0) = SK_ColorRED;
-+    const gfx::Image site_favicon = gfx::Image::CreateFrom1xBitmap(bitmap);
-+    entry->GetFavicon().valid = true;
-+    entry->GetFavicon().url = GURL("https://example.com/favicon.ico");
-+    entry->GetFavicon().image = site_favicon;
-+    const TabData valid_icon_data = TabData::FromTabInterface(tab_interface);
-+    EXPECT_FALSE(valid_icon_data.should_themify_favicon);
-+    EXPECT_EQ(ui::ImageModel::FromImage(site_favicon), valid_icon_data.favicon);
-   }
- 
-   {  // Themeable by virtual URL only.
 diff --git a/chrome/browser/ui/tabs/tab_features.cc b/chrome/browser/ui/tabs/tab_features.cc
 index b8826e9cb6..f5a9f5b4a0 100644
 --- a/chrome/browser/ui/tabs/tab_features.cc
@@ -3596,7 +2894,7 @@ index e20e096dfc..5995b9d238 100644
  
  void FindBarHost::SetDialogPosition(const gfx::Rect& new_pos) {
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
-index 07ff3566c1..47ca0e57a9 100644
+index 07ff3566c1..e28dc5cc51 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
 +++ b/chrome/browser/ui/views/frame/BUILD.gn
 @@ -474,6 +474,7 @@ source_set("base_tab_strip_region_view") {
@@ -3855,14 +3153,14 @@ index 07ff3566c1..47ca0e57a9 100644
    }
  
    source_set("browser_native_widget_factory_mac") {
-@@ -2258,6 +2319,7 @@ source_set("unit_tests") {
+@@ -2256,6 +2317,7 @@ source_set("unit_tests") {
+   testonly = true
+ 
    sources = [
++    "//chrome/browser/ui/views/yee/yee_browser_view_tabbed_layout_native_geometry_unittest.cc",
      "frame_separator_unittest.cc",
      "layout/browser_view_layout_params_unittest.cc",
-+    "layout/browser_view_tabbed_layout_native_geometry_unittest.cc",
      "multi_contents_drop_target_view_unittest.cc",
-     "multi_contents_view_drop_target_controller_unittest.cc",
-     "safe_invoke/safe_invoke_unittest.cc",
 @@ -2313,6 +2375,8 @@ source_set("unit_tests") {
        "//chrome/browser/ui/views:tab_icon_view",
      ]
@@ -17425,44 +16723,6 @@ index de391b015c..10a7273aba 100644
  };
  
  #endif  // CHROME_BROWSER_UI_VIEWS_SIDE_PANEL_SIDE_PANEL_H_
-diff --git a/chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc b/chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc
-index 002417e852..18dc112b70 100644
---- a/chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc
-+++ b/chrome/browser/ui/views/side_panel/side_panel_coordinator_browsertest.cc
-@@ -57,6 +57,7 @@
- #include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
- #include "chrome/browser/ui/views/frame/browser_view.h"
- #include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
-+#include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.h"
- #include "chrome/browser/ui/views/frame/multi_contents_view.h"
- #include "chrome/browser/ui/views/side_panel/side_panel.h"
- #include "chrome/browser/ui/views/side_panel/side_panel_animation_content_view.h"
-@@ -2604,11 +2605,25 @@ IN_PROC_BROWSER_TEST_F(SidePanelCoordinatorTest,
-   // Advance the animation by 150ms, at this point the browser view should own
-   // the contents view.
-   test_api.IncrementTime(base::Milliseconds(150));
-+  BrowserView* const browser_view =
-+      BrowserView::GetBrowserViewForBrowser(browser());
-+  views::test::RunScheduledLayout(browser_view);
-   ASSERT_NE(BrowserView::GetBrowserViewForBrowser(browser())
-                 ->GetBrowserViewLayoutForTesting()
-                 ->side_panel_animation_content(),
-             nullptr);
-   ASSERT_EQ(side_panel->GetContentParentView()->children().size(), 0u);
-+  auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
-+      browser_view->GetBrowserViewLayoutForTesting());
-+  ASSERT_TRUE(layout->last_native_layout_for_testing());
-+  const auto& native_result = *layout->last_native_layout_for_testing();
-+  ASSERT_TRUE(native_result.side_panel.animation_content_bounds);
-+  EXPECT_EQ(*native_result.side_panel.animation_content_bounds,
-+            browser_view->GetSidePanelAnimationContent()->bounds());
-+  EXPECT_EQ(native_result.side_panel.current_bounds, side_panel->bounds());
-+  EXPECT_EQ(native_result.side_panel.local_clip_bounds,
-+            side_panel->clip_to_visible_area_for_testing());
-+  EXPECT_EQ(1, native_result.top_container_calculation_count);
- 
-   // Advance the animation to its end, at this point the contents view should be
-   // reparented to the side panel's ContentParentView.
 diff --git a/chrome/browser/ui/views/side_panel/side_panel_header.cc b/chrome/browser/ui/views/side_panel/side_panel_header.cc
 index bcb52bda7f..7f7ffbb41a 100644
 --- a/chrome/browser/ui/views/side_panel/side_panel_header.cc
@@ -17797,7 +17057,7 @@ index c726fbc277..752dda078f 100644
  
  bool BrowserTabStripController::GetContextMenuAccelerator(
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 7571027287..9e4073d033 100644
+index 7571027287..ba2e6ee225 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
 @@ -4,6 +4,7 @@
@@ -17834,7 +17094,7 @@ index 7571027287..9e4073d033 100644
  }
  
  source_set("browser_tests") {
-@@ -226,9 +232,81 @@ source_set("browser_tests") {
+@@ -226,9 +232,85 @@ source_set("browser_tests") {
    }
  }
  
@@ -17892,16 +17152,20 @@ index 7571027287..9e4073d033 100644
 +# 전체 unit_tests 링크는 피한다.
 +test("yee_layout_unittests") {
 +  sources = [
-+    "../../frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc",
++    "//chrome/browser/ui/views/yee/yee_browser_animation_controller_unittest.cc",
++    "//chrome/browser/ui/views/yee/yee_browser_view_tabbed_layout_native_geometry_unittest.cc",
 +  ]
 +  deps = [
 +    ":unit_tests",
 +    "//base/test:test_support",
++    "//chrome/browser/ui:test_support",
++    "//chrome/browser/ui/animation",
 +    "//chrome/browser/ui/animation:unit_tests",
 +    "//chrome/browser/ui/views/frame:browser_view_tabbed_layout_native_geometry",
 +    "//chrome/browser/ui/views/yee:yee_ui",
 +    "//chrome/test:test_support_unit",
 +    "//testing/gtest",
++    "//ui/base/interaction:test_support",
 +    "//ui/views:test_support",
 +  ]
 +}
@@ -17916,7 +17180,7 @@ index 7571027287..9e4073d033 100644
      "tab_collection_animating_layout_manager_unittest.cc",
      "tab_collection_z_order_manager_unittest.cc",
      "tab_group_header_view_unittest.cc",
-@@ -237,16 +315,20 @@ source_set("unit_tests") {
+@@ -237,16 +319,20 @@ source_set("unit_tests") {
    deps = [
      ":common",
      ":impl",
@@ -17937,7 +17201,7 @@ index 7571027287..9e4073d033 100644
    ]
  }
  
-@@ -268,7 +350,9 @@ source_set("interactive_ui_tests") {
+@@ -268,7 +354,9 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui:browser_commands",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui/browser_window",
@@ -17947,7 +17211,7 @@ index 7571027287..9e4073d033 100644
      "//chrome/browser/ui/views/frame:base_tab_strip_region_view",
      "//chrome/browser/ui/views/frame:browser_view_header",
      "//chrome/browser/ui/views/frame:browser_widget",
-@@ -276,9 +360,12 @@ source_set("interactive_ui_tests") {
+@@ -276,9 +364,12 @@ source_set("interactive_ui_tests") {
      "//chrome/browser/ui/views/tabs/hovercard",
      "//chrome/browser/ui/views/tabs/shared",
      "//chrome/browser/ui/views/tabs/tab",
@@ -24702,10 +23966,18 @@ index 0e2111a106..b5a27f3e5b 100644
        network::mojom::CSPDirectiveName::WorkerSrc,
        "worker-src blob: chrome://resources 'self';");
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/BUILD.gn b/chrome/browser/ui/webui/side_panel/customize_chrome/BUILD.gn
-index 3ab90cf072..09635f296d 100644
+index 3ab90cf072..c9648dc77a 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/BUILD.gn
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/BUILD.gn
-@@ -111,6 +111,10 @@ if (!is_android || enable_webui_ntp) {
+@@ -64,6 +64,7 @@ if (!is_android || enable_webui_ntp) {
+       "//chrome/browser/new_tab_page",
+       "//chrome/browser/search/background",
+       "//chrome/browser/themes",
++      "//chrome/browser/ui/views/yee/webui/customization:mojo_bindings",
+       "//chrome/browser/ui/webui/top_chrome",
+       "//chrome/common",
+       "//chrome/common:constants",
+@@ -111,6 +112,10 @@ if (!is_android || enable_webui_ntp) {
        "//chrome/browser/ui/navigator",
        "//chrome/browser/ui/search",
        "//chrome/browser/ui/select_file_policy",
@@ -24716,7 +23988,7 @@ index 3ab90cf072..09635f296d 100644
        "//chrome/browser/ui/webui:theme_source",
        "//chrome/browser/ui/webui:webui_util",
        "//chrome/browser/ui/webui/cr_components/customize_color_scheme_mode",
-@@ -198,6 +202,8 @@ if (!is_android) {
+@@ -198,6 +203,8 @@ if (!is_android) {
        "//chrome/browser/ui:browser_commands",
        "//chrome/browser/ui:ui_features",
        "//chrome/browser/ui/side_panel:side_panel_views_dependent",
@@ -24725,118 +23997,22 @@ index 3ab90cf072..09635f296d 100644
        "//chrome/browser/ui/views/new_tab_footer",
        "//chrome/test:test_support",
        "//chrome/test:test_support_ui",
-diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom
-index 7a8c2af15f..de1c69616c 100644
---- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom
-+++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom
-@@ -163,6 +163,10 @@ interface CustomizeChromePageHandler {
-   // Triggers a call to |CustomizeChromePage.SetTheme()|.
-   UpdateTheme();
- 
-+  // native 탭바 controller가 소유하는 브라우저 탭 배치다.
-+  UpdateTabLayout();
-+  SetTabLayout(bool vertical);
-+
-   // Triggers a call to |CustomizeChromePage.SetThemeEditable()|.
-   UpdateThemeEditable(bool is_theme_editable);
- 
-@@ -256,6 +260,7 @@ interface CustomizeChromePage {
- 
-   // Sets the current theme.
-   SetTheme(Theme theme);
-+  SetTabLayout(bool vertical, bool enabled);
-   // Sets whether edit theme should be enabled.
-   SetThemeEditable(bool is_theme_editable);
-   // Scrolls side panel to |section|. Possibly a response to a call to
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
-index 0589fbcd78..43d395c440 100644
+index 0589fbcd78..de0afeb807 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
-@@ -34,6 +34,10 @@
+@@ -34,6 +34,9 @@
  #include "chrome/browser/ui/search/ntp_user_data_types.h"
  #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
  #include "chrome/browser/ui/ui_features.h"
 +#include "chrome/browser/ui/views/new_tab_footer/footer_controller.h"
 +#include "chrome/browser/ui/views/side_panel/customize_chrome/customize_chrome_utils.h"
-+#include "chrome/browser/ui/views/yee/customization.h"
 +#include "chrome/browser/ui/webui/new_tab_footer/new_tab_footer_helper.h"
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
  #include "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_section.h"
  #include "chrome/browser/ui/webui/webui_embedding_context.h"
-@@ -138,6 +142,10 @@ CustomizeChromePageHandler::CustomizeChromePageHandler(
-   OnBrowserWindowInterfaceChanged();
- 
-   pref_change_registrar_.Init(profile_->GetPrefs());
-+  pref_change_registrar_.Add(
-+      prefs::kVerticalTabsEnabled,
-+      base::BindRepeating(&CustomizeChromePageHandler::UpdateTabLayout,
-+                          base::Unretained(this)));
-   pref_change_registrar_.Add(
-       prefs::kNtpModulesVisible,
-       base::BindRepeating(&CustomizeChromePageHandler::UpdateModulesSettings,
-@@ -333,6 +341,16 @@ void CustomizeChromePageHandler::RemoveBackgroundImage() {
-   }
- }
- 
-+void CustomizeChromePageHandler::UpdateTabLayout() {
-+  const auto state = yee::GetCustomizationTabLayout(*web_contents_);
-+  page_->SetTabLayout(state.vertical, state.enabled);
-+}
-+
-+void CustomizeChromePageHandler::SetTabLayout(bool vertical) {
-+  yee::SetCustomizationTabLayout(*web_contents_, vertical);
-+  UpdateTabLayout();
-+}
-+
- void CustomizeChromePageHandler::UpdateTheme() {
-   if (ntp_custom_background_service_) {
-     ntp_custom_background_service_->RefreshBackgroundIfNeeded();
-@@ -539,6 +557,7 @@ void CustomizeChromePageHandler::UpdateMostVisitedSettings() {
- 
- void CustomizeChromePageHandler::OnBrowserWindowInterfaceChanged() {
- #if !BUILDFLAG(IS_ANDROID)
-+  UpdateTabLayout();
-   if (!base::FeatureList::IsEnabled(ntp_features::kNtpFooter)) {
-     return;
-   }
-diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.h b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.h
-index f8bf8b96df..45a5c29047 100644
---- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.h
-+++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.h
-@@ -132,6 +132,8 @@ class CustomizeChromePageHandler
-       ChooseLocalCustomBackgroundCallback callback) override;
-   void RemoveBackgroundImage() override;
-   void UpdateTheme() override;
-+  void UpdateTabLayout() override;
-+  void SetTabLayout(bool vertical) override;
-   void UpdateThemeEditable(bool is_theme_editable) override;
-   void OpenChromeWebStore() override;
-   void OpenThirdPartyThemePage(const std::string& theme_id) override;
-diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler_unittest.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler_unittest.cc
-index 70f2abf98e..7ad29d8afa 100644
---- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler_unittest.cc
-+++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler_unittest.cc
-@@ -175,6 +175,7 @@ class MockPage : public side_panel::mojom::CustomizeChromePage {
-                bool,
-                const std::vector<ntp_tiles::TileType>&));
-   MOCK_METHOD(void, SetTheme, (side_panel::mojom::ThemePtr));
-+  MOCK_METHOD(void, SetTabLayout, (bool, bool));
-   MOCK_METHOD(void, SetThemeEditable, (bool));
-   MOCK_METHOD(void, ScrollToSection, (CustomizeChromeSection));
-   MOCK_METHOD(void,
-@@ -320,9 +321,7 @@ class CustomizeChromePageHandlerTest : public testing::Test {
-     task_environment_.RunUntilIdle();
-   }
- 
--  void TearDown() override {
--    test_url_loader_factory_.ClearResponses();
--  }
-+  void TearDown() override { test_url_loader_factory_.ClearResponses(); }
- 
-   void SetMostVisitedPrefs(bool custom_links_visible,
-                            bool enterprise_shortcuts_visible,
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc
-index 9cb5428f57..39bc83de84 100644
+index 9cb5428f57..15992f2d2b 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc
 @@ -17,6 +17,8 @@
@@ -24867,6 +24043,43 @@ index 9cb5428f57..39bc83de84 100644
    if (customize_chrome_page_handler_) {
      customize_chrome_page_handler_->ScrollToSection(section);
    } else {
+@@ -550,3 +557,9 @@ void CustomizeChromeUI::CreateCustomizeToolbarHandler(
+       std::move(handler), std::move(client), web_contents_);
+ }
+ #endif
++
++void CustomizeChromeUI::BindInterface(content::RenderFrameHost* frame,
++    mojo::PendingReceiver<yee::mojom::TabLayoutHandler> receiver) {
++  CHECK_EQ(frame->GetWebUI(), web_ui());
++  yee::BindCustomizationTabLayout(*frame, std::move(receiver));
++}
+diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h
+index abe1e4c3bc..7a3f0edddd 100644
+--- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h
++++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h
+@@ -32,7 +32,12 @@
+ #include "chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search.mojom.h"
+ #endif
+ 
++namespace yee::mojom {
++class TabLayoutHandler;
++}
++
+ namespace content {
++class RenderFrameHost;
+ class WebContents;
+ }  // namespace content
+ 
+@@ -101,6 +106,9 @@ class CustomizeChromeUI
+       mojo::PendingReceiver<
+           side_panel::mojom::CustomizeChromePageHandlerFactory> receiver);
+ 
++  void BindInterface(content::RenderFrameHost* frame,
++      mojo::PendingReceiver<yee::mojom::TabLayoutHandler> receiver);
++
+   void BindInterface(
+       mojo::PendingReceiver<help_bubble::mojom::HelpBubbleHandlerFactory>
+           pending_receiver);
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/BUILD.gn b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/BUILD.gn
 index 5186305184..fad85ed69b 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/BUILD.gn
@@ -24954,37 +24167,6 @@ index 6079c8cdf1..304af58b71 100644
    if (url.spec() == chrome::kChromeUISplitViewNewTabPageURL) {
      is_split = tabs::TabInterface::GetFromContents(web_ui_->GetWebContents())
                     ->IsSplit();
-diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-index 7cb8c985a5..eda4f6c872 100644
---- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-+++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler_browsertest.cc
-@@ -1502,6 +1502,26 @@ IN_PROC_BROWSER_TEST_P(TabSearchPageHandlerTest, RemoveSplit_NTP) {
-   ASSERT_TRUE(ui_test_utils::NavigateToURL(
-       browser1(), GURL(chrome::kChromeUISplitViewNewTabPageURL)));
- 
-+  // 분할 새 탭이 아직 현재 문서인 동안 다음 이동의 표시 URL로 판정하면
-+  // 비동기 응답이 false가 되어 사용자가 입력한 이동을 새 탭으로 덮어쓴다.
-+  auto* const split_contents = tab_strip_model->GetActiveWebContents();
-+  const GURL split_url(chrome::kChromeUISplitViewNewTabPageURL);
-+  ASSERT_EQ(split_url, split_contents->GetLastCommittedURL());
-+  content::TestNavigationManager pending_navigation(split_contents, tab_url2_);
-+  split_contents->GetController().LoadURL(
-+      tab_url2_, content::Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
-+  ASSERT_TRUE(pending_navigation.WaitForRequestStart());
-+  EXPECT_EQ(tab_url2_, split_contents->GetVisibleURL());
-+  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
-+  base::test::TestFuture<bool> is_split;
-+  handler()->GetIsSplit(is_split.GetCallback());
-+  EXPECT_TRUE(is_split.Get());
-+  // 실패한 baseline도 멈춘 이동을 취소한 뒤 원래 분할 해제 검사를 계속한다.
-+  split_contents->Stop();
-+  EXPECT_TRUE(pending_navigation.WaitForNavigationFinished());
-+  EXPECT_FALSE(pending_navigation.was_committed());
-+  EXPECT_EQ(split_url, split_contents->GetLastCommittedURL());
-+
-   base::RunLoop run_loop;
-   EXPECT_CALL(page_, TabUnsplit()).WillOnce([&]() { run_loop.Quit(); });
-   tab_strip_model->RemoveSplit(split_id);
 diff --git a/chrome/browser/ui/webui/theme_colors_source_manager.cc b/chrome/browser/ui/webui/theme_colors_source_manager.cc
 index 5d8a77b3bc..9ca5413a1a 100644
 --- a/chrome/browser/ui/webui/theme_colors_source_manager.cc
@@ -25637,133 +24819,6 @@ index 3fda254dc9..43b9c585d4 100644
  #if !BUILDFLAG(IS_ANDROID)
  
  // Use in browser interactive uitests to wait until a browser is set to active.
-diff --git a/chrome/test/base/interactive_test_utils_mac.mm b/chrome/test/base/interactive_test_utils_mac.mm
-index 65b6c1a530..2495ce0176 100644
---- a/chrome/test/base/interactive_test_utils_mac.mm
-+++ b/chrome/test/base/interactive_test_utils_mac.mm
-@@ -9,6 +9,7 @@
- 
- #include "base/apple/scoped_cftyperef.h"
- #include "base/apple/scoped_objc_class_swizzler.h"
-+#include "base/command_line.h"
- #include "base/logging.h"
- #include "base/mac/mac_util.h"
- #include "base/run_loop.h"
-@@ -25,6 +26,94 @@
- 
- namespace ui_test_utils {
- 
-+namespace {
-+
-+bool IsWindowStateTraceEnabled() {
-+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-+      "yee-mac-window-state-trace");
-+}
-+
-+void TraceWindowState(const char* event, NSWindow* changed) {
-+  if (!IsWindowStateTraceEnabled()) {
-+    return;
-+  }
-+  NSWindow* key = NSApp.keyWindow;
-+  NSWindow* main = NSApp.mainWindow;
-+  NSRunningApplication* front =
-+      NSWorkspace.sharedWorkspace.frontmostApplication;
-+  LOG(ERROR) << "YEE_MAC_WINDOW_STATE event=" << event
-+             << " changed=" << changed.windowNumber << " class="
-+             << (changed ? NSStringFromClass(changed.class).UTF8String : "none")
-+             << " app_active=" << NSApp.active << " key=" << key.windowNumber
-+             << " main=" << main.windowNumber
-+             << " front_pid=" << front.processIdentifier
-+             << " visible=" << changed.visible
-+             << " active_space=" << changed.onActiveSpace
-+             << " occlusion=" << changed.occlusionState;
-+}
-+
-+void InstallWindowStateTrace() {
-+  static bool installed = false;
-+  if (installed || !IsWindowStateTraceEnabled()) {
-+    return;
-+  }
-+  installed = true;
-+  // 진단을 명시한 검사 프로세스에서만 알림을 관찰하며 창을 붙잡지 않는다.
-+  for (NSString* name in @[
-+         NSWindowDidBecomeKeyNotification, NSWindowDidResignKeyNotification,
-+         NSWindowWillEnterFullScreenNotification,
-+         NSWindowDidEnterFullScreenNotification,
-+         NSWindowWillExitFullScreenNotification,
-+         NSWindowDidExitFullScreenNotification, NSWindowWillCloseNotification,
-+         NSWindowDidChangeOcclusionStateNotification,
-+         NSApplicationDidBecomeActiveNotification,
-+         NSApplicationDidResignActiveNotification
-+       ]) {
-+    [NSNotificationCenter.defaultCenter
-+        addObserverForName:name
-+                    object:nil
-+                     queue:nil
-+                usingBlock:^(NSNotification* notification) {
-+                  NSWindow* window =
-+                      [notification.object isKindOfClass:NSWindow.class]
-+                          ? notification.object
-+                          : nil;
-+                  TraceWindowState(notification.name.UTF8String, window);
-+                }];
-+  }
-+  for (NSString* name in @[
-+         NSWorkspaceDidActivateApplicationNotification,
-+         NSWorkspaceActiveSpaceDidChangeNotification
-+       ]) {
-+    [NSWorkspace.sharedWorkspace.notificationCenter
-+        addObserverForName:name
-+                    object:nil
-+                     queue:nil
-+                usingBlock:^(NSNotification* notification) {
-+                  TraceWindowState(notification.name.UTF8String,
-+                                   NSApp.keyWindow);
-+                }];
-+  }
-+  // 입력 이벤트는 그대로 돌려주고 좌표·modifier만 기록한다.
-+  [NSEvent
-+      addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown |
-+                                           NSEventMaskLeftMouseDragged |
-+                                           NSEventMaskLeftMouseUp |
-+                                           NSEventMaskFlagsChanged
-+                                   handler:^NSEvent*(NSEvent* event) {
-+                                     LOG(ERROR)
-+                                         << "YEE_MAC_INPUT type=" << event.type
-+                                         << " window="
-+                                         << event.window.windowNumber
-+                                         << " x=" << event.locationInWindow.x
-+                                         << " y=" << event.locationInWindow.y
-+                                         << " flags=" << event.modifierFlags;
-+                                     return event;
-+                                   }];
-+}
-+
-+}  // namespace
-+
- void HideNativeWindow(gfx::NativeWindow native_window) {
-   NSWindow* window = native_window.GetNativeNSWindow();
-   [window orderOut:nil];
-@@ -32,8 +121,10 @@ void HideNativeWindow(gfx::NativeWindow native_window) {
- 
- bool ShowAndFocusNativeWindow(gfx::NativeWindow native_window) {
-   NSWindow* window = native_window.GetNativeNSWindow();
-+  InstallWindowStateTrace();
-+  TraceWindowState("focus_request", window);
-   // Make sure an unbundled program can get the input focus.
--  ProcessSerialNumber psn = { 0, kCurrentProcess };
-+  ProcessSerialNumber psn = {0, kCurrentProcess};
-   TransformProcessType(&psn,kProcessTransformToForegroundApplication);
-   // We used to call [NSApp activateIgnoringOtherApps:YES] but this
-   // would not reliably activate the app, causing the window to never
-@@ -59,6 +150,7 @@ bool ShowAndFocusNativeWindow(gfx::NativeWindow native_window) {
-   NSMenu* file_menu = [[NSApp.mainMenu itemWithTag:IDC_FILE_MENU] submenu];
-   [file_menu.delegate menuNeedsUpdate:file_menu];
- 
-+  TraceWindowState("focus_request_complete", window);
-   return !async_waiter || notification_observed;
- }
- 
 diff --git a/chrome/test/base/interactive_test_utils_win.cc b/chrome/test/base/interactive_test_utils_win.cc
 index de52ce6fb3..32afeb40ab 100644
 --- a/chrome/test/base/interactive_test_utils_win.cc
@@ -26379,157 +25434,6 @@ index 16120a47f0..582fde4e30 100644
  
    // Returns true if the client's sandbox flags allow access to a
    // ServiceWorkerContainer (i.e. not sandboxed without the allow-same-origin
-diff --git a/content/browser/service_worker/service_worker_container_host_unittest.cc b/content/browser/service_worker/service_worker_container_host_unittest.cc
-index 5231dd32d2..7a13e77d3f 100644
---- a/content/browser/service_worker/service_worker_container_host_unittest.cc
-+++ b/content/browser/service_worker/service_worker_container_host_unittest.cc
-@@ -22,6 +22,7 @@
- #include "content/browser/renderer_host/frame_tree_node.h"
- #include "content/browser/service_worker/embedded_worker_test_helper.h"
- #include "content/browser/service_worker/service_worker_client.h"
-+#include "content/browser/service_worker/service_worker_consts.h"
- #include "content/browser/service_worker/service_worker_context_core.h"
- #include "content/browser/service_worker/service_worker_context_core_observer.h"
- #include "content/browser/service_worker/service_worker_context_wrapper.h"
-@@ -43,11 +44,18 @@
- #include "content/public/test/test_content_browser_client.h"
- #include "content/public/test/test_content_client.h"
- #include "content/public/test/test_utils.h"
-+#include "mojo/public/cpp/bindings/remote.h"
- #include "mojo/public/cpp/system/functions.h"
-+#include "net/base/net_errors.h"
- #include "net/cookies/site_for_cookies.h"
-+#include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
- #include "services/network/public/cpp/is_potentially_trustworthy.h"
-+#include "services/network/public/cpp/resource_request.h"
- #include "services/network/public/mojom/web_sandbox_flags.mojom-shared.h"
-+#include "services/network/test/test_url_loader_client.h"
-+#include "services/network/test/test_url_loader_factory.h"
- #include "testing/gtest/include/gtest/gtest.h"
-+#include "third_party/blink/public/common/features.h"
- #include "third_party/blink/public/common/storage_key/storage_key.h"
- #include "third_party/blink/public/common/tokens/tokens.h"
- #include "third_party/blink/public/mojom/service_worker/service_worker_ancestor_frame_type.mojom.h"
-@@ -196,6 +204,72 @@ class ServiceWorkerContainerHostTest : public testing::Test {
-                                 /*route_id=*/1));
-   }
- 
-+  void ExpectControlledWorkerFactoryForwardsRequest(
-+      const PolicyContainerPolicies& policies) {
-+    base::test::ScopedFeatureList feature_list;
-+    feature_list.InitAndEnableFeature(
-+        blink::features::kServiceWorkerInDedicatedWorker);
-+    const GURL document_url("https://www.example.com/foo");
-+    const url::Origin origin = url::Origin::Create(document_url);
-+    auto service_worker_client =
-+        context_->service_worker_client_owner()
-+            .CreateServiceWorkerClientForWorker(
-+                helper_->mock_render_process_id(),
-+                ServiceWorkerClientInfo(blink::DedicatedWorkerToken()));
-+    service_worker_client->UpdateUrls(
-+        document_url, origin, blink::StorageKey::CreateFirstParty(origin));
-+
-+    auto version = base::MakeRefCounted<ServiceWorkerVersion>(
-+        registration1_.get(), script_url_, blink::mojom::ScriptType::kClassic,
-+        1 /* version_id */,
-+        mojo::PendingRemote<storage::mojom::ServiceWorkerLiveVersionRef>(),
-+        context_, std::nullopt, std::nullopt, PolicyContainerPolicies());
-+    version->set_fetch_handler_type(
-+        ServiceWorkerVersion::FetchHandlerType::kNotSkippable);
-+    version->SetStatus(ServiceWorkerVersion::ACTIVATED);
-+    registration1_->SetActiveVersion(version);
-+    CommittedServiceWorkerClient committed_client(
-+        std::move(service_worker_client), policies);
-+    committed_client->SetControllerRegistration(
-+        registration1_, /*notify_controllerchange=*/false);
-+    ASSERT_EQ(version.get(), committed_client->controller());
-+
-+    network::TestURLLoaderFactory terminal(/*observe_loader_requests=*/true);
-+    mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream;
-+    terminal.Clone(downstream.InitWithNewPipeAndPassReceiver());
-+    mojo::Remote<network::mojom::URLLoaderFactory> wrapped;
-+    // 워커 fixture는 연결된 associated Mojo 파이프를 만들지 않으므로,
-+    // 허용 경로에서는 컨테이너 호스트를 직접 호출한다.
-+    committed_client.container_host().WrapSubresourceLoaderFactory(
-+        wrapped.BindNewPipeAndPassReceiver(), std::move(downstream));
-+    wrapped.FlushForTesting();
-+    ASSERT_TRUE(wrapped.is_connected());
-+    ASSERT_TRUE(bad_messages_.empty());
-+
-+    network::ResourceRequest request;
-+    request.url = GURL("https://www.example.com/resource.js");
-+    request.request_initiator = origin;
-+    network::TestURLLoaderClient client;
-+    mojo::Remote<network::mojom::URLLoader> loader;
-+    wrapped->CreateLoaderAndStart(
-+        loader.BindNewPipeAndPassReceiver(), 7, 0, request,
-+        client.CreateRemote(),
-+        net::MutableNetworkTrafficAnnotationTag(TRAFFIC_ANNOTATION_FOR_TESTS));
-+    wrapped.FlushForTesting();
-+
-+    ASSERT_EQ(1u, terminal.total_requests());
-+    const auto* pending = terminal.GetPendingRequest(0);
-+    ASSERT_TRUE(pending);
-+    EXPECT_EQ(request.url, pending->request.url);
-+    EXPECT_EQ(request.request_initiator, pending->request.request_initiator);
-+    EXPECT_EQ(7, pending->request_id);
-+    ASSERT_TRUE(terminal.SimulateResponseForPendingRequest(request.url.spec(),
-+                                                           "local response"));
-+    client.RunUntilComplete();
-+    EXPECT_TRUE(client.has_received_response());
-+    EXPECT_EQ(net::OK, client.completion_status().error_code);
-+  }
-+
-   blink::mojom::ServiceWorkerErrorType Register(
-       blink::mojom::ServiceWorkerContainerHost* container_host,
-       GURL scope,
-@@ -1156,6 +1230,46 @@ TEST_F(ServiceWorkerContainerHostTest,
-   EXPECT_EQ(1u, bad_messages_.size());
- }
- 
-+TEST_F(ServiceWorkerContainerHostTest,
-+       WrapSubresourceLoaderFactory_SandboxedDocumentRejected) {
-+  PolicyContainerPolicies policies;
-+  policies.sandbox_flags = network::mojom::WebSandboxFlags::kOrigin;
-+  CommittedServiceWorkerClient service_worker_client =
-+      PrepareServiceWorkerContainerHost(GURL("https://www.example.com/foo"),
-+                                        policies);
-+
-+  // 유효한 factory 파이프를 보내 샌드박스 검사 자체가 거부하는지 확인한다.
-+  network::TestURLLoaderFactory terminal;
-+  mojo::PendingRemote<network::mojom::URLLoaderFactory> downstream;
-+  terminal.Clone(downstream.InitWithNewPipeAndPassReceiver());
-+  mojo::Remote<network::mojom::URLLoaderFactory> wrapped;
-+  ASSERT_TRUE(bad_messages_.empty());
-+  service_worker_client.host_remote()->WrapSubresourceLoaderFactory(
-+      wrapped.BindNewPipeAndPassReceiver(), std::move(downstream));
-+  service_worker_client.host_remote().FlushForTesting();
-+  wrapped.FlushForTesting();
-+
-+  ASSERT_EQ(1u, bad_messages_.size());
-+  EXPECT_EQ(ServiceWorkerConsts::kBadMessageFromSandboxedClient,
-+            bad_messages_.front());
-+  EXPECT_FALSE(wrapped.is_connected());
-+  EXPECT_EQ(0u, terminal.total_requests());
-+}
-+
-+TEST_F(ServiceWorkerContainerHostTest,
-+       WrapSubresourceLoaderFactory_ControlledWorkerAllowed) {
-+  // 샌드박스가 없는 제어된 워커의 요청과 응답이 factory를 통과해야 한다.
-+  ExpectControlledWorkerFactoryForwardsRequest(PolicyContainerPolicies());
-+}
-+
-+TEST_F(ServiceWorkerContainerHostTest,
-+       WrapSubresourceLoaderFactory_ControlledWorkerWithAllowSameOrigin) {
-+  // allow-same-origin을 유지한 샌드박스도 실제 요청을 전달해야 한다.
-+  PolicyContainerPolicies policies;
-+  policies.sandbox_flags = network::mojom::WebSandboxFlags::kAutomaticFeatures;
-+  ExpectControlledWorkerFactoryForwardsRequest(policies);
-+}
-+
- TEST_F(ServiceWorkerContainerHostTest,
-        IsEligibleForServiceWorkerController_SandboxedDocumentFalse) {
-   PolicyContainerPolicies policies;
 diff --git a/content/browser/websockets/websocket_connector_impl.cc b/content/browser/websockets/websocket_connector_impl.cc
 index e756aaf3ee..dfb7b2249c 100644
 --- a/content/browser/websockets/websocket_connector_impl.cc
@@ -26998,6 +25902,42 @@ index c9b91fe5d2..7e79309a06 100644
    void HintToUpdateServiceWorker() override { NOTIMPLEMENTED(); }
    void EnsureFileAccess(const std::vector<base::FilePath>& files,
                          EnsureFileAccessCallback callback) override {
+diff --git a/content/test/BUILD.gn b/content/test/BUILD.gn
+index 309d2cd928..6ace6527ed 100644
+--- a/content/test/BUILD.gn
++++ b/content/test/BUILD.gn
+@@ -3969,3 +3969,31 @@ if (is_fuchsia) {
+     ]
+   }
+ }
++
++# Yee guard의 소스 소유권은 overlay에 두고 Content 내부 API의
++# 노출은 넓히지 않는다.
++source_set("yee_service_worker_test_cases") {
++  testonly = true
++  visibility =
++      [ "//chrome/browser/yee_content_blocking:yee_service_worker_unittests" ]
++
++  # Content의 다른 test target과 같은 component-build 검사 경계를
++  # 따른다.
++  if (is_component_build) {
++    check_includes = false
++  }
++  sources = [
++    "../browser/service_worker/service_worker_container_host_unittest.cc",
++    "//chrome/browser/yee_content_blocking/yee_service_worker_container_host_unittest.cc",
++  ]
++  deps = [
++    ":test_support",
++    "//base/test:test_support",
++    "//content/browser:for_content_tests",
++    "//content/public/browser",
++    "//mojo/public/cpp/bindings",
++    "//net:test_support",
++    "//services/network:test_support",
++    "//testing/gtest",
++  ]
++}
 diff --git a/extensions/common/api/_api_features.json b/extensions/common/api/_api_features.json
 index bff2cbf3d5..51bb66e29a 100644
 --- a/extensions/common/api/_api_features.json
@@ -28369,369 +27309,3 @@ index 0000000000..cb2eb80025
 +}  // namespace browser_view_layout
 +
 +#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_TABBED_LAYOUT_NATIVE_GEOMETRY_H_
-diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc
-new file mode 100644
-index 0000000000..2c0b504ad2
---- /dev/null
-+++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry_unittest.cc
-@@ -0,0 +1,360 @@
-+// Copyright 2026 The Chromium Authors
-+// Use of this source code is governed by a BSD-style license that can be
-+// found in the LICENSE file.
-+
-+#include "chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_native_geometry.h"
-+
-+#include "testing/gtest/include/gtest/gtest.h"
-+#include "ui/gfx/animation/tween.h"
-+
-+namespace browser_view_layout {
-+namespace {
-+
-+NativeHorizontalPlanInput BaseHorizontalInput(int width) {
-+  NativeHorizontalPlanInput input;
-+  input.browser_params.visual_client_area = gfx::Rect(0, 0, width, 600);
-+  input.content_column_bounds = input.browser_params.visual_client_area;
-+  input.tab_strip_type = NativeTabStripType::kHorizontal;
-+  input.toolbar_minimum_width = 400;
-+  input.side_panel_visible = true;
-+  input.side_panel_minimum_width = 300;
-+  input.side_panel_preferred_width = 500;
-+  input.side_panel_padding = 10;
-+  input.minimum_content_width = 200;
-+  input.separator_thickness = 1;
-+  return input;
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     HorizontalThresholdUsesStrictLessThanAndAuthoritativeRowMode) {
-+  NativeHorizontalPlanInput input = BaseHorizontalInput(710);
-+  NativeHorizontalPlan plan = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(NativeSidePanelRowMode::kSharedRow, plan.row_mode);
-+  EXPECT_FALSE(plan.force_top_container_to_top());
-+  EXPECT_TRUE(plan.top_container_shares_panel_row());
-+  EXPECT_EQ(400, plan.min_content_width);
-+  EXPECT_EQ(300, plan.side_panel_width);
-+
-+  input.browser_params.visual_client_area.set_width(709);
-+  input.content_column_bounds.set_width(709);
-+  plan = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel, plan.row_mode);
-+  EXPECT_TRUE(plan.force_top_container_to_top());
-+  EXPECT_FALSE(plan.top_container_shares_panel_row());
-+  EXPECT_EQ(200, plan.min_content_width);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     PanelTypeTabModeAndVisibilityRemainIndependentInputs) {
-+  NativeHorizontalPlanInput input = BaseHorizontalInput(1000);
-+  input.side_panel_content_type = true;
-+  EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel,
-+            PlanNativeHorizontalLayout(input).row_mode);
-+
-+  input.side_panel_row_policy = NativeSidePanelRowPolicy::kSharedRow;
-+  EXPECT_EQ(NativeSidePanelRowMode::kSharedRow,
-+            PlanNativeHorizontalLayout(input).row_mode);
-+  input.side_panel_row_policy = NativeSidePanelRowPolicy::kAutomatic;
-+
-+  input.side_panel_content_type = false;
-+  input.tab_strip_type = NativeTabStripType::kVertical;
-+  EXPECT_TRUE(PlanNativeHorizontalLayout(input).force_top_container_to_top());
-+
-+  input.vertical_tab_strip_inside_content_column = false;
-+  EXPECT_EQ(NativeSidePanelRowMode::kSharedRow,
-+            PlanNativeHorizontalLayout(input).row_mode);
-+
-+  input.side_panel_content_type = true;
-+  EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel,
-+            PlanNativeHorizontalLayout(input).row_mode);
-+
-+  input.side_panel_content_type = false;
-+  input.toolbar_minimum_width = 701;
-+  EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel,
-+            PlanNativeHorizontalLayout(input).row_mode);
-+
-+  input.tab_strip_type = NativeTabStripType::kNone;
-+  input.side_panel_visible = false;
-+  const NativeHorizontalPlan no_panel = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(NativeSidePanelRowMode::kNoPanel, no_panel.row_mode);
-+  EXPECT_TRUE(no_panel.force_top_container_to_top());
-+  EXPECT_FALSE(no_panel.has_side_panel());
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     ExplicitPanelRowsPreserveHeaderPlacementAcrossTypeAndWidth) {
-+  for (int width : {600, 1000}) {
-+    for (bool content_type : {false, true}) {
-+      NativeHorizontalPlanInput input = BaseHorizontalInput(width);
-+      input.side_panel_content_type = content_type;
-+      input.side_panel_row_policy = NativeSidePanelRowPolicy::kTopAbovePanel;
-+      const auto above = PlanNativeHorizontalLayout(input);
-+      EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel, above.row_mode);
-+      EXPECT_TRUE(above.force_top_container_to_top());
-+      EXPECT_EQ(input.minimum_content_width, above.min_content_width);
-+
-+      input.side_panel_row_policy = NativeSidePanelRowPolicy::kSharedRow;
-+      const auto beside = PlanNativeHorizontalLayout(input);
-+      EXPECT_EQ(NativeSidePanelRowMode::kSharedRow, beside.row_mode);
-+      EXPECT_FALSE(beside.force_top_container_to_top());
-+      EXPECT_EQ(input.toolbar_minimum_width, beside.min_content_width);
-+    }
-+  }
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     ContentPanelCapAndVerticalFirstFlexUseContentColumn) {
-+  NativeHorizontalPlanInput input = BaseHorizontalInput(900);
-+  input.content_column_bounds = gfx::Rect(244, 0, 600, 600);
-+  input.tab_strip_type = NativeTabStripType::kVertical;
-+  input.vertical_tab_strip_inside_content_column = false;
-+  input.vertical_tab_strip_minimum_width = 100;
-+  input.vertical_tab_strip_preferred_width = 200;
-+  input.side_panel_content_type = true;
-+  input.side_panel_restrict_max_width = true;
-+  input.side_panel_minimum_width = 100;
-+  input.side_panel_preferred_width = 500;
-+  input.toolbar_minimum_width = 100;
-+  const NativeHorizontalPlan outside_plan = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(200, outside_plan.vertical_tab_strip_width);
-+  EXPECT_EQ(390, outside_plan.side_panel_width);
-+  EXPECT_EQ(gfx::Rect(244, 0, 600, 600),
-+            outside_plan.content_column_params.visual_client_area);
-+
-+  input.browser_params.visual_client_area = gfx::Rect(0, 0, 700, 600);
-+  input.content_column_bounds = input.browser_params.visual_client_area;
-+  input.vertical_tab_strip_inside_content_column = true;
-+  input.side_panel_content_type = false;
-+  input.side_panel_restrict_max_width = false;
-+  input.side_panel_preferred_width = 300;
-+  const NativeHorizontalPlan inside_plan = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(200, inside_plan.vertical_tab_strip_width);
-+  EXPECT_EQ(290, inside_plan.side_panel_width);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     GrabHandleRevisionPrecedesContentColumnExclusionConversion) {
-+  NativeHorizontalPlanInput input = BaseHorizontalInput(900);
-+  input.tab_strip_type = NativeTabStripType::kVertical;
-+  input.side_panel_visible = false;
-+  input.minimum_grab_handle_padding = 40;
-+  input.browser_params.leading_exclusion.content = gfx::SizeF(30, 20);
-+  input.content_column_bounds = gfx::Rect(50, 0, 850, 600);
-+
-+  const NativeHorizontalPlan plan = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(40,
-+            plan.revised_browser_params.leading_exclusion.horizontal_padding);
-+  EXPECT_EQ(20,
-+            plan.content_column_params.leading_exclusion.horizontal_padding);
-+  EXPECT_TRUE(plan.content_column_params.leading_exclusion.content.IsEmpty());
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     SeparatorFactsFollowResolvedRowNotPanelType) {
-+  NativeHorizontalPlanInput input = BaseHorizontalInput(1000);
-+  input.split = true;
-+  NativeHorizontalPlan shared = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(NativeSidePanelRowMode::kSharedRow, shared.row_mode);
-+  EXPECT_EQ((NativeSeparatorState{/*top_container_separator=*/false,
-+                                  /*multi_contents_separator=*/true,
-+                                  /*shadow_box=*/true,
-+                                  /*adjust_for_missing_separator=*/false,
-+                                  /*side_panel_top_padding=*/true}),
-+            shared.separator);
-+
-+  input.tab_strip_type = NativeTabStripType::kVertical;
-+  NativeHorizontalPlan forced = PlanNativeHorizontalLayout(input);
-+  EXPECT_EQ(NativeSidePanelRowMode::kTopAbovePanel, forced.row_mode);
-+  EXPECT_EQ((NativeSeparatorState{/*top_container_separator=*/false,
-+                                  /*multi_contents_separator=*/true,
-+                                  /*shadow_box=*/false,
-+                                  /*adjust_for_missing_separator=*/false,
-+                                  /*side_panel_top_padding=*/false}),
-+            forced.separator);
-+
-+  input.infobar_visible = true;
-+  forced = PlanNativeHorizontalLayout(input);
-+  EXPECT_TRUE(forced.separator.shadow_box);
-+  EXPECT_TRUE(forced.separator.adjust_for_missing_separator);
-+  EXPECT_FALSE(forced.separator.top_container_separator);
-+  EXPECT_FALSE(forced.separator.multi_contents_separator);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     FinalHeaderLocalToolbarUsesNormalizedReservationExactlyOnce) {
-+  NativeTopContainerLayoutInput input;
-+  input.params.visual_client_area = gfx::Rect(0, 0, 900, 42);
-+  input.tab_strip_type = NativeTabStripType::kVertical;
-+  input.toolbar_parented = true;
-+  input.toolbar_visible = true;
-+  input.toolbar_uses_config = true;
-+  input.toolbar_insets = gfx::Insets::TLBR(1, 10, 0, 8);
-+  input.toolbar_height = 40;
-+  input.toolbar_reserved_height = 42;
-+
-+  const NativeTopContainerLayout result =
-+      CalculateNativeTopContainerLayout(input);
-+  EXPECT_EQ(gfx::Rect(0, 0, 900, 42), result.bounds);
-+  EXPECT_EQ(gfx::Rect(10, 1, 882, 40), result.toolbar.bounds);
-+  EXPECT_TRUE(result.toolbar.visible);
-+
-+  // exclusion을 처리한 뒤 caption 여백은 별도 행이 소유한다.
-+  input.params.leading_exclusion.content = gfx::SizeF(90, 8);
-+  input.params.trailing_exclusion.content = gfx::SizeF(60, 8);
-+  input.needs_exclusion = false;
-+  EXPECT_EQ(result.toolbar.bounds,
-+            CalculateNativeTopContainerLayout(input).toolbar.bounds);
-+  input.needs_exclusion = true;
-+  EXPECT_EQ(gfx::Rect(100, 1, 732, 40),
-+            CalculateNativeTopContainerLayout(input).toolbar.bounds);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     PanelRevealPreservesFloorRoundAndLocalClipConventions) {
-+  NativeSidePanelGeometryInput input;
-+  input.available_bounds = gfx::Rect(250, 48, 744, 746);
-+  input.unclipped_contents_region = input.available_bounds;
-+  input.panel_clip_bounds = input.available_bounds;
-+  input.target_width = 301;
-+  input.panel_padding = 7;
-+  input.leading = true;
-+  input.shadow_box = true;
-+  input.separator_thickness = 1;
-+  input.animation.reveal = 0.5;
-+
-+  NativeSidePanelGeometry result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(150, result.visible_width);  // floor(150.5)
-+  EXPECT_EQ(gfx::Insets::TLBR(1, 0, 4, 4), result.shadow_insets);
-+  EXPECT_EQ(gfx::Rect(99, 48, 301, 746), result.current_bounds);
-+  EXPECT_EQ(gfx::Rect(250, 48, 301, 746), result.final_bounds);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(151, 0, 150, 746), *result.local_clip_bounds);
-+  EXPECT_TRUE(result.animating);
-+
-+  input.animation.reveal = 0.0;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(301, 0, 1, 746), *result.local_clip_bounds);
-+
-+  input.animation.reveal = 0.999;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(300, result.visible_width);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(1, 0, 300, 746), *result.local_clip_bounds);
-+  EXPECT_TRUE(result.animating);
-+
-+  input.animation.reveal = 1.0;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(301, result.visible_width);
-+  EXPECT_FALSE(result.local_clip_bounds);
-+  EXPECT_FALSE(result.animating);
-+  EXPECT_EQ(result.remaining_bounds, result.unclipped_contents_region);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     PanelPaintClipContainsEveryPhysicalEdge) {
-+  NativeSidePanelGeometryInput input;
-+  input.available_bounds = gfx::Rect(244, 0, 956, 800);
-+  input.unclipped_contents_region = input.available_bounds;
-+  input.panel_clip_bounds = gfx::Rect(250, 6, 944, 788);
-+  input.target_width = 300;
-+  input.animation.reveal = 1.0;
-+
-+  input.leading = true;
-+  NativeSidePanelGeometry result = ResolveNativeSidePanelGeometry(input);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(6, 6, 294, 788), *result.local_clip_bounds);
-+  gfx::Rect visible_bounds = *result.local_clip_bounds;
-+  visible_bounds.Offset(result.current_bounds.OffsetFromOrigin());
-+  EXPECT_TRUE(input.panel_clip_bounds.Contains(visible_bounds));
-+
-+  input.leading = false;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(0, 6, 294, 788), *result.local_clip_bounds);
-+  visible_bounds = *result.local_clip_bounds;
-+  visible_bounds.Offset(result.current_bounds.OffsetFromOrigin());
-+  EXPECT_TRUE(input.panel_clip_bounds.Contains(visible_bounds));
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     TrailingPanelRevealAndContentProgressRemainIndependent) {
-+  NativeSidePanelGeometryInput input;
-+  input.available_bounds = gfx::Rect(10, 20, 600, 400);
-+  input.unclipped_contents_region = input.available_bounds;
-+  input.panel_clip_bounds = input.available_bounds;
-+  input.target_width = 200;
-+  input.leading = false;
-+  input.animation_content_visible = true;
-+  input.animation.reveal = 0.25;
-+  input.animation.content_starting_bounds = gfx::Rect(30, 40, 80, 100);
-+  input.animation.content_insets = gfx::Insets::TLBR(3, 5, 7, 11);
-+  input.animation.content_progress = 0.5;
-+
-+  const NativeSidePanelGeometry result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(gfx::Rect(560, 20, 200, 400), result.current_bounds);
-+  EXPECT_EQ(gfx::Rect(410, 20, 200, 400), result.final_bounds);
-+  ASSERT_TRUE(result.local_clip_bounds);
-+  EXPECT_EQ(gfx::Rect(0, 0, 50, 400), *result.local_clip_bounds);
-+  ASSERT_TRUE(result.animation_content_bounds);
-+
-+  EXPECT_EQ(gfx::Rect(223, 32, 132, 245), *result.animation_content_bounds);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     ContentTransitionRoundsEdgesLikeNative157) {
-+  NativeSidePanelGeometryInput input;
-+  input.available_bounds = gfx::Rect(101, 101, 101, 101);
-+  input.unclipped_contents_region = input.available_bounds;
-+  input.panel_clip_bounds = input.available_bounds;
-+  input.target_width = 101;
-+  input.leading = true;
-+  input.animation_content_visible = true;
-+  input.animation.reveal = 0.5;
-+  input.animation.content_progress = 0.5;
-+  input.animation.content_starting_bounds = gfx::Rect(0, 0, 100, 100);
-+  auto result = ResolveNativeSidePanelGeometry(input);
-+  ASSERT_TRUE(result.animation_content_bounds);
-+  // 홀수 edge를 각각 반올림해야 폭이 한 픽셀 흔들리지 않는다.
-+  EXPECT_EQ(gfx::Rect(51, 51, 100, 100), *result.animation_content_bounds);
-+  input.animation.content_progress = 0.0;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(gfx::Rect(0, 0, 100, 100), *result.animation_content_bounds);
-+  input.animation.content_progress = 1.0;
-+  result = ResolveNativeSidePanelGeometry(input);
-+  EXPECT_EQ(gfx::Rect(101, 101, 101, 101), *result.animation_content_bounds);
-+}
-+
-+TEST(BrowserViewTabbedLayoutNativeGeometryTest,
-+     SplitInsetAndUnderlapThresholdsAreLiteralCurrentBehavior) {
-+  NativeHorizontalPlanInput horizontal_input = BaseHorizontalInput(1000);
-+  horizontal_input.split = true;
-+  const NativeHorizontalPlan plan =
-+      PlanNativeHorizontalLayout(horizontal_input);
-+  EXPECT_EQ(gfx::Insets::TLBR(0, 4, 4, 4),
-+            ResolveNativeSplitViewInsets(
-+                true, BrowserViewLayoutDelegate::WindowState::kNormal,
-+                /*infobar_visible=*/false, plan,
-+                /*side_panel_leading=*/true,
-+                /*side_panel_reveal=*/0.5, /*default_inset=*/4));
-+
-+  NativeBodyAllocationInput body_input;
-+  body_input.notice_flow_allocation = gfx::Rect(250, 48, 200, 500);
-+  body_input.allowed_bounds = gfx::Rect(244, 0, 470, 600);
-+  body_input.panel_visible_region = gfx::Rect(244, 48, 6, 500);
-+  body_input.minimum_content_width = 200;
-+  NativeBodyAllocation body = ResolveNativeBodyAllocation(body_input);
-+  EXPECT_EQ(0, body.underlap_deficit);
-+  EXPECT_EQ(body_input.notice_flow_allocation, body.body_allocation);
-+  EXPECT_TRUE(body.body_occlusion_rect.IsEmpty());
-+
-+  body_input.minimum_content_width = 201;
-+  body = ResolveNativeBodyAllocation(body_input);
-+  EXPECT_EQ(1, body.underlap_deficit);
-+  EXPECT_EQ(body_input.notice_flow_allocation, body.body_allocation);
-+  EXPECT_TRUE(body.body_occlusion_rect.IsEmpty());
-+  EXPECT_TRUE(body.has_contiguous_notice_flow);
-+}
-+
-+}  // namespace
-+}  // namespace browser_view_layout
