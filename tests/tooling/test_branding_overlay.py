@@ -658,6 +658,9 @@ manifest.write_text(json.dumps(data), encoding='utf-8')
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
         catalog["new_glue"] = []
         catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        concerns = {"schema_version": 1, "concerns": {"shell": "셸 연결"},
+                    "paths": {"structural.cc": ["shell"]}}
+        (self.repo / "build/patch-concerns.json").write_text(json.dumps(concerns), encoding="utf-8")
         with mock.patch.object(sys, "argv", ["regenerate-shell-patch.py", "--chromium-src", str(self.src)]), \
                 contextlib.redirect_stdout(io.StringIO()):
             module.main()

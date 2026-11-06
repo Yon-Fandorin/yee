@@ -99,6 +99,11 @@ class OverlayToolsTest(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             sync_sources(plan, check_only)
 
+    def write_concerns(self, *paths):
+        data = {'schema_version': 1, 'concerns': {'shell': '셸 연결'},
+                'paths': {path: ['shell'] for path in paths}}
+        (self.overlay / 'build/patch-concerns.json').write_text(json.dumps(data))
+
     def test_fresh_preview_apply_and_reapply(self):
         before = git(self.src, 'diff')
         plan = patch_plan(self.src, self.catalog, self.overlay)
@@ -140,6 +145,7 @@ class OverlayToolsTest(unittest.TestCase):
         generated.write_text('generated change\n')
         (dependency/'source.cc').write_text('dependency tool patch\n')
         (self.src/'new-glue.cc').write_text('new glue\n')
+        self.write_concerns('shell.cc', 'new-glue.cc')
         index_before = git(self.src, 'diff', '--cached', '--binary')
         result = subprocess.run([sys.executable, str(tool/'regenerate-shell-patch.py'),
                                  '--chromium-src', str(self.src)],
@@ -165,6 +171,7 @@ class OverlayToolsTest(unittest.TestCase):
             'commit', '-qm', 'test source')
         git(self.src, 'config', 'diff.context', '3')
         source.write_text(''.join(lines).replace('Step(15)', 'Changed(15)'))
+        self.write_concerns('context_unittest.cc')
         result = subprocess.run([sys.executable, str(tool/'regenerate-shell-patch.py'),
                                  '--chromium-src', str(self.src)],
                                 cwd=self.base, capture_output=True, text=True)
@@ -183,6 +190,9 @@ class OverlayToolsTest(unittest.TestCase):
         ratchet = {'schema_version': 1,
                    'roles': {'shell': {'baseline': baseline, 'exceptions': []}}}
         (self.overlay/'build/patch-ratchet.json').write_text(json.dumps(ratchet))
+        concerns = {'schema_version': 1, 'concerns': {'shell': '셸 연결'},
+                    'paths': {'shell.cc': ['shell']}}
+        (self.overlay/'build/patch-concerns.json').write_text(json.dumps(concerns))
         (self.src/'shell.cc').write_text('if (yee::IsShellEnabled()) {}\n')
         command = [sys.executable, str(tool/'regenerate-shell-patch.py'),
                    '--chromium-src', str(self.src)]
@@ -195,6 +205,45 @@ class OverlayToolsTest(unittest.TestCase):
         (self.overlay/'build/patch-ratchet.json').write_text(json.dumps(ratchet))
         result = subprocess.run(command, cwd=self.base, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_regenerate_saves_patch_then_fails_when_path_is_unclassified(self):
+        """기준선 유무와 무관하게 미분류 경로는 저장 후 실패하고, 분류를 추가하면 통과한다."""
+        tool = self.overlay / 'tools/overlay'
+        tool.mkdir(parents=True)
+        shutil.copy(ROOT/'tools/overlay/regenerate-shell-patch.py', tool)
+        shutil.copytree(ROOT/'tools/overlay/lib', tool/'lib',
+                        ignore=shutil.ignore_patterns('__pycache__'))
+        ratchet_path = self.overlay / 'build/patch-ratchet.json'
+        self.catalog['new_glue'] = ['unclassified.h']
+        (self.overlay/'build/overlay.json').write_text(json.dumps(self.catalog))
+        (self.src/'shell.cc').write_text('overlay\n')
+        (self.src/'unclassified.h').write_text('new glue\n')
+        index_before = git(self.src, 'diff', '--cached', '--binary')
+        command = [sys.executable, str(tool/'regenerate-shell-patch.py'),
+                   '--chromium-src', str(self.src)]
+        patch = self.overlay / 'patches/0001-integrate-yee-shell.patch'
+        for baseline_role in (None, 'branding', 'shell'):
+            with self.subTest(baseline_role=baseline_role):
+                ratchet_path.unlink(missing_ok=True)
+                if baseline_role is not None:
+                    ratchet = {'schema_version': 1, 'roles': {
+                        baseline_role: {'baseline': {metric: {} for metric in METRICS},
+                                        'exceptions': []}}}
+                    ratchet_path.write_text(json.dumps(ratchet))
+                before = ratchet_path.read_bytes() if ratchet_path.exists() else None
+                self.write_concerns('shell.cc')
+                result = subprocess.run(command, cwd=self.base, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('미분류 경로: unclassified.h', result.stderr)
+                self.assertEqual(patch_paths(patch), ['shell.cc', 'unclassified.h'])
+                self.assertIn('+new glue', patch.read_text())
+                git(self.src, 'apply', '--reverse', '--check', str(patch))
+                self.assertEqual(ratchet_path.read_bytes() if ratchet_path.exists() else None, before)
+                self.assertEqual(git(self.src, 'diff', '--cached', '--binary'), index_before)
+                self.write_concerns('shell.cc', 'unclassified.h')
+                result = subprocess.run(command, cwd=self.base, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(ratchet_path.read_bytes() if ratchet_path.exists() else None, before)
 
     def test_late_patch_conflict_is_rejected_before_any_write(self):
         (self.src / 'windows.bat').write_text('conflict\n')

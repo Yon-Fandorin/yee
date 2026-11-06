@@ -34,8 +34,13 @@ ticket을 등록한다. mock 완료 콜백만 기다리는 `TestFuture`는 정�
 
 `test_patch_ratchet.py`는 파일 분류·지표 측정·멤버 선언 근사 판정, 최초 기준선 기록,
 감소분만 저장하는 `--update`, 증가·예외 허용량·잘못된 설정을 임시 패치로 검사한다.
+관심사 지도의 누락·남은 경로·미정의 이름·빈 목록, 혼합 경로의 중복 없는 요약과
+인자·stdin 분류의 출력·`unclassified` 처리도 확인한다.
+기준선이 없을 때도 지도 파일과 올바른 분류를 요구하고 지표 검사만 생략하는지 검사한다.
 `test_overlay_tools.py`의 `test_regenerate_saves_patch_then_fails_when_ratchet_grows`는
 래칫 증가 시에도 `0001`을 먼저 저장한 뒤 실패 코드를 반환하는지 확인한다.
+`test_regenerate_saves_patch_then_fails_when_path_is_unclassified`는 새 미분류 경로도
+기준선 유무와 무관하게 저장 후 실패하며 분류를 추가하면 통과하는지 검사한다.
 
 `test_native_test_discovery.py`는 일반·타입·값 매개변수 목록, 양수·음수 필터,
 비활성 테스트, 패턴 일부 누락과 순수 Python CLI를 가짜 목록으로 확인한다.

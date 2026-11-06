@@ -20,7 +20,7 @@
 | `audit_logo_assets.py` | GRIT·네이티브·공통 WebUI·삽화의 독립 로고 경로와 적용 상태 검사 |
 | `audit-branding.py` | 브랜딩 적용 대상과 남은 문구 점검 |
 | `regenerate-shell-patch.py` | 실제 변경 내역에서 `0001` 다시 만들기 |
-| `check-patch-ratchet.py` | 패치의 경로별 결합 지표와 기준선·예외 검사 |
+| `check-patch-ratchet.py` | 패치의 결합 지표·기준선·예외·관심사 지도 검사와 충돌 경로 분류 |
 | `vendor-yee-adblock.py` | 외부 Rust 원본 확인과 빌드 파일 생성 |
 
 공통 코드는 [`lib/`](lib/README.md)에 있다.
@@ -139,8 +139,26 @@ python3 tools/overlay/check-patch-ratchet.py --update
 `--role`의 기본값은 `shell`이고, `--init`은 해당 role의 기준선이 없을 때만 쓴다.
 검사 종료 코드는 통과 `0`, 위반 `1`, 설정 오류 `2`다.
 `regenerate-shell-patch.py`도 `0001` 저장 후 래칫을 실행하고 실패 시 non-zero로 끝난다.
-저장한 패치는 유지하며, 해당 role의 기준선이 없으면 재생성의 래칫 검사만 건너뛴다.
+저장한 패치는 유지하며, 해당 role의 기준선이 없으면 재생성의 지표 검사만 건너뛴다.
+`shell` role은 기준선이 없어도 관심사 지도 파일과 경로 집합을 항상 검사한다.
 지표·예외 규칙과 후속 범위는 [이식 구조](../../docs/chromium-upgrade-structure.md)에 있다.
+
+[`build/patch-concerns.json`](../../build/patch-concerns.json)은 `0001`의 모든 Chromium
+경로를 `paths`에 명시한다. 각 값은 `concerns`에 정의한 `shell`, `content_blocking`의
+목록이며, 혼합 파일은 둘 다 적는다. 새 경로가 생기면 분류를 추가하고 패치에서 빠진
+경로는 지도에서도 지운다. 누락·남은 경로, 미정의 관심사와 빈 목록은 설정 오류(2)다.
+재생성은 `0001`을 저장한 뒤 검사하므로 미분류 경로가 있으면 패치를 남기고 실패한다.
+관심사별 크기와 5개 지표 합계에서 혼합 경로는 별도 행으로 한 번만 센다.
+
+충돌 파일은 같은 CLI의 `--classify`로 분류한다. 인자가 없으면 stdin에서 한 줄씩 읽는다.
+
+```sh
+python3 tools/overlay/check-patch-ratchet.py --classify chrome/browser/BUILD.gn chrome/renderer/BUILD.gn
+git -C /absolute/path/to/chromium/src diff --name-only --diff-filter=U | python3 tools/overlay/check-patch-ratchet.py --classify
+```
+
+지도에 없는 경로는 `unclassified`로 출력하며 관심사별 파일 수도 보고한다.
+중복 입력과 빈 줄은 세지 않는다. 분류에는 패치나 래칫 기준선이 필요 없다.
 
 현재 UI와 기능은 [브라우저 코드](../../browser/README.md),
 [Sidebar 결정](../../docs/sidebar/README.md), [Header 테스트](../../docs/header/README.md),

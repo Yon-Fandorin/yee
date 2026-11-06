@@ -105,6 +105,15 @@ Sidebar에서 Yee 셸이 쓰지 않는 compact rail 너비를 강제하는 원�
 `0001`은 Chromium 연결을 담는 단일 패치 파일로 유지한다. Yee 소유 코드는
 [`build/overlay.json`](../build/overlay.json)의 경로 매핑으로 동기화한다.
 
+콘텐츠 차단 연결을 별도 패치로 물리 분리하는 안은 검토 후 채택하지 않았다.
+이동 범위가 41개 경로의 +581/-100줄(`0001`의 약 4%)에 그치고, 같은 Chromium
+파일의 업그레이드 충돌과 래칫 총량은 그대로인데 적용·재생성 도구 비용은 커진다.
+셸 UI가 콘텐츠 차단에 의존해 해당 패치만 보류할 수도 없다.
+
+대신 [`build/patch-concerns.json`](../build/patch-concerns.json)에 파일별 관심사를
+기록한다. 콘텐츠 차단만 따로 보류하거나 rebase해야 할 때 물리 분리를 다시 검토하며,
+그때는 UI의 콘텐츠 차단 의존부터 끊는다.
+
 ## 테스트 gate 누락 방지
 
 `tests/tooling/test_gate_coverage.py`는 overlay의 GTest 선언과 `0001`의 추가·수정
@@ -153,6 +162,12 @@ python3 tools/overlay/check-patch-ratchet.py --update
 `roles.shell.exceptions`는 `{metric, path, allowed, reason}` 항목의 목록이다.
 `path`는 Chromium 상대 경로이며 기준선에 없는 경로는 0으로 본다.
 
+[`build/patch-concerns.json`](../build/patch-concerns.json)은 `schema_version: 1`과
+관심사 설명(`concerns`), 경로별 관심사 목록(`paths`)을 둔다. `shell` role의 모든
+패치 경로를 명시하며, 누락·남은 경로, 미정의 관심사와 빈 목록은 설정 오류다.
+관심사별 파일 수·추가/삭제 줄·hunk 수·5개 지표 합계를 보고한다.
+혼합 경로는 `shell+content_blocking`처럼 별도 행으로 세어 중복 합산하지 않는다.
+
 전체 지표에 고정 상한을 두지 않고, 경로별 기준선의 증가를 막는다.
 증가가 필요하면 검토한 예외에 지표·경로·허용 수·이유를 남긴다.
 `allowed`는 증가분이 아닌 해당 지표·경로의 절대 허용 수이며 기준선보다 커야 한다.
@@ -165,8 +180,10 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 종류별 파일 수·수정 위치·추가/삭제 줄·hunk 수는 보고용이며 통과 조건이 아니다.
 `regenerate-shell-patch.py`는 `0001`을 먼저 저장한 뒤 래칫을 실행한다.
-래칫 실패 시 저장한 패치를 유지하며 non-zero로 끝난다. 해당 role의 기준선이 없으면
-재생성 단계의 래칫 검사만 건너뛴다. 독립 검사 명령은 기준선 누락을 설정 오류로 처리한다.
+미분류 경로나 래칫 위반이 있으면 저장한 패치를 유지하며 non-zero로 끝난다.
+해당 role의 기준선이 없으면 재생성 단계의 지표 검사만 건너뛴다.
+`shell` role의 관심사 지도는 필수이며, 지도와 경로 집합은 기준선 유무와 무관하게 검사한다.
+독립 검사 명령은 기준선 누락을 설정 오류로 처리한다.
 
 ## 구현된 소유 경계
 
@@ -257,7 +274,7 @@ tier·OS·parameter 연결은 유지한다.
 
 각 업그레이드의 [Stable 인수인계](chromium-stable-handoff.md)에 다음을 기록한다.
 
-- rebase 중 충돌한 파일과 hunk 수
+- rebase 중 충돌한 파일과 hunk 수. 파일은 관심사별로 나누고 혼합·미분류도 따로 기록한다.
 - 이식 시작부터 첫 빌드 성공까지의 시간
 - 같은 시작점부터 필요한 gate가 모두 통과할 때까지의 시간
 
@@ -272,5 +289,4 @@ tier·OS·parameter 연결은 유지한다.
 macOS에서 전체 gate(`--tier=all`)가 통과했다.
 
 Windows 전용 테스트·지원 코드 이전, `.ps1` gate의 실행 파일·필터 전환과 검증은
-후속 작업이다. SW IPC 분리, 전체 상태 이전, View 트리 재설계와 콘텐츠 차단 배포 코드의
-패치 분리도 별도 설계 대상으로 남긴다.
+후속 작업이다. SW IPC 분리, 전체 상태 이전과 View 트리 재설계도 별도 설계 대상으로 남긴다.

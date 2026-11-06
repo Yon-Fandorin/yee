@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/overlay'))
 from lib.overlay_tools import load_catalog
 from lib.patch_ratchet import (FILE_KINDS, METRICS, Measurement, evaluate, file_kind,
-                               is_yee_member, load_ratchet, measure, run, statements,
-                               validate_ratchet)
+                               is_yee_member, load_concerns, load_ratchet, measure, run,
+                               statements, validate_concerns, validate_ratchet)
 
 
 def section(path, body, created=False):
@@ -64,8 +64,29 @@ class PatchRatchetTest(unittest.TestCase):
     def write_shell_patch(self, *sections):
         (self.root / 'patches/shell.patch').write_text(''.join(sections))
 
+    def write_concerns(self, paths):
+        data = {'schema_version': 1,
+                'concerns': {'shell': '셸 연결', 'content_blocking': '콘텐츠 차단 연결'},
+                'paths': paths}
+        path = self.root / 'build/patch-concerns.json'
+        path.write_text(json.dumps(data))
+        return path
+
     def run_ratchet(self, mode='check', **options):
         return run(self.root, mode=mode, out=self.output.append, **options)
+
+    def run_cli(self, *args, stdin=''):
+        spec = importlib.util.spec_from_file_location(
+            'check_patch_ratchet', ROOT / 'tools/overlay/check-patch-ratchet.py')
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        cli.REPO_ROOT = self.root
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(sys, 'argv', ['check-patch-ratchet.py', *args]), \
+                mock.patch.object(sys, 'stdin', io.StringIO(stdin)), \
+                contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = cli.main()
+        return code, stdout.getvalue(), stderr.getvalue()
 
     def ratchet(self):
         return load_ratchet(self.root / 'build/patch-ratchet.json')
@@ -277,6 +298,7 @@ class PatchRatchetTest(unittest.TestCase):
             self.write_shell_patch(section('chrome/browser/a.cc', body))
 
         shell_patch(2)
+        self.write_concerns({'chrome/browser/a.cc': ['shell']})
         with self.assertRaisesRegex(ValueError, '--init'):
             self.run_ratchet()
         self.assertEqual(self.run_ratchet(missing_ok=True), 0)
@@ -305,6 +327,134 @@ class PatchRatchetTest(unittest.TestCase):
         (self.root / 'build/patch-ratchet.json').write_text(json.dumps(data))
         self.assertEqual(self.run_ratchet(), 0)
         self.assertIn('결과: 통과', self.output[-1])
+
+    def test_missing_baseline_does_not_skip_concern_validation(self):
+        """기준선이 없어도 지도 파일과 모든 분류를 요구하고 지표 검사만 생략한다."""
+        path = 'chrome/browser/a.cc'
+        self.write_shell_patch(section(path, [' context', '+if (yee::IsShellEnabled()) {}']))
+        with self.assertRaises(FileNotFoundError):
+            self.run_ratchet(missing_ok=True)
+        code, _, stderr = self.run_cli()
+        self.assertEqual(code, 2)
+        self.assertIn('build/patch-concerns.json', stderr)
+        cases = [
+            ({}, '미분류 경로: ' + path),
+            ({path: ['shell'], 'stale.cc': ['shell']}, '패치에 없는 경로: stale.cc'),
+            ({path: ['unknown']}, "정의되지 않은 관심사 'unknown': " + path),
+            ({path: []}, '빈 관심사 목록 또는 잘못된 목록: ' + path),
+        ]
+        for paths, message in cases:
+            self.write_concerns(paths)
+            with self.subTest(paths=paths), self.assertRaisesRegex(ValueError, message):
+                self.run_ratchet(missing_ok=True)
+        self.write_concerns({path: ['shell']})
+        self.assertEqual(self.run_ratchet(missing_ok=True), 0)
+        self.assertIn('지표 검사를 건너뛴다', self.output[-1])
+        self.assertFalse((self.root / 'build/patch-ratchet.json').exists())
+
+    def test_concern_errors_fail_check_and_update_without_writing_baseline(self):
+        """누락·남은 경로, 미정의 이름과 빈 목록은 설정 오류(2)로 끝나며 기준선을 보존한다."""
+        path = 'chrome/browser/a.cc'
+        self.write_shell_patch(section(path, [' context', '+added']))
+        self.write_concerns({path: ['shell']})
+        self.assertEqual(self.run_ratchet('init'), 0)
+        ratchet = self.root / 'build/patch-ratchet.json'
+        before = ratchet.read_bytes()
+        cases = [
+            ({}, '미분류 경로: ' + path),
+            ({path: ['shell'], 'stale.cc': ['shell']}, '패치에 없는 경로: stale.cc'),
+            ({path: ['unknown']}, "정의되지 않은 관심사 'unknown': " + path),
+            ({path: []}, '빈 관심사 목록 또는 잘못된 목록: ' + path),
+        ]
+        for paths, message in cases:
+            self.write_concerns(paths)
+            for args in ((), ('--update',)):
+                with self.subTest(paths=paths, args=args):
+                    code, _, stderr = self.run_cli(*args)
+                    self.assertEqual(code, 2)
+                    self.assertIn('build/patch-concerns.json', stderr)
+                    self.assertIn(message, stderr)
+                    self.assertEqual(ratchet.read_bytes(), before)
+
+    def test_init_requires_classification_but_other_roles_do_not(self):
+        """shell 최초 기록도 분류를 요구하고, 다른 patch role은 기존대로 지도 없이 검사한다."""
+        self.write_shell_patch(section('a.cc', [' context', '+added']))
+        self.write_concerns({})
+        code, _, stderr = self.run_cli('--init')
+        self.assertEqual(code, 2)
+        self.assertIn('미분류 경로: a.cc', stderr)
+        self.assertFalse((self.root / 'build/patch-ratchet.json').exists())
+        (self.root / 'build/patch-concerns.json').unlink()
+        (self.root / 'patches/branding.patch').write_text(section('brand.cc', ['+brand'], created=True))
+        self.assertEqual(self.run_ratchet('init', role='branding'), 0)
+        self.assertEqual(self.run_ratchet(role='branding'), 0)
+
+    def test_concern_summary_counts_mixed_paths_once_and_preserves_metrics(self):
+        """혼합 목록의 순서와 무관하게 한 행에 합치고, 새 파일은 크기에만 포함한다."""
+        paths = {'shell.cc': ['shell'], 'blocking_unittest.cc': ['content_blocking'],
+                 'mixed.h': ['shell', 'content_blocking'],
+                 'mixed.cc': ['content_blocking', 'shell'], 'new.h': ['content_blocking']}
+        self.write_shell_patch(
+            section('shell.cc', ['-old', '+plain']),
+            section('blocking_unittest.cc', [' context', '+test']),
+            section('mixed.h', [' context', '+#include "chrome/browser/ui/views/yee/yee_ui.h"',
+                                '+  bool yee_pending_ = false;']),
+            section('mixed.cc', [' context', '+if (yee::IsShellEnabled()) GetViewByID(1);']),
+            section('new.h', ['+bool yee_new_ = yee::IsShellEnabled();'], created=True),
+        )
+        concerns = load_concerns(self.write_concerns(paths))
+        result = measure(self.root / 'patches/shell.patch', self.catalog, concerns)
+        self.assertEqual(set(result.concerns), {'shell', 'content_blocking', 'shell+content_blocking'})
+        self.assertEqual(result.concerns['shell+content_blocking'],
+                         Counter(files=2, added=3, removed=0, hunks=2, edit_sites=2,
+                                 shell_branches=1, view_id_lookups=1, yee_includes=1, yee_members=1))
+        self.assertEqual(result.concerns['content_blocking']['files'], 2)
+        self.assertEqual(result.concerns['content_blocking']['added'], 2)
+        for metric in METRICS:
+            self.assertEqual(sum(total[metric] for total in result.concerns.values()),
+                             sum(result.counts[metric].values()))
+        for size in ('files', 'added', 'removed', 'hunks'):
+            self.assertEqual(sum(total[size] for total in result.concerns.values()),
+                             sum(total[size] for total in result.sizes.values()))
+        self.assertEqual(self.run_ratchet('init'), 0)
+        self.assertIn('shell+content_blocking: 파일 2 · +3/-0 · hunk 2', self.output[-1])
+        self.assertIn('upstream_test_lines 0 · shell_branches 1 · view_id_lookups 1'
+                      ' · yee_includes 1 · yee_members 1', self.output[-1])
+
+    def test_classify_accepts_arguments_and_stdin_without_ratchet_or_patch(self):
+        """인자와 stdin은 같은 분류·개수·unclassified를 출력하고 중복·빈 줄은 세지 않는다."""
+        self.write_concerns({'s.cc': ['shell'], 'c.cc': ['content_blocking'],
+                             'm.cc': ['content_blocking', 'shell']})
+        paths = ['c.cc', 's.cc', 'm.cc', 'unknown.cc']
+        expected = ('content_blocking\tc.cc\nshell\ts.cc\nshell+content_blocking\tm.cc\n'
+                    'unclassified\tunknown.cc\n관심사별 파일 수 (합계 4)\n'
+                    '  content_blocking: 1\n  shell: 1\n  shell+content_blocking: 1\n'
+                    '  unclassified: 1\n')
+        self.assertEqual(self.run_cli('--classify', *paths), (0, expected, ''))
+        self.assertEqual(self.run_cli('--classify', stdin='\n'.join(paths + ['', 's.cc', ''])),
+                         (0, expected, ''))
+        self.assertEqual(self.run_cli('--classify'), (0, '관심사별 파일 수 (합계 0)\n', ''))
+
+    def test_invalid_concern_schema_and_duplicate_keys_are_rejected(self):
+        """잘못된 schema·목록·설명과 중복 JSON 경로를 거부한다."""
+        data = json.loads(self.write_concerns({'a.cc': ['shell']}).read_text())
+        cases = [
+            {**data, 'schema_version': True},
+            {**data, 'schema_version': 2},
+            {**data, 'concerns': {'shell': '  '}},
+            {**data, 'paths': {'a.cc': 'shell'}},
+            {**data, 'paths': {'a.cc': [[]]}},
+            {**data, 'paths': {'a.cc': ['shell', 'shell']}},
+            {**data, 'paths': {'../a.cc': ['shell']}},
+        ]
+        for value in cases:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_concerns(value)
+        path = self.root / 'build/patch-concerns.json'
+        path.write_text('{"schema_version": 1, "concerns": {"shell": "셸"}, '
+                        '"paths": {"a.cc": ["shell"], "a.cc": ["shell"]}}')
+        with self.assertRaisesRegex(ValueError, 'Duplicate keys in build/patch-concerns.json'):
+            load_concerns(path)
 
     def test_invalid_ratchet_files_are_rejected(self):
         """이유 없는 예외, 중복·알 수 없는 지표와 잘못된 기준선 값을 거부한다."""
@@ -355,27 +505,16 @@ class PatchRatchetTest(unittest.TestCase):
 
     def test_cli_reports_input_and_configuration_errors_with_code_two(self):
         """누락된 패치와 잘못된 예외 형식은 지표 위반(1)이 아니라 입력 오류(2)로 끝난다."""
-        spec = importlib.util.spec_from_file_location(
-            'check_patch_ratchet', ROOT / 'tools/overlay/check-patch-ratchet.py')
-        cli = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(cli)
-        cli.REPO_ROOT = self.root
-
-        def main(*args):
-            stderr = io.StringIO()
-            with mock.patch.object(sys, 'argv', ['check-patch-ratchet.py', *args]), \
-                    contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
-                return cli.main(), stderr.getvalue()
-
-        code, stderr = main('--init')
+        self.write_concerns({'chrome/browser/a.cc': ['shell']})
+        code, _, stderr = self.run_cli('--init')
         self.assertEqual(code, 2)
         self.assertIn('입력 오류', stderr)
         self.write_shell_patch(section('chrome/browser/a.cc', [' context', '+added']))
-        self.assertEqual(main('--init')[0], 0)
+        self.assertEqual(self.run_cli('--init')[0], 0)
         data = self.ratchet()
         data['roles']['shell']['exceptions'].append(exception('chrome/browser/a.cc', 2, metric=[]))
         (self.root / 'build/patch-ratchet.json').write_text(json.dumps(data))
-        code, stderr = main()
+        code, _, stderr = self.run_cli()
         self.assertEqual(code, 2)
         self.assertIn('입력 오류', stderr)
 

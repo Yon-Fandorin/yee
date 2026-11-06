@@ -10,6 +10,7 @@ from .overlay_tools import load_catalog, patch_paths, relative_path
 
 
 RATCHET_FILE = 'build/patch-ratchet.json'
+CONCERNS_FILE = 'build/patch-concerns.json'
 SCHEMA_VERSION = 1
 
 # 검사하는 지표와 보고용 설명. 순서는 보고 순서다.
@@ -229,35 +230,102 @@ def owned_include_matcher(catalog):
 class Measurement:
     counts: dict
     sizes: dict
+    concerns: dict = field(default_factory=dict)
 
 
-def measure(patch_file, catalog):
+def measure(patch_file, catalog, concerns=None):
     """패치가 수정한 Chromium 파일별 지표와 보고용 크기를 센다. 새 파일은 지표에서 제외한다."""
+    diffs = file_diffs(patch_file)
+    if concerns is not None:
+        missing = sorted({diff.path for diff in diffs} - set(concerns))
+        stale = sorted(set(concerns) - {diff.path for diff in diffs})
+        errors = []
+        if missing:
+            errors.append('미분류 경로: ' + ', '.join(missing))
+        if stale:
+            errors.append('패치에 없는 경로: ' + ', '.join(stale))
+        if errors:
+            raise ValueError(f'{CONCERNS_FILE}: ' + '; '.join(errors))
     owned = owned_include_matcher(catalog)
     counts = {metric: Counter() for metric in METRICS}
     sizes = {kind: Counter() for kind in FILE_KINDS}
-    for diff in file_diffs(patch_file):
-        size = sizes[diff.kind]
-        size.update(files=1, edit_sites=diff.edit_sites, added=len(diff.added),
-                    removed=diff.removed, hunks=diff.hunks)
-        if diff.kind == 'new':
-            continue
+    concern_totals = {}
+    for diff in diffs:
+        size = Counter(files=1, edit_sites=diff.edit_sites, added=len(diff.added),
+                       removed=diff.removed, hunks=diff.hunks)
+        sizes[diff.kind].update(size)
         found = Counter()
-        if diff.kind == 'test':
-            found['upstream_test_lines'] = len(diff.added)
-        for line in diff.added:
-            include = INCLUDE.match(line)
-            found.update(shell_branches=int('IsShellEnabled(' in line),
-                         view_id_lookups=int('GetViewByID(' in line),
-                         yee_includes=int(bool(include and owned(include[1]))))
-        if diff.path.endswith('.h'):
-            found['yee_members'] = sum(is_yee_member(statement)
-                                       for run in diff.added_runs
-                                       for statement in statements(run))
+        if diff.kind != 'new':
+            if diff.kind == 'test':
+                found['upstream_test_lines'] = len(diff.added)
+            for line in diff.added:
+                include = INCLUDE.match(line)
+                found.update(shell_branches=int('IsShellEnabled(' in line),
+                             view_id_lookups=int('GetViewByID(' in line),
+                             yee_includes=int(bool(include and owned(include[1]))))
+            if diff.path.endswith('.h'):
+                found['yee_members'] = sum(is_yee_member(statement)
+                                           for run in diff.added_runs
+                                           for statement in statements(run))
         for metric, count in found.items():
             if count:
                 counts[metric][diff.path] = count
-    return Measurement(counts, sizes)
+        if concerns is not None:
+            total = concern_totals.setdefault(concerns[diff.path], Counter())
+            total.update(size)
+            total.update(found)
+    return Measurement(counts, sizes, concern_totals)
+
+
+def validate_concerns(data):
+    """관심사 설명과 모든 명시적 경로의 비어 있지 않은 관심사 목록을 검사한다."""
+    if (not isinstance(data, dict) or set(data) != {'schema_version', 'concerns', 'paths'}
+            or type(data['schema_version']) is not int
+            or data['schema_version'] != SCHEMA_VERSION
+            or not isinstance(data['concerns'], dict) or not data['concerns']
+            or not isinstance(data['paths'], dict)):
+        raise ValueError(f'Unsupported {CONCERNS_FILE} schema')
+    for name, description in data['concerns'].items():
+        if (not isinstance(name, str) or not re.fullmatch(r'[a-z][a-z0-9_]*', name)
+                or not isinstance(description, str) or not description.strip()):
+            raise ValueError(f'{CONCERNS_FILE}: 관심사 이름과 한 줄 설명이 필요하다: {name!r}')
+    for path, names in data['paths'].items():
+        relative_path(path)
+        if not isinstance(names, list) or not names:
+            raise ValueError(f'{CONCERNS_FILE}: 빈 관심사 목록 또는 잘못된 목록: {path}')
+        for name in names:
+            if not isinstance(name, str) or name not in data['concerns']:
+                raise ValueError(f'{CONCERNS_FILE}: 정의되지 않은 관심사 {name!r}: {path}')
+        if len(names) != len(set(names)):
+            raise ValueError(f'{CONCERNS_FILE}: 중복 관심사: {path}')
+    return data
+
+
+def load_concerns(path):
+    """지도를 검증하고 정의 순서대로 합친 관심사 이름을 경로별로 반환한다."""
+    text = Path(path).read_text(encoding='utf-8')
+    data = validate_concerns(json.loads(
+        text, object_pairs_hook=lambda pairs: unique_object(pairs, CONCERNS_FILE)))
+    return {path: '+'.join(name for name in data['concerns'] if name in names)
+            for path, names in data['paths'].items()}
+
+
+def classify_paths(repo_root, paths, out=print):
+    """충돌 경로를 지도에 따라 분류하며, 중복 입력은 한 파일로 센다."""
+    concerns = load_concerns(Path(repo_root) / CONCERNS_FILE)
+    totals, seen = Counter(), set()
+    for path in paths:
+        path = path.strip()
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        label = concerns.get(path, 'unclassified')
+        out(f'{label}\t{path}')
+        totals[label] += 1
+    out(f'관심사별 파일 수 (합계 {sum(totals.values())})')
+    for label, count in sorted(totals.items()):
+        out(f'  {label}: {count}')
+    return 0
 
 
 def validate_ratchet(data):
@@ -296,12 +364,12 @@ def validate_ratchet(data):
     return data
 
 
-def unique_object(pairs):
-    """같은 JSON 객체 안의 중복 키가 앞의 기준선·예외 값을 덮어쓰지 못하게 거부한다."""
+def unique_object(pairs, config_file=RATCHET_FILE):
+    """같은 JSON 객체 안의 중복 키가 앞의 설정값을 덮어쓰지 못하게 거부한다."""
     keys = [key for key, _ in pairs]
     duplicates = sorted({key for key in keys if keys.count(key) > 1})
     if duplicates:
-        raise ValueError(f'Duplicate keys in {RATCHET_FILE}: {", ".join(duplicates)}')
+        raise ValueError(f'Duplicate keys in {config_file}: {", ".join(duplicates)}')
     return dict(pairs)
 
 
@@ -391,6 +459,12 @@ def report(role, patch, measurement, config, findings):
         size = measurement.sizes[kind]
         lines.append(f'    {label}: 파일 {size["files"]} · 수정 위치 {size["edit_sites"]}'
                      f' · +{size["added"]}/-{size["removed"]} · hunk {size["hunks"]}')
+    if measurement.concerns:
+        lines.append('  관심사 (파일 단위, 혼합 경로는 별도 집계)')
+        for label, total in sorted(measurement.concerns.items()):
+            lines.append(f'    {label}: 파일 {total["files"]}'
+                         f' · +{total["added"]}/-{total["removed"]} · hunk {total["hunks"]}')
+            lines.append('      ' + ' · '.join(f'{metric} {total[metric]}' for metric in METRICS))
     if not findings:
         lines.append('결과: 통과')
         return '\n'.join(lines)
@@ -419,14 +493,19 @@ def run(repo_root, role='shell', mode='check', patch=None, missing_ok=False, out
     ratchet_path = repo_root / RATCHET_FILE
     data = (load_ratchet(ratchet_path) if ratchet_path.is_file()
             else {'schema_version': SCHEMA_VERSION, 'roles': {}})
+    measurement = None
+    if role == 'shell':
+        concerns = load_concerns(repo_root / CONCERNS_FILE)
+        measurement = measure(patch, catalog, concerns)
     if mode != 'init' and role not in data['roles']:
         if missing_ok:
-            out(f'패치 래칫: {role} 기준선이 없어 검사를 건너뛴다.')
+            out(f'패치 래칫: {role} 기준선이 없어 지표 검사를 건너뛴다.')
             return 0
         raise ValueError(f'No {role} baseline in {RATCHET_FILE}; record it once with --init')
     if mode == 'init' and role in data['roles']:
         raise ValueError(f'{role} baseline already exists; lower it with --update')
-    measurement = measure(patch, catalog)
+    if measurement is None:
+        measurement = measure(patch, catalog)
     if mode == 'init':
         data['roles'][role] = {'baseline': initial_baseline(measurement), 'exceptions': []}
         write_ratchet(ratchet_path, data)
