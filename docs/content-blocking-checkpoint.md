@@ -130,6 +130,18 @@ script factory에도 기존 embedder 정책을 연결한다. 제어되는 client
 새 factory를 fallback에 연결하지 않는다. top/frame 출처가 다른 문맥에는 임의의
 쿠키 문맥을 만들지 않고 빈 `SiteForCookies`를 사용한다.
 
+서비스 워커 client의 factory 감싸기를 Chrome renderer의 `URLLoaderThrottleProvider`
+throttle과 브라우저 checker로 대체하는 안은 검토했지만 채택하지 않았다.
+Chromium 157의 공개 throttle API로는 비동기 판정 뒤 URL 변경(`removeparam`),
+요청 시작 전 대체 응답, 차단 요소 접기(`should_collapse_initiator`)를 구현할 수 없다.
+`ContentBrowserClient`에는 frame·서비스 워커용 binder 등록 hook은 있지만
+dedicated/shared worker용은 없어, 공식 hook만으로 해당 worker 신원이 붙은 checker를
+연결할 수 없다. 현재 감싸기는 확장 WebRequest 등 같은 `WillCreateURLLoaderFactory`
+정책을 서비스 워커 직접 응답 경로에도 적용하므로 throttle 전환은 이 범위를 바꾸며,
+응답 본문은 현재도 data pipe로 전달되어 브라우저가 바이트를 복사하지 않는다.
+Chromium이 worker용 binder hook이나 판정 후 URL 변경·접기 전달을 지원하는 throttle API를
+제공하면 재검토한다.
+
 `SiteControlsBrowserTest.ServiceWorkerCacheCannotBypassReenabledProtection`은
 이 관문을 실제 CacheStorage 응답으로 확인한다. HTTP 캐시를 우회하는 요청으로
 사이트 예외에서 캐시 응답을 받은 뒤, 보호를 켜면 같은 요청이 차단되는지 확인한다.
