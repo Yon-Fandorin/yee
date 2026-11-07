@@ -202,7 +202,7 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 [Microsoft의 종료 전 UIA 자원 정리 지침](https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcoreapi/nf-uiautomationcoreapi-uiadisconnectallproviders)을
 따르며 접근성 기능·COM 누수 검사는 유지한다.
 
-`UiaApplicationExitBrowserTest.*`는 별도 프로세스의 실제 UIA 클라이언트로 세 경로를
+`YeeUiaApplicationExitBrowserTest.*`는 별도 프로세스의 실제 UIA 클라이언트로 세 경로를
 확인한다. 다른 창을 닫아도 남은 창 조회가 가능해야 하며, 앱 종료와 마지막 창이 먼저
 닫힌 종료는 클라이언트가 참조를 보유한 상태에서도 모든 접근성 노드가 0개가 돼야 한다.
 수정 호출을 제거한 대조 빌드는 종료 검사 두 개에서 각각 41개·2개 참조가 남아
@@ -248,10 +248,10 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 실제 팝업의 renderer에 media emulation을 적용하고 실제 media query와 선택 행의 계산된 표시를 검사. Windows 대비 설정 전파 검증과는 별도 |
 | 선행 일반 탭 유무와 관계없이 수평 그룹의 첫 두 멤버를 연속으로 닫아도 실제 파비콘이 이름을 침범하지 않음. 접기·펼치기 모두 알약 배경을 유지하며 양 끝 사이의 중간 폭을 거치고 마지막 멤버도 정상적으로 닫힘 | `YeeHorizontalGroupTransitionsKeepHeaderClear` |
 | 맞춤설정 패널이 세로·수평 모두 창 Header 아래 행에 도킹해 닫기 버튼을 분리 | `YeeCustomizationPanelStaysBelowWindowHeader` |
-| macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `ImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
+| macOS 실제 전체화면에서 Toolbar·본문 경계와 Sidebar Header 축, 메뉴막대·창 버튼 노출 시 주소줄·바탕의 잘림과 복귀, Header·고정 Sidebar의 실제 합성색 일치, 고정·접힌 Sidebar의 native 창 가림 방지·본문 배분 유지, 항상 표시/숨김·고정/접힘, Flyout 고정 중 Header 행·목록 연속성, 설정을 보존한 분할 전환·비활성 renderer 크기·주소창 실제 키 입력, 해제 시 레이어 복귀 | `YeeImmersiveModeControllerMacInteractiveTest.ToggleFullscreenWithVerticalTabstrip` (`test-browser-surface-layout.sh interactive` 소유) |
 | macOS 수평 전체화면에서 별도 Widget으로 이동한 Header가 명시적으로 적용된 구조를 유지하고, 색상 갱신에도 clip·곡률이 보존되며, 추가 상단 카드 윤곽선을 그리지 않음 | `YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity`의 실제 전체화면·Side Panel 조합과 투명 raster 검사 |
 
-`BrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque`의 선택적
+`YeeBrowserNativeWidgetMacGlassTest.FullscreenWindowIsOpaque`의 선택적
 `--yee-fullscreen-capture-dir`는 수평 탭바와 주소줄을 함께 호스팅하는 실제
 AppKit 창을 캡처한다. 이동 전 overlay Widget의 오프스크린 NSWindow 대신
 이동된 NSView의 현재 창을 사용하므로 두 영역 사이의 접합도 검수할 수 있다.
@@ -358,8 +358,8 @@ Site Controls의 숫자 칩은 같은 Header snapshot을 받으며, 실제 칩 �
 
 `test-browser-surface-layout.sh interactive`는
 `YeeShellWithoutVerticalTabsUsesNativeToolbar`, `TestMinimumWindowSizeWhenSidePanelIsOpen`과
-macOS의 `BrowserNativeWidgetMacGlassTest`의 Yee guard 6개를 선택한다. Header gate의 기존 선택은
+macOS의 `YeeBrowserNativeWidgetMacGlassTest`의 Yee guard 6개를 선택한다. Header gate의 기존 선택은
 유지하며, 실제 실행·시각 검증은 목록 발견과 구분한다.
-`test-site-controls.sh`는 `TabDataObserverBrowserTest.FaviconAndIconFlags`와
-`All/TabSearchPageHandlerTest.RemoveSplit_NTP/*`를 `site_controls_browsertests`에 포함해
+`test-site-controls.sh`는 `YeeTabDataObserverBrowserTest.FaviconAndIconFlags`와
+`All/YeeTabSearchPageHandlerTest.RemoveSplit_NTP/*`를 `site_controls_browsertests`에 포함해
 전체 `browser_tests` 빌드 없이 실행한다.

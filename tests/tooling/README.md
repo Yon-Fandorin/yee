@@ -142,6 +142,11 @@ GN 파일로 그 연결도 확인한다.
 현재 예외는 opt-in YouTube 1개와 Windows 세션 소유 18개(Aura 포함)다. 삭제된 사례의
 stale 항목이나 빈 이유는 실패한다. 일반 누락을 예외에 추가하는 대신 gate에 연결한다.
 
+이 검사의 Windows 셸 평가는 PC 로컬 `run-windows-native-gates.py`의 실제 실행을
+검증하지 않는다. 저장소에는 Windows 테스트 gate `.ps1`이 없다. 실행기 위치 결정과
+이전한 fixture·TaskbarPinning·Aura의 연결·실행은
+[Windows 인계 체크리스트](../../docs/chromium-stable-handoff.md#다음-windows-세션-작업)를 따른다.
+
 ## 사례별 tier와 gate tier
 
 [`test_tiers.json`](test_tiers.json)은 정확한 `소스::Suite.Case`별로 OS 범위,

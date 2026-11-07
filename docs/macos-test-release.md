@@ -76,11 +76,11 @@ node tools/dev/test-macos-installer.mjs PACKAGE_DIRECTORY
 검사 기록과 전용 프로필은 `.local-build/macos-install-test-*`에 남는다.
 
 DMG 감지 회귀 검사는 Chromium의 `chrome/browser/mac:install_sh_test`를 빌드한 뒤
-`DiskImageInstallTest.*`만 실행한다. 임시 HFS+ 디스크 이미지를 직접 연결해 읽기 전용
+`YeeDiskImageInstallTest.*`만 실행한다. 임시 HFS+ 디스크 이미지를 직접 연결해 읽기 전용
 설치 원본과 쓰기 가능한 이미지·일반 앱 폴더를 구분한다. 검사에서 만든 이미지의
 추출·휴지통 이동도 확인하며, 실제 앱을 설치하지 않는다.
 
-`InstallShTest.UpdaterBuildFlagControlsElevatedSteps`는 실제 설치 템플릿을
+`YeeInstallShTest.UpdaterBuildFlagControlsElevatedSteps`는 실제 설치 템플릿을
 업데이터 포함·미포함 값으로 각각 렌더하고 관리자 권한 분기를 검사한다.
 EUID 판정과 시스템 명령을 임시 fixture로 바꾸므로 실제 권한 승격이나
 `/Applications`·`/Library`·LaunchServices 변경은 수행하지 않는다.

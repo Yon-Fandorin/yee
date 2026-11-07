@@ -288,5 +288,8 @@ tier·OS·parameter 연결은 유지한다.
 
 macOS에서 전체 gate(`--tier=all`)가 통과했다.
 
-Windows 전용 테스트·지원 코드 이전, `.ps1` gate의 실행 파일·필터 전환과 검증은
-후속 작업이다. SW IPC 분리, 전체 상태 이전과 View 트리 재설계도 별도 설계 대상으로 남긴다.
+Windows 전용 테스트·지원 코드 이전과 컴파일·실행 검증은 남아 있다.
+저장소에는 Windows 테스트 gate `.ps1`이 없으며 PC 로컬
+`run-windows-native-gates.py`를 사용한다. 실행기 위치 결정과 대상·필터 전환은
+[다음 Windows 세션 작업](chromium-stable-handoff.md#다음-windows-세션-작업)을 따른다.
+SW IPC 분리, 전체 상태 이전과 View 트리 재설계는 별도 설계 대상이다.

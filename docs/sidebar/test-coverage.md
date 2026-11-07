@@ -14,7 +14,7 @@
 각 정상 종료 뒤 새 프로필의 Crashpad 기록도 검사한다. 그룹 생성·복원이 성공해도
 충돌 또는 비치명적 진단 덤프가 생기면 파일 이름·크기·지문을 남기고 실패한다.
 그룹의 테마 판정은 실제 창에 붙은 뒤 수행하고, 부착 시 헤더 여백을 다시 계산한다.
-`test-site-controls.sh`의 `SessionStartupPrefTest.*`는 기본값,
+`test-site-controls.sh`의 `YeeSessionStartupPrefTest.*`는 기본값,
 사용자 시작 설정·관리자 정책의 우선순위와 Yee 비활성화 시 native 기본값을 검사한다.
 
 `test-sidebar.sh`의 기본값은 `unit`이며 `--no-build`만 줘도 단위 검사만 실행한다.
@@ -36,8 +36,8 @@ Widget이 비활성인지 확인한다. Footer도 비활성으로 시작하며 p
 | Light scheme은 frame 색을 보존하고 Dark scheme은 같은 hue의 차분한 shell로 정규화 | `YeeShellColorTest.*` |
 | 일반 행·Favorite·drag preview의 라이트/다크 및 활성/비활성 상태 팔레트 | `YeeSidebarItemColorTest.*` |
 | Resting→Hover→Active→Dragging의 fill·stroke 강도와 실제 합성 표면의 전경 대비 | `YeeSidebarItemColorTest.EveryStateSharesOneThemeAwarePalette` |
-| 세로 Group Header의 resting·hover 표면과 전경이 함께 바뀌고 창 활성 상태를 다시 반영 | `TabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether` |
-| 세로 Group 편집기를 열고 닫아도 기본 배경·전경·펼침 아이콘 상태를 유지 | `TabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed` |
+| 세로 Group Header의 resting·hover 표면과 전경이 함께 바뀌고 창 활성 상태를 다시 반영 | `YeeTabGroupHeaderViewTest.YeeVerticalHoverUpdatesSurfaceAndForegroundTogether` |
+| 세로 Group 편집기를 열고 닫아도 기본 배경·전경·펼침 아이콘 상태를 유지 | `YeeTabGroupHeaderViewTest.YeeVerticalEditorKeepsSidebarPresentationWhenOpenedAndClosed` |
 | Group mark가 브라우저 신호만 사용하고 Agent 상태를 섞지 않음 | `GroupMarkSignalsTest.*` |
 
 세로 Group 편집기 검사는 Header 부착 전에 포인터를 창 밖으로 옮겨 초기 hover가
@@ -99,7 +99,7 @@ Windows에서는 `PointerExitAndReentryKeepNativePopupFocus`가 실제 press/rel
 3:1 대비 및 글자 가독성을 검사한다. Escape와 외부 클릭 검사는 native 활성화
 완료 후 각각 traversal focus 복원과 새 목적지 focus 보존을 확인한다.
 실제 앱 검사는
-`VerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus`
+`YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus`
 에서 OS pointer 이동과 Escape 후 focus를 검증한다.
 `EscapeRestoreIsCancelledWhenTriggerLeavesWidget`는 Escape 직후 trigger를
 분리·재부착한 뒤 다른 컨트롤의 focus를 지연 복원 작업이 빼앗지 않는지 확인한다.
@@ -284,7 +284,7 @@ Windows 분할 호스트는 Native 조작과 주소창의 실제 최소 폭에 �
 실제 viewport 물리 크기와 새 프레임을 기다려 이전 크기의 페이지를 판정하지 않는다.
 크기뿐 아니라 WebContents의 화면 원점도 비교하고, 두 페이지의 왼쪽 위 고정 표식을
 root 합성 픽셀에서 읽는다. 각 Pane의 WebContents 동일성과 정확한 committed URL·제목을
-먼저 확인해 새 탭 페이지를 시험용 페이지로 오인하지 않는다. `TabSearchPageHandlerTest.RemoveSplit_NTP`는 다음
+먼저 확인해 새 탭 페이지를 시험용 페이지로 오인하지 않는다. `YeeTabSearchPageHandlerTest.RemoveSplit_NTP`는 다음
 주소 이동을 commit 전에 멈춘 상태에서도 현재 분할 새 탭의 판정이 유지되는지 두
 실험 설정에서 검사한다. 이동을 명시적으로 취소한 뒤 기존 분할 해제 검사를 계속한다.
 가로·세로 전환 뒤 비활성 native layer가 이전 좌표계에
@@ -349,8 +349,8 @@ allocation은 유지한다. Header clip도 native가 계산한 현재 paint allo
 명시적으로 받고 이전 clip의 형태로 geometry를 추론하지 않는다.
 
 앞의 Group 시각 검사는 모델 명령으로 만든 상태를 확인하므로 실제 드래그의
-편입·해제 성공을 대신하지 않는다. `horizontal`과 `interactive` 게이트는 native
-`DetachToBrowserTabDragControllerTest`의 양방향 편입, 그룹 밖 이동, 취소 복원,
+편입·해제 성공을 대신하지 않는다. `horizontal`과 `interactive` 게이트는 Yee 소유
+`YeeDetachToBrowserTabDragControllerTest`의 양방향 편입, 그룹 밖 이동, 취소 복원,
 그룹 헤더 이동과 접힌 그룹 경계를 함께 실행한다. legacy 수평 fixture는 프로필의
 기본 탭 배치와 관계없이 수평 모드로 진입한다.
 `YeeGroupMembershipDragSurvivesLayoutSwitch`는 세로→가로 전환 후 일반 창과
@@ -557,7 +557,7 @@ hit target·active·drawn·focus·배경·focus 이유를 각각 기록한다. �
 
 ## gate 연결 보완
 
-`test-sidebar.sh unit`은 기존 `EditorBubbleButtonVisibilityOnHover`와 overlay의
+`test-sidebar.sh unit`은 `YeeTabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover`와
 `YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons`를 선택한다. Yee 테스트는
 확장 헤더의 focus mode에서 hover 진입·이탈과 키보드 focus 동안 mark raster가
 변하지 않고 editor 버튼은 표시되며 collapse 버튼은 숨겨지는지 확인한다.
@@ -566,7 +566,7 @@ hit target·active·drawn·focus·배경·focus 이유를 각각 기록한다. �
 새 테스트는 같은 `yee_layout_unittests`에 컴파일하며 독립된 최소 Views fixture를 쓴다.
 `interactive`는 `ResizeGestureDoubleTapEqualizesSplitViews`의 양쪽 split 배치도 선택한다.
 `test-site-controls.sh`는 `SidebarFooterBrowserTest.*`, `DisclosureArrowTest.*`,
-`SessionStartupPrefTest.*`와 그룹 rename 뒤 비활성 탭 접근성 이름 갱신을 실행한다.
+`YeeSessionStartupPrefTest.*`와 그룹 rename 뒤 비활성 탭 접근성 이름 갱신을 실행한다.
 프로젝트 저장·탐색은 `test-projects.sh unit`과 `test-projects.sh browser`가 소유하며,
 후자는 기본 프로젝트 전체 검사 뒤 TabStripUnification을 켠 전용 사례를 별도 실행한다.
 이 연결 검사는 [tooling coverage](../../tests/tooling/README.md#yee-테스트-gate-누락-검사)가 지킨다.

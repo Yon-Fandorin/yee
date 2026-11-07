@@ -4,7 +4,8 @@ Chromium 소스 준비, 빌드, 앱 실행과 테스트를 담당한다.
 소스와 빌드 결과는 Git에서 제외된 `.local-build/`에 둔다.
 기본 빌드 결과 경로는 `chromium/src/out/YeePilot`이다.
 
-명령은 저장소 루트에서 실행한다. macOS는 `.sh`, Windows는 `.ps1` 스크립트를 사용한다.
+명령은 저장소 루트에서 실행한다. 소스 준비·빌드·실행은 macOS의 `.sh`, Windows의
+`.ps1` 스크립트를 사용한다. Windows native 테스트는 PC 로컬 실행기를 사용한다.
 두 플랫폼은 같은 제품 소스, 브랜딩 설정과 GN 빌드 설정을 사용한다.
 `depot_tools`에는 플랫폼별 상태가 있으므로 Windows와 WSL/Linux에서 같은
 디렉터리를 공유하지 않는다.
@@ -481,7 +482,10 @@ Omnibox·Mac immersive/glass의 Yee fixture는 `browser/ui`의 소유 테스트 
 원본 guard는 pristine 소스를 그대로 컴파일하고 실행 필터로 선택한다.
 layout의 `browser` 범위는 Yee 소유 Side Panel·selection 사례를 `site_controls_browsertests`에서,
 나머지 원본 guard를 `browser_tests`에서 실행한다. 모든 필수 필터에 실제 사례 발견 검사를 적용한다.
-Windows `.ps1` gate의 실행 파일·필터 전환은 후속 작업이다.
+저장소에는 Windows 테스트 gate `.ps1`이 없으며 Windows 검사는 PC 로컬
+`run-windows-native-gates.py`로 실행한다. 실행기 위치는 다음 Windows 세션에서
+사용자가 정한다. 새 실행 파일·fixture 필터, TaskbarPinning·Aura와 Windows 예외 검증은
+[Windows 인계 체크리스트](../../docs/chromium-stable-handoff.md#다음-windows-세션-작업)를 따른다.
 
 ### UI 테스트 작성과 applied-wait
 
