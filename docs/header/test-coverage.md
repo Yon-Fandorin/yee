@@ -11,7 +11,6 @@ Yee Shell·Shell 표시를 끈 native Toolbar의 조합으로 총 16개 실행�
 `YeeShell/OmniboxNavigationBrowserTest.*`는 HTTP·HTTPS에서 실제 Enter 이동과
 Alt+왼쪽·오른쪽의 문서·주소 동기화를 두 사례로 추가한다. 이 입력 조합을 쓰는
 Windows/Linux의 집중 gate는 총 18사례이며, macOS에서는 새 두 사례를 생략한다.
-이 수는 실제 앱 검수 항목 18개와 다른 집계다.
 
 Windows 검사 입력은 가상 키 방식으로 전송할 때도 전용 방향키의 확장 표시를
 보존한다. 이 표시가 없으면 Alt+왼쪽·오른쪽이 숫자 키패드의 Alt 문자 입력으로
@@ -34,13 +33,14 @@ Edit 역할·실제 값·편집 가능 여부를 확인한다. HTTP는 편집 �
 별개로 수행하며, 별도 MTA 스레드에서 읽는 동안 브라우저 UI 스레드는 요청을 처리한다.
 탭 전환 후 활성 문서 하나, 분할 중 두 문서, 분할 해제 후 문서 하나의 실제 URL을 확인한다.
 같은 제목의 문서도 URL로 구분하며, 편집 초안·첫 Escape·취소 뒤에도 문서의 URL을 확인한다.
-Yee의 현재 URL 처리는 Chromium 탭·내비게이션·주소창이 담당한다. 이 검사에는 Codex 연결이 필요하지 않다.
-이 gate는 외부 제어 도구의 URL 인식 성공이나 18개 수동 앱 검수를 대신 통과 처리하지 않는다.
+Yee 내부에서 커밋된 문서 주소는 활성 탭의 `WebContents::GetLastCommittedURL()`로 읽는다.
+`GetVisibleURL()`은 커밋 대기 중인 탐색을 포함하는 표시용 주소다. 이 gate의 검증 범위는
+Yee가 노출하는 값이다. 외부 도구의 URL 판별과 화면 읽기는 그 도구에서 따로 확인한다.
 
 Windows에서도 같은 테스트 코드를 직접 실행할 수 있다.
 
 ```powershell
-& ./out/YeeStable157/site_controls_browsertests.exe --single-process-tests --test-launcher-preserve-desktop-windows --test-launcher-jobs=1 --test-launcher-retry-limit=0 '--gtest_filter=Presentation/OmniboxAccessibilityBrowserTest.*:YeeShell/OmniboxNavigationBrowserTest.*'
+.\tools\dev\test-native.ps1 -Gate omnibox-accessibility -Tier foreground -StartOnDesktop
 ```
 
 표면 구조는 `browser_surface_layout`의 `BrowserSurfaceMode`와
@@ -165,35 +165,13 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 각 방향 전환의 native 배치 애니메이션이 끝나고 버튼이 보이는지 기다린 뒤 창을
 앞으로 가져온다. 매 클릭의 화면 좌표가 실제 버튼의 이벤트 대상인지와 포인터가
 그 위치에 도착했는지도 확인한다. 팝업이 열린 동안 부모 창을 다시 활성화하지 않는다.
-2026-10-26 Windows 실제 입력 검증에서 두 배치의 총 8회 클릭 assertion을 완료했다.
-초기 실행은 아래 공통 COM `ghost_count` 종료 오류로 실패했다. 후속 수정 결과는
-아래 접근성 종료 검증 기록을 따른다.
 
 `SiteControlsBrowserTest.PageInfoAndProtectionUseSeparatePopups`는 수평·수직 탭
 배치에서 방패 버튼이 탭 없는 Protection 팝업을 열고, 사이트 정보 action은 별도의
 Chromium Page Info bubble을 여는지 확인한다. `PageInfoOpensNativeSiteSettings`는
 그 native 팝업에서 현재 사이트의 설정 화면으로 이동하는 경로를 확인한다.
 `--yee-site-controls-capture-dir`를 지정하면 두 배치의 각 팝업 PNG를 저장한다.
-Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다. 2026-10-26
-Windows 검증에서 앱·검사 실행 파일 빌드와 실제 팝업 캡처를 완료했다. 관련 8개
-사례의 기능 assertion은 완료됐지만, 모든 사례가 종료 시 공통 접근성 검사
-`content_test_suite_base.cc`의 COM `ghost_count` 오류로 실패했다. 전체 통과로
-기록하지 않았다. 후속 수정 결과는 아래 접근성 종료 검증 기록을 따른다.
-
-같은 날 후속 진단에서 방패 팝업을 열지 않는
-`InternalURLsBrowserTest.ProductAndNativeSettingsRoutes`도 같은 종료 오류를 재현했다.
-접근성 노드의 소유자 연결은 모두 해제됐지만 Windows UI Automation의 외부 COM
-참조가 남아 있었다.
-창을 명시적으로 닫은 진단 실행에서는 `ghost_count`가 44에서, 메시지를 처리하며
-5초 기다린 뒤 3으로 줄었다. `UiaDisconnectRootProviders`를 활성화한 별도 실행도
-44→3으로 같았다. 일부는 비동기 해제 지연이며, 나머지 참조가 영구 누수인지와
-안전한 수정 위치는 당시 확정하지 못했다. 플랫폼 소멸자에서 전체 연결을 해제하거나
-개별 요소를 해제하는 초기 실험은 오류를 해결하지 못해 모두 되돌렸다.
-
-2026-10-26 후속 진단에서는 두 기존 검사의 종료 참조 45개를 재현했고, Yee 화면을
-끈 기본 Chromium 화면에서도 같은 문제가 발생했다. 창을 닫고 10초 동안 메시지를
-처리하거나 `UiaDisconnectRootProviders`만 켜는 비교 실행에서도 43개가 남았다.
-반면 UI 스레드에서 전체 UIA 연결을 해제하면 마지막 창이 먼저 닫힌 경로까지 0개가 됐다.
+Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다.
 
 Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에서 Widget을
 정리하기 전에 기존 `AXPlatform::DisableActiveUiaProvider()`를 호출한다. 새 UIA
@@ -205,31 +183,11 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 `YeeUiaApplicationExitBrowserTest.*`는 별도 프로세스의 실제 UIA 클라이언트로 세 경로를
 확인한다. 다른 창을 닫아도 남은 창 조회가 가능해야 하며, 앱 종료와 마지막 창이 먼저
 닫힌 종료는 클라이언트가 참조를 보유한 상태에서도 모든 접근성 노드가 0개가 돼야 한다.
-수정 호출을 제거한 대조 빌드는 종료 검사 두 개에서 각각 41개·2개 참조가 남아
-실패했고, 수정본은 세 경로를 통과했다. 같은 수정본의 관련 실행 35회 중 34회가
-통과했으며 모든 실행에서 COM 종료 오류가 사라졌다. 서비스워커 캐시 응답 사례
-하나는 기대한 `allowed` 대신 `blocked`로 실패했다. 이 검사 실패는 종료 수정을
-뺀 비교 빌드에서도 재현됐으므로 접근성 수정과 구분하고 해당 회차를 전체 suite
-통과로 기록하지 않았다.
-
-후속 캐시 검사 진단에서 이 실패는 서비스워커 캐시를 허용해야 한다는 옛 기대값이
-현재의 응답 전 차단 정책과 충돌한 것으로 확인됐다. 검사를
-`ServiceWorkerCacheCannotBypassReenabledProtection`으로 바꾸고 캐시 준비·보호 켬·
-사이트 예외 복구·캐시 삭제 후 서버 도달을 검증한다. 저장된 본문과 서버 요청 횟수를
-함께 확인하며 제품의 차단 동작을 완화하지 않는다. 상세 계약은
-[서비스 워커 연결](../content-blocking-checkpoint.md#실시간-연결서비스-워커-후속-연결)을 따른다.
-수정 후 같은 관련 실행 35회가 모두 종료 단계까지 통과했다. 서비스워커·HTTP 캐시,
-사이트 제어·내부 페이지와 외부 UIA 클라이언트의 접근성 종료 검사를 포함한다.
 
 `test-header.sh interactive`가 실제 Yee 창과 Chromium Omnibox를 함께 사용한다.
 실행 파일은 `yee_interactive_ui_tests`이며 Header 시나리오는
 `browser/ui/split_pane_interactive_uitest.cc`의 `YeeMultiContentsViewUiTest`와
 `YeePopupWindowUiTest`가 소유한다. `SplitTabLayout/` 매개변수와 사례 이름은 유지한다.
-2026-11-04 macOS 테스트 이전 검증에서 새 실행 파일로 Header interactive gate
-기본 15/15·RTL 125% 4/4, 레이아웃 interactive gate 기본 70/72·RTL 125% 43/43·
-통합 탭 스트립 4/4가 통과했다. 레이아웃 실패 2건은 옮기지 않은
-`ImmersiveModeControllerMacInteractiveTest`의 전체화면 전환 시간 초과로, 같은 조건의
-기존 `interactive_ui_tests`에서도 재현돼 이전과 무관하다.
 렌더러 경계색·presentation binding 검사는 RTL + DSF 1.25에서도 실행한다.
 단위·GUI 실행 모두 launcher retry를 0으로 고정한다.
 실제 View parent·renderer·popup·입력 전달 계약은 순수 geometry 검사로 대체하지
@@ -276,26 +234,16 @@ WebUI balanced-insets 검사는 DOM 결과뿐 아니라 native WebView의 자동
 실제 frame 표시를 기다린 뒤 hover를 보낸다. DOM 결과 교체 중에는 행이 다시
 준비될 때까지 기다리며, 캡처 옵션 없이도 두 split 방향의 검증을 수행한다.
 
-2026-10-27 Windows 후속 검수에서는 동일한 최종 검사 빌드로 40개 exact case를
-각각 새 프로세스와 별도 프로필에서 실행해 모두 종료 단계까지 통과했다.
-미디어 표시·실제 재생 4개, WebUI·Views 제안 4개, AI·맞춤설정 팝업 2개,
-창 버튼 8개, 분할·포커스·탭 상태 13개, 수평 탭·테마·경계 9개다.
-기본·RTL 125%·통합 탭바를 포함한다. 별도로 통과한 단위 106개와 도구 검사
-16개는 이 실제 창 검사 수에 합산하지 않는다.
-
-당시 제품 실행 파일과 `chrome.dll`은 `95f3e45` 검수본과 동일하며 검사 코드만 보완했다.
 WebUI 대비 행렬은 Blink의 색상 캐시도 갱신하는 정식 media emulation을 사용하고,
 실제 선택 행의 Down·Up 결과를 확인한다. 맞춤설정은 로컬 페이지의 탐색을 완료한
-뒤 실제 WebView와 활성 select를 제한 시간 안에서 확인하며 기존 6회의 native
+뒤 실제 WebView와 활성 select를 제한 시간 안에서 확인하며 native
 팝업 위치·Escape 검증을 유지한다. Rest 표면·구분선의 픽셀 검사 전에는 실제
 커서를 본문으로 옮기고 필요한 hover 종료를 기다린다. 모니터 밖 창 버튼 여백은
 논리 hit-test만 검증한다.
 
-대비 행렬은 renderer의 CSS 반응 검증이며 Windows 자체 대비 설정 전파나
-화면 읽기 프로그램 동작을 검증한 결과는 아니다. 이번 실행은 Windows의
-software rendering 경로이며 macOS·Linux 실기 결과를 의미하지 않는다.
-완료된 검수의 일회성 프로필·로그·캡처·보고서는 보관하지 않는다. 재검증에는
-저장소의 검사 코드와 위 실행 조건을 사용한다.
+대비 행렬은 renderer의 CSS 반응을 검증한다. Windows 대비 설정의 전파와 화면
+읽기 프로그램의 동작은 각각 별도 실기 검증이 필요하다. Windows의 software
+rendering 검사와 각 OS 실기 검사는 범위를 구분한다.
 
 테마 보강의 자동 검사와 빌드/실행 범위는
 [`theming-structural-audit.md`](../theming-structural-audit.md)를 따른다.
@@ -304,13 +252,6 @@ software rendering 경로이며 macOS·Linux 실기 결과를 의미하지 않�
 hidden 취소를 다루며, `YeeRenderedBoundaryTracksDelayedCssWithoutMetadata`는
 실제 페이지의 지연 CSS 변경과 클릭을 두 split 방향에서 검증한다.
 선택/hover 및 보안색 대비는 `BrowserSurfacePresentationResolverTest.*`에 포함한다.
-
-2026-10-28 프로젝트 구현 후 Windows 후속 검수는 별도 checkpoint다. 새 앱 빌드에서
-정상 속도의 기본 interactive gate 71개, RTL 125% 수평·창 버튼·그룹 드래그 25개,
-통합 수평·창 버튼 13개를 각각 실행했다. 최종 실행은 통과했으며, RTL 첫 실행의
-COM 참조 종료 검사 1회 간헐 실패는 동일 빌드 전체 재실행 통과와 함께 기록했다.
-원인은 미확정이고 해당 종료 assertion은 유지한다. 단위·프로젝트·실제 실행 파일
-재시작과 플랫폼 한계는 [현재 인계](../project-navigation-handoff.md#2026-10-28-windows-후속-검증)를 따른다.
 
 아래는 geometry 한 프레임만으로 체감 품질을 판단할 수 없어 실제 Yee 앱 검수를
 유지한다.
@@ -333,23 +274,19 @@ Site Controls의 숫자 칩은 같은 Header snapshot을 받으며, 실제 칩 �
 ## 4. Browser Surface에 남은 검증 범위
 
 구조별 구현·테스트 연결은 [레이아웃 검토](../browser-surface-layout-design-audit.md)를
-따른다. 과거 macOS 검수의 완료된 캡처·녹화·실행 이력은 정리했으며, 아래 한계는
-이번 Windows 40개 사례의 통과로 해소된 것으로 간주하지 않는다.
+따른다. 아래는 추가 실기 검증이 필요한 범위다.
 
 - 전체화면의 제어된 전환 중간 픽셀과 실제 OS callback 타이밍. 안정된 전체화면
   화면이나 결정적 epoch 검사가 실제 OS 전환의 모든 프레임을 증명하지 않는다.
-- Side Panel 전환은 제어된 compositor 읽기로 검증했지만, 당시 잠긴 세션 때문에
-  수정 후 새 OS 캡처를 얻지 못했다. 이후 해당 경로 변경 시 실제 창에서 재확인한다.
-- 전체 hard-clip 행렬의 Windows 배율별 실행과 Linux 200% 실행. 과거 macOS의
-  DSF 1/1.25/1.5/2 결과와 이번 Windows 기본·RTL 125% 사례는 범위가 다르다.
+- Side Panel 전환 중 실제 OS 창 캡처. 제어된 compositor 읽기와 별도로 확인한다.
+- 전체 hard-clip 행렬의 Windows 배율별 실행과 Linux 200% 실행. 배율과 OS가 다른
+  검사는 별도 구성으로 실행한다.
 - Status Bubble의 실제 hover 픽셀·포인터 전환, 실제 AI WebUI 제어와 pane 기준
   탭 모달 픽셀. 기존 기하 검사나 before-unload 표시·Cancel만으로 대체하지 않는다.
 - Data Protection·Indigo·Actor의 실제 상태와 남은 Windows/Linux native-host·
   compositor 조합. Glic·Lens·DevTools·Read Anything·Sad Tab 생명주기 검사와 구분한다.
 - `YeeSplitPanelDevToolsNoticeKeepOwningPane`는 Side Panel·분할·세 DevTools dock
   전략·InfoBar의 적용 기하를 검사하며 실제 DevTools frontend 검증은 아니다.
-- 과거 `NativePlannerMatchesAppliedAnimationFramesAndReversal`의 Header 전경 픽셀은
-  간헐 실패 뒤 assertion 수정 없이 최종 재실행을 통과했다. 간헐 실패의 원인은 미확정이다.
 
 예약 Sidebar 슬롯 Pins·Bookmarks·Chat·Agent의 활성화는 제품 결정이며 검수를 위해
 임의로 켜지 않는다. 구조 검토의 `built`는 전체 플랫폼 독립 검증을 의미하지 않는다.

@@ -1,20 +1,20 @@
 # Chromium 버전 이식 구조와 패치 래칫
 
-Yee 소유 코드와 테스트는 overlay에서 관리하고, Chromium 원본의 변경은 `0001`에 둔다.
+Yee 소유 코드와 테스트는 overlay에서 관리하고, Chromium 원본의 변경은 관심사별 패치에 둔다.
 패치 래칫은 원본 파일에 남는 Yee 연결과 상태의 증가를 경로별로 제한한다.
 
 ## 현재 패치 구성
 
-`0001-integrate-yee-shell.patch`에 포함된 변경이다. overlay 소스 전체의 크기는
-이 표에 포함하지 않는다.
+| 패치 | 소유 범위 |
+| --- | --- |
+| [0001](../patches/0001-integrate-yee-shell.patch) | Yee 셸과 콘텐츠 차단 연결 |
+| [0002](../patches/0002-brand-yee-application.patch) | 제품 브랜딩과 설치 연결 |
+| [0003](../patches/0003-fix-windows-protoc-python-aliases.patch) | Windows protoc Python 별칭 |
 
-| 구분 | 파일 | 추가 줄 | 삭제 줄 |
-| --- | ---: | ---: | ---: |
-| 수정한 제품 파일(GN 연결 포함) | 296 | 12,363 | 1,656 |
-| 수정한 Chromium 테스트 파일(GN 연결 포함) | 9 | 507 | 40 |
-| 새 파일 | 4 | 792 | 0 |
-
-줄 수는 결합 정도의 근사치이며, 패치 크기 자체는 래칫의 통과 조건이 아니다.
+Chromium 파일 하나는 패치 하나가 소유한다. 예를 들어 `chrome/installer/util/BUILD.gn`의
+브랜딩 입력과 `taskbar_util_internal.h` 등록은 `0002`에 함께 둔다. 헤더는
+`0001`에서 추가하고 [overlay manifest](../build/overlay.json)의 `new_glue`에
+등록한다. 패치를 바꿀 때는 각 패치의 역적용과 overlay 사전 검사를 확인한다.
 
 ## 구조 원칙
 
@@ -87,7 +87,7 @@ target을 정의한다. 브라우저 테스트 실행 파일은 Chromium 브라�
 
 공통 대기 API는 `WaitForApplied(ticket, conditions)`로 두고 Chromium observer와
 결합한다. 새 Yee 시나리오는 upstream 테스트 파일에 추가하지 않는다.
-이전한 macOS·공용 테스트 원본은 pristine으로 복원했다.
+테스트를 Yee fixture로 옮기면 해당 Chromium 원본을 pristine으로 복원한다.
 Yee 셸을 켰을 때 실패하는 원본 테스트는 실행 filter로 제외하고 원본을 수정하지 않는다.
 
 `.sh` gate는 선택한 범위에 필요한 실행 파일을 빌드한다. Yee 테스트는 소유 fixture에서,
@@ -127,7 +127,7 @@ checkout의 테스트 선언 범위와 hunk 변경 줄을 대조한다. checkout
 Side Panel·selection 사례를 같은 실행 파일에서, 나머지 원본 guard를 `browser_tests`에서
 실행한다. Service Worker의 factory wrapping 사례는 `yee_service_worker_unittests`,
 Windows Aura의 layer 위치 guard는 `is_win && use_aura`의 `yee_aura_unittests`에 연결한다.
-전체 gate와 Windows 소유 예외는 [개발 도구](../tools/dev/README.md#변경-후-테스트)와
+Windows gate와 사례 연결 규칙은 [개발 도구](../tools/dev/README.md#windows-native-gate)와
 [tooling 안내](../tests/tooling/README.md#yee-테스트-gate-누락-검사)를 따른다.
 
 ## 패치 래칫
@@ -151,10 +151,10 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 | 지표 | 세는 내용 | 현재 합계 |
 | --- | --- | ---: |
-| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 507 |
+| `upstream_test_lines` | Chromium 테스트 파일의 추가 줄 | 46 |
 | `shell_branches` | `IsShellEnabled(`가 있는 추가 줄 | 52 |
 | `view_id_lookups` | `GetViewByID(`가 있는 추가 줄 | 17 |
-| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 222 |
+| `yee_includes` | overlay 소유 목적지 또는 `new_glue` 헤더의 include 줄 | 221 |
 | `yee_members` | 수정한 헤더의 Yee 이름·타입 멤버 선언(여러 줄 선언은 하나로 합침) | 55 |
 
 [`build/patch-ratchet.json`](../build/patch-ratchet.json)은 `schema_version: 1`과
@@ -189,45 +189,40 @@ python3 tools/overlay/check-patch-ratchet.py --update
 
 ### 1. 래칫과 기준선
 
-패치 재생성은 경로별 기준선과 검토한 예외를 검사한다. 원본에서 제거한 변경은
-`--update`로 낮은 값에 잠그며, 증가에는 경로별 검토가 필요하다.
+원본 패치 변경은 [경로별 기준선과 예외](#패치-래칫)를 따른다.
 
 ### 2. 테스트 소유권
 
-macOS·공용 범위의 Yee 사례와 셸 적응 guard는 `browser/ui`,
-`browser/content_blocking`, `components/branding` 등 소유 코드 곁의 fixture에 있다.
-이전 대상 Chromium 테스트 원본은 pristine으로 복원했다. 원본 fixture가 `.cc` 내부에
-있는 사례는 공개 기반과 필요한 helper로 재조립했다.
+Yee 사례와 셸 적응 guard는 `browser/ui`, `browser/content_blocking`,
+`components/branding` 등 소유 코드 곁의 fixture에 둔다. 원본 fixture가 `.cc` 내부에
+있는 사례는 공개 기반과 필요한 helper로 조립한다. 기존 assertion·tier·OS·parameter와
+실제 입력 계약을 유지하고 새 대상의 컴파일·발견·실행을 확인한다.
 
 | 검사 범위 | 실행 파일 |
 | --- | --- |
 | BrowserView·split pane·drag·Omnibox·Mac immersive/glass | `yee_interactive_ui_tests` |
 | 시작 설정·favicon·Tab Search·Side Panel·selection·Customize Chrome·UIA | `site_controls_browsertests` |
 | native geometry·animation | `yee_layout_unittests` |
+| Windows Aura 창 좌표·수명 | `yee_aura_unittests` |
+| Windows 설치 바로가기·작업 표시줄 | `setup_unittests`의 Yee 소유 fixture |
 | Service Worker factory wrapping | `yee_service_worker_unittests` |
 | macOS 설치 정책·임시 DMG | `install_sh_test` |
 
-native geometry unittest는 `new_glue`에서 제거하고
-`browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc`로 옮겼다.
-Mac trace와 소유 창의 focus 준비는 Yee test support가 맡는다.
+native geometry unittest는
+`browser/ui/yee_browser_view_tabbed_layout_native_geometry_unittest.cc`가 소유한다.
+Mac·Windows 입력 trace와 소유 창의 focus 준비는 Yee test support가 맡는다.
+Windows 설치 fixture는 전용 레지스트리와 가짜 COM을 사용한다.
+`0002`의 setup GN 연결에서 원본 바로가기 fixture를 Yee 소유 fixture로 교체한다.
 
-원본 테스트·지원 경로에 남은 추가 줄은 다음과 같다. Windows 경로는 이전을 기다리는
-기준선이며, Service Worker fake와 Content GN 연결은 검토한 예외다.
+`0001`의 Chromium 테스트 예외는 Service Worker fake와 Content GN 연결에 필요하다.
 
 | Chromium 경로 | 추가 줄 | 유지 이유 |
 | --- | ---: | --- |
-| `chrome/test/base/interactive_test_utils_win.cc` | 211 | Windows 세션에서 이전 |
-| `ui/base/test/ui_controls_internal_win.cc` | 6 | Windows 세션에서 이전 |
-| `chrome/installer/setup/install_unittest.cc` | 11 | Windows 세션에서 이전 |
-| `chrome/installer/setup/taskbar_util_unittest.cc` | 157 | Windows 세션에서 이전 |
-| `ui/aura/window_unittest.cc` | 54 | Windows 세션에서 이전 |
-| `chrome/test/base/interactive_test_utils.h` | 22 | 남아 있는 Windows 구현의 선언·include |
 | `content/renderer/service_worker/service_worker_provider_context_unittest.cc` | 9 | client capability와 IPC 수명 보존 |
 | `content/renderer/service_worker/service_worker_subresource_loader_unittest.cc` | 9 | client capability와 IPC 수명 보존 |
 | `content/test/BUILD.gn` | 28 | Content 내부 fixture를 허용된 testonly 경계에서 컴파일 |
 
-Windows 전용 경로 439줄, 공용 header의 Windows 선언 22줄, SW fake 18줄과
-Content GN 연결 28줄이 `upstream_test_lines`의 507줄을 이룬다.
+SW fake 18줄과 Content GN 연결 28줄이 `upstream_test_lines`의 46줄을 이룬다.
 SW fake의 `WrapSubresourceLoaderFactory`를 별도 IPC로 분리하려면 client capability,
 Clone→Wrap→Connector 순서, browser의 sandbox·StorageKey 검사와 disconnect 수명을
 함께 재설계해야 한다. Content testonly 연결은 소형 실행 파일 하나만 소비하며
@@ -244,8 +239,8 @@ include 1줄도 경로별 예외다.
 `ProjectNavigationController`의 생성·소유·정리는 embedder root가 맡는다.
 생성은 `BrowserWindowFeatures::Init` 마지막에, BrowserView 연결은
 `InitPostBrowserViewConstruction`에서 수행한다.
-`browser_window_features.{h,cc}`는 pristine이며 `browser_view.cc`의 별도 attach
-코드는 제거했다. 명령·표시 여부를 조회하는 Chromium 호출 지점은 좁은 API를 사용한다.
+`browser_window_features.{h,cc}`는 pristine으로 유지한다. 명령·표시 여부를 조회하는
+Chromium 호출 지점은 좁은 API를 사용한다.
 
 ### 4. 헤더별 계약
 
@@ -261,8 +256,8 @@ include 1줄도 경로별 예외다.
 
 ### 5. 대기 API
 
-`WaitForApplied(ticket, conditions)`와 Chromium observer를 Yee UI 테스트 전반과
-drag 테스트에 적용했다. fixture가 세션·observer 연결을 소유하며, 제품 소유자는
+`WaitForApplied(ticket, conditions)`와 Chromium observer를 Yee UI와 drag 테스트에
+사용한다. fixture가 세션·observer 연결을 소유하며, 제품 소유자는
 적용값과 구독을 제공한다. 적용 상태를 기다리는 테스트는 입력 전에 ticket을 등록하고
 해당 요청의 조건이 충족됐는지 판정한다. 원본 guard와 이전한 사례의
 tier·OS·parameter 연결은 유지한다.
@@ -270,26 +265,15 @@ tier·OS·parameter 연결은 유지한다.
 관측 read, Kombucha 시퀀스의 평가 시점, 상태·배치 조건과 정상 콜백 대기는
 [UI 테스트 작성 규칙](../tools/dev/README.md#ui-테스트-작성과-applied-wait)을 따른다.
 
-## 업그레이드 기록과 남은 결정
+## 업그레이드 비교 기준
 
-각 업그레이드의 [Stable 인수인계](chromium-stable-handoff.md)에 다음을 기록한다.
+다음 버전 이식에서 아래 항목을 원본·대상 revision, 빌드 조건과 함께 로컬에 기록한다.
 
 - rebase 중 충돌한 파일과 hunk 수. 파일은 관심사별로 나누고 혼합·미분류도 따로 기록한다.
 - 이식 시작부터 첫 빌드 성공까지의 시간
 - 같은 시작점부터 필요한 gate가 모두 통과할 때까지의 시간
 
-원본·대상 revision과 빌드 조건을 함께 남겨 서로 다른 업그레이드 결과를 비교한다.
+사전 컴파일 시간과 전체 빌드·실행 시간은 분리해 비교한다.
 새 Beta/Stable마다 유지보수 checkout에서 rebase를 예행해 네 milestone을 한 번에
 넘기는 일을 피할지는 아직 결정하지 않았다.
-
-각 구조 변경의 기대 효과는 검증 결과가 아니며 다음 업그레이드에서 측정한다.
-
-## 검증과 후속 작업
-
-macOS에서 전체 gate(`--tier=all`)가 통과했다.
-
-Windows 전용 테스트·지원 코드 이전과 컴파일·실행 검증은 남아 있다.
-저장소에는 Windows 테스트 gate `.ps1`이 없으며 PC 로컬
-`run-windows-native-gates.py`를 사용한다. 실행기 위치 결정과 대상·필터 전환은
-[다음 Windows 세션 작업](chromium-stable-handoff.md#다음-windows-세션-작업)을 따른다.
 SW IPC 분리, 전체 상태 이전과 View 트리 재설계는 별도 설계 대상이다.

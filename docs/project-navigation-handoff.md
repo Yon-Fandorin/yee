@@ -1,157 +1,25 @@
 # 프로젝트 탐색 UX 핸드오프
 
-2026-10-28 · 브랜치 `codex/project-navigation-handoff`
-
-프로젝트 탐색의 UX 방향과 첫 native 구현을 다음 작업에서 이어가기 위한 인계다.
-`53bacd6`에는 프로젝트·페이지 참조 저장, 창별 native 탭 연결, 세로 목록·수평 선택기,
-허브 왕복과 세션 UUID 복원, macOS 설치 패키징이 포함돼 있다. UI 시안은 참고 자료다.
-책임·저장 계약과 실제 연결 지점은 [상세 구현 계획](project-navigation-implementation-plan.md)의
-8절 및 [프로젝트 소유자 문서](../browser/projects/README.md)를 먼저 읽는다.
+프로젝트 탐색의 UX 방향과 남은 provider 작업을 다룬다.
+프로젝트·페이지 참조 저장, 창별 native 탭 연결, 세로 목록·수평 선택기,
+허브 왕복과 세션 UUID 복원의 책임과 저장 계약은
+[상세 구현 계획](project-navigation-implementation-plan.md)의 8절과
+[프로젝트 소유자 문서](../browser/projects/README.md)를 따른다.
 
 ## 바로 이어갈 작업
 
-**첫 구현의 플랫폼별 검증과 남은 provider 범위를 이어간다.** 프로젝트 생성 → 실제 탭
-연결 → 허브 왕복 → 재시작 후 복원은 이미 코드로 연결돼 있다. 기존 상세 계획을
-처음부터 다시 작성하거나 같은 기능을 새로 구현하지 않는다.
-
-Windows의 이 프로젝트 구현은 아래 후속 작업에서 빌드·실제 native 앱 검수를 마쳤다.
-아래 2026-10-27의 40개 결과는 프로젝트 구현 전 Header 검수이므로 구분한다.
-대화·작업 provider와 혼합 항목의 실제 실행·기록 연결은 아직 구현하지 않았다.
+대화·작업 provider의 저장 계약과 혼합 항목의 실제 실행·기록 연결이 남아 있다.
+플랫폼별 검증에서는 macOS·Linux의 실제 창과 macOS 설치 앱에서 프로젝트 탐색·탭 연결·
+재실행 복원을 확인한다. [구현 후 검증](#구현-후-검증)을 따른다.
 
 후속 작업을 시작할 때는 이 문서와 [AGENTS.md](../AGENTS.md),
 [CONTRIBUTING.md](../CONTRIBUTING.md)를 읽는다. 이 인계 자체가 예약 슬롯 활성화나
 AI 실행 기능의 구현을 모두 승인하는 것은 아니다.
 
-## 체크아웃과 기존 작업
+## 작업 체크아웃
 
-| 항목 | 값 |
-| --- | --- |
-| 현재 기반 | `pilot`의 `7966cf8250f046448a7cc6675c180381d0356d30` 위로 리베이스 |
-| 최초 분기 기준 | `efc3e425bd80a8db507b89430cc5f9824a527d9b` |
-| 기존 13개 파일 | 위 `pilot` 커밋에 반영되어 이 브랜치의 기반에 모두 포함 |
-| Windows의 UI 작업 폴더 | `F:/yee/worktrees/project-navigation-handoff` — 다른 환경에서는 실제 체크아웃 루트 사용 |
-| Windows의 기본 브랜치 폴더 | `F:/yee/pilot-repo` |
-
-기존 변경은 주소창 제안의 여백·강조·구분선, 주소줄 hover 배경, 미디어 버튼,
-Windows 창 버튼의 크기·입력 범위, 팝업 재구성 시 상태 유지와 관련 검사·명세를 다룬다.
-검토에서 발견한 고대비 선택 표시 문제도 함께 보완했다. 별도 파일 전달 없이 Git 기록으로
-가져올 수 있다.
-
-작업 폴더 위치는 `git worktree list`로 확인하고 해당 환경의 경로를 사용한다.
-
-### 맥에서 최신 브랜치 받기
-
-먼저 미커밋 작업을 보존한다. 이 저장소는 `pilot`만 가져오도록 설정된 환경도 있으므로,
-처음 한 번 UI 브랜치도 가져올 대상으로 등록한다. 명령행 fetch만으로는 추적 설정이
-등록되지 않는다. 아래 명령은 저장소 루트에서 실행한다.
-
-```sh
-git remote set-branches --add origin codex/project-navigation-handoff
-git fetch origin \
-  +refs/heads/pilot:refs/remotes/origin/pilot \
-  +refs/heads/codex/project-navigation-handoff:refs/remotes/origin/codex/project-navigation-handoff
-```
-
-로컬에 UI 브랜치가 없으면 다음으로 시작한다.
-
-```sh
-git switch --create codex/project-navigation-handoff --track origin/codex/project-navigation-handoff
-```
-
-이미 `53bacd6`을 받은 로컬 UI 브랜치는 미커밋 변경을 보존한 뒤 다음으로 갱신한다.
-
-```sh
-git switch codex/project-navigation-handoff
-git pull --ff-only origin codex/project-navigation-handoff
-```
-
-리베이스 전의 옛 로컬 UI 브랜치는 일반 pull로 합치지 않는다.
-미커밋 변경을 먼저 보존하고, 아래 백업을 만든 뒤 해당하는 옛 끝점을 확인한다.
-
-```sh
-git branch backup/project-navigation-before-20261027 codex/project-navigation-handoff
-```
-
-이전 원격 끝점 `2874d6c521b43050b8e65bd390b7b41fe0fcdf44`을 받아 작업한 브랜치라면,
-아래 조상 확인이 성공한 경우에만 로컬 추가 커밋을 새 원격 기반 위로 옮긴다.
-추가 커밋이 없어도 같은 명령으로 새 끝점으로 옮길 수 있다.
-
-```sh
-git merge-base --is-ancestor 2874d6c521b43050b8e65bd390b7b41fe0fcdf44 codex/project-navigation-handoff &&
-git rebase --onto origin/codex/project-navigation-handoff 2874d6c521b43050b8e65bd390b7b41fe0fcdf44 codex/project-navigation-handoff
-```
-
-더 오래된 `ab368ca2040cda10608c6be607d879c3ee18b096`에서 아직 갱신하지 않았다면,
-위 두 명령의 옛 끝점을 이 해시로 바꾸고 동일하게 조상을 확인한 뒤 진행한다.
-이미 새 원격 끝점 기반인 브랜치에는 이 옛 기준 명령을 다시 적용하지 않는다.
-두 옛 끝점 모두 조상이 아니면 명령을 적용하지 말고 로컬 기록을 먼저 확인한다.
-
-### 2026-10-28 Windows 후속 검증
-
-검수 대상은 `53bacd6` 위에 적용한 후속 수정이며, 이 문서와 같은 커밋에 포함돼 있다.
-`out/YeePilot/chrome.exe`와 같은 출력 폴더의 검사 실행 파일을 빌드했다. 실사용
-프로필 대신 격리 프로필을 사용하며 설치된 릴리즈 창은 검수 종료 대상으로 삼지 않는다.
-
-수평 탭은 테마색을 유지하고 주소줄만 페이지색을 따른다. 그룹의 연속 첫 멤버 닫기,
-접힘 첫 프레임의 제목·아이콘, 알약 배경의 연속 폭 전환을 보완했다. 두 방향의
-맞춤설정은 공용 Header 아래에서 시작하고 배경도 연결하며, 다른 세로 패널로 바꾸면
-기존 카드 장식으로 돌아간다. 추가 시각 검토에서 최소 폭의 일반 favicon 겹침과
-프로젝트만 남았을 때 빈 native 영역의 불필요한 스크롤도 발견해 보완했다.
-
-| 범위 | 결과 |
-| --- | --- |
-| Windows 앱·관련 검사 실행 파일 빌드 | 성공 |
-| native 단위 검사 | Project 7, layout 231, Header 107: 338개 통과·조건부 7개 제외 |
-| 기본 실제 창 interactive gate | 정상 속도 71개 통과 |
-| RTL 125% 수평·창 버튼·그룹 드래그 | 정상 속도 전체 25개 재실행 통과 |
-| 통합 탭바의 수평·창 버튼 | 정상 속도 13개 통과 |
-| 프로젝트 native 탐색 | 기본 38개 통과·통합 전용 1개 제외, 통합 39개 통과 |
-| 실제 `chrome.exe` 정상 종료·재시작 | 3회 실행으로 그룹 이름·색·접힘·탭 순서 복원 및 명시적 새 탭 시작 설정 유지 확인 |
-| 독립 코드·시각 검토 | 수정 사항 반영 후 남은 actionable finding 없음 |
-| macOS 패키지 이름 검사 | 단축 이름·실행 파일 이름을 구분하는 도구 fixture 6개 통과 |
-
-행·hover·선택·키보드 초점, 긴/빈/짧은 그룹 제목, 최소 폭, 패널 좌우 배치와 모션
-중간 장면을 실제 창에서 캡처해 검토했다. 모션의 기본 실행은 정상 속도이며 선택적
-중간 촬영만 같은 곡선을 4배 느리게 재생한다. 맞춤설정은 초기 설정 응답과 CSS 펼침
-완료를 기다린 뒤 촬영한다. 촬영 자체를 정상 속도 전체 프레임의 증거로 합산하지 않는다.
-기본·RTL 125%·통합에서 이 중간 촬영 검사도 각각 통과했다. 프로젝트 UUID의 세션 파일
-저장·창별 재연결 검사는 프로젝트 native 사례이며, 위 별도 실행 파일 재시작의 그룹 복원과 구분한다.
-
-RTL의 첫 최종 실행에서는 UI assertion 뒤 Windows COM 참조 종료 검사 한 건이 실패했다.
-검사나 빌드를 바꾸지 않은 전체 25개 재실행은 통과했으며, 이 간헐 실패의 원인은 미확정이다.
-해당 종료 검사는 유지한다. Windows 검증은 software
-rendering의 기본 배율과 명시한 RTL 125% 범위다. macOS·Linux 실기 및 실제 macOS 패키징은
-이번 실행에 포함하지 않았다. 대화·작업 provider와 Computer Use의 URL 인식 문제도 별도다.
-완료 후 일회성 검수 프로필·캡처·로그는 정리하고 재실행 코드와 조건, 필요한 UX 시안만 유지한다.
-
-### 프로젝트 구현 전 Header 통합 검증
-
-| 항목 | 결과 |
-| --- | --- |
-| Windows 앱 및 관련 회귀 검사 실행 파일 빌드 | 성공 |
-| 앞선 통합의 단위 검사 | layout 27, geometry 18, Header 60, Aura 1: 총 106개 통과 |
-| Overlay 도구 검사 | 16개 통과 |
-| 최종 독립 코드 검토 | 남은 수정 사항 없음 |
-| 2026-10-27 Windows 실제 창 검사 | 40개를 각각 새 프로세스·별도 프로필에서 실행해 종료 단계까지 통과 |
-| 새 WebUI 대비 행렬 | 실제 팝업의 renderer media emulation과 선택 행 검사 통과 |
-| macOS·Linux 빌드와 실제 앱 검수 | 이번 후속 검수에서 미실시 |
-
-Windows 40개는 미디어 표시·재생 4, WebUI·Views 제안 4, AI·맞춤설정 팝업 2,
-창 버튼 8, 분할·포커스·탭 상태 13, 수평 탭·테마·경계 9개다. 단위 106개와
-도구 16개를 여기에 합산하지 않는다. 제품 실행 파일·DLL은 `95f3e45` 검수본과
-동일하며, 이번 후속 커밋은 검사 코드와 문서 보완 및 완료 자료 정리를 담는다.
-
-실행 범위는 Windows software rendering, 기본 배율과 명시된 RTL 125% 사례다.
-renderer 대비 검사는 OS 대비 설정 전파나 화면 읽기 프로그램 검증을 의미하지 않는다.
-화면 밖 창 버튼 여백은 논리 hit-test만 확인한다. 완료된 검수 캡처·로그·보고서와
-오래된 13개 파일 해시 목록은 정리했으며, 다음 구현에 필요한 UX 시안은 유지한다.
-검사 코드·실행 조건·남은 플랫폼 및 전환 픽셀 한계는 [Header 검사 문서](header/test-coverage.md)를 따른다.
-Computer Use의 URL 인식 문제는 별도 미해결 사항이며 native 검사 통과로 해결됐다고 보지 않는다.
-
-패치는 파일별로 한 소유자만 둔다. `chrome/installer/util/BUILD.gn`은 `0002`에서
-브랜딩 입력과 `taskbar_util_internal.h` 등록을 함께 관리한다. 새 연결 헤더 자체는
-`0001`과 `build/overlay.json`의 `new_glue`에 유지한다. 재생성할 때 한 파일을 두 패치에
-나누지 말고 전체 패치의 역적용과 overlay 사전 검사를 함께 확인한다.
+프로젝트 탐색 구현이 포함된 `pilot`에서 작업한다. `git worktree list`로 작업 위치를
+확인하고 기존 변경을 보존한다. 깨끗한 작업 트리는 `git pull --ff-only`로 갱신한다.
 
 ## 자료 열기
 
@@ -311,18 +179,9 @@ Computer Use의 URL 인식 문제는 별도 미해결 사항이며 native 검사
   실행 파일·프로필이 분리돼 있으면 계속 사용한다. 다른 창을 닫는 테스트 복구도 사용하지 않는다.
 - 시안의 320px 반응형 검사는 네이티브 앱의 최소 창 폭이나 모바일 지원을 확정한 것이 아니다.
 
-최초 시안의 동선 확인, 프로젝트 구현 전 Header 검사, 첫 native 프로젝트 구현의 검증을
-구분한다. 프로젝트의 영속 저장·세션 복원은 코드에 포함돼 있다. AI 실행·provider 연결은
-아직 구현하지 않았으며 다른 단계의 통과 결과로 검증을 대신하지 않는다.
-
-## 다음 대화에 전달할 문장
-
-> `codex/project-navigation-handoff`의 이 인계와 상세 구현 계획 8절, 작업 규칙을 읽고 이어가줘.
-> `53bacd6`의 프로젝트 저장·창별 탭 연결·허브·세션 복원은 이미 구현돼 있어.
-> 최신 플랫폼별 검수 범위와 남은 한계를 확인한 뒤 기존 구현 위에서 다음 변경을 진행해줘.
-> 대화·작업 provider는 아직 연결하지 않았어. 설치된 릴리즈 Yee와 검수 빌드의 실행 파일·
-> 프로필이 분리돼 있으면 릴리즈 창을 종료하지 말고 검수 프로필을 사용해줘.
-
+창별 프로젝트 UUID의 저장·재연결과 앱을 재시작한 뒤의 탭 그룹 복원은 각각 확인한다.
+기본 모션 검사는 정상 속도로 실행한다. 중간 장면을 느리게 촬영한 결과는
+해당 장면의 레이아웃을 검토하는 데 쓴다.
 
 ## 창별 페이지와 공통 조작
 

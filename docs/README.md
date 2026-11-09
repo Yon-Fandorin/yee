@@ -1,6 +1,6 @@
 # 제품 문서
 
-제품의 화면 배치, 기능 설계와 테스트 기록을 모은다.
+제품의 화면 배치, 기능 설계와 검증 기준을 모은다.
 디렉터리별 역할과 사용 방법은 각 README에 있다.
 
 ## 주제별 문서
@@ -9,7 +9,8 @@
 | --- | --- |
 | 파일 배치와 Chromium 적용 경로 | [프로젝트 구조](project-structure.md) |
 | Chromium 버전 이식 구조와 패치 래칫 | [이식 구조](chromium-upgrade-structure.md) |
-| Chromium 157 Windows 빌드·검수 | [다음 Windows 세션 작업](chromium-stable-handoff.md#다음-windows-세션-작업), [실제 앱 18항목](chromium-stable-handoff.md#windows-실제-앱-검수-18항목) |
+| Windows 빌드·검수·설치 | [개발 환경](../tools/dev/README.md#windows에서-작업하기), [native gate](../tools/dev/README.md#windows-native-gate), [테스트판](windows-test-release.md) |
+| Windows 외부 제어 | [남은 URL 판별 작업](chromium-stable-handoff.md#5-외부-제어-도구의-url-판별) |
 | 화면 배치와 용어 | [셸 명세](browser-shell-spec.md), [레이아웃 용어](browser-shell-layout-glossary.md) |
 | 사이드바의 제품 결정 | [Sidebar 문서](sidebar/README.md) |
 | 프로젝트 탐색 UX와 후속 작업 | [설계 핸드오프·캡처](project-navigation-handoff.md), [상세 구현 계획](project-navigation-implementation-plan.md) |
@@ -22,9 +23,9 @@
 | Agent 구조와 사용 | [Agent 구조](agent-browser-architecture.md), [MCP 사용](agent-browser-mcp-usage.md), [검증 자료](agent-browser-validation/README.md), [UI 자동화](ui-automation-session.md) |
 | 콘텐츠 차단 구현과 검증 | [현재 checkpoint](content-blocking-checkpoint.md), [패키지·라이선스](content-blocking-private-core-filter-data.md) |
 
-## 테스트 기록 읽기
+## 검증 기준 읽기
 
-Browser Surface의 검사 기준·최근 통과 범위·남은 한계는
+Browser Surface의 검사 기준과 남은 한계는
 [Header 검사](header/test-coverage.md)와 [Sidebar 검사](sidebar/test-coverage.md)에 유지한다.
 완료된 일회성 화면 검수 자료는 보관하지 않는다.
 [Agent 실행 기록](agent-browser-validation/README.md)은 현재 비교·다음 작업의 기준이므로

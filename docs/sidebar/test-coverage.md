@@ -51,7 +51,6 @@ Widget이 비활성인지 확인한다. Footer도 비활성으로 시작하며 p
 실행 파일은 `yee_interactive_ui_tests`이며 split 시나리오는
 `browser/ui/split_pane_interactive_uitest.cc`의 `YeeMultiContentsViewUiTest`로 선택한다.
 원본 `MultiContentsViewUiTest`는 같은 실행 파일에 수정 없이 포함한다.
-2026-11-04 macOS 테스트 이전 검증에서 Sidebar interactive gate 60/60이 통과했다.
 주소줄·Header의 실제 색상·popup·renderer 연결 검사는
 [`test-header.sh interactive`](../header/test-coverage.md)가 소유하며 여기서 중복
 실행하지 않는다. 두 영역을 함께 바꾸면 두 gate를 선택한다. 아래의 Sidebar flyout
@@ -123,15 +122,9 @@ Escape 복원·trigger 분리 검사는 native 활성화 메시지를 기다리�
 기본 `PostRunTestOnMainThread`가 창을 닫은 뒤 UIA provider를 정리하고,
 10ms 간격으로 메시지 루프를 깨워 남은 COM 참조가 0이 되는지 확인한다.
 그 뒤 기존 `ContentTestSuiteBase`의 창·COM 누수 검사를 그대로 실행한다.
-외부 참조를 UI 스레드 종료 뒤까지 남기는 이전 대조 실행에서는
-`ghost_count=53`, 먼저 정리하는 실행에서는 0으로 차이가 재현됐다.
 UIA 클라이언트 스레드 원칙은
 [Microsoft UI Automation threading](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-threading)을 따른다.
 
-이전 Windows 검수는 단위 25개와 관련 실제 창 7종을 모두 종료 검사까지
-통과했다. Footer는 외부 UIA 조회를 포함해 3회 반복했다. macOS·Linux는 실제
-실행 대신 Footer의 주요 비-Windows 메서드 6개의 본문과 기존 18/30 팔레트가
-유지되는지 소스로 대조했다. 두 플랫폼의 빌드·실기 결과를 의미하지 않는다.
 `InteractionStatesUseOnlyTheYeeSurface`는 rest → hover →
 rest와 direct focus → keyboard traversal focus 순서에서 배경·외곽선 painter와
 고정 inset 계약을 확인한다. `PointerDismissDoesNotRestoreFocusOrOutlinedSurface`는

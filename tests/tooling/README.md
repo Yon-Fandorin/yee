@@ -10,6 +10,13 @@
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/tooling -p 'test_*.py'
 ```
 
+Windows PowerShell에서는 UTF-8 모드를 지정한다.
+
+```powershell
+$env:PYTHONUTF8 = '1'
+python3 -B -m unittest discover -s tests/tooling -p 'test_*.py'
+```
+
 임시 파일, 임시 Git 저장소와 가짜 빌드 도구를 사용한다.
 실제 Chromium 컴파일이나 브라우저 실행은 수행하지 않는다.
 일부 브랜딩 테스트는 `.local-build/chromium/src`의 도구를 읽는다.
@@ -109,8 +116,9 @@ Grok cohort의 경로·최신성 검사도 선택 가드 뒤에 실행되는지 
 ## Yee 테스트 gate 누락 검사
 
 `test_gate_coverage.py`는 `browser/`, `renderer/`, `components/`의 C++ GTest 선언을
-항상 검사한다. upstream 부분은 `YEE_LOCAL_BUILD_ROOT/chromium/src`, 환경 변수 미지정 시
-`.local-build/*/chromium/src`와 `.local-build/chromium/src`에서 checkout을 찾는다.
+항상 검사한다. upstream 부분은 명시한 `YEE_CHROMIUM_ROOT/src`를 먼저 사용한다.
+해당 변수를 지정하지 않았으면 `YEE_LOCAL_BUILD_ROOT/chromium/src`와
+`.local-build/*/chromium/src` 또는 `.local-build/chromium/src`에서 checkout을 찾는다.
 checkout이 없으면 upstream 사례·GN 검사만 skip하고 이유를 출력한다. overlay 검사는
 계속 실행하며, checkout 없이 확인할 수 없는 native Header·Sidebar·layout·설치·Content
 test GN 연결에는 소유한 overlay 소스의 명시적 대응을 쓴다. checkout이 있으면 실제
@@ -135,17 +143,18 @@ GN 파일로 그 연결도 확인한다.
 대조한다. 그 밖의 C++ 이름 함수는 평가하지 않으며 suffix 전체를 고르는 필터만
 인정한다. 필터의 prefix·suffix를 가상 이름에 복사하지 않는다.
 
-이 검사는 선언 단위다. 매개변수의 모든 인스턴스, 기능 플래그에 따른 `GTEST_SKIP`,
-실제 OS의 컴파일 여부는 native `--gtest_list_tests`·실행으로 검증한다. zsh가 없으면
-셸 연결 검사는 건너뛰므로 Windows 검증은 별도로 기록한다.
-`gate_coverage_allowlist.json`은 정확한 `소스::Suite.Case`별로 소유 gate와 이유를 둔다.
-현재 예외는 opt-in YouTube 1개와 Windows 세션 소유 18개(Aura 포함)다. 삭제된 사례의
-stale 항목이나 빈 이유는 실패한다. 일반 누락을 예외에 추가하는 대신 gate에 연결한다.
+`test_windows_native_gates.py`는 zsh 없이 저장소 Windows gate의 모드·소스·타깃·필터·
+tier를 대조한다. PowerShell 계획 모드와 빌드 출처·프로필·XML·중단 처리도 fixture로 검사한다.
+공통 coverage에는 `.ps1` 전용 설치 사례도 연결한다.
 
-이 검사의 Windows 셸 평가는 PC 로컬 `run-windows-native-gates.py`의 실제 실행을
-검증하지 않는다. 저장소에는 Windows 테스트 gate `.ps1`이 없다. 실행기 위치 결정과
-이전한 fixture·TaskbarPinning·Aura의 연결·실행은
-[Windows 인계 체크리스트](../../docs/chromium-stable-handoff.md#다음-windows-세션-작업)를 따른다.
+이 검사는 선언 단위다. 매개변수의 모든 인스턴스, 기능 플래그에 따른 `GTEST_SKIP`,
+실제 OS의 컴파일 여부는 native `--gtest_list_tests`·실행으로 검증한다.
+`gate_coverage_allowlist.json`은 정확한 `소스::Suite.Case`별로 소유 gate와 이유를 둔다.
+외부 생중계처럼 명시적으로 선택하는 사례는 opt-in으로 기록한다.
+삭제된 사례의 항목이나 빈 이유는 실패한다. 일반 사례는 실행 gate에 연결한다.
+
+Windows 실행 방법과 결과 경로는
+[Windows native gate](../../tools/dev/README.md#windows-native-gate)를 따른다.
 
 ## 사례별 tier와 gate tier
 
@@ -154,6 +163,7 @@ A/B/C, 소유 gate, 실행 바이너리와 짧은 근거를 둔다. `binaries`�
 대조하며 같은 이름 패턴을 쓰는 다른 바이너리의 사례가 섞이지 않게 한다.
 매개변수 선언은 `parameters`에 실제
 `INSTANTIATE_*`의 prefix·suffix를 기록하며 coverage 파서와 대조한다.
+OS별로 컴파일되지 않는 인스턴스는 `parameter_exclusions`에 `prefix/suffix`로 기록한다.
 이전한 사례는 Yee 소유 경로와 fixture 이름으로 기록한다. tier·OS·parameter와
 `needs_display` 분류를 보존하고, 실행 파일이 바뀌면 `binaries`와 gate 필터를 함께 갱신한다.
 wildcard tier 기본값은 없다. allowlist 항목에도 tier가 필요하며 manifest와 같아야 한다.

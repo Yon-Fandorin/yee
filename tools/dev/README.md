@@ -5,7 +5,7 @@ Chromium 소스 준비, 빌드, 앱 실행과 테스트를 담당한다.
 기본 빌드 결과 경로는 `chromium/src/out/YeePilot`이다.
 
 명령은 저장소 루트에서 실행한다. 소스 준비·빌드·실행은 macOS의 `.sh`, Windows의
-`.ps1` 스크립트를 사용한다. Windows native 테스트는 PC 로컬 실행기를 사용한다.
+`.ps1` 스크립트를 사용한다. Windows native 테스트는 `test-native.ps1`에서 실행한다.
 두 플랫폼은 같은 제품 소스, 브랜딩 설정과 GN 빌드 설정을 사용한다.
 `depot_tools`에는 플랫폼별 상태가 있으므로 Windows와 WSL/Linux에서 같은
 디렉터리를 공유하지 않는다.
@@ -35,6 +35,7 @@ macOS에서는 `.sh`, Windows에서는 `.ps1`을 사용한다.
 | `build-ui.*` | `yee_ui`만 컴파일 |
 | `check-compile.*` | 패치·owned 컴파일 단위 사전 점검 (명시적으로 실행) |
 | `build.*` | 실제 앱 빌드 |
+| `test-native.ps1` | Windows native 사례 발견·빌드·실행 |
 | `run.*` | 빌드한 앱 실행 |
 | `smoke-test.*` | 기본 실행과 페이지 열기 확인 |
 | `usage.*` | 사용 중인 디스크 용량 확인 |
@@ -420,6 +421,9 @@ AAC/H.264 빌드를 바꾼 뒤에는 다음 실제 앱 검사를 실행한다. C
 시험 파일을 로컬 HTTP로 제공해 일반 MP4의 직접 재생과 조각 MP4의 MSE에서
 영상·음성 디코딩과 재생 종료를 확인한다. 별도 Temp 프로필을 쓰고 정상 종료 후 제거하며,
 이 검사는 외부 YouTube 라이브의 재생 검증과 구분한다.
+배포판의 재생 문제를 비교할 때는 설치 파일에서 추출한 실행 파일·DLL을 빌드 출력과
+대조한 뒤 격리 프로필에서 같은 영상을 재생한다. 선택된 코덱, 프레임과 재생 시간의
+진행을 함께 확인한다.
 Windows CDP 연결은 새 본체의 실행 파일·전용 프로필·리스너 PID와 loopback
 WebSocket 주소를 확인한다. 종료 직전에도 소유권을 확인하며, 달라진 연결에는
 `Browser.close`를 보내지 않는다. 확인된 검수용 PID의 정상 종료 뒤 소유권 오류를
@@ -482,10 +486,54 @@ Omnibox·Mac immersive/glass의 Yee fixture는 `browser/ui`의 소유 테스트 
 원본 guard는 pristine 소스를 그대로 컴파일하고 실행 필터로 선택한다.
 layout의 `browser` 범위는 Yee 소유 Side Panel·selection 사례를 `site_controls_browsertests`에서,
 나머지 원본 guard를 `browser_tests`에서 실행한다. 모든 필수 필터에 실제 사례 발견 검사를 적용한다.
-저장소에는 Windows 테스트 gate `.ps1`이 없으며 Windows 검사는 PC 로컬
-`run-windows-native-gates.py`로 실행한다. 실행기 위치는 다음 Windows 세션에서
-사용자가 정한다. 새 실행 파일·fixture 필터, TaskbarPinning·Aura와 Windows 예외 검증은
-[Windows 인계 체크리스트](../../docs/chromium-stable-handoff.md#다음-windows-세션-작업)를 따른다.
+### Windows native gate
+
+`test-native.ps1`은 기존 Windows 소스·출력 선택을 사용한다. 먼저 현재 패치를 적용해
+`configure.ps1`로 준비한 graph가 필요하다. `-Gate`에는 `test-*.sh` 이름에서 `test-`와 `.sh`를 뺀 값을
+쓰고, `-Mode`로 해당 gate의 범위를 고른다. `-Tier`의 기본값은 `background`다.
+
+```powershell
+.\tools\dev\test-native.ps1 -Gate browser-surface-layout -Mode fast
+.\tools\dev\test-native.ps1 -Gate browser-surface-layout -Mode interactive -Tier foreground
+.\tools\dev\test-native.ps1 -Gate applied-wait -Mode all -Tier all
+.\tools\dev\test-native.ps1 -Gate required -Tier all
+```
+
+`required`는 Windows 필수 gate의 모드를 합치고, 각 gate 안에서 여러 모드가 공유하는
+실행 항목을 한 번만 선택한다.
+`tools/dev/test-*.sh`를 기준으로
+[Windows 모드·실행 파일·필터](lib/windows_gate_modes.json)를 관리한다.
+원본 테스트와 비교할 때 OS, tier, parameter, 기능 플래그, RTL과 배율을 함께 확인한다.
+`-Gate setup`은 격리된 바로가기·작업표시줄 fixture만 선택한다. YouTube 실험은
+`-Gate youtube-live -Mode off -Tier foreground` 또는 `-Mode on -Tier foreground`로 실행한다.
+[macOS 설치](test-macos-install.sh)는 macOS에서 실행한다.
+[실행 사전 점검](test-run-preflight.sh)은 zsh의 도구 fixture로 실행한다.
+
+탭 메뉴의 그룹·분할 생성, 작업 표시줄 창 복귀와 공개 생중계 전체 창 검수는
+`-Gate browser-surface-layout -Mode acceptance -Tier foreground -StartOnDesktop`으로 실행한다.
+Windows 10 Explorer의 작업 표시줄 검사에서는 전용 창에 고유 앱 식별자와 표시 이름을
+부여한다. Explorer가 그 이름으로 노출한 항목을 실행해 같은 창과 문서가 복귀하는지
+확인한다. 공개 생중계는 네트워크를 사용하는 선택 검사다. 재생 시간·표시 프레임·
+라이브 구간의 전진을 확인하고,
+주소창과 탭을 포함한 전체 창을 `live-window.png`에 남긴다.
+
+`-PrintFilters`는 계획만 읽는다. `-List`는 바이너리에서 실제 사례를 발견해 기록한다.
+실행은 전용 프로필과 임시 경로를 쓰며 foreground 입력을 직렬로 처리한다.
+Windows background에서 합성 결과를 비교하는 gate는 headless 픽셀 출력을 활성화한다.
+실제 HWND의 마우스 캡처가 필요한 사례는 Windows foreground에서 실행한다.
+같은 출력의 프로세스가 남아 있으면 실행을 중단한다. Windows가 백그라운드 실행기의 전면화를
+거부하는 환경에서는 `-StartOnDesktop`을 추가하고 시작 창에서 확인을 누른다.
+시작 창은 첫 전면 검사 직전에 한 번 나타난다.
+시간 초과로 검사 프로세스가 남으면 실행을 멈추고 PID와 프로필을 기록한다.
+실행기 종료 뒤에는 mutex가 해제되므로 남은 검사 창을 정상 종료한 뒤 전면 검사를 다시 시작한다.
+성공한 빌드 출처 기록과 현재 소스·인수·대상·실행 파일·GN 런타임 리소스가
+일치할 때 `-NoBuild -ProvenanceFile`로 빌드를 재사용할 수 있다. 런타임 리소스에는
+GN이 나열한 Chromium checkout의 테스트 데이터와 별도로 설치된 도구도 포함한다.
+`YEE_LOCAL_BUILD_ROOT` 아래 `logs/native-gates/`의 계획·빌드 기록·실행 로그·XML과
+`summary.json`에서 통과·실패·생략·목록 조회를 확인한다.
+빌드와 실제 실행은 각각 판정한다. 실패 사례만 다시 실행할 때는 실행 파일·필터·
+기능·배율을 대조하고 각각의 XML을 해당 실행에 연결한다.
+별도 `YEE_LOCAL_BUILD_ROOT`는 두 저장소 밖이나 Git에서 제외한 디렉터리로 지정한다.
 
 ### UI 테스트 작성과 applied-wait
 
@@ -503,6 +551,8 @@ fixture는 [AppliedTestContext](../../browser/ui/applied_wait_test_util.h)로 �
   drag 시작이나 최종 배치 완료까지 요구하지 않는다.
 - 상태 flag와 배치가 따로 바뀌면 assertion이 읽는 bounds·opacity도 같은 완료 조건에
   넣는다. hover flag가 먼저 바뀌어도 배치가 적용되기 전에 검사가 진행되지 않아야 한다.
+- Windows의 native 활성화와 포인터 캡처 해제는 실제 메시지가 적용되는 시점을 확인한다.
+  드래그 입력 ACK와 최종 배치의 완료 조건은 각각 해당 입력 단계에 둔다.
 - Mac Omnibox 팝업은 성공 presentation을 받지 못하므로 팝업 commit과 현재 DOM/native
   상태를 확인하는 대체 조건을 쓴다. commit만으로 성공 presentation을 받았다고 판정하지 않는다.
 - 빈 조건으로 `Begin`한 ticket은 dispatch가 거부된다. mock의 `TabUnsplit`처럼 완료

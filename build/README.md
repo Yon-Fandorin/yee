@@ -14,8 +14,8 @@ Chromium 소스, 캐시와 빌드 결과는 Git에서 제외된 `.local-build/`�
 [오버레이 도구](../tools/overlay/README.md)를 참고한다.
 새 소스 디렉터리를 추가할 때는 [프로젝트 구조](../docs/project-structure.md)의 등록 절차를 따른다.
 
-진행 중인 157 이식의 체크포인트와 Mac 빌드 시작·Windows 재개 명령은
-[Stable 작업 인수인계](../docs/chromium-stable-handoff.md)에 정리했다.
+Mac·Windows 빌드 절차는 [Stable 기준과 업그레이드](../tools/dev/README.md#stable-기준과-업그레이드),
+패치·테스트의 경계와 비교 기준은 [Chromium 이식 구조](../docs/chromium-upgrade-structure.md)를 따른다.
 
 ## Stable 이식 후 전수 재검사
 
