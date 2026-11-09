@@ -1240,9 +1240,12 @@ bool AppliedValueMatches(const AppliedCondition& condition,
           if (condition.match == AppliedMatch::kPresentationDark ||
               condition.match == AppliedMatch::kCapsuleTheme)
             return expected.use_native_theme == value.use_native_theme;
+          // 색 보간이 목표 RGB에 먼저 도달해도 팝업 정책의 확정은 별도다.
           return condition.match == AppliedMatch::kPresentationColor &&
                  expected.source_id == value.source_id &&
-                 expected.background_color == value.background_color;
+                 expected.background_color == value.background_color &&
+                 (expected.popup_revision == 0 ||
+                  expected.popup_revision == value.popup_revision);
         } else if constexpr (std::is_same_v<T, TabModelMatches>) {
           if (condition.match == AppliedMatch::kTabMembership) {
             return std::ranges::all_of(expected.tabs, [&](const auto& tab) {

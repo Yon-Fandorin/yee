@@ -112,8 +112,11 @@ def testonly_sources(root):
                 continue
             for assignment in re.finditer(r'\b(?:sources|public)\s*\+?=\s*\[([^\]]*)\]', body, re.S):
                 for source in re.findall(r'"([^"$]+\.(?:cc|h|mm))"', assignment.group(1)):
-                    path = gn.parent / source
-                    if path.is_file():
+                    # //로 시작하는 GN 경로는 Chromium 소스 루트 기준이다.
+                    if source.startswith('//'):
+                        continue
+                    path = (gn.parent / source).resolve()
+                    if path.is_relative_to(root.resolve()) and path.is_file():
                         sources.add(path)
     return sources
 
@@ -255,7 +258,7 @@ class LegacyUiWaitGuardTest(unittest.TestCase):
                 source_set("adapter") {
                   testonly = true
                   public = [ "applied_wait_kombucha.h" ]
-                  sources = [ "applied_wait_browser_observers.cc" ]
+                  sources = [ "applied_wait_browser_observers.cc", "//ui/views/run_all_unittests_main.cc" ]
                   if (is_mac) { sources += [ "observer_mac.mm" ] }
                 }
                 source_set("product") { sources = [ "product.cc" ] }

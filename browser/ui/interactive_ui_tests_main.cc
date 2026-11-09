@@ -35,8 +35,6 @@
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "ash/test/ui_controls_ash.h"
-#elif BUILDFLAG(IS_WIN)
-#include "ui/aura/test/ui_controls_aurawin.h"
 #endif
 
 #if defined(USE_AURA) && BUILDFLAG(IS_OZONE)
@@ -48,8 +46,6 @@
 #include "base/functional/bind.h"
 #include "base/win/scoped_com_initializer.h"
 #include "base/win/win_util.h"
-#include "chrome/test/base/always_on_top_window_killer_win.h"
-#include "ui/base/test/ui_controls_internal_win.h"
 #include "ui/views/widget/desktop_aura/desktop_drag_drop_client_win.h"
 #endif
 
@@ -77,9 +73,9 @@ class InteractiveUITestSuite : public ChromeTestSuite {
     ash::test::EnableUIControlsAsh();
 #elif BUILDFLAG(IS_WIN)
     com_initializer_ = std::make_unique<base::win::ScopedCOMInitializer>();
-    aura::test::EnableUIControlsAuraWin();
+    yee::test::InstallOwnedWindowsUIControls();
     views::DesktopDragDropClientWin::SetOnDragStartedCallbackForTesting(
-        base::BindRepeating(&ui_controls::internal::QueueDragUnblockNudge));
+        base::BindRepeating(&yee::test::QueueOwnedDragUnblockNudge));
 #elif BUILDFLAG(IS_OZONE)
     // Notifies the platform that test config is needed. For Wayland, for
     // example, makes it possible to use emulated input.
@@ -144,31 +140,6 @@ class InteractiveUITestLauncherDelegate : public ChromeTestLauncherDelegate {
       const InteractiveUITestLauncherDelegate&) = delete;
 
  protected:
-  // content::TestLauncherDelegate:
-  void PreSharding() override {
-    ChromeTestLauncherDelegate::PreSharding();
-#if BUILDFLAG(IS_WIN)
-    // Check for any always-on-top windows present before any tests are run.
-    // Take a snapshot if any are found and attempt to close any that are system
-    // dialogs.
-    if (!IsBackgroundTestRun()) {
-      KillAlwaysOnTopWindows(RunType::BEFORE_SHARD);
-    }
-#endif
-  }
-
-  void OnTestTimedOut(const base::CommandLine& command_line) override {
-#if BUILDFLAG(IS_WIN)
-    // Take a snapshot of the screen and check for any always-on-top windows
-    // present before terminating the test. Attempt to close any that are system
-    // dialogs.
-    if (!IsBackgroundTestRun()) {
-      KillAlwaysOnTopWindows(RunType::AFTER_TEST_TIMEOUT, &command_line);
-    }
-#endif
-    ChromeTestLauncherDelegate::OnTestTimedOut(command_line);
-  }
-
 #if BUILDFLAG(IS_MAC)
   void PreRunTest() override {
     // Clear currently pressed modifier keys (if any) before the test starts.
@@ -228,6 +199,10 @@ int main(int argc, char** argv) {
 
 #if BUILDFLAG(IS_WIN)
   base::win::EnableHighDPISupport();
+  yee::test::ScopedLauncherForegroundPermission foreground;
+  if (!foreground.ready()) {
+    return 1;
+  }
 #endif  // BUILDFLAG(IS_WIN)
 
   // For ash chrome, it's using multiple X11 windows to host the browser.

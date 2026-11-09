@@ -52,6 +52,7 @@ case "$(uname -s)" in
     HORIZONTAL_GROUP_UX_FILTER+=':TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0'
     INTERACTIVE_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsNativeClipSurvivesRendererAttachment'
     HORIZONTAL_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader:YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations:CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*'
+    HORIZONTAL_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState:YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose:YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip'
     ;;
 esac
 INTERACTIVE_FILTER+=":$HORIZONTAL_FILTER"
@@ -108,7 +109,7 @@ if [[ "$MODE" == "fast" || "$MODE" == "all" ]]; then
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
       run_tiered_native_test_gate "$YEE_OUT_DIR/yee_aura_unittests" \
-        --gtest_filter='WindowObserverTest.UnmanagedLayerKeepsScreenOriginAfterAncestorMoves' \
+        --gtest_filter='YeeAuraWindowTest.*' \
         --test-launcher-jobs=1 --test-launcher-retry-limit=0
       ;;
   esac

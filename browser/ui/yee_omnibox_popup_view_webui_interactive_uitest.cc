@@ -632,7 +632,7 @@ IN_PROC_BROWSER_TEST_F(YeeOmniboxPopupViewWebUITest,
     })();
       )JS"));
           } else if (close_method == 1) {
-            ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+            ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
                 presenter->GetWidget()->GetNativeWindow(), ui::VKEY_ESCAPE,
                 false, false, false, false));
           } else {

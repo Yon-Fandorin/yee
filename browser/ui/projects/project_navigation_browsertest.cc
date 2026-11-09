@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -49,6 +50,7 @@
 #include "chrome/browser/ui/views/infobars/confirm_infobar.h"
 #include "chrome/browser/ui/views/infobars/infobar_container_view.h"
 #include "chrome/browser/ui/views/side_panel/side_panel.h"
+#include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
@@ -780,6 +782,9 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto project = service()->CreateProject(u"스크롤 자료");
   auto other = service()->CreateProject(u"다른 프로젝트");
   ASSERT_TRUE(project && other);
+  ASSERT_TRUE(service()->AttachPage(
+      *other, embedded_test_server()->GetURL("/empty.html?other=1"),
+      u"다른 프로젝트 자료"));
   std::vector<std::string> pages;
   for (int i = 0; i < 36; ++i) {
     auto page =
@@ -790,6 +795,23 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     ASSERT_TRUE(page);
     pages.push_back(*page);
   }
+  auto* const model = browser()->tab_strip_model();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  const auto tab_order = [&] {
+    std::vector<tabs::TabHandle> handles;
+    for (int index = 0; index < model->count(); ++index) {
+      handles.push_back(model->GetTabAtIndex(index)->GetHandle());
+    }
+    return handles;
+  };
+  const auto initial_order = tab_order();
+  const auto initial_active = model->GetActiveTab()->GetHandle();
+  const auto expect_tabs_preserved = [&] {
+    EXPECT_EQ(initial_order, tab_order());
+    ASSERT_TRUE(model->GetActiveTab());
+    EXPECT_EQ(initial_active, model->GetActiveTab()->GetHandle());
+  };
   auto* controller = ProjectNavigationController::From(browser());
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   // 큰 화면에서도 허브와 Sidebar 양쪽에 스크롤 여유를 만든다.
@@ -800,11 +822,42 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
       ->SetVerticalTabsEnabled(true);
   auto layout = [&] { WaitForProjectApplied(view); };
   layout();
-  auto* heading = FindButton(FindProjectSidebar(view), u"스크롤 자료");
-  ASSERT_TRUE(heading);
-  views::test::ButtonTestApi(heading).NotifyDefaultMouseClick();
-  controller->ShowHub(*project);
-  layout();
+  const auto activate_project = [&](std::u16string_view name) {
+    auto* sidebar = FindProjectSidebar(view);
+    ASSERT_TRUE(sidebar);
+    auto* title = FindButton(sidebar, name);
+    ASSERT_TRUE(title && title->IsDrawn());
+    auto* row = views::AsViewClass<ProjectRowView>(title->parent());
+    auto* overview = FindButton(
+        sidebar, l10n_util::GetStringUTF16(IDS_YEE_PROJECT_OVERVIEW) + u": " +
+                     std::u16string(name));
+    ASSERT_TRUE(row && overview);
+    title->ScrollViewToVisible();
+    ASSERT_TRUE(applied_.Run(
+        {applied_.View(*overview, {.visible = true},
+                       yee::test::AppliedMatch::kViewVisible)},
+        [&] {
+          ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::Point(),
+                               gfx::Point(), base::TimeTicks::Now(), 0, 0);
+          static_cast<views::View*>(row)->OnMouseEntered(enter);
+        }));
+    view->DeprecatedLayoutImmediately();
+    ASSERT_TRUE(overview->IsDrawn() && !overview->GetVisibleBounds().IsEmpty());
+    ASSERT_TRUE(applied_.Run({ProjectReady(view), VerticalIdle(view)}, [&] {
+      views::test::ButtonTestApi(overview).NotifyDefaultMouseClick();
+    }));
+    view->DeprecatedLayoutImmediately();
+    expect_tabs_preserved();
+  };
+  auto* sidebar = FindProjectSidebar(view);
+  ASSERT_TRUE(sidebar);
+  auto* heading = FindButton(sidebar, u"스크롤 자료");
+  ASSERT_TRUE(heading && heading->IsDrawn());
+  ASSERT_TRUE(applied_.Run({ProjectReady(view), VerticalIdle(view)}, [&] {
+    views::test::ButtonTestApi(heading).NotifyDefaultMouseClick();
+  }));
+  view->DeprecatedLayoutImmediately();
+  ASSERT_NO_FATAL_FAILURE(activate_project(u"스크롤 자료"));
   auto hub = [&] {
     return views::AsViewClass<ProjectHubView>(
         view->GetViewByID(ProjectNavigationController::kHubViewId));
@@ -813,7 +866,15 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     return FindScrollView(FindProjectSidebar(view));
   };
   auto hub_scroll = [&] { return FindScrollView(hub()); };
+  const auto expect_visible_row = [&](std::u16string_view title) {
+    auto* current_hub = hub();
+    ASSERT_TRUE(current_hub && current_hub->IsDrawn());
+    auto* row = FindButton(current_hub, title);
+    ASSERT_TRUE(row && row->IsDrawn());
+    EXPECT_FALSE(row->GetVisibleBounds().IsEmpty());
+  };
   ASSERT_TRUE(hub() && sidebar_scroll());
+  ASSERT_NO_FATAL_FAILURE(expect_visible_row(u"자료 0"));
   view->GetFocusManager()->ClearFocus();
   sidebar_scroll()->ScrollToPosition(sidebar_scroll()->vertical_scroll_bar(),
                                      140);
@@ -828,20 +889,26 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   ASSERT_LE(hub_offset, 260);
   const auto url = service()->FindPage(pages.front())->url;
   for (const auto& title : {u"갱신 1", u"갱신 2"}) {
-    ASSERT_TRUE(service()->UpdatePage(pages.front(), url, title));
-    // 레이아웃 전에 연속 갱신해도 보존 중인 offset을 0으로 덮지 않는다.
-    controller->ShowHub(*project);
-    controller->ShowHub(*project);
-    layout();
+    ASSERT_TRUE(applied_.Run({ProjectReady(view), VerticalIdle(view)}, [&] {
+      ASSERT_TRUE(service()->UpdatePage(pages.front(), url, title));
+      // 레이아웃 전에 연속 갱신해도 보존 중인 offset을 0으로 덮지 않는다.
+      controller->ShowHub(*project);
+      controller->ShowHub(*project);
+    }));
+    view->DeprecatedLayoutImmediately();
+    expect_tabs_preserved();
+    ASSERT_TRUE(hub() && sidebar_scroll() && hub_scroll());
     EXPECT_TRUE(FindButton(hub(), title));
     EXPECT_EQ(sidebar_offset, sidebar_scroll()->CurrentOffset().y());
     EXPECT_EQ(hub_offset, hub_scroll()->CurrentOffset().y());
   }
-  controller->ShowHub(*other);
-  layout();
+  ASSERT_NO_FATAL_FAILURE(activate_project(u"다른 프로젝트"));
+  ASSERT_NO_FATAL_FAILURE(expect_visible_row(u"다른 프로젝트 자료"));
+  ASSERT_TRUE(hub_scroll());
   EXPECT_EQ(0, hub_scroll()->CurrentOffset().y());
-  controller->ShowHub(*project);
-  layout();
+  ASSERT_NO_FATAL_FAILURE(activate_project(u"스크롤 자료"));
+  ASSERT_NO_FATAL_FAILURE(expect_visible_row(u"갱신 2"));
+  ASSERT_TRUE(hub_scroll());
   EXPECT_EQ(0, hub_scroll()->CurrentOffset().y());
   for (const auto& id : pages) {
     ASSERT_TRUE(service()->RemovePage(id));
@@ -1851,15 +1918,35 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   ASSERT_TRUE(coordinator()->Attach(*model->GetActiveTab(), *project, {}));
   chrome::AddTabAt(browser(), embedded_test_server()->GetURL("/title2.html"),
                    -1, true);
+  ASSERT_TRUE(content::WaitForLoadStop(model->GetActiveWebContents()));
   auto* ordinary = model->GetActiveTab();
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
-  tabs::VerticalTabStripStateController::From(browser())
-      ->SetVerticalTabsEnabled(true);
-  WaitForProjectApplied(view);
-  auto* dock = view->GetViewByID(yee::kSidebarFavoritesDockViewId);
+  auto* orientation = tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_TRUE(applied_.Run({ProjectReady(view), VerticalIdle(view)}, [&] {
+    orientation->SetVerticalTabsEnabled(true);
+    view->DeprecatedLayoutImmediately();
+  }));
+  auto* dock = views::AsViewClass<views::ScrollView>(
+      view->GetViewByID(yee::kSidebarFavoritesDockViewId));
+  ASSERT_TRUE(dock);
+  auto* pinned = views::AsViewClass<PinnedTabContainerView>(dock->contents());
+  ASSERT_TRUE(pinned);
+  auto* pinned_layout = static_cast<TabCollectionAnimatingLayoutManager*>(
+      pinned->GetLayoutManager());
+  ASSERT_TRUE(pinned_layout);
+  const auto collection_idle = applied_.Condition(
+      applied_.source().ObserveTabCollectionAnimations(*view, 1),
+      yee::test::AnimationMatches{.group_id = 1, .running = false});
+  const auto dock_idle = applied_.Condition(
+      applied_.source().ObserveUnifiedAnimation(*pinned, *pinned_layout, 2),
+      yee::test::AnimationMatches{.group_id = 2, .running = false});
+  // dock의 표시와 고정 탭 높이 적용이 끝난 상태에서 순서를 읽는다.
+  ASSERT_TRUE(Await({applied_.View(*dock, {.drawn = true},
+                                   yee::test::AppliedMatch::kViewDrawn),
+                     collection_idle, dock_idle}));
   auto* sidebar = FindProjectSidebar(view);
   auto* native = FindNativeTab(view, ordinary);
-  ASSERT_TRUE(dock && sidebar && native);
+  ASSERT_TRUE(sidebar && native);
   EXPECT_TRUE(dock->IsDrawn());
   EXPECT_TRUE(sidebar->IsDrawn());
   EXPECT_TRUE(native->IsDrawn());
@@ -2434,7 +2521,7 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
   auto* contents = browser()->tab_strip_model()->GetActiveWebContents();
   ASSERT_TRUE(content::ExecJs(
       contents, "document.body.innerHTML='<input id=note value=preserved>';"));
-  const auto expect_hub_layout = [&] {
+  const auto expect_hub_layout = [&](bool header_drawn) {
     auto* hub = view->GetViewByID(ProjectNavigationController::kHubViewId);
     auto* toolbar = view->toolbar();
     auto* header = toolbar->parent()->GetViewByID(
@@ -2444,12 +2531,16 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     EXPECT_EQ(view, hub->parent());
     EXPECT_EQ(toolbar->parent(), header->parent());
     EXPECT_TRUE(hub->IsDrawn());
-    EXPECT_TRUE(header->IsDrawn());
+    EXPECT_EQ(header_drawn, header->IsDrawn());
     EXPECT_FALSE(hub->bounds().IsEmpty());
-    EXPECT_FALSE(header->bounds().IsEmpty());
     EXPECT_EQ(view->multi_contents_view()->GetBoundsInScreen(),
               hub->GetBoundsInScreen());
     const auto& resolved = toolbar->GetCompactShellHeaderBoundsForLayout();
+    if (!header_drawn) {
+      EXPECT_FALSE(resolved);
+      return;
+    }
+    EXPECT_FALSE(header->bounds().IsEmpty());
     ASSERT_TRUE(resolved);
     gfx::Rect expected = view->GetMirroredRect(*resolved);
     views::View::ConvertRectToScreen(view, &expected);
@@ -2457,27 +2548,59 @@ IN_PROC_BROWSER_TEST_F(ProjectNavigationBrowserTest,
     EXPECT_TRUE(header->GetWidget()->GetWindowBoundsInScreen().Contains(
         header->GetBoundsInScreen()));
   };
-  browser()->GetWindow()->Activate();
+  auto* const widget = view->GetWidget();
+  ASSERT_TRUE(
+      applied_.Run({applied_.Widget(*widget, {.active = true},
+                                    yee::test::AppliedMatch::kWidgetActive)},
+                   [&] { browser()->GetWindow()->Activate(); }));
+  auto* const immersive = ImmersiveModeController::From(browser());
+  std::unique_ptr<ImmersiveRevealedLock> reveal;
+  using ShowState = yee::test::WidgetStateMatches::ShowState;
+  const auto windowed_state =
+      widget->IsMaximized() ? ShowState::kMaximized : ShowState::kNormal;
+  const auto toggle_fullscreen = [&](bool fullscreen) {
+    auto result = applied_.Run(
+        {ProjectReady(view), VerticalIdle(view),
+         applied_.Widget(*widget,
+                         {.show_state = fullscreen ? ShowState::kFullscreen
+                                                   : windowed_state},
+                         yee::test::AppliedMatch::kWidgetShowState)},
+        [&] {
+          ui_test_utils::ToggleFullscreenModeAndWait(browser());
+          if (!fullscreen) {
+            reveal.reset();
+          } else if (immersive) {
+            reveal = immersive->GetRevealedLock(
+                ImmersiveModeController::ANIMATE_REVEAL_NO);
+          }
+        },
+        yee::test::AppliedDomain::kWidget);
+    if (result) {
+      view->DeprecatedLayoutImmediately();
+    }
+    return result;
+  };
   for (bool vertical : {false, true}) {
-    orientation->SetVerticalTabsEnabled(vertical);
-    view->DeprecatedLayoutImmediately();
-    controller->ShowHub(*project);
-    ui_test_utils::ToggleFullscreenModeAndWait(browser());
-    auto* immersive = ImmersiveModeController::From(browser());
-    auto reveal = immersive ? immersive->GetRevealedLock(
-                                  ImmersiveModeController::ANIMATE_REVEAL_NO)
-                            : nullptr;
-    WaitForProjectApplied(view);
+    ASSERT_TRUE(applied_.Run({ProjectReady(view), VerticalIdle(view)}, [&] {
+      orientation->SetVerticalTabsEnabled(vertical);
+      view->DeprecatedLayoutImmediately();
+      controller->ShowHub(*project);
+    }));
+    ASSERT_TRUE(toggle_fullscreen(true));
     EXPECT_TRUE(controller->showing_hub());
-    expect_hub_layout();
+#if BUILDFLAG(IS_WIN)
+    // Windows 전체화면에서는 허브를 유지하고 도구 모음을 숨긴다.
+    ASSERT_NO_FATAL_FAILURE(expect_hub_layout(/*header_drawn=*/false));
+#else
+    ASSERT_NO_FATAL_FAILURE(expect_hub_layout(/*header_drawn=*/true));
+#endif
     EXPECT_EQ(contents, browser()->tab_strip_model()->GetActiveWebContents());
-    ui_test_utils::ToggleFullscreenModeAndWait(browser());
-    reveal.reset();
-    WaitForProjectApplied(view);
+    ASSERT_TRUE(toggle_fullscreen(false));
     EXPECT_TRUE(controller->showing_hub());
-    expect_hub_layout();
+    ASSERT_NO_FATAL_FAILURE(expect_hub_layout(/*header_drawn=*/true));
     EXPECT_EQ(contents, browser()->tab_strip_model()->GetActiveWebContents());
-    controller->ExitHub();
+    ASSERT_TRUE(
+        applied_.Run({ProjectReady(view)}, [&] { controller->ExitHub(); }));
     EXPECT_EQ(
         "preserved",
         content::EvalJs(contents, "document.querySelector('#note').value"));

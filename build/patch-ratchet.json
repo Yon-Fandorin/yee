@@ -3,14 +3,7 @@
   "roles": {
     "shell": {
       "baseline": {
-        "upstream_test_lines": {
-          "chrome/installer/setup/install_unittest.cc": 11,
-          "chrome/installer/setup/taskbar_util_unittest.cc": 157,
-          "chrome/test/base/interactive_test_utils.h": 22,
-          "chrome/test/base/interactive_test_utils_win.cc": 211,
-          "ui/aura/window_unittest.cc": 54,
-          "ui/base/test/ui_controls_internal_win.cc": 6
-        },
+        "upstream_test_lines": {},
         "shell_branches": {
           "chrome/browser/prefs/session_startup_pref.cc": 1,
           "chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc": 3,
@@ -132,7 +125,6 @@
           "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc": 1,
           "chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/customize_toolbar_handler.cc": 1,
           "chrome/common/chrome_content_client.cc": 1,
-          "chrome/installer/setup/taskbar_util_unittest.cc": 1,
           "chrome/installer/util/taskbar_util.cc": 1,
           "chrome/renderer/chrome_content_renderer_client.cc": 1,
           "components/omnibox/browser/omnibox_text_util.cc": 1,

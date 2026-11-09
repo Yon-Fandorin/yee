@@ -208,7 +208,8 @@ class YeeContentsViewUiTest
 
   yee::test::AppliedCondition ColorCondition(int index,
                                              SkColor color,
-                                             bool actual_location = false) {
+                                             bool actual_location = false,
+                                             uint64_t popup_revision = 0) {
     auto* contents = tab_strip_model()->GetWebContentsAt(index);
     const auto owner = applied_.source().ObserveSurfaceColor(
         *contents, actual_location ? location_bar() : nullptr);
@@ -216,7 +217,8 @@ class YeeContentsViewUiTest
         owner,
         yee::test::PresentationMatches{
             .source_id = YeeSurfaceSourceForTab(index)->source_id(),
-            .background_color = color},
+            .background_color = color,
+            .popup_revision = popup_revision},
         yee::test::AppliedMatch::kPresentationColor);
   }
 
@@ -1063,7 +1065,8 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
           applied_,
           [&] {
             return yee::test::AppliedConditions{
-                ColorCondition(1, kSurfaceC, true)};
+                ColorCondition(1, kSurfaceC, /*actual_location=*/true,
+                               popup_revision_before_transition + 1)};
           },
           [&] {
             YeeSurfaceSourceForTab(1)->TransitionToPageSurfaceColorForTesting(
@@ -1112,6 +1115,7 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
         return matches && location_matches;
       }),
       Do([] {}));
+  ASSERT_TRUE(open_popup_view && presentation_c);
   {
     auto* const presenter = open_popup_view->presenter();
     if (presenter) {
@@ -1712,7 +1716,7 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
           {DomCondition(dom, {.selected_index = 1},
                         yee::test::AppliedMatch::kWebUiSelection)},
           [&] {
-            ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+            ASSERT_TRUE(yee::test::SendKeyPressSync(
                 browser(), ui::VKEY_DOWN, false, false, false, false));
           }));
       EXPECT_TRUE((content::EvalJs(contents, R"(
@@ -1723,7 +1727,7 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
           {DomCondition(dom, {.selected_index = 0},
                         yee::test::AppliedMatch::kWebUiSelection)},
           [&] {
-            ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+            ASSERT_TRUE(yee::test::SendKeyPressSync(
                 browser(), ui::VKEY_UP, false, false, false, false));
           }));
       EXPECT_TRUE((content::EvalJs(contents, R"(
@@ -1733,7 +1737,7 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
       for (int attempt = 0;
            attempt < 2 && location_bar()->GetOmniboxController()->IsPopupOpen();
            ++attempt) {
-        ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+        ASSERT_TRUE(yee::test::SendKeyPressSync(
             browser(), ui::VKEY_ESCAPE, false, false, false, false));
       }
       EXPECT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
@@ -1785,18 +1789,18 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
     capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
             prefix + "-hover-window.png");
     capture(popup_widget, prefix + "-hover-popup.png");
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_DOWN, false,
+    ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_DOWN, false,
                                                 false, false, false));
     EXPECT_EQ(1u, popup->GetSelectedIndex());
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_UP, false,
+    ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_UP, false,
                                                 false, false, false));
     EXPECT_EQ(0u, popup->GetSelectedIndex());
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+    ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
                                                 false, false, false, false));
     if (location_bar()->GetOmniboxController()->IsPopupOpen()) {
       // native Omnibox는 먼저 임시 제안 텍스트를 복원할 수 있다.
       EXPECT_EQ(0u, popup->GetSelectedIndex());
-      ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+      ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
                                                   false, false, false, false));
     }
     EXPECT_FALSE(location_bar()->GetOmniboxController()->IsPopupOpen());
@@ -2021,8 +2025,8 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
             })));
       }),
       ArmApplied(
-          kDraggedLayoutObserver, applied_.session(), [&] { return drag_ticket; },
-          [&] { return drag_conditions; }),
+          kDraggedLayoutObserver, applied_.session(),
+          [&] { return drag_ticket; }, [&] { return drag_conditions; }),
       DragMouseTo(
           base::BindLambdaForTesting([&]() { return drag_destination; }),
           /*release=*/false),
@@ -2059,6 +2063,33 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                tab_strip_model()->GetSplitForTab(0) == split_id &&
                tab_strip_model()->GetSplitForTab(1) == split_id;
       }));
+#if BUILDFLAG(IS_WIN)
+  using namespace yee::test;
+  if (HasFailure()) {
+    return;
+  }
+  ASSERT_TRUE(multi_contents_view()->IsInSplitView());
+  auto* const close_button = multi_contents_view()
+                                 ->mini_toolbar_for_testing(1)
+                                 ->close_button_for_testing();
+  ASSERT_TRUE(close_button && close_button->IsDrawn());
+  const auto window = close_button->GetWidget()->GetNativeWindow();
+  const auto owner = applied_.source().ObserveTabModel(*tab_strip_model());
+  const uint64_t remaining =
+      tab_strip_model()->GetTabAtIndex(0)->GetHandle().raw_value();
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Condition(owner,
+                          TabModelMatches{.tabs = {{.handle = remaining}}},
+                          AppliedMatch::kTabOrder)},
+      [&] {
+        ASSERT_TRUE(yee::test::SendMouseMoveSync(
+            close_button->GetBoundsInScreen().CenterPoint(), window));
+        ASSERT_TRUE(yee::test::SendLeftMouseClickSync(window));
+      }));
+  EXPECT_FALSE(multi_contents_view()->IsInSplitView());
+  ASSERT_EQ(1, tab_strip_model()->count());
+  EXPECT_EQ(start_contents, tab_strip_model()->GetActiveWebContents());
+#endif
 }
 
 IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,

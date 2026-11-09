@@ -436,7 +436,7 @@ class OmniboxAccessibilityBrowserTest
   void FocusAddress() {
     ASSERT_TRUE(applied_.Run({applied_.Focus(*Omnibox())}, [&] {
       ASSERT_TRUE(
-          ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_L,
+          yee::test::SendKeyPressSync(browser(), ui::VKEY_L,
                                           /*control=*/!BUILDFLAG(IS_MAC),
                                           /*shift=*/false,
                                           /*alt=*/false,
@@ -650,7 +650,7 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
   EXPECT_EQ(Url(), Contents()->GetVisibleURL());
   EXPECT_EQ(Url(), Contents()->GetLastCommittedURL());
   ASSERT_TRUE(applied_.Run({PopupState(false)}, [&] {
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+    ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
                                                 false, false, false, false));
   }));
   // 첫 Escape는 제안만 닫고 초안을 유지한다. 다음 Escape가 편집을 취소한다.
@@ -661,7 +661,7 @@ IN_PROC_BROWSER_TEST_P(OmniboxAccessibilityBrowserTest,
   EXPECT_EQ(Url(), Contents()->GetVisibleURL());
   EXPECT_EQ(Url(), Contents()->GetLastCommittedURL());
   ASSERT_TRUE(applied_.Run({PopupState(false, false, true)}, [&] {
-    ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
+    ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_ESCAPE,
                                                 false, false, false, false));
   }));
   ASSERT_FALSE(controller->edit_model()->user_input_in_progress());
@@ -694,7 +694,7 @@ IN_PROC_BROWSER_TEST_P(OmniboxNavigationBrowserTest,
   base::UserActionTester actions;
   auto* const original_contents = Contents();
 #if BUILDFLAG(IS_WIN)
-  ui_test_utils::ScopedNativeInputTrace native_input(View()->GetWidget());
+  yee::test::ScopedNativeInputTrace native_input(View()->GetWidget());
 #endif
   // 입력 도달·명령 전달·내비게이션 이력을 구분하되 입력과 대기는 바꾸지 않는다.
   const auto record_history = [&](const std::string& phase) {
@@ -743,11 +743,21 @@ IN_PROC_BROWSER_TEST_P(OmniboxNavigationBrowserTest,
   const GURL second = Server()->GetURL("a.test", "/history-next?step=2");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), first));
   ASSERT_NO_FATAL_FAILURE(FocusAddress());
-  Omnibox()->SetUserText(base::UTF8ToUTF16(second.spec()),
-                         /*update_popup=*/true);
+  const auto address = base::UTF8ToUTF16(second.spec());
+#if BUILDFLAG(IS_WIN)
+  ASSERT_TRUE(
+      applied_.Run({PopupState(true), PopupState(true, true, true)}, [&] {
+        ASSERT_TRUE(yee::test::SendTextToWindowSync(
+            View()->GetWidget()->GetNativeWindow(), address));
+      }));
+  ASSERT_EQ(address, Omnibox()->GetText());
+  RecordProperty("typed_address", base::UTF16ToUTF8(Omnibox()->GetText()));
+#else
+  Omnibox()->SetUserText(address, /*update_popup=*/true);
+#endif
   content::TestNavigationObserver entered(Contents());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_RETURN, false,
-                                              false, false, false));
+  ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_RETURN, false,
+                                          false, false, false));
   entered.Wait();
   ASSERT_EQ(second, Contents()->GetLastCommittedURL());
   ASSERT_NO_FATAL_FAILURE(FocusAddress());
@@ -756,7 +766,7 @@ IN_PROC_BROWSER_TEST_P(OmniboxNavigationBrowserTest,
 
   record_history("before_back");
   content::TestNavigationObserver went_back(Contents());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_LEFT, false,
+  ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_LEFT, false,
                                               false, true, false));
   record_history("after_back_key");
   went_back.Wait();
@@ -767,7 +777,7 @@ IN_PROC_BROWSER_TEST_P(OmniboxNavigationBrowserTest,
 
   record_history("before_forward");
   content::TestNavigationObserver went_forward(Contents());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressSync(browser(), ui::VKEY_RIGHT, false,
+  ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_RIGHT, false,
                                               false, true, false));
   record_history("after_forward_key");
   went_forward.Wait();

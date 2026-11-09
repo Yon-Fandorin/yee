@@ -18,6 +18,7 @@
 #if BUILDFLAG(IS_WIN)
 #include "base/win/dark_mode_support.h"
 #include "base/win/win_util.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #endif
 
 int main(int argc, char** argv) {
@@ -40,6 +41,13 @@ int main(int argc, char** argv) {
     yee::test::SuppressBackgroundBrowserActivation();
 #endif
   }
+
+#if BUILDFLAG(IS_WIN)
+  yee::test::ScopedLauncherForegroundPermission foreground;
+  if (!foreground.ready()) {
+    return 1;
+  }
+#endif
 
   // foreground의 옵션 처리와 launcher는 upstream browser_tests와 같다.
   if (command_line->HasSwitch(switches::kTestLauncherInteractive)) {

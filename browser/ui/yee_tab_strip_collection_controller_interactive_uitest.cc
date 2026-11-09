@@ -47,6 +47,7 @@
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/interaction/interactive_browser_test.h"
 #include "components/tab_groups/tab_group_id.h"
@@ -294,7 +295,7 @@ IN_PROC_BROWSER_TEST_P(YeeTabStripCollectionControllerInteractiveUiTest,
   TabDragContext* original_context = nullptr;
   gfx::Point last_intended;
 #if BUILDFLAG(IS_WIN)
-  ui_test_utils::ScopedNativeInputTrace native_trace(
+  yee::test::ScopedNativeInputTrace native_trace(
       BrowserView::GetBrowserViewForBrowser(browser())->GetWidget());
   const auto record_input = [&](std::string_view phase,
                                 const gfx::Point& intended) {

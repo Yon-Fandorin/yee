@@ -109,9 +109,18 @@ class AppliedTestContext {
                       AppliedDomain domain = AppliedDomain::kLayout,
                       base::TimeDelta budget = TestTimeouts::action_timeout(),
                       bool no_op = false) {
+    return BeginUntil(conditions, domain, base::TimeTicks::Now() + budget,
+                      no_op);
+  }
+
+  AppliedTicket BeginUntil(const AppliedConditions& conditions,
+                           AppliedDomain domain,
+                           base::TimeTicks deadline,
+                           bool no_op = false) {
     AppliedIntent intent{.domain = domain};
-    if (no_op)
+    if (no_op) {
       intent.operation = AppliedIntent::Operation::kNoOp;
+    }
     for (const auto& condition : conditions) {
       if (!std::ranges::contains(intent.owner_tokens, condition.owner))
         intent.owner_tokens.push_back(condition.owner);
@@ -120,7 +129,7 @@ class AppliedTestContext {
     const auto& command = *base::CommandLine::ForCurrentProcess();
     const bool headless = command.HasSwitch("headless");
     WaitOptions options{
-        .deadline = base::TimeTicks::Now() + budget,
+        .deadline = deadline,
         .test_name =
             info ? std::string(info->test_suite_name()) + "." + info->name()
                  : "fixture",

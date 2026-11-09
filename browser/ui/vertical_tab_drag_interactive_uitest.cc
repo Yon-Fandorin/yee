@@ -16,6 +16,8 @@
 #include "base/functional/bind.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_timeouts.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
@@ -40,6 +42,7 @@
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
 #include "chrome/browser/ui/views/test/vertical_tabs_interactive_test_mixin.h"
 #include "chrome/browser/ui/views/yee/favorites.h"
+#include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/yee_projects/project_service.h"
 #include "chrome/browser/yee_projects/project_service_factory.h"
@@ -662,13 +665,14 @@ class YeeVerticalTabDragTest
           *point = std::visit(
               [](auto&& value) -> gfx::Point {
                 using T = std::decay_t<decltype(value)>;
-                if constexpr (std::is_same_v<T, gfx::Point>)
+                if constexpr (std::is_same_v<T, gfx::Point>) {
                   return value;
-                else if constexpr (std::is_same_v<
-                                       T, std::reference_wrapper<gfx::Point>>)
+                } else if constexpr (std::is_same_v<T, std::reference_wrapper<
+                                                           gfx::Point>>) {
                   return value.get();
-                else
+                } else {
                   return std::move(value).Run();
+                }
               },
               std::move(position));
         }),
@@ -700,8 +704,24 @@ class YeeVerticalTabDragTest
       AppliedConditions conditions;
       AppliedTicket ticket;
       DispatchDone done;
+      base::TimeTicks deadline;
     };
     auto request = std::make_shared<Request>();
+#if BUILDFLAG(IS_WIN)
+    // Windows ui_controls는 좌표 변환이나 같은 점 이동에서 목적지가 달라질
+    // 수 있다. 소유 창에 정확한 DIP를 보내고 버튼 수명은 Kombucha가 관리한다.
+    auto move =
+        CheckElement(reference, [this, point, request](ui::TrackedElement*) {
+          return yee::test::SendMouseMoveSync(
+              *point, GetBrowserView().GetWidget()->GetNativeWindow(),
+              request->deadline);
+        });
+#else
+    auto move = views::test::InteractiveMouseTestApi::MoveMouseTo(
+        reference, base::BindOnce([](std::shared_ptr<gfx::Point> point,
+                                     ui::TrackedElement*) { return *point; },
+                                  point));
+#endif
     return Steps(
         Do([this, point, request] {
           CHECK(drag_);
@@ -747,9 +767,11 @@ class YeeVerticalTabDragTest
                                      *browser()->GetTabStripModel()),
                                  count, AppliedMatch::kTabCount),
               CollectionIdle()};
+          request->deadline =
+              base::TimeTicks::Now() + TestTimeouts::action_timeout();
           request->ticket =
-              applied_.Begin(request->conditions, AppliedDomain::kPreview,
-                             TestTimeouts::action_timeout(), same_point);
+              applied_.BeginUntil(request->conditions, AppliedDomain::kPreview,
+                                  request->deadline, same_point);
         }),
         ArmApplied(
             kMoveApplied, applied_.session(),
@@ -764,12 +786,7 @@ class YeeVerticalTabDragTest
                   },
                   request)));
         }),
-        views::test::InteractiveMouseTestApi::MoveMouseTo(
-            reference,
-            base::BindOnce([](std::shared_ptr<gfx::Point> point,
-                              ui::TrackedElement*) { return *point; },
-                           point)),
-        Do([this, request] {
+        std::move(move), Do([this, request] {
           views::test::RunScheduledLayout(&GetBrowserView());
           drag_->InputAckAtCursor(std::move(request->done)).Run();
         }),
@@ -1730,7 +1747,7 @@ IN_PROC_BROWSER_TEST_F(YeeVerticalTabDragTest, DragOutOfGroup) {
     return TabOrder({GroupHandles({Tab(0)}), Tab(2), Tab(1)});
   };
 #if BUILDFLAG(IS_WIN)
-  ui_test_utils::ScopedNativeInputTrace native_input(
+  yee::test::ScopedNativeInputTrace native_input(
       GetBrowserView().GetWidget());
 #endif
   const auto record_drag = [&](const std::string& phase) {
@@ -2883,6 +2900,28 @@ IN_PROC_BROWSER_TEST_F(YeeVerticalTabDragTest,
         return CombineConditions(
             {OrderCondition(PinnedHandles({Tab(0), Tab(1), Tab(2)}), true)});
       }),
+#if BUILDFLAG(IS_WIN)
+      Do([&] { model->ActivateTabAt(2); }), RunScheduledLayout(),
+      ApplyInput(
+          Steps(Do([&] {
+            auto* const tab = GetTabViewAt(0);
+            ASSERT_TRUE(tab && tab->IsDrawn());
+            const auto window = tab->GetWidget()->GetNativeWindow();
+            ASSERT_TRUE(yee::test::SendMouseMoveSync(
+                tab->GetBoundsInScreen().CenterPoint(), window));
+            ASSERT_TRUE(yee::test::SendLeftMouseClickSync(window));
+          })),
+          [&] {
+            return AppliedConditions{applied_.Condition(
+                applied_.source().ObserveTabModel(*model),
+                TabModelMatches{
+                    .active_tab = static_cast<uint64_t>(
+                        model->GetTabAtIndex(0)->GetHandle().raw_value())},
+                AppliedMatch::kTabActive)};
+          },
+          Phase::kInactive, -1, -1),
+      Check([&] { return model->active_index() == 0; }),
+#endif
       ApplyInput(
           Steps(StartDragBetweenTabs(0, 1)),
           [&] { return CombineConditions({}); }, Phase::kAttached, 0, -1),

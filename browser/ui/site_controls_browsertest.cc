@@ -387,7 +387,7 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   auto* view = BrowserView::GetBrowserViewForBrowser(browser());
   auto* state = tabs::VerticalTabStripStateController::From(browser());
 #if BUILDFLAG(IS_WIN)
-  ui_test_utils::ScopedNativeInputTrace native_trace(view->GetWidget());
+  yee::test::ScopedNativeInputTrace native_trace(view->GetWidget());
   const auto record_input = [&](std::string_view phase,
                                 const gfx::Point& intended) {
     native_trace.Snapshot(phase, intended);

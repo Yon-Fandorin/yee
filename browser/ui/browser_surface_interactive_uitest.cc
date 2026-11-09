@@ -19,6 +19,7 @@
 #include "base/containers/span.h"
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/i18n/rtl.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -124,6 +125,7 @@
 #include "chrome/browser/ui/views/yee/tab_group_presentation.h"
 #include "chrome/browser/ui/views/yee/yee_ui.h"
 #include "chrome/common/chrome_features.h"
+#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/interactive_test_utils.h"
@@ -149,6 +151,7 @@
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/base/filename_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/accessibility/ax_enums.mojom.h"
@@ -214,9 +217,16 @@
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_WIN)
+#include "base/strings/utf_string_conversions.h"
+#include "base/uuid.h"
+#include "chrome/browser/ui/tabs/split_view_layout_menu_model.h"
+#include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/views/frame/browser_caption_button_container_win.h"
 #include "chrome/browser/ui/views/frame/browser_frame_view_win.h"
 #include "chrome/browser/ui/views/frame/windows_caption_button.h"
+#include "content/public/common/content_switches.h"
+#include "content/public/common/isolated_world_ids.h"
+#include "net/dns/mock_host_resolver.h"
 #include "ui/aura/window.h"
 #include "ui/base/hit_test.h"
 #endif
@@ -1169,6 +1179,353 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
 }
 
 #if BUILDFLAG(IS_WIN)
+class YeeWindowsLivePlaybackUiTest : public YeeAppliedSurfaceUiTest {
+ protected:
+  void SetUpInProcessBrowserTestFixture() override {
+    YeeAppliedSurfaceUiTest::SetUpInProcessBrowserTestFixture();
+    base::CommandLine::ForCurrentProcess()->RemoveSwitch(
+        switches::kDomAutomationController);
+  }
+
+  void SetUpOnMainThread() override {
+    YeeAppliedSurfaceUiTest::SetUpOnMainThread();
+    host_resolver()->AllowDirectLookup("*");
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(YeeWindowsLivePlaybackUiTest,
+                       DISABLED_PublicLivePlaybackShowsWholeWindow) {
+  const auto capture = base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+      "yee-live-window-capture");
+  ASSERT_FALSE(capture.empty());
+  const GURL url("https://www.earthcam.com/usa/newyork/timessquare/?cam=tstwo_hd2");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+  auto* const contents = browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_EQ(url, contents->GetLastCommittedURL());
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+  constexpr int kPlaybackWorld = content::ISOLATED_WORLD_ID_CONTENT_END;
+
+  // 같은 영상에서 재생 시각, 표시 프레임, 라이브 경계가 함께 진행해야 한다.
+  const auto playback = content::EvalJs(contents, R"(
+    new Promise(resolve => {
+      const listeners = new AbortController();
+      let source, mediaUrl, frame;
+      let startTime, startFrames, startEdge, lastEdge, edgeUpdates;
+      const finish = result => {
+        listeners.abort();
+        if (source) source.cancelVideoFrameCallback(frame);
+        resolve(result);
+      };
+      const sample = () => {
+        if (!source.paused && !source.error && source.seekable.length &&
+            source.currentSrc === mediaUrl && document.visibilityState === 'visible') {
+          const frames = source.getVideoPlaybackQuality();
+          const presented = frames.totalVideoFrames - frames.droppedVideoFrames;
+          const edge = source.seekable.end(source.seekable.length - 1);
+          if (startTime === undefined) {
+            startTime = source.currentTime;
+            startFrames = presented;
+            startEdge = lastEdge = edge;
+            edgeUpdates = 0;
+          }
+          if (edge > lastEdge + 0.5) {
+            ++edgeUpdates;
+            lastEdge = edge;
+          }
+          const seconds = source.currentTime - startTime;
+          const advancedFrames = presented - startFrames;
+          if (seconds >= 1 && advancedFrames >= 15 && edgeUpdates >= 2) {
+            globalThis.yeeLiveTestVideo = source;
+            finish({mediaUrl, seconds,
+                    frames: advancedFrames, edgeAdvance: edge - startEdge,
+                    edgeUpdates, time: source.currentTime, presented, edge});
+            return;
+          }
+        }
+        frame = source.requestVideoFrameCallback(sample);
+      };
+      const observe = () => {
+        const video = [...document.querySelectorAll('video')].find(candidate => {
+          const bounds = candidate.getBoundingClientRect();
+          return candidate.currentSrc && !candidate.error &&
+              candidate.readyState >= 2 && candidate.videoWidth > 0 &&
+              candidate.videoHeight > 0 && bounds.width > 0 && bounds.height > 0 &&
+              bounds.right > 0 && bounds.bottom > 0 && bounds.top < innerHeight &&
+              bounds.left < innerWidth;
+        });
+        if (!video || (video === source && video.currentSrc === mediaUrl)) return;
+        if (source) source.cancelVideoFrameCallback(frame);
+        source = video;
+        mediaUrl = video.currentSrc;
+        startTime = undefined;
+        frame = video.requestVideoFrameCallback(sample);
+        if (video.paused) video.play().catch(() => {});
+      };
+      for (const event of ['loadeddata', 'playing', 'resize', 'durationchange']) {
+        document.addEventListener(event, observe,
+                                  {capture: true, signal: listeners.signal});
+      }
+      AbortSignal.timeout(40000).addEventListener('abort', () => finish(null),
+                                                   {signal: listeners.signal});
+      observe();
+    })
+  )", content::EXECUTE_SCRIPT_NO_USER_GESTURE, kPlaybackWorld);
+  ASSERT_TRUE(playback.is_dict()) << playback;
+  const auto& progress = playback.ExtractDict();
+  ASSERT_TRUE(progress.FindDouble("seconds") && progress.FindInt("frames") &&
+              progress.FindDouble("edgeAdvance") &&
+              progress.FindInt("edgeUpdates") &&
+              progress.FindString("mediaUrl") && progress.FindDouble("time") &&
+              progress.FindInt("presented") && progress.FindDouble("edge"));
+  RecordProperty("LivePlaybackSeconds",
+                 base::StringPrintf("%.3f", *progress.FindDouble("seconds")));
+  RecordProperty("LivePresentedFrames", progress.FindInt("frames").value());
+  RecordProperty("LiveEdgeAdvanceSeconds",
+                 base::StringPrintf("%.3f", *progress.FindDouble("edgeAdvance")));
+  RecordProperty("LiveEdgeUpdates", progress.FindInt("edgeUpdates").value());
+
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const widget = view->GetWidget();
+  ASSERT_TRUE(widget->IsActive());
+  ASSERT_TRUE(PresentedFrame(*widget));
+  auto* const page = view->multi_contents_view()->GetActiveContentsView();
+  ASSERT_EQ(contents, page->web_contents());
+  auto* const address = view->GetLocationBarView();
+  const auto root = widget->GetRootView()->GetBoundsInScreen();
+  for (auto* part : {view->tab_strip_view()->GetTabStripView(),
+                     static_cast<views::View*>(address),
+                     static_cast<views::View*>(page)}) {
+    ASSERT_TRUE(part && part->IsDrawn());
+    const auto bounds = part->GetBoundsInScreen();
+    EXPECT_FALSE(bounds.IsEmpty());
+    EXPECT_TRUE(root.Contains(bounds));
+  }
+  EXPECT_FALSE(address->GetBoundsInScreen().Intersects(page->GetBoundsInScreen()));
+  ASSERT_NO_FATAL_FAILURE(CaptureYeeWindowFrame(widget, capture));
+  const auto bytes = base::ReadFileToBytes(capture);
+  ASSERT_TRUE(bytes);
+  const auto bitmap = gfx::PNGCodec::Decode(*bytes);
+  const auto window_pixels = widget->GetCompositor()->size();
+  ASSERT_FALSE(window_pixels.IsEmpty());
+  EXPECT_GE(bitmap.width(), window_pixels.width());
+  EXPECT_GE(bitmap.height(), window_pixels.height());
+  const auto video_bounds = content::EvalJs(contents, content::JsReplace(R"(
+    (() => {
+      const video = globalThis.yeeLiveTestVideo;
+      if (!video?.isConnected || video.currentSrc !== $1 || video.paused || video.error ||
+          video.readyState < 2 || !video.seekable.length ||
+          document.visibilityState !== 'visible') return null;
+      const frames = video.getVideoPlaybackQuality();
+      if (video.currentTime < $2 ||
+          frames.totalVideoFrames - frames.droppedVideoFrames < $3 ||
+          video.seekable.end(video.seekable.length - 1) < $4) return null;
+      const bounds = video.getBoundingClientRect();
+      const left = Math.max(bounds.left, 0), top = Math.max(bounds.top, 0);
+      const width = Math.min(bounds.right, innerWidth) - left;
+      const height = Math.min(bounds.bottom, innerHeight) - top;
+      if (width <= 0 || height <= 0) return null;
+      const scale = devicePixelRatio;
+      return [Math.ceil((left + width * 0.2) * scale),
+              Math.ceil((top + height * 0.2) * scale),
+              Math.floor(width * 0.6 * scale), Math.floor(height * 0.6 * scale)];
+    })()
+  )", *progress.FindString("mediaUrl"),
+      *progress.FindDouble("time"), *progress.FindInt("presented"),
+      *progress.FindDouble("edge")),
+      content::EXECUTE_SCRIPT_NO_USER_GESTURE, kPlaybackWorld);
+  ASSERT_TRUE(video_bounds.is_list()) << video_bounds;
+  const auto& region = video_bounds.ExtractList();
+  ASSERT_EQ(4u, region.size());
+  gfx::Rect page_rect = page->GetBoundsInScreen();
+  page_rect.Offset(-root.x(), -root.y());
+  const gfx::Rect page_pixels = gfx::ScaleToEnclosedRect(
+      page_rect, widget->GetCompositor()->device_scale_factor());
+  const gfx::Rect video_pixels(page_pixels.x() + region[0].GetInt(),
+                              page_pixels.y() + region[1].GetInt(),
+                              region[2].GetInt(), region[3].GetInt());
+  ASSERT_GT(video_pixels.width(), 4);
+  ASSERT_GT(video_pixels.height(), 4);
+  ASSERT_TRUE(gfx::Rect(bitmap.width(), bitmap.height()).Contains(video_pixels));
+  // 캡처에 검은 비디오 자리만 남는 경우를 걸러낸다.
+  const SkColor first = bitmap.getColor(video_pixels.x(), video_pixels.y());
+  bool has_image = false;
+  for (int y = 1; y <= 4; ++y) {
+    for (int x = 1; x <= 4; ++x) {
+      const int sample_x = video_pixels.x() + (video_pixels.width() - 1) * x / 4;
+      const int sample_y = video_pixels.y() + (video_pixels.height() - 1) * y / 4;
+      has_image |= bitmap.getColor(sample_x, sample_y) != first;
+    }
+  }
+  EXPECT_TRUE(has_image);
+}
+
+class YeeWindowsStartupUiTest : public YeeAppliedSurfaceUiTest {
+ public:
+  YeeWindowsStartupUiTest() { set_open_about_blank_on_browser_launch(false); }
+
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    YeeAppliedSurfaceUiTest::SetUpCommandLine(command_line);
+    ASSERT_TRUE(startup_dir_.CreateUniqueTempDir());
+    const auto page = startup_dir_.GetPath().AppendASCII("yee-startup.html");
+    ASSERT_TRUE(base::WriteFile(
+        page, "<!doctype html><title>Yee Startup</title><h1>Yee Startup</h1>"));
+    startup_url_ = net::FilePathToFileURL(page);
+    command_line->AppendArg(startup_url_.spec());
+  }
+
+  GURL startup_url_;
+
+ private:
+  base::ScopedTempDir startup_dir_;
+};
+
+IN_PROC_BROWSER_TEST_F(YeeWindowsStartupUiTest,
+                       StartupAndHorizontalTabRoundTrip) {
+  using namespace yee::test;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const widget = view->GetWidget();
+  auto* const model = browser()->tab_strip_model();
+  const auto profile_root =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          switches::kUserDataDir);
+  ASSERT_FALSE(profile_root.empty());
+  EXPECT_EQ(profile_root, browser()->GetProfile()->GetPath().DirName());
+  ASSERT_EQ(1, model->count());
+  auto* const original_contents = model->GetActiveWebContents();
+  ASSERT_TRUE(original_contents);
+  ASSERT_TRUE(content::WaitForLoadStop(original_contents));
+  ASSERT_EQ(startup_url_, original_contents->GetLastCommittedURL());
+  EXPECT_EQ(u"Yee Startup", original_contents->GetTitle());
+  ASSERT_TRUE(widget->IsVisibleOnScreen());
+  ASSERT_TRUE(BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(PresentedFrame(*widget));
+  auto* const startup_tabs = view->tab_strip_view()->GetTabStripView();
+  auto* const address = view->GetLocationBarView();
+  auto* const contents = view->multi_contents_view()->GetActiveContentsView();
+  const gfx::Rect root_bounds = widget->GetRootView()->GetBoundsInScreen();
+  for (auto* part : {startup_tabs, static_cast<views::View*>(address),
+                     static_cast<views::View*>(contents)}) {
+    ASSERT_TRUE(part && part->IsDrawn());
+    const gfx::Rect bounds = part->GetBoundsInScreen();
+    EXPECT_FALSE(bounds.IsEmpty());
+    EXPECT_TRUE(root_bounds.Contains(bounds));
+  }
+  EXPECT_FALSE(
+      address->GetBoundsInScreen().Intersects(contents->GetBoundsInScreen()));
+  const auto captures =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          "yee-tabbar-capture-dir");
+  if (!captures.empty()) {
+    ASSERT_TRUE(base::CreateDirectory(captures));
+    CaptureYeeWindowFrame(widget, captures.AppendASCII("startup.png"));
+  }
+
+  auto* const layout = tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_TRUE(layout);
+  if (view->ShouldDrawVerticalTabStrip()) {
+    ASSERT_TRUE(applied_.Run({VerticalIdle()}, [&] {
+      layout->SetVerticalTabsEnabled(false);
+      ApplyScheduledLayout();
+    }));
+  }
+  ASSERT_FALSE(view->ShouldDrawVerticalTabStrip());
+  auto* const strip = view->tab_strip_view()->GetTabStripView();
+  ASSERT_TRUE(strip && strip->IsDrawn());
+  EXPECT_FALSE(
+      strip->GetBoundsInScreen().Intersects(contents->GetBoundsInScreen()));
+
+  const auto owner = applied_.source().ObserveTabModel(*model);
+  const auto initial =
+      applied_.source().Read({owner, AppliedConditionKind::kTabModelMatches});
+  ASSERT_TRUE(initial);
+  const auto& original = std::get<TabModelMatches>(initial->value);
+  ASSERT_EQ(1u, original.tabs.size());
+  auto* const first_tab = GetTabAnchorForModelIndex(view, 0);
+  ASSERT_TRUE(first_tab);
+  AppliedOwnerToken tab_layout_owner;
+  if (auto* legacy =
+          views::AsViewClass<TabContainerImpl>(first_tab->parent())) {
+    tab_layout_owner =
+        applied_.source().ObserveTabContainerAnimation(*legacy, 1);
+  } else {
+    auto* const unified =
+        views::AsViewClass<UnpinnedTabContainerView>(first_tab->parent());
+    ASSERT_TRUE(unified && unified->GetLayoutManager());
+    tab_layout_owner = applied_.source().ObserveUnifiedAnimation(
+        *unified,
+        *static_cast<TabCollectionAnimatingLayoutManager*>(
+            unified->GetLayoutManager()),
+        1);
+  }
+  const auto tab_layout_idle = applied_.Condition(
+      tab_layout_owner, AnimationMatches{.group_id = 1, .running = false});
+  const auto click = [&](views::View* target) {
+    ASSERT_TRUE(target);
+    views::ViewTracker tracker(target);
+    ApplyScheduledLayout();
+    target = tracker.view();
+    ASSERT_TRUE(target && target->IsDrawn() && target->GetWidget() == widget);
+    const gfx::Rect bounds = target->GetBoundsInScreen();
+    ASSERT_FALSE(bounds.IsEmpty());
+    auto point = bounds.CenterPoint();
+    ASSERT_TRUE(SendMouseMoveSync(point, widget->GetNativeWindow()));
+    target = tracker.view();
+    ASSERT_TRUE(target && target->GetWidget() == widget);
+    auto* const root = widget->GetRootView();
+    views::View::ConvertPointFromScreen(root, &point);
+    auto* const hit = root->GetEventHandlerForPoint(point);
+    ASSERT_TRUE(target->Contains(hit))
+        << "tab or button: " << target->GetClassName()
+        << ", target bounds: " << target->GetBoundsInScreen().ToString()
+        << ", root point: " << point.ToString()
+        << ", hit: " << (hit ? hit->GetClassName() : "none");
+    ASSERT_TRUE(SendLeftMouseClickSync(widget->GetNativeWindow()));
+    ApplyScheduledLayout();
+  };
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Condition(owner, original, AppliedMatch::kNewTabActive),
+       tab_layout_idle},
+      [&] {
+        click(views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
+            kNewTabButtonElementId,
+            views::ElementTrackerViews::GetContextForWidget(widget), true));
+      }));
+  ASSERT_EQ(2, model->count());
+  auto* const new_tab = model->GetActiveTab();
+  const uint64_t new_handle = new_tab->GetHandle().raw_value();
+  ASSERT_NE(original.active_tab, new_handle);
+  auto* const new_contents = new_tab->GetContents();
+  const auto active = [&](uint64_t handle) {
+    return applied_.Condition(owner, TabModelMatches{.active_tab = handle},
+                              AppliedMatch::kTabActive);
+  };
+  ASSERT_TRUE(applied_.Run({active(original.active_tab), tab_layout_idle},
+                           [&] { click(GetTabAnchorForModelIndex(view, 0)); }));
+  EXPECT_EQ(
+      original_contents,
+      view->multi_contents_view()->GetActiveContentsView()->web_contents());
+  ASSERT_TRUE(applied_.Run({active(new_handle), tab_layout_idle},
+                           [&] { click(GetTabAnchorForModelIndex(view, 1)); }));
+  EXPECT_EQ(
+      new_contents,
+      view->multi_contents_view()->GetActiveContentsView()->web_contents());
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Condition(owner, original, AppliedMatch::kTabOrder),
+       active(original.active_tab)},
+      [&] {
+        ASSERT_TRUE(
+            SendKeyPressSync(browser(), ui::VKEY_W, true, false, false, false));
+        ApplyScheduledLayout();
+      }));
+  ASSERT_EQ(1, model->count());
+  EXPECT_EQ(original_contents, model->GetActiveWebContents());
+  EXPECT_EQ(startup_url_, original_contents->GetLastCommittedURL());
+  EXPECT_EQ(
+      original_contents,
+      view->multi_contents_view()->GetActiveContentsView()->web_contents());
+}
+
 // 각 표시 조합에 새 창을 사용해 앞선 최대화·테마 전환의 입력 상태를 격리한다.
 class YeeWindowsCaptionInputUiTest
     : public YeeBrowserViewTabbedLayoutImplUiTest,
@@ -1262,7 +1619,7 @@ IN_PROC_BROWSER_TEST_P(YeeWindowsCaptionInputUiTest,
           {applied_.View(*button, {.hovered = true},
                          yee::test::AppliedMatch::kViewHovered)},
           [&] {
-            ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(inside, window));
+            ASSERT_TRUE(yee::test::SendMouseMoveSync(inside, window));
           },
           yee::test::AppliedDomain::kLayout, TestTimeouts::action_timeout()));
       ASSERT_TRUE(([&]() {
@@ -1310,7 +1667,7 @@ IN_PROC_BROWSER_TEST_P(YeeWindowsCaptionInputUiTest,
           applied_.Run({applied_.View(*button, {.hovered = false},
                                       yee::test::AppliedMatch::kViewHovered)},
                        [&] {
-                         ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+                         ASSERT_TRUE(yee::test::SendMouseMoveSync(
                              mouse_padding, window));
                        }));
       ASSERT_TRUE(([&]() {
@@ -1322,6 +1679,294 @@ IN_PROC_BROWSER_TEST_P(YeeWindowsCaptionInputUiTest,
   theme->SetBrowserColorScheme(original_scheme);
   widget->SetZOrderLevel(original_z_order);
   ApplyScheduledLayout();
+}
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       YeeWindowsCaptionButtonsChangeWindowState) {
+  using yee::test::AppliedDomain;
+  using yee::test::AppliedMatch;
+  using ShowState = yee::test::WidgetStateMatches::ShowState;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const widget = view->GetWidget();
+  auto* const state = tabs::VerticalTabStripStateController::From(browser());
+  const auto native_window = widget->GetNativeWindow();
+  ASSERT_TRUE(state);
+  ASSERT_FALSE(widget->IsMaximized());
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+
+  for (bool vertical : {true, false}) {
+    SCOPED_TRACE(vertical);
+    state->SetVerticalTabsEnabled(vertical);
+    ApplyScheduledLayout();
+    ASSERT_EQ(vertical, view->ShouldDrawVerticalTabStrip());
+    for (const auto [id, expected] :
+         {std::pair{VIEW_ID_MAXIMIZE_BUTTON, ShowState::kMaximized},
+          std::pair{VIEW_ID_RESTORE_BUTTON, ShowState::kNormal},
+          std::pair{VIEW_ID_MINIMIZE_BUTTON, ShowState::kMinimized}}) {
+      SCOPED_TRACE(id);
+      ApplyScheduledLayout();
+      auto* const button = widget->GetRootView()->GetViewByID(id);
+      ASSERT_TRUE(button && button->IsDrawn());
+      ASSERT_TRUE(applied_.Run(
+          {applied_.Widget(*widget, {.show_state = expected},
+                           AppliedMatch::kWidgetShowState)},
+          [&] {
+            ASSERT_TRUE(yee::test::SendMouseMoveSync(
+                button->GetBoundsInScreen().CenterPoint(), native_window));
+            ASSERT_TRUE(yee::test::SendLeftMouseClickSync(native_window));
+          },
+          AppliedDomain::kWidget));
+    }
+    // 작업 표시줄을 조작하지 않고 같은 테스트 창을 복귀시킨다.
+    ASSERT_TRUE(applied_.Run(
+        {applied_.Widget(*widget, {.show_state = ShowState::kNormal},
+                         AppliedMatch::kWidgetShowState),
+         applied_.Widget(*widget, {}, AppliedMatch::kWidgetReady)},
+        [&] {
+          widget->Restore();
+          ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+        },
+        AppliedDomain::kWidget));
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       YeeWindowsTaskbarRestoresMinimizedWindow) {
+  using namespace yee::test;
+  using ShowState = WidgetStateMatches::ShowState;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const widget = view->GetWidget();
+  const auto window = widget->GetNativeWindow();
+  const auto profile_root =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+          switches::kUserDataDir);
+  ASSERT_FALSE(profile_root.empty());
+  ASSERT_EQ(profile_root, browser()->GetProfile()->GetPath().DirName());
+  const std::string marker =
+      "YeeTaskbarSmoke-" + base::Uuid::GenerateRandomV4().AsLowercaseString();
+  auto* const contents = browser()->tab_strip_model()->GetActiveWebContents();
+  content::TitleWatcher title(contents, base::ASCIIToUTF16(marker));
+  ASSERT_TRUE(content::ExecJs(contents,
+                              content::JsReplace("document.title = $1", marker)));
+  EXPECT_EQ(base::ASCIIToUTF16(marker), title.WaitAndGetTitle());
+  view->UpdateTitleBar();
+  ASSERT_TRUE(NameTaskbarTestWindow(window, base::ASCIIToWide(marker)));
+  ASSERT_TRUE(BringBrowserWindowToFront(browser()));
+  ASSERT_TRUE(PresentedFrame(*widget));
+  ApplyScheduledLayout();
+  auto* const minimize =
+      widget->GetRootView()->GetViewByID(VIEW_ID_MINIMIZE_BUTTON);
+  ASSERT_TRUE(minimize && minimize->IsDrawn());
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*widget, {.show_state = ShowState::kMinimized},
+                       AppliedMatch::kWidgetShowState)},
+      [&] {
+        ASSERT_TRUE(SendMouseMoveSync(minimize->GetBoundsInScreen().CenterPoint(),
+                                      window));
+        ASSERT_TRUE(SendLeftMouseClickSync(window));
+      },
+      AppliedDomain::kWidget));
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Widget(*widget, {.show_state = ShowState::kNormal},
+                       AppliedMatch::kWidgetShowState),
+       applied_.Widget(*widget, {.active = true}, AppliedMatch::kWidgetActive),
+       applied_.Widget(*widget, {}, AppliedMatch::kWidgetReady)},
+      [&] { ASSERT_TRUE(RestoreFromTaskbar(window, base::ASCIIToWide(marker))); },
+      AppliedDomain::kWidget));
+  EXPECT_EQ(window, widget->GetNativeWindow());
+  EXPECT_EQ(contents, browser()->tab_strip_model()->GetActiveWebContents());
+}
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       YeeWindowsTabContextMenuCreatesGroup) {
+  using namespace yee::test;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const model = browser()->tab_strip_model();
+  ASSERT_EQ(2, model->count());
+  auto* const other = model->GetTabAtIndex(0);
+  auto* const tab = model->GetTabAtIndex(1);
+  ASSERT_TRUE(model->group_model()->ListTabGroups().empty());
+  ASSERT_TRUE(BringBrowserWindowToFront(browser()));
+  ApplyScheduledLayout();
+  const auto owner = applied_.source().ObserveTabModel(*model);
+  TabModelMatches tabs;
+  tabs.tabs.resize(model->count());
+  const auto menu = TabMenuModel::kAddToNewGroupItemIdentifier;
+
+  ASSERT_TRUE(RunTestSequence(
+      NameView("TabToGroup", GetTabAnchorForModelIndex(view, 1)),
+      CheckView("TabToGroup", [](views::View* target) {
+        return SendContextMenuClickSync(*target, NativeContextMenuAction::kOpen);
+      }),
+      WaitForShow(menu),
+      ApplyStepsAndWait(
+          applied_,
+          [&] {
+            return AppliedConditions{applied_.Condition(
+                owner, tabs, AppliedMatch::kTabCount,
+                AppliedFreshness::kNewApply)};
+          },
+          Steps(CheckView(menu, [](views::View* target) {
+                  return SendContextMenuClickSync(
+                      *target, NativeContextMenuAction::kSelect);
+                }).SetMustRemainVisible(false))),
+      WaitForShow(kTabGroupHeaderElementId)));
+
+  ASSERT_TRUE(tab->GetGroup());
+  EXPECT_THAT(model->group_model()->ListTabGroups(),
+              testing::ElementsAre(*tab->GetGroup()));
+  EXPECT_FALSE(other->GetGroup());
+}
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       YeeWindowsTabContextMenuCreatesSplit) {
+  using namespace yee::test;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const model = browser()->tab_strip_model();
+  auto* const panes = view->multi_contents_view();
+  ASSERT_EQ(2, model->count());
+  auto* const peer = model->GetTabAtIndex(0);
+  auto* const active = model->GetActiveTab();
+  ASSERT_NE(active, peer);
+  ASSERT_FALSE(panes->IsInSplitView());
+  ASSERT_TRUE(BringBrowserWindowToFront(browser()));
+  ApplyScheduledLayout();
+  const auto menu = TabMenuModel::kSplitTabsMenuItem;
+  const auto layout = SplitViewLayoutMenuModel::kVerticalMenuItem;
+  const auto select = [](views::View* target) {
+    return SendContextMenuClickSync(*target, NativeContextMenuAction::kSelect);
+  };
+  auto select_split =
+      tabs::IsSplitViewHorizontalDirectAccessEnabledForTab()
+          ? Steps(CheckView(menu, [](views::View* target) {
+                    return target->IsDrawn() && target->GetWidget() &&
+                           SendMouseMoveSync(
+                               target->GetBoundsInScreen().CenterPoint(),
+                               target->GetWidget()->GetNativeWindow());
+                  }),
+                  WaitForShow(layout),
+                  CheckView(layout, select).SetMustRemainVisible(false))
+          : Steps(CheckView(menu, select).SetMustRemainVisible(false));
+
+  ASSERT_TRUE(RunTestSequence(
+      NameView("TabToSplit", GetTabAnchorForModelIndex(view, 0)),
+      CheckView("TabToSplit", [](views::View* target) {
+        return SendContextMenuClickSync(*target, NativeContextMenuAction::kOpen);
+      }),
+      WaitForShow(menu),
+      ApplyStepsAndWait(
+          applied_,
+          [&] {
+            return AppliedConditions{applied_.View(
+                *panes->resize_area_for_testing(), {.visible = true},
+                AppliedMatch::kViewVisible)};
+          },
+          std::move(select_split))));
+
+  ASSERT_TRUE(active->GetSplit());
+  EXPECT_EQ(active->GetSplit(), peer->GetSplit());
+  EXPECT_TRUE(panes->IsInSplitView());
+  EXPECT_EQ(2, model->count());
+}
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       YeeWindowsSidebarGroupEditorAndFirstTabClose) {
+  using namespace yee::test;
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const model = browser()->tab_strip_model();
+  const auto native_window = view->GetWidget()->GetNativeWindow();
+  ASSERT_EQ(2, model->count());
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  const auto group = model->AddToNewGroup({0, 1, 2});
+  model->ChangeTabGroupVisuals(
+      group, tab_groups::TabGroupVisualData(
+                 u"검수 그룹", tab_groups::TabGroupColorId::kBlue, false));
+  model->ActivateTabAt(0);
+  ApplyScheduledLayout();
+
+  auto* const tracker = views::ElementTrackerViews::GetInstance();
+  const auto context = views::ElementTrackerViews::GetContextForView(view);
+  const auto group_header = [&] {
+    return tracker->GetFirstMatchingView(kTabGroupHeaderElementId, context,
+                                         true);
+  };
+  auto* const header = views::AsViewClass<TabGroupHeaderView>(group_header());
+  ASSERT_TRUE(header && header->group() == group);
+  ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+  const auto parking =
+      view->multi_contents_view()->GetBoundsInScreen().CenterPoint();
+  ASSERT_TRUE(yee::test::SendMouseMoveSync(parking, native_window));
+  const auto visible_editors = [&] {
+    return tracker->GetAllMatchingViews(kTabGroupEditorBubbleId, context, true);
+  };
+  EXPECT_TRUE(visible_editors().empty());
+  auto* const editor_button = header->editor_bubble_button();
+  ASSERT_TRUE(editor_button);
+  const auto title_center =
+      header->title_label_for_testing()->GetBoundsInScreen().CenterPoint();
+  ASSERT_TRUE(applied_.Run(
+      {applied_.View(*editor_button, {.visible = true},
+                     AppliedMatch::kViewVisible),
+       applied_.View(*editor_button, {}, AppliedMatch::kViewCenterVisible)},
+      [&] {
+        ASSERT_TRUE(yee::test::SendMouseMoveSync(title_center, native_window));
+        ApplyScheduledLayout();
+      }));
+  ASSERT_TRUE(editor_button->IsDrawn());
+  // 창의 활성 상태는 bubble의 표시 여부와 독립적이다. 포인터가 Header를
+  // 떠난 뒤에도 편집 버튼과 실제 bubble이 표시되는지 확인한다.
+  ASSERT_TRUE(applied_.Run(
+      {applied_.View(*header, {.hovered = false}, AppliedMatch::kViewHovered),
+       applied_.View(*editor_button, {.visible = true},
+                     AppliedMatch::kViewVisible)},
+      [&] {
+        const auto center = editor_button->GetBoundsInScreen().CenterPoint();
+        ASSERT_TRUE(yee::test::SendMouseMoveSync(center, native_window));
+        auto* const root = view->GetWidget()->GetRootView();
+        auto root_point = center;
+        views::View::ConvertPointFromScreen(root, &root_point);
+        ASSERT_TRUE(
+            editor_button->Contains(root->GetEventHandlerForPoint(root_point)));
+        ASSERT_TRUE(yee::test::SendLeftMouseClickSync(native_window));
+        ASSERT_TRUE(yee::test::SendMouseMoveSync(parking, native_window));
+      }));
+  const auto editors = visible_editors();
+  ASSERT_EQ(1u, editors.size());
+  ASSERT_TRUE(editors.front()->IsDrawn());
+  auto* const editor_widget = editors.front()->GetWidget();
+  ASSERT_TRUE(editor_widget && editor_widget->IsVisible());
+  const auto editor = editor_widget->GetWeakPtr();
+  ASSERT_TRUE(applied_.Run(
+      {applied_.View(*editor_button, {.visible = false},
+                     AppliedMatch::kViewVisible)},
+      [&] {
+        ASSERT_TRUE(editor && editor->IsVisible());
+        ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
+            editor->GetNativeWindow(), ui::VKEY_ESCAPE, false, false, false,
+            false));
+      },
+      AppliedDomain::kWidget));
+  EXPECT_TRUE(visible_editors().empty());
+
+  const auto owner = applied_.source().ObserveTabModel(*model);
+  const auto before =
+      applied_.source().Read({owner, AppliedConditionKind::kTabModelMatches});
+  ASSERT_TRUE(before);
+  auto remaining = std::get<TabModelMatches>(before->value);
+  ASSERT_EQ(3u, remaining.tabs.size());
+  remaining.tabs.erase(remaining.tabs.begin());
+  ASSERT_TRUE(applied_.Run(
+      {applied_.Condition(owner, remaining, AppliedMatch::kTabOrder)}, [&] {
+        ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), ui::VKEY_W, true,
+                                                false, false, false));
+      }));
+  ASSERT_EQ(2, model->count());
+  for (int index = 0; index < model->count(); ++index) {
+    EXPECT_EQ(group, model->GetTabGroupForTab(index));
+  }
+  ApplyScheduledLayout();
+  ASSERT_TRUE(group_header());
+  EXPECT_TRUE(group_header()->IsDrawn());
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1391,6 +2036,11 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   ApplyScheduledLayout();
   ASSERT_TRUE(view->multi_contents_view()->IsInSplitView());
   const double saved_ratio = view->multi_contents_view()->GetSplitRatio();
+  const SkColor pane_a_light = SkColorSetRGB(242, 245, 250);
+  const SkColor pane_a_dark = SkColorSetRGB(36, 40, 48);
+  const SkColor pane_b_dark = SkColorSetRGB(21, 24, 32);
+  const auto pane_a_background =
+      applied_.source().ObserveRendererBackground(*pane_a_contents);
   const auto check_header = [&](ContentsContainerView* container,
                                 const gfx::Rect& controls) {
     auto* const header = container->mini_toolbar();
@@ -1454,18 +2104,35 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
       ApplyScheduledLayout();
       for (bool dark : {false, true}) {
         SCOPED_TRACE(dark);
-        // 캡처 옵션과 무관하게 실제 프레임 재생성을 통과한다.
-        theme->SetBrowserColorScheme(
-            dark ? ThemeService::BrowserColorScheme::kDark
-                 : ThemeService::BrowserColorScheme::kLight);
+        const SkColor pane_a_color = dark ? pane_a_dark : pane_a_light;
+        // 실제 문서의 배경을 바꾸고 renderer가 새 색을 알린 뒤 합성한다.
+        ASSERT_TRUE(applied_.Run(
+            {applied_.Condition(
+                pane_a_background,
+                yee::test::PresentationMatches{.use_native_theme = dark},
+                yee::test::AppliedMatch::kPresentationDark)},
+            [&] {
+              ASSERT_TRUE(content::ExecJs(
+                  pane_a_contents,
+                  content::JsReplace(
+                      "Object.assign(document.body.style, "
+                      "{backgroundColor: $1, color: $2});",
+                      color_utils::SkColorToRgbaString(pane_a_color),
+                      dark ? "#e1e8f5" : "#19375a")));
+            },
+            yee::test::AppliedDomain::kFrame));
+        // 테마가 frame을 다시 만들면 소유 창이 전면에 표시된 뒤 합성한다.
+        ASSERT_TRUE(applied_.Run(
+            {applied_.Widget(*view->GetWidget(), {},
+                             yee::test::AppliedMatch::kWidgetReady)},
+            [&] {
+              theme->SetBrowserColorScheme(
+                  dark ? ThemeService::BrowserColorScheme::kDark
+                       : ThemeService::BrowserColorScheme::kLight);
+              ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+            },
+            yee::test::AppliedDomain::kWidget));
         ApplyScheduledLayout();
-        if (!captures.empty()) {
-          ASSERT_TRUE(applied_.Run(
-              {applied_.Widget(*view->GetWidget(), {.active = true},
-                               yee::test::AppliedMatch::kWidgetActive)},
-              [&] { view->GetWidget()->Activate(); }));
-          ASSERT_TRUE(([&]() { return view->GetWidget()->IsActive(); })());
-        }
         const BrowserLayoutParams frame_params =
             view->browser_widget()->GetFrameView()->GetBrowserLayoutParams();
         ASSERT_FALSE(frame_params.IsEmpty());
@@ -1566,8 +2233,8 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                 measurement));
           }
           ASSERT_TRUE(renderer_size_matches) << measurement;
-          ASSERT_TRUE(RendererPresented(*contents, *web_view));
           content::WaitForCopyableViewInFrame(contents->GetPrimaryMainFrame());
+          ASSERT_TRUE(RendererPresented(*contents, *web_view));
           EXPECT_EQ(web_view->GetBoundsInScreen(),
                     contents->GetRenderWidgetHostView()->GetViewBounds());
           check_header(container, controls);
@@ -1612,18 +2279,27 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
             view->GetWidget()->GetRootView()->GetBoundsInScreen().origin();
         for (const auto& container : view->GetContentsContainerViews()) {
           auto* const web_view = container->contents_view();
-          gfx::Point marker = web_view->GetBoundsInScreen().origin();
-          marker -= root_origin.OffsetFromOrigin();
-          marker.Offset(12, 12);
-          marker = gfx::ScaleToFlooredPoint(marker,
+          const auto viewport_origin = web_view->GetBoundsInScreen().origin() -
+                                       root_origin.OffsetFromOrigin();
+          const auto pixel_at = [&](gfx::Vector2d offset) {
+            return gfx::ScaleToFlooredPoint(viewport_origin + offset,
                                             compositor->device_scale_factor());
-          ASSERT_TRUE(
-              gfx::Rect(bitmap.width(), bitmap.height()).Contains(marker));
-          const SkColor expected = web_view->web_contents() == pane_a_contents
-                                       ? SkColorSetRGB(255, 0, 255)
-                                       : SkColorSetRGB(0, 255, 255);
+          };
+          const gfx::Rect image_bounds(bitmap.width(), bitmap.height());
+          const auto marker = pixel_at(gfx::Vector2d(12, 12));
+          const auto background = pixel_at(gfx::Vector2d(24, 24));
+          ASSERT_TRUE(image_bounds.Contains(marker));
+          ASSERT_TRUE(image_bounds.Contains(background));
+          const bool pane_a = web_view->web_contents() == pane_a_contents;
+          const SkColor expected =
+              pane_a ? SkColorSetRGB(255, 0, 255) : SkColorSetRGB(0, 255, 255);
           EXPECT_EQ(expected, bitmap.getColor(marker.x(), marker.y()))
-              << "viewport=" << web_view->GetBoundsInScreen().ToString();
+              << "viewport=" << web_view->GetBoundsInScreen().ToString()
+              << " marker_px=" << marker.ToString()
+              << " readback_px=" << result->rect().ToString();
+          EXPECT_EQ(pane_a ? pane_a_color : pane_b_dark,
+                    bitmap.getColor(background.x(), background.y()))
+              << "page_background_px=" << background.ToString();
         }
         if (!captures.empty()) {
           CaptureYeeWindowFrame(
@@ -3820,7 +4496,7 @@ IN_PROC_BROWSER_TEST_F(
     ASSERT_TRUE(applied_.Run(
         fullscreen_conditions,
         [&] {
-          ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+          ASSERT_TRUE(yee::test::SendKeyPressSync(
               browser(), ui::VKEY_F, true, false, false, true));
           native_fullscreen.WaitForEnterAndExitCount(1, 0);
         },
@@ -3845,7 +4521,7 @@ IN_PROC_BROWSER_TEST_F(
     ASSERT_TRUE(applied_.Run(
         exit_conditions,
         [&] {
-          ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+          ASSERT_TRUE(yee::test::SendKeyPressSync(
               browser(), ui::VKEY_F, true, false, false, true));
           native_fullscreen.WaitForEnterAndExitCount(1, 1);
           record_window_state("after_exit");
@@ -4484,7 +5160,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   ASSERT_TRUE(applied_.Run(
       {FooterMenuState(*footer, true)},
       [&] {
-        ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+        ASSERT_TRUE(yee::test::SendKeyPressSync(
             browser(), ui::VKEY_SPACE, false, false, false, false));
       },
       yee::test::AppliedDomain::kLayout, TestTimeouts::action_timeout()));
@@ -4505,13 +5181,13 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   auto* const menu = yee::GetSidebarFooterMenuForTesting(*footer);
   ASSERT_TRUE(menu);
   const auto menu_window = menu->GetWidget()->GetNativeWindow();
-  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+  ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
       menu_window, ui::VKEY_RETURN, false, false, false, false));
   ASSERT_TRUE(([&]() {
     return yee::GetSidebarFooterMenuForTesting(*footer) == menu &&
            !menu->GetViewByID(yee::kSidebarFooterRootBrowserToolsViewId);
   })());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+  ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
       menu_window, ui::VKEY_ESCAPE, false, false, false, false));
   ASSERT_TRUE(([&]() {
     return yee::GetSidebarFooterMenuForTesting(*footer) == menu &&
@@ -4541,11 +5217,11 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   ASSERT_TRUE(tools->HasFocus());
   ASSERT_TRUE(menu->GetWidget()->IsActive());
   // macOS의 사용자 Home 키 바인딩과 별개인 native Tab 순회를 검수한다.
-  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+  ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
       menu_window, ui::VKEY_TAB, false, false, false, false));
   EXPECT_TRUE(
       menu->GetViewByID(yee::kSidebarFooterRootMemoryViewId)->HasFocus());
-  ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+  ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
       menu_window, ui::VKEY_TAB, false, true, false, false));
   EXPECT_TRUE(tools->HasFocus());
   EXPECT_EQ(views::FocusManager::FocusChangeReason::kFocusTraversal,
@@ -4584,7 +5260,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
             tools->background() != nullptr,
             static_cast<int>(menu->GetFocusManager()->focus_change_reason())));
   };
-  ui_test_utils::ScopedNativeInputTrace native_trace(menu->GetWidget());
+  yee::test::ScopedNativeInputTrace native_trace(menu->GetWidget());
   native_trace.Snapshot("before-pointer-return", pointer_return);
   record_row("YeeFlyoutPointerReturnReady");
   RecordProperty("YeeFlyoutPointerReturnBounds",
@@ -4699,7 +5375,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   ASSERT_TRUE(applied_.Run(
       {FooterMenuState(*footer, true)},
       [&] {
-        ASSERT_TRUE(ui_test_utils::SendKeyPressSync(
+        ASSERT_TRUE(yee::test::SendKeyPressSync(
             browser(), ui::VKEY_SPACE, false, false, false, false));
       },
       yee::test::AppliedDomain::kLayout, TestTimeouts::action_timeout()));
@@ -4712,7 +5388,7 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
        applied_.Widget(*browser_view->GetWidget(), {.active = true},
                        yee::test::AppliedMatch::kWidgetActive)},
       [&] {
-        ASSERT_TRUE(ui_test_utils::SendKeyPressToWindowSync(
+        ASSERT_TRUE(yee::test::SendKeyPressToWindowSync(
             yee::GetSidebarFooterMenuForTesting(*footer)
                 ->GetWidget()
                 ->GetNativeWindow(),

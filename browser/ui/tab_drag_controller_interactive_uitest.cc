@@ -10,6 +10,7 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <utility>
 
 #include "base/command_line.h"
 #include "base/containers/span.h"
@@ -25,6 +26,8 @@
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
+#include "base/test/test_timeouts.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
@@ -170,6 +173,9 @@ class YeeDetachToBrowserTabDragControllerTest
   }
   void TearDownOnMainThread() override {
     browser_change_.reset();
+#if BUILDFLAG(IS_WIN)
+    EXPECT_TRUE(ReleasePressedMouse());
+#endif
     drag_.reset();
     applied_.Stop();
     TabDragControllerTest::TearDownOnMainThread();
@@ -237,11 +243,19 @@ class YeeDetachToBrowserTabDragControllerTest
     if (!owns_source)
       return;
     auto* strip = GetTabStripForBrowser(detached);
-    if (strip)
+    if (strip) {
       drag_->AddContext(*strip->GetDragContext(), *detached);
+    }
     if (input_source() == InputSource::INPUT_SOURCE_MOUSE) {
+#if BUILDFLAG(IS_WIN)
+      if (pressed_mouse_ && strip && strip->GetWidget()) {
+        pressed_mouse_ = strip->GetWidget()->GetWeakPtr();
+      }
+      EXPECT_TRUE(ReleasePressedMouse({}, /*wait_for_completion=*/false));
+#else
       EXPECT_TRUE(
           ui_controls::SendMouseEvents(ui_controls::LEFT, ui_controls::UP));
+#endif
     }
 #if BUILDFLAG(IS_CHROMEOS)
     else {
@@ -254,10 +268,12 @@ class YeeDetachToBrowserTabDragControllerTest
                    gfx::Point screen,
                    Submit submit,
                    AppliedConditions conditions = {},
-                   bool first = false) {
+                   bool first = false,
+                   base::TimeTicks input_deadline = {}) {
     CHECK(drag_);
-    if (!first)
+    if (!first) {
       drag_->BeginStep(++step_);
+    }
     TabModelMatches count;
     count.tabs.resize(browser()->GetTabStripModel()->count());
     conditions.push_back(applied_.Condition(
@@ -283,43 +299,125 @@ class YeeDetachToBrowserTabDragControllerTest
                          .visible = phase == Phase::kAttached},
           AppliedMatch::kPreviewSettled));
     }
-    const auto ticket = applied_.Begin(conditions, AppliedDomain::kDrag);
+    const auto ticket =
+        input_deadline.is_null()
+            ? applied_.Begin(conditions, AppliedDomain::kDrag)
+            : applied_.BeginUntil(conditions, AppliedDomain::kDrag,
+                                  input_deadline);
     const auto error = applied_.session().DispatchAsync(
         ticket, base::BindLambdaForTesting([&](DispatchDone done) {
           auto [ack, reject] = base::SplitOnceCallback(std::move(done));
           auto input_ack = input_source() == InputSource::INPUT_SOURCE_MOUSE
                                ? drag_->InputAckAtCursor(std::move(ack))
                                : drag_->InputAck(std::move(ack), screen);
-          if (!submit(std::move(input_ack)))
+          if (!submit(std::move(input_ack))) {
             std::move(reject).Run(AppliedDispatchStatus::kRejected);
+          }
         }));
     if (error) {
       ADD_FAILURE() << error->ToString();
       return false;
     }
     const auto result = applied_.Wait(ticket, conditions);
-    if (!result)
+    if (!result) {
       ADD_FAILURE() << result.message();
+    }
     last_input_ = screen;
     return bool(result);
   }
-  // 이전 input mixin처럼 첫 누름은 ACK까지 기다린다. focus 확보/버블 닫기는
-  // controller를 만들지 않을 수 있고, 실제 이동은 kAttached를 계속 요구한다.
-  bool PressInputAtCenter(const views::View* view, int id = 0) {
-    if (!BeginPress(
-            *const_cast<TabSlotView*>(static_cast<const TabSlotView*>(view))))
+
+#if BUILDFLAG(IS_WIN)
+  bool ReleasePressedMouse(base::TimeTicks deadline = {},
+                           bool wait_for_completion = true) {
+    if (!pressed_mouse_) {
+      return true;
+    }
+    if (!*pressed_mouse_) {
       return false;
-    const auto location = GetCenterInScreenCoordinates(view);
-    const auto hint = GetWindowHint(view);
-    return ApplyNative(
+    }
+    // 완료를 기다리는 도중 detach callback이 중복 UP을 보내지 않게 한다.
+    auto owner = std::exchange(pressed_mouse_, std::nullopt);
+    const auto window = (*owner)->GetNativeWindow();
+    if (!wait_for_completion) {
+      const bool sent = yee::test::SendLeftMouseButtonRelease(window);
+      if (!sent) {
+        pressed_mouse_ = std::move(owner);
+      }
+      return sent;
+    }
+    const auto release =
+        yee::test::SendLeftMouseButtonSync(window, false, deadline);
+    if (!release.sent) {
+      pressed_mouse_ = std::move(owner);
+    }
+    return release.completed;
+  }
+#endif
+
+  // 첫 누름은 ACK까지만 기다린다. 실제 drag 이동은 kAttached를 요구한다.
+  bool PressSlotAt(TabSlotView& slot,
+                   const gfx::Point& location,
+                   gfx::NativeWindow hint,
+                   int id) {
+    base::TimeTicks deadline;
+#if BUILDFLAG(IS_WIN)
+    auto* const source_widget = slot.GetWidget();
+    if (!source_widget || pressed_mouse_) {
+      return false;
+    }
+    const auto widget = source_widget->GetWeakPtr();
+    deadline = base::TimeTicks::Now() + TestTimeouts::action_timeout();
+#endif
+    const bool applied = ApplyNative(
         std::nullopt, location,
         [&, location, hint, id](base::OnceClosure done) {
+#if BUILDFLAG(IS_WIN)
+          if (input_source() == InputSource::INPUT_SOURCE_MOUSE) {
+            if (!widget)
+              return false;
+            // 같은 좌표에 이미 도달했으면 Windows가 1 DIP 옮기게 하지 않는다.
+            const bool at_target =
+                display::Screen::Get()->GetCursorScreenPoint() == location;
+            const bool moved =
+                at_target || yee::test::SendMouseMoveSync(
+                                 location, widget->GetNativeWindow(), deadline);
+            if (!moved || !widget ||
+                display::Screen::Get()->GetCursorScreenPoint() != location) {
+              return false;
+            }
+            pressed_mouse_ = widget;
+            const auto press = yee::test::SendLeftMouseButtonSync(
+                widget->GetNativeWindow(), true, deadline);
+            if (!press.sent) {
+              pressed_mouse_.reset();
+            }
+            if (press.completed)
+              std::move(done).Run();
+            return press.completed;
+          }
+#endif
           const bool accepted = Input::PressInput(location, hint, id);
           if (accepted)
             std::move(done).Run();
           return accepted;
         },
-        {}, true);
+        {}, true, deadline);
+#if BUILDFLAG(IS_WIN)
+    if (!applied) {
+      EXPECT_TRUE(ReleasePressedMouse());
+    }
+#endif
+    return applied;
+  }
+
+  bool PressInputAtCenter(const views::View* view, int id = 0) {
+    auto& slot =
+        *const_cast<TabSlotView*>(static_cast<const TabSlotView*>(view));
+    if (!BeginPress(slot)) {
+      return false;
+    }
+    return PressSlotAt(slot, GetCenterInScreenCoordinates(view),
+                       GetWindowHint(view), id);
   }
   bool PressInput(const gfx::Point& location,
                   gfx::NativeWindow hint,
@@ -327,31 +425,38 @@ class YeeDetachToBrowserTabDragControllerTest
     auto* strip = GetTabStripForBrowser(browser());
     TabSlotView* source = nullptr;
     for (int i = 0; i < strip->GetTabCount(); ++i) {
-      if (strip->tab_at(i)->GetBoundsInScreen().Contains(location))
+      if (strip->tab_at(i)->GetBoundsInScreen().Contains(location)) {
         source = strip->tab_at(i);
+      }
     }
     CHECK(source);
-    if (!BeginPress(*source))
+    if (!BeginPress(*source)) {
       return false;
-    return ApplyNative(
-        std::nullopt, location,
-        [&, location, hint, id](base::OnceClosure done) {
-          const bool accepted = Input::PressInput(location, hint, id);
-          if (accepted)
-            std::move(done).Run();
-          return accepted;
-        },
-        {}, true);
+    }
+    return PressSlotAt(*source, location, hint, id);
   }
   bool DragInputTo(const gfx::Point& location,
                    gfx::NativeWindow hint,
                    AppliedConditions conditions = {}) {
+    base::TimeTicks deadline;
+#if BUILDFLAG(IS_WIN)
+    deadline = base::TimeTicks::Now() + TestTimeouts::action_timeout();
+#endif
     return ApplyNative(
         Phase::kAttached, location,
-        [this, location, hint](base::OnceClosure done) {
-          if (input_source() == InputSource::INPUT_SOURCE_MOUSE)
+        [&, location, hint](base::OnceClosure done) {
+          if (input_source() == InputSource::INPUT_SOURCE_MOUSE) {
+#if BUILDFLAG(IS_WIN)
+            if (!yee::test::SendMouseMoveSync(location, hint, deadline)) {
+              return false;
+            }
+            std::move(done).Run();
+            return true;
+#else
             return ui_controls::SendMouseMoveNotifyWhenDone(
                 location.x(), location.y(), std::move(done), hint);
+#endif
+          }
 #if BUILDFLAG(IS_CHROMEOS)
           return ui_controls::SendTouchEventsNotifyWhenDone(
               ui_controls::kTouchMove, 0, location.x(), location.y(),
@@ -360,7 +465,7 @@ class YeeDetachToBrowserTabDragControllerTest
           NOTREACHED();
 #endif
         },
-        std::move(conditions));
+        std::move(conditions), false, deadline);
   }
   bool DragInputToCenter(const views::View* view,
                          gfx::Vector2d offset = {},
@@ -369,27 +474,57 @@ class YeeDetachToBrowserTabDragControllerTest
                        GetWindowHint(view), std::move(conditions));
   }
   bool ReleaseInput(int id = 0) {
+    base::TimeTicks deadline;
+#if BUILDFLAG(IS_WIN)
+    deadline = base::TimeTicks::Now() + TestTimeouts::action_timeout();
+#endif
     return ApplyNative(
-        Phase::kInactive, last_input_, [this, id](base::OnceClosure done) {
+        Phase::kInactive, last_input_,
+        [&, id](base::OnceClosure done) {
           static_cast<void>(id);
-          if (input_source() == InputSource::INPUT_SOURCE_MOUSE)
+          if (input_source() == InputSource::INPUT_SOURCE_MOUSE) {
+#if BUILDFLAG(IS_WIN)
+            if (!ReleasePressedMouse(deadline)) {
+              return false;
+            }
+            std::move(done).Run();
+            return true;
+#else
             return ui_controls::SendMouseEventsNotifyWhenDone(
                 ui_controls::LEFT, ui_controls::UP, std::move(done));
+#endif
+          }
 #if BUILDFLAG(IS_CHROMEOS)
           return ui_controls::SendTouchEventsNotifyWhenDone(
               ui_controls::kTouchRelease, id, 0, 0, std::move(done));
 #else
-        NOTREACHED();
+          NOTREACHED();
 #endif
-        });
+        },
+        {}, false, deadline);
   }
   bool EscapeInput() {
-    return ApplyNative(
+    const bool escaped = ApplyNative(
         Phase::kInactive, last_input_, [this](base::OnceClosure done) {
+#if BUILDFLAG(IS_WIN)
+          if (!yee::test::SendKeyPressToWindowSync(
+                  browser()->GetWindow()->GetNativeWindow(), ui::VKEY_ESCAPE,
+                  false, false, false, false)) {
+            return false;
+          }
+          std::move(done).Run();
+          return true;
+#else
           return ui_controls::SendKeyPressNotifyWhenDone(
               browser()->GetWindow()->GetNativeWindow(), ui::VKEY_ESCAPE, false,
               false, false, false, std::move(done));
+#endif
         });
+#if BUILDFLAG(IS_WIN)
+    return escaped && ReleaseInput();
+#else
+    return escaped;
+#endif
   }
   void EnsureFocusToTabStrip(TabStrip* strip) {
     ASSERT_TRUE(PressInputAtCenter(strip->tab_at(0)));
@@ -425,6 +560,9 @@ class YeeDetachToBrowserTabDragControllerTest
   uint64_t session_ = 0;
   uint64_t step_ = 0;
   gfx::Point last_input_;
+#if BUILDFLAG(IS_WIN)
+  std::optional<base::WeakPtr<views::Widget>> pressed_mouse_;
+#endif
   base::test::ScopedFeatureList features_;
   gfx::AnimationTestApi::RenderModeResetter animation_mode_reset_{
       gfx::AnimationTestApi::SetRichAnimationRenderMode(
@@ -810,7 +948,7 @@ IN_PROC_BROWSER_TEST_P(YeeDetachToBrowserTabDragControllerTest,
   const auto* source = model->GetTabAtIndex(0);
   const auto* original_context = tab_strip->GetDragContext();
 #if BUILDFLAG(IS_WIN)
-  ui_test_utils::ScopedNativeInputTrace native_trace(tab_strip->GetWidget());
+  yee::test::ScopedNativeInputTrace native_trace(tab_strip->GetWidget());
 #endif
   const auto record_phase = [&](const char* phase,
                                 [[maybe_unused]] const gfx::Point& intended) {

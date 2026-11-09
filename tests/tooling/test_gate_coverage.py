@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import io
 import json
 import os
+import posixpath
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -128,6 +129,10 @@ def patch_changes(patch):
 
 
 def chromium_checkout(root, environ):
+    chromium = environ.get('YEE_CHROMIUM_ROOT')
+    if chromium:
+        candidate = Path(chromium) / 'src'
+        return candidate if (candidate / 'BUILD.gn').is_file() else None
     explicit = environ.get('YEE_LOCAL_BUILD_ROOT')
     candidates = ([Path(explicit) / 'chromium/src'] if explicit else
                   sorted((root / '.local-build').glob('*/chromium/src')) +
@@ -141,7 +146,7 @@ def overlay_inventory(root):
         for source in (root / directory).rglob('*'):
             if not re.search(r'(?:test|tests)\.(?:cc|mm)$', source.name):
                 continue
-            text = source.read_text()
+            text = source.read_text(encoding='utf-8')
             instances = instantiations(text)
             for name, (_, _, parameterized) in case_ranges(text).items():
                 found[(source.relative_to(root).as_posix(), name)] = (
@@ -154,7 +159,7 @@ def upstream_inventory(chromium, patch):
     for path, changed, expected in patch_changes(patch):
         if not re.search(r'(?:test|tests)\.(?:cc|mm)$', path):
             continue
-        text = (chromium / path).read_text()
+        text = (chromium / path).read_text(encoding='utf-8')
         instances = instantiations(text)
         lines = text.splitlines()
         if any(number > len(lines) or lines[number - 1] != value for number, value in expected.items()):
@@ -232,17 +237,18 @@ def strip_gn_comments(text):
 
 def gn_targets(root, patch, chromium=None):
     """overlay·checkout의 sources/deps를 읽고 GN 조건은 OS의 합집합으로 취급한다."""
-    catalog = json.loads((root / 'build/overlay.json').read_text())
+    catalog = json.loads((root / 'build/overlay.json').read_text(encoding='utf-8'))
     files = {}
     for entry in catalog['source_roots']:
         for source in (root / entry['source']).rglob('BUILD.gn'):
             destination = PurePosixPath(entry['destination']) / source.relative_to(root / entry['source'])
-            files[destination.as_posix()] = source.read_text()
+            files[destination.as_posix()] = source.read_text(encoding='utf-8')
     if chromium:
         paths = {path for path, _, _ in patch_changes(patch) if path.endswith('BUILD.gn')}
         paths.add('chrome/browser/ui/animation/BUILD.gn')
+        paths.add('chrome/installer/setup/BUILD.gn')
         for path in paths:
-            files[path] = (chromium / path).read_text()
+            files[path] = (chromium / path).read_text(encoding='utf-8')
     # 기존 heavy browser gate의 원본 fixture는 overlay 밖 조립 지점이다.
     targets = {'browser_tests': [
         'chrome/browser/glic/selection/selection_overlay_browsertest.cc',
@@ -273,6 +279,9 @@ def gn_targets(root, patch, chromium=None):
             'components/yee_branding/yee_mac_install_unittest.cc']
         targets['content/test:yee_service_worker_test_cases'] = [
             'chrome/browser/yee_content_blocking/yee_service_worker_container_host_unittest.cc']
+        targets['chrome/installer/setup:setup_unittests'] = [
+            'components/yee_branding/yee_windows_install_shortcuts_unittest.cc',
+            'components/yee_branding/yee_windows_taskbar_pinning_unittest.cc']
     for path, text in files.items():
         parent = PurePosixPath(path).parent
         text = strip_gn_comments(text)
@@ -291,7 +300,7 @@ def gn_targets(root, patch, chromium=None):
 
 
 def normalize_path(parent, value):
-    return os.path.normpath(value[2:] if value.startswith('//') else str(parent / value))
+    return posixpath.normpath(value[2:] if value.startswith('//') else str(parent / value))
 
 
 def normalize_label(parent, value):
@@ -379,7 +388,7 @@ def tier_inventory(root, chromium, patch, targets, catalog, runs):
         file = root / path if (root / path).is_file() else chromium / path if chromium else None
         if file is None or not file.is_file():
             continue
-        text = file.read_text()
+        text = file.read_text(encoding='utf-8')
         instances = instantiations(text)
         for name, (_, _, parameterized) in case_ranges(text).items():
             parameters = instances.get(name.split('.')[0], []) if parameterized else False
@@ -441,7 +450,7 @@ def gate_runs(root, tier_values=(None, 'background', 'foreground', 'all')):
         manifest_dir.mkdir(parents=True)
         shutil.copy(ROOT / 'tests/tooling/test_tiers.json', manifest_dir)
         native_scripts = {path.name for path in (root / 'tools/dev').glob('test-*.sh')
-                          if 'YEE_OUT_DIR/' in path.read_text()}
+                          if 'YEE_OUT_DIR/' in path.read_text(encoding='utf-8')}
         if native_scripts != set(GATE_MODES) | {'test-youtube-live.sh'}:
             raise AssertionError('native gate 모드 등록을 갱신해야 한다: ' + str(sorted(native_scripts)))
         capture = temp / 'capture.py'
@@ -480,7 +489,7 @@ run_native_test_gate() {
         (bin_dir / 'uname').chmod(0o755)
         for script in scripts:
             shutil.copy(script, dev / script.name)
-            for binary in re.findall(r'\$YEE_OUT_DIR/(\w+)', script.read_text()):
+            for binary in re.findall(r'\$YEE_OUT_DIR/(\w+)', script.read_text(encoding='utf-8')):
                 fake = out / binary
                 fake.write_text('''#!/bin/zsh
 if [[ " $* " == *' --gtest_list_tests '* ]]; then
@@ -508,7 +517,7 @@ python3 "$FIXTURE/capture.py" run "$0" "$@"
                                             env=env, capture_output=True, text=True)
                     if result.returncode:
                         raise AssertionError(f'{script.name} {mode} {tier} {platform}: {result.stderr}')
-                    events = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+                    events = [json.loads(line) for line in log.read_text(encoding='utf-8').splitlines()] if log.exists() else []
                     built = {arg.removeprefix('//') for event in events if event[0] == 'build' for arg in event[1:]}
                     display, shutdown = False, False
                     for event in events:
@@ -522,17 +531,41 @@ python3 "$FIXTURE/capture.py" run "$0" "$@"
                             runs.append(GateRun(script.name, platform, binary, event[2:], built,
                                                 mode, resolved_tier, display, shutdown))
                             display, shutdown = False, False
+        if (root / 'tools/dev/test-native.ps1').is_file():
+            runs.extend(run for run in windows_gate_runs(root, tier_values)
+                        if run.script == 'test-native.ps1')
         return runs
+
+
+def windows_gate_runs(root, tier_values=('background', 'foreground', 'all')):
+    """저장소 Windows 실행 계획을 공통 GN·tier 검사에 연결한다."""
+    import windows_native_gate
+
+    runs = []
+    for name, definition in windows_native_gate.read_configuration(root)['gates'].items():
+        if not definition['required']:
+            continue
+        for mode in definition['modes']:
+            for tier in tier_values:
+                resolved_tier = tier or 'background'
+                for selected in windows_native_gate.plan(root, name, mode, resolved_tier):
+                    runs.append(GateRun(
+                        definition.get('script', 'test-native.ps1'), 'MSYS_NT-10.0',
+                        selected.binary,
+                        [f'--gtest_filter={selected.pattern}', *selected.arguments],
+                        {selected.target}, (mode,), resolved_tier,
+                        windows_native_gate.uses_desktop(selected), False))
+    return runs
 
 
 class GateCoverageTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.patch = PATCH.read_text()
+        cls.patch = PATCH.read_text(encoding='utf-8')
         cls.chromium = chromium_checkout(ROOT, os.environ)
         cls.targets, cls.catalog = gn_targets(ROOT, cls.patch, cls.chromium)
         cls.runs = gate_runs(ROOT) if shutil.which('zsh') else None
-        cls.allowlist = json.loads((ROOT / 'tests/tooling/gate_coverage_allowlist.json').read_text())
+        cls.allowlist = json.loads((ROOT / 'tests/tooling/gate_coverage_allowlist.json').read_text(encoding='utf-8'))
         cls.manifest = load_manifest(ROOT / 'tests/tooling/test_tiers.json')
 
     def assert_covered(self, found, overlay):
@@ -630,7 +663,8 @@ class GateCoverageTest(unittest.TestCase):
             expected = {name for key, entry in self.manifest.items() if platform in entry['os']
                         and covered_by_gate(destination_path(key.split('::')[0], self.catalog),
                                             key.split('::')[1], entry.get('parameters', False), self.targets, [run])
-                        for name in case_names(key, entry) if selected(name, False, run.arguments)}
+                        for name in case_names(key, entry, platform)
+                        if selected(name, False, run.arguments)}
             positive = pattern.partition('-')[0] or '*'
             for part in positive.split(':'):
                 self.assertTrue(any(fnmatch.fnmatchcase(name, part) for name in expected),
@@ -818,6 +852,19 @@ class GateCoverageTest(unittest.TestCase):
         targets, _ = gn_targets(ROOT, self.patch)
         with mock.patch.object(self, 'targets', targets):
             self.assert_covered(overlay_inventory(ROOT), overlay=True)
+
+    def test_explicit_chromium_root_is_used_without_guessing_another_checkout(self):
+        """Windows 원본 루트 지정을 우선하며 잘못된 명시값은 다른 경로로 바꾸지 않는다."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            src = root / 'chromium-stable157/src'
+            src.mkdir(parents=True)
+            (src / 'BUILD.gn').touch()
+            self.assertEqual(src, chromium_checkout(root, {
+                'YEE_CHROMIUM_ROOT': str(src.parent),
+                'YEE_LOCAL_BUILD_ROOT': str(root / 'different')}))
+            self.assertIsNone(chromium_checkout(root, {
+                'YEE_CHROMIUM_ROOT': str(root / 'missing')}))
 
     def test_commented_gn_source_or_dependency_is_not_compiled(self):
         """GN 주석 안의 소스와 의존성은 타깃 연결로 세지 않는다."""

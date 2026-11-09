@@ -239,6 +239,7 @@ assert received
                 (['binary', '--', '--user-data-dir=/other'], True)):
             self.assertEqual(background_test.profile_is_owned(arguments, directory), expected)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_process_session_snapshot_keeps_full_executable_and_start_time(self):
         listing = (' 101 1 101 S Wed Nov  4 12:30:00 2026 /tmp/yee tests/binary\n'
                    ' 102 1 555 S Wed Nov  4 12:30:00 2026 /tmp/yee tests/binary\n')
@@ -247,6 +248,7 @@ assert received
             self.assertEqual(background_test.process_session_snapshot(101),
                              {101: (('Wed', 'Nov', '4', '12:30:00', '2026'), '/tmp/yee tests/binary')})
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_process_group_and_recorded_descendants_survive_unreadable_sessions(self):
         """세션 조회가 막혀도 전용 그룹·자손·기록한 고아 PID를 추적하고 좀비는 제외한다."""
         listing = ('101 1 101 S Wed Nov 4 12:30:00 2026 /tmp/test\n'
@@ -267,6 +269,7 @@ assert received
                 with self.assertRaises(ValueError):
                     background_test.process_session_snapshot(101)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_exited_child_argv_errors_are_gone_without_cleanup_signals(self):
         """열거 직후 끝난 자식의 EINVAL·ESRCH는 기록 오류나 정리 대상이 아니다."""
         for error in (errno.EINVAL, errno.ESRCH):
@@ -289,6 +292,7 @@ assert received
                 self.assertIn('Fixture.', output)
                 kill.assert_not_called()
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_live_child_with_einval_cannot_hide_a_cleanup_leftover(self):
         """EINVAL이 반복되어도 정리 뒤 살아 있는 자식을 통과시키지 않는다."""
         child = mock.Mock(pid=101, returncode=0)
@@ -304,6 +308,7 @@ assert received
             with self.assertRaisesRegex(ValueError, '^남은 자식 PID: 102$'):
                 background_test.run_background_command(['binary'], self.directory / 'run', lambda: False)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_live_owned_child_with_einval_is_still_cleaned_by_process_identity(self):
         """argv 오류가 있어도 그룹·PID로 확인한 자기 helper에는 정리 신호를 보낸다."""
         child = mock.Mock(pid=101, returncode=0)
@@ -319,6 +324,7 @@ assert received
         self.assertEqual(code, 0)
         kill.assert_called_once_with(102, signal.SIGTERM)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_cleanup_targets_only_verified_child_identity(self):
         child = mock.Mock(pid=101, returncode=0)
         child.communicate.return_value = ('Fixture.\n  Case\n', None)
@@ -338,6 +344,7 @@ assert received
         self.assertIn('--user-data-dir=', launch.call_args.args[0][-1])
         self.assertFalse((self.directory / 'run').exists())
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_macos_temp_environment_overrides_inherited_chromium_directory(self):
         """Chromium의 launcher 프로필도 이번 실행의 짧은 임시 경로를 사용한다."""
         child = mock.Mock(pid=101, returncode=0)
@@ -352,6 +359,7 @@ assert received
         self.assertEqual(environment['TMPDIR'], str(directory) + '/')
         self.assertEqual(environment['MAC_CHROMIUM_TMPDIR'], environment['TMPDIR'])
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_profileless_reparented_helper_is_cleaned_on_exit_and_interrupt(self):
         """부모·프로필 인수가 없는 renderer도 전용 세션의 신원으로 정리한다."""
         helper = (('Wed', 'Nov', '4', '12:30:00', '2026'), '/tmp/Renderer Helper')
@@ -388,6 +396,7 @@ assert received
                 group.assert_not_called()
                 observer.close_session.assert_called_once_with(101)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_profile_boundary_error_does_not_disown_session_for_cleanup(self):
         """잘못된 프로필은 실패로 기록하되 자기 세션의 자식은 남기지 않는다."""
         child = mock.Mock(pid=101, returncode=0)
@@ -439,6 +448,7 @@ assert received
             observed_test_root_pids=[101, 202], observed_test_process_groups=[101, 202])))
         self.assertTrue(observer.finish()['passed'])
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_header_site_controls_and_install_receive_both_root_pgid_pairs_before_exec(self):
         """GUI 없는 sensor·바이너리로 세 gate의 목록·실행 경로와 setsid 완료 순서를 확인한다."""
         cache = self.directory / 'background-observer'
@@ -510,6 +520,7 @@ else:
             self.assertNotIn(lookup, source)
         self.assertIn('KERN_PROC_PGRP', source)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_missing_observer_acknowledgement_never_executes_the_test(self):
         """준비 확인이 실패하면 대기 중인 자기 자식만 정리하고 테스트는 실행하지 않는다."""
         marker = self.directory / 'executed'
@@ -536,6 +547,7 @@ else:
         self.assertIsNotNone(children[0].poll())
         observer.close_session.assert_called_once_with(children[0].pid)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_interruption_while_observer_prepares_never_executes_the_test(self):
         """관찰기 응답 대기 중 받은 중단은 pipe를 해제하지 않고 SIGINT로 반환한다."""
         marker = self.directory / 'executed'
@@ -549,6 +561,7 @@ else:
         self.assertEqual(code, -signal.SIGINT)
         self.assertFalse(marker.exists())
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_process_identity_snapshot_waits_for_exec_completion(self):
         """launcher 전환을 지연해도 첫 신원 조회는 exec가 끝난 뒤에만 수행한다."""
         active = self.directory / 'launcher.active'
@@ -588,6 +601,7 @@ os.execvp(sys.argv[4], sys.argv[4:])
         self.assertIn('Fixture.', output)
         self.assertTrue(snapshots)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_process_listing_failure_still_reaps_the_direct_child(self):
         """실행 후 목록 권한이 사라져도 직접 생성한 Popen 자식은 회수한다."""
         children = []
@@ -615,6 +629,7 @@ os.execvp(sys.argv[4], sys.argv[4:])
                     child.kill()
                 child.wait(timeout=5)
 
+    @unittest.skipUnless(hasattr(os, 'killpg'), 'POSIX 세션 신호가 필요하다')
     def test_killed_root_is_reaped_before_waiting_for_descendant_output(self):
         """root가 TERM을 무시하고 자손이 stdout을 유지해도 KILL 뒤 root부터 회수한다."""
         child = mock.Mock(pid=101, returncode=None)

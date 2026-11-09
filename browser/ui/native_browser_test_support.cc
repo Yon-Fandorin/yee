@@ -11,20 +11,48 @@
 
 namespace yee::test {
 bool BringBrowserWindowToFront(const BrowserWindowInterface* browser) {
+#if !BUILDFLAG(IS_WIN)
   ui_test_utils::BrowserActivationWaiter waiter(browser);
+#endif
   const ui::BaseWindow* const browser_window = browser->GetWindow();
-  if (!browser_window)
+  if (!browser_window) {
     return false;
+  }
   const auto window = browser_window->GetNativeWindow();
-  if (!window || !ShowAndFocusNativeWindow(window))
+  if (!window || !ShowAndFocusNativeWindow(window)) {
     return false;
+  }
+#if !BUILDFLAG(IS_WIN)
   waiter.WaitForActivation();
+#endif
   return true;
 }
-#if !BUILDFLAG(IS_MAC)
+#if !BUILDFLAG(IS_MAC) && !BUILDFLAG(IS_WIN)
 bool ShowAndFocusNativeWindow(gfx::NativeWindow window) {
-  // Windows 입력·창 보존 구현은 다음 Windows checkpoint까지 그대로 사용한다.
   return ui_test_utils::ShowAndFocusNativeWindow(window);
+}
+#endif
+
+bool SendKeyPressSync(const BrowserWindowInterface* browser,
+                      ui::KeyboardCode key,
+                      bool control,
+                      bool shift,
+                      bool alt,
+                      bool command) {
+  const auto* window = browser->GetWindow();
+  return window && SendKeyPressToWindowSync(window->GetNativeWindow(), key,
+                                            control, shift, alt, command);
+}
+
+#if !BUILDFLAG(IS_WIN)
+bool SendKeyPressToWindowSync(gfx::NativeWindow window,
+                              ui::KeyboardCode key,
+                              bool control,
+                              bool shift,
+                              bool alt,
+                              bool command) {
+  return window && ui_test_utils::SendKeyPressToWindowSync(window, key, control,
+                                                           shift, alt, command);
 }
 #endif
 }  // namespace yee::test

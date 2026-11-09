@@ -1545,10 +1545,25 @@ index ed578609ad..c6f9da3593 100644
  
  }  // namespace mini_installer
 diff --git a/chrome/installer/setup/BUILD.gn b/chrome/installer/setup/BUILD.gn
-index e7e695f652..13ee0b3b52 100644
+index e7e695f652..a1c67a1385 100644
 --- a/chrome/installer/setup/BUILD.gn
 +++ b/chrome/installer/setup/BUILD.gn
-@@ -176,6 +176,7 @@ if (is_win) {
+@@ -159,12 +159,13 @@ if (is_win) {
+   # This test covers the mini installer and setup tests.
+   test("setup_unittests") {
+     sources = [
++      "//components/yee_branding/yee_windows_install_shortcuts_unittest.cc",
++      "//components/yee_branding/yee_windows_taskbar_pinning_unittest.cc",
+       "configure_app_container_sandbox_unittest.cc",
+       "downgrade_cleanup_unittest.cc",
+       "dynamic_patch_component_unittest.cc",
+       "generate_visual_elements_manifest_work_item_unittest.cc",
+       "install_component_unittest.cc",
+-      "install_unittest.cc",
+       "install_worker_unittest.cc",
+       "installer_state_unittest.cc",
+       "memory_unittest.cc",
+@@ -176,6 +177,7 @@ if (is_win) {
        "setup_util_unittest.cc",
        "setup_util_unittest.h",
        "taskbar_util_unittest.cc",
@@ -1556,7 +1571,7 @@ index e7e695f652..13ee0b3b52 100644
        "unpack_archive_unittest.cc",
        "update_active_setup_version_work_item_unittest.cc",
        "user_hive_visitor_unittest.cc",
-@@ -189,6 +190,7 @@ if (is_win) {
+@@ -189,6 +191,7 @@ if (is_win) {
        "//base/allocator:buildflags",
        "//base/test:test_support",
        "//build:branding_buildflags",
@@ -1564,7 +1579,7 @@ index e7e695f652..13ee0b3b52 100644
        "//chrome/common:constants",
        "//chrome/common:version_header",
        "//chrome/common/child_module",
-@@ -198,11 +200,14 @@ if (is_win) {
+@@ -198,11 +201,14 @@ if (is_win) {
        "//chrome/installer/mini_installer:unit_tests",
        "//chrome/installer/util:serial_unittests",
        "//chrome/installer/util:test_support",

@@ -49,6 +49,7 @@
 #include "ui/base/test/ui_controls.h"
 #if BUILDFLAG(IS_WIN)
 #include "ui/aura/window.h"
+#include "ui/display/screen.h"
 #endif
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/controls/webview/webview.h"
@@ -150,12 +151,21 @@ IN_PROC_BROWSER_TEST_F(YeeCustomizeChromeInteractiveTest,
     gfx::Rect bounds = widget->GetWindowBoundsInScreen();
     if (bounds.origin() != position) {
       bounds.set_origin(position);
-      ASSERT_TRUE(applied_.Run({applied_.Widget(*widget, {.bounds = bounds},
-                                                AppliedMatch::kWidgetBounds)},
-                               [&] {
-                                 widget->SetBounds(bounds);
-                                 widget->LayoutRootViewIfNecessary();
-                               }));
+      gfx::Rect expected_bounds = bounds;
+#if BUILDFLAG(IS_WIN)
+      // SetBounds는 요청을 픽셀로 옮긴다. 125%에서는 화면으로 되돌린
+      // 창 크기에 플랫폼의 픽셀 올림이 포함된다.
+      const auto* screen = display::Screen::Get();
+      const auto pixels = screen->DIPToScreenRectInWindow({}, bounds);
+      expected_bounds = screen->ScreenToDIPRectInWindow({}, pixels);
+#endif
+      ASSERT_TRUE(
+          applied_.Run({applied_.Widget(*widget, {.bounds = expected_bounds},
+                                        AppliedMatch::kWidgetBounds)},
+                       [&] {
+                         widget->SetBounds(bounds);
+                         widget->LayoutRootViewIfNecessary();
+                       }));
     }
     SCOPED_TRACE(position.ToString());
     // 표시 위치뿐 아니라 select가 참조하는 native 원점도 확인한다.

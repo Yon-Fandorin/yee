@@ -298,7 +298,10 @@ source_set("applied_wait_browser_test_support") {
     "applied_wait_browser_observers.cc",
     "native_browser_test_support.cc",
   ]
-  if (is_mac) {
+  if (is_win) {
+    sources += [ "native_browser_test_support_win.cc" ]
+    libs = [ "oleacc.lib" ]
+  } else if (is_mac) {
     public += [ "native_frame_applied_test_support_mac.h" ]
     sources += [
       "native_browser_test_support_mac.mm",
@@ -312,6 +315,7 @@ source_set("applied_wait_browser_test_support") {
   }
   public_deps = [
     ":applied_wait_views_test_support",
+    "//ui/events:events_base",
     "//ui/gfx:native_ui_types",
   ]
   deps = [
@@ -347,7 +351,16 @@ source_set("applied_wait_browser_test_support") {
     "//ui/base:test_support",
     "//ui/views",
   ]
-  if (is_mac) {
+  if (is_win) {
+    public_deps += [ "//base" ]
+    deps += [
+      "//base/test:test_support",
+      "//content/public/common",
+      "//ui/aura",
+      "//ui/display",
+      "//ui/events",
+    ]
+  } else if (is_mac) {
     deps += [
       "//chrome/browser/ui/views/frame:immersive_mode_controller_mac",
       "//chrome/browser/ui/views/frame:top_container_view",
@@ -937,26 +950,28 @@ if (!is_chromeos_device) {
   }
 }
 
-# 선택할 원본 guard가 IS_WIN 안에 있으므로 Windows에서만
-# 컴파일한다.
+# Windows에서만 사용하는 Aura layer·수명 fixture다.
 if (is_win && use_aura) {
   test("yee_aura_unittests") {
     use_xvfb = use_xvfb_in_this_config
     sources = [
       "//ui/aura/test/run_all_unittests.cc",
-      "//ui/aura/window_unittest.cc",
+      "yee_aura_window_unittest.cc",
     ]
     deps = [
+      "//base",
       "//base/test:test_support",
       "//cc/mojo_embedder",
       "//components/viz/client",
       "//mojo/core/embedder",
       "//skia",
       "//testing/gtest",
+      "//ui/aura",
       "//ui/aura:test_support",
       "//ui/aura_extra",
       "//ui/base:test_support",
       "//ui/base/clipboard:clipboard_types",
+      "//ui/compositor",
       "//ui/compositor:test_support",
       "//ui/decoration",
       "//ui/display:test_support",

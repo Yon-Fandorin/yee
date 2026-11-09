@@ -336,7 +336,7 @@ class PatchRatchetTest(unittest.TestCase):
             self.run_ratchet(missing_ok=True)
         code, _, stderr = self.run_cli()
         self.assertEqual(code, 2)
-        self.assertIn('build/patch-concerns.json', stderr)
+        self.assertIn(repr(str(self.root / 'build/patch-concerns.json')), stderr)
         cases = [
             ({}, '미분류 경로: ' + path),
             ({path: ['shell'], 'stale.cc': ['shell']}, '패치에 없는 경로: stale.cc'),

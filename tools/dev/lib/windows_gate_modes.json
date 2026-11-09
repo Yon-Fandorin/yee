@@ -1,0 +1,885 @@
+{
+  "schema_version": 1,
+  "targets": {
+    "multi_contents_geometry_unittests": "chrome/browser/ui/views/yee:multi_contents_geometry_unittests",
+    "agent_bridge_prompt_unittests": "chrome/browser/ui/views/yee:agent_bridge_prompt_unittests",
+    "yee_interactive_ui_tests": "chrome/browser/ui/views/yee:yee_interactive_ui_tests",
+    "site_controls_browsertests": "chrome/browser/ui/views/yee:site_controls_browsertests",
+    "yee_layout_unittests": "chrome/browser/ui/views/tabs/common:yee_layout_unittests",
+    "yee_aura_unittests": "chrome/browser/ui/views/yee:yee_aura_unittests",
+    "browser_tests": "browser_tests",
+    "yee_content_blocking_unittests": "components/yee_content_blocking:yee_content_blocking_unittests",
+    "yee_filtering_factory_unittests": "chrome/browser/yee_content_blocking:yee_filtering_factory_unittests",
+    "yee_service_worker_unittests": "chrome/browser/yee_content_blocking:yee_service_worker_unittests",
+    "yee_header_unittests": "chrome/browser/ui/views/tabs/common:yee_header_unittests",
+    "internal_urls_unittests": "components/yee_branding:internal_urls_unittests",
+    "project_service_unittests": "chrome/browser/yee_projects:project_service_unittests",
+    "setup_unittests": "chrome/installer/setup:setup_unittests"
+  },
+  "gates": {
+    "agent-browser": {
+      "script": "test-agent-browser.sh",
+      "sha256": "2c58dffafabe9b4970f8ee43d6156dd4286c4f52d26816ad0d69244517007a65",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "multi_contents_geometry"
+        ]
+      },
+      "runs": {
+        "multi_contents_geometry": {
+          "binary": "multi_contents_geometry_unittests",
+          "include": [
+            "AgentBrowserContractTest.*",
+            "AgentInputRequestTest.*",
+            "AgentTabActivityTest.*",
+            "AgentRequestLedgerTest.*",
+            "AgentTaskPermissionsTest.*"
+          ],
+          "display": false
+        }
+      }
+    },
+    "agent-prompt": {
+      "script": "test-agent-prompt.sh",
+      "sha256": "2e7196dd2c84bdfaf71d95b4b99be50728803f50cc3d1d8013bee83e6dd4d671",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "agent_bridge_prompt"
+        ]
+      },
+      "runs": {
+        "agent_bridge_prompt": {
+          "binary": "agent_bridge_prompt_unittests",
+          "include": [
+            "AgentBridgePromptTest.*",
+            "AgentBridgePointerGeometryTest.*"
+          ],
+          "display": false
+        }
+      }
+    },
+    "applied-wait": {
+      "script": "test-applied-wait.sh",
+      "sha256": "647d078688066a05a0a29e52c8d2258388635b0cb259e8ac1941285d4f59b38a",
+      "default": "all",
+      "required": [
+        "all"
+      ],
+      "modes": {
+        "core": [
+          "multi_contents_geometry"
+        ],
+        "interactive": [
+          "yee_interactive_ui_tests"
+        ],
+        "browser": [
+          "site_controls"
+        ],
+        "all": [
+          "multi_contents_geometry",
+          "yee_interactive_ui_tests",
+          "site_controls"
+        ]
+      },
+      "runs": {
+        "multi_contents_geometry": {
+          "binary": "multi_contents_geometry_unittests",
+          "include": [
+            "AppliedWaitTest.*"
+          ],
+          "display": false
+        },
+        "yee_interactive_ui_tests": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeAppliedWaitInteractiveTest.*",
+            "YeeAppliedWaitDragInteractiveTest.*"
+          ],
+          "display": true,
+          "arguments": [
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "YeeAppliedWaitBrowserTest.*"
+          ],
+          "display": true
+        }
+      }
+    },
+    "browser-surface-layout": {
+      "script": "test-browser-surface-layout.sh",
+      "sha256": "e898870ba9acc9d7fbb37d92f56b8ab7da199bf4aaf8b6350f7a0753e125e683",
+      "default": "fast",
+      "required": [
+        "fast",
+        "horizontal",
+        "interactive",
+        "browser"
+      ],
+      "modes": {
+        "fast": [
+          "yee_layout",
+          "multi_contents_geometry",
+          "yee_aura"
+        ],
+        "horizontal": [
+          "yee_interactive_ui_tests",
+          "yee_interactive_ui_tests-2",
+          "yee_interactive_ui_tests-3"
+        ],
+        "interactive": [
+          "yee_interactive_ui_tests-4",
+          "yee_interactive_ui_tests-5",
+          "yee_interactive_ui_tests-3"
+        ],
+        "browser": [
+          "site_controls",
+          "browser_tests"
+        ],
+        "acceptance": [
+          "yee_window_acceptance",
+          "yee_live_window"
+        ],
+        "all": [
+          "yee_layout",
+          "multi_contents_geometry",
+          "yee_aura",
+          "yee_interactive_ui_tests-4",
+          "yee_interactive_ui_tests-5",
+          "yee_interactive_ui_tests-3",
+          "site_controls",
+          "browser_tests"
+        ]
+      },
+      "runs": {
+        "yee_window_acceptance": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsTabContextMenuCreatesGroup",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsTabContextMenuCreatesSplit",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsTaskbarRestoresMinimizedWindow"
+          ],
+          "display": true
+        },
+        "yee_live_window": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeWindowsLivePlaybackUiTest.DISABLED_PublicLivePlaybackShowsWholeWindow"
+          ],
+          "display": true,
+          "arguments": [
+            "--gtest_also_run_disabled_tests",
+            "--autoplay-policy=no-user-gesture-required",
+            "--mute-audio",
+            "--ui-test-action-timeout=60000",
+            "--ui-test-action-max-timeout=120000",
+            "--yee-live-window-capture=/gate/live-window.png"
+          ]
+        },
+        "yee_layout": {
+          "binary": "yee_layout_unittests",
+          "include": [
+            "BrowserAnimationControllerTest.*",
+            "YeeBrowserViewTabbedLayoutNativeGeometryTest.*",
+            "YeeSurfaceGeometryTest.*",
+            "YeeSurfaceColorTest.HorizontalTabsFollowThemeAndKeepReadableStates",
+            "YeeSurfaceColorTest.HorizontalGroupsAndMembersShareNativeThemeFallback",
+            "PageViewportAppliedStateTest.*",
+            "FavoritesPreviewAppliedStateTest.*",
+            "HorizontalTabGroupCapsuleStateTest.*",
+            "YeeBrowserAnimationControllerTest.*"
+          ],
+          "display": false,
+          "exclude": [
+            "BrowserAnimationControllerTest.Reset_MidMotion_SameMotion"
+          ]
+        },
+        "multi_contents_geometry": {
+          "binary": "multi_contents_geometry_unittests",
+          "include": [
+            "AppliedWaitTest.*",
+            "BrowserSurfaceTransitionTest.*",
+            "MultiContentsGeometryTest.*",
+            "PageViewportGeometryTest.*",
+            "PageViewportMigrationTest.*"
+          ],
+          "display": false
+        },
+        "yee_aura": {
+          "binary": "yee_aura_unittests",
+          "include": [
+            "YeeAuraWindowTest.*"
+          ],
+          "display": false
+        },
+        "yee_interactive_ui_tests": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations",
+            "CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState",
+            "YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsTabContextMenuCreatesGroup",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsTabContextMenuCreatesSplit",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0"
+          ],
+          "display": true,
+          "arguments": [
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "yee_interactive_ui_tests-2": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations",
+            "CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState",
+            "YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0"
+          ],
+          "display": true,
+          "arguments": [
+            "--force-ui-direction=rtl",
+            "--force-device-scale-factor=1.25",
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "yee_interactive_ui_tests-3": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations",
+            "CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState",
+            "YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose"
+          ],
+          "display": true,
+          "arguments": [
+            "--enable-features=TabStripUnification",
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "yee_interactive_ui_tests-4": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplFeatureOffUiTest.NativeSidePanelRowModesMatchAppliedLayout",
+            "YeeBrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeePageHostsPreserveSplitFocusAndContainerReuse",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeInfoBarFollowsExactSplitPaneIdentity",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSurfaceDecorationAndZOrderUseResolvedFrame",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeInfoBarPresentationRoundsOnlyTheTopVisibleBar",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.NativePlannerMatchesAppliedAnimationFramesAndReversal",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeFindBarStaysInsideActiveSplitPaneAtMinimumWidth",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeStatusBubblesStayInsideOwningSplitPane",
+            "YeeBrowserViewTabbedLayoutImplAiOverlayUiTest.YeeAiOverlayStaysInsideOwningSplitPane",
+            "YeeBrowserViewTabbedLayoutImplOptionalViewportChildrenUiTest.YeeOptionalTargetChildrenShareTargetBoundsAndClip",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeTabModalDialogHostStaysInsideOwningSplitPane",
+            "YeeOmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState",
+            "All/YeeBrowserViewTabbedLayoutImplTopContainerBackgroundUiTest.TopContainerBackground/*",
+            "YeeBrowserViewTabbedLayoutImplFeatureOffUiTest.YeeShellWithoutVerticalTabsUsesNativeToolbar",
+            "YeeBrowserViewTabbedLayoutImplUiTest.TestMinimumWindowSizeWhenSidePanelIsOpen",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsNativeClipSurvivesRendererAttachment",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations",
+            "CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState",
+            "YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0",
+            "YeeVerticalTabDragTest.YeeProjectHiddenGroupRowsKeepFavoriteDropAnchor",
+            "YeeVerticalTabDragTest.YeeProjectHiddenSplitGroupRowsKeepFavoriteDropAnchor",
+            "YeeVerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle",
+            "YeeVerticalTabDragTest.DragWithinGroup",
+            "YeeVerticalTabDragTest.DragOutOfGroup",
+            "YeeVerticalTabDragTest.YeeSidebarGroupHeaderDragHasNoFavoriteAffordance",
+            "YeeVerticalTabDragTest.DragGroupHeader",
+            "YeeVerticalTabDragTest.DragCollapsedGroupStaysCollapsed",
+            "YeeVerticalTabDragTest.DragFavoriteToExpandedGroupFirstSlot",
+            "YeeVerticalTabDragTest.DragFavoriteToExpandedGroupLastSlot",
+            "YeeVerticalTabDragTest.CancelFavoriteToGroupDragRestoresSource",
+            "YeeVerticalTabDragTest.YeeSidebarSingleFavoriteDragReordersWithinDock",
+            "YeeOmniboxPopupViewWebUITest.YeeAimPopupOpensAndDismissesAfterClosedThemeChanges",
+            "Shadow/YeeOmniboxPopupAimShadowGeometryTest.YeeAimShadowFitsWidgetAndKeepsHostTransparent/*",
+            "YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeHardClipOwnersMatchAtDeviceScale",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSinglePaneCollapse",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSinglePaneExpand",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSplitViewCollapse",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSplitViewExpand",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeCombinedPanelSidebarTransitionsKeepViewportContained",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSplitPanelDevToolsNoticeKeepOwningPane",
+            "Flyover/YeeRendererResizeUiTest.YeeResizeCollapseReloadKeepsRendererLive/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSidePanelGutterPhysicallyResizesBesideWebContents"
+          ],
+          "display": true,
+          "arguments": [
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "yee_interactive_ui_tests-5": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeHardClipOwnersMatchAtDeviceScale",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSinglePaneCollapse",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSinglePaneExpand",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSplitViewCollapse",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.VerticalTabsSplitViewExpand",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeCombinedPanelSidebarTransitionsKeepViewportContained",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSplitPanelDevToolsNoticeKeepOwningPane",
+            "Flyover/YeeRendererResizeUiTest.YeeResizeCollapseReloadKeepsRendererLive/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSidePanelGutterPhysicallyResizesBesideWebContents",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeSidebarFlyoutKeepsExpandedControlsAndPageBounds",
+            "YeeBrowserViewTabbedLayoutImplContentLayoutUiTest.YeeSidebarFlyoutPinAndReverseKeepContinuousPresentation",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations",
+            "CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState",
+            "YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip",
+            "YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabLeftIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabWithinGroupDoesNotModifyGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupDragKeepsSingleCapsuleAtEveryPosition/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragOnlyTabInGroupRetainsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragSingleTabRightOfRightmostGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertDragSingleTabIntoGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.RevertTabDragOutOfGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragGroupHeaderDragsGroup/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabLeftPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragTabRightPastCollapsedGroupHeader/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.DragCollapsedGroupHeaderRemainsCollapsed/0",
+            "TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0",
+            "YeeVerticalTabDragTest.YeeProjectHiddenGroupRowsKeepFavoriteDropAnchor",
+            "YeeVerticalTabDragTest.YeeProjectHiddenSplitGroupRowsKeepFavoriteDropAnchor",
+            "YeeVerticalTabDragTest.YeeSidebarTopLevelTabCanEnterExpandedGroupMiddle",
+            "YeeVerticalTabDragTest.DragWithinGroup",
+            "YeeVerticalTabDragTest.DragOutOfGroup",
+            "YeeVerticalTabDragTest.YeeSidebarGroupHeaderDragHasNoFavoriteAffordance",
+            "YeeVerticalTabDragTest.DragGroupHeader",
+            "YeeVerticalTabDragTest.DragCollapsedGroupStaysCollapsed",
+            "YeeVerticalTabDragTest.DragFavoriteToExpandedGroupFirstSlot",
+            "YeeVerticalTabDragTest.DragFavoriteToExpandedGroupLastSlot",
+            "YeeVerticalTabDragTest.CancelFavoriteToGroupDragRestoresSource",
+            "YeeVerticalTabDragTest.YeeSidebarSingleFavoriteDragReordersWithinDock",
+            "YeeOmniboxPopupViewWebUITest.YeeAimPopupOpensAndDismissesAfterClosedThemeChanges",
+            "Shadow/YeeOmniboxPopupAimShadowGeometryTest.YeeAimShadowFitsWidgetAndKeepsHostTransparent/*",
+            "YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost"
+          ],
+          "display": true,
+          "arguments": [
+            "--force-ui-direction=rtl",
+            "--force-device-scale-factor=1.25",
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "YeeSidePanelCoordinatorTest.ShowFromAnimationReparentsContentView",
+            "YeeSelectionOverlayBrowserTest.SelectionUsedFromController",
+            "YeeSelectionOverlayBrowserTest.SelectionStaysScopedThroughSplitLifecycle"
+          ],
+          "display": true
+        },
+        "browser_tests": {
+          "binary": "browser_tests",
+          "include": [
+            "LensOverlayControllerBrowserTest.OverlayClosesIfRendererExits",
+            "LensOverlayControllerSideBySideBrowserTest.BackgroundBlurLiveInitiallyInSplitTab",
+            "SadTabSplitViewBrowserTest.SadTabMovedToSecondarySplitView",
+            "ReadAnythingControllerBrowserTest.CloseTabWithIrmInSplitView_ClosesIrm",
+            "ReadAnythingControllerBrowserTest.FocusInactiveIrmInSplitView_ActivatesTab",
+            "ReadAnythingControllerBrowserTest.ShowImmersive_AfterUnresponsiveRenderer_DoesNotCrash",
+            "BrowserViewTest.CloseWidgetWithTabsNoCrash"
+          ],
+          "display": true
+        }
+      }
+    },
+    "content-blocking-native": {
+      "script": "test-content-blocking-native.sh",
+      "sha256": "bfaf66e4590b7d26d9586ba9f0032fcb399c4988499f02b2ffe63ff4ae578d1a",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "yee_content_blocking",
+          "yee_filtering_factory",
+          "yee_service_worker"
+        ]
+      },
+      "runs": {
+        "yee_content_blocking": {
+          "binary": "yee_content_blocking_unittests",
+          "include": [
+            "*"
+          ],
+          "display": false
+        },
+        "yee_filtering_factory": {
+          "binary": "yee_filtering_factory_unittests",
+          "include": [
+            "*"
+          ],
+          "display": false
+        },
+        "yee_service_worker": {
+          "binary": "yee_service_worker_unittests",
+          "include": [
+            "YeeServiceWorkerContainerHostTest.WrapSubresourceLoaderFactory_*"
+          ],
+          "display": false
+        }
+      }
+    },
+    "header": {
+      "script": "test-header.sh",
+      "sha256": "baec90e27ad0e7df9e80adde57546c4c5b6af28d2360275ded4bb80edd5434db",
+      "default": "unit",
+      "required": [
+        "all"
+      ],
+      "modes": {
+        "unit": [
+          "yee_header"
+        ],
+        "interactive": [
+          "yee_interactive_ui_tests",
+          "yee_interactive_ui_tests-2"
+        ],
+        "all": [
+          "yee_header",
+          "yee_interactive_ui_tests",
+          "yee_interactive_ui_tests-2"
+        ]
+      },
+      "runs": {
+        "yee_header": {
+          "binary": "yee_header_unittests",
+          "include": [
+            "BrowserSurfaceColorControllerTest.*",
+            "BrowserSurfacePresentationResolverTest.*",
+            "YeeRestingTextViewTest.*",
+            "YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages",
+            "YeeSurfaceColorTest.FocusStrokeKeepsNonTextContrast",
+            "YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache",
+            "YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract",
+            "BrowserSurfaceColorSampleTest.*",
+            "YeeNativePresentationTest.*",
+            "YeeTabIconPresentationTest.*",
+            "SplitPaneControlsTest.*",
+            "SplitPaneControlsTransitTest.*",
+            "SidePanelResizeGutterTest.*",
+            "SidePanelResizeGutterViewTest.*"
+          ],
+          "display": false
+        },
+        "yee_interactive_ui_tests": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeePopupWindowUiTest.PaneHeadersRetainNativeControls",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeSingleAndSplitHeadersShareLocationBarGeometry/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeInactivePaneHeaderActivatesAddressEditing/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeOmniboxPopupFollowsSingleAndSplitHeader/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*",
+            "YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility",
+            "YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets"
+          ],
+          "display": true,
+          "arguments": [
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        },
+        "yee_interactive_ui_tests-2": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*"
+          ],
+          "display": true,
+          "arguments": [
+            "--force-ui-direction=rtl",
+            "--force-device-scale-factor=1.25",
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        }
+      }
+    },
+    "internal-pages": {
+      "script": "test-internal-pages.sh",
+      "sha256": "486525928842162c6b3d16f724174544952709bd1128a64ab2aed3f24bc545f2",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "internal_urls",
+          "site_controls"
+        ],
+        "ui-on": [
+          "internal_urls",
+          "site_controls"
+        ]
+      },
+      "runs": {
+        "internal_urls": {
+          "binary": "internal_urls_unittests",
+          "include": [
+            "*"
+          ],
+          "display": false
+        },
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "ExtensionsBrowserTest.*",
+            "HistoryBrowserTest.*",
+            "BookmarksBrowserTest.*",
+            "DownloadsBrowserTest.*",
+            "InternalURLsBrowserTest.*"
+          ],
+          "display": true
+        }
+      }
+    },
+    "omnibox-accessibility": {
+      "script": "test-omnibox-accessibility.sh",
+      "sha256": "1f042c9ddf36ce0ab8a437297741e6b7001e2d01d415f44b1e721a2c21db56bc",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "site_controls"
+        ]
+      },
+      "runs": {
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "Presentation/OmniboxAccessibilityBrowserTest.*",
+            "YeeShell/OmniboxNavigationBrowserTest.*"
+          ],
+          "display": true
+        }
+      }
+    },
+    "projects": {
+      "script": "test-projects.sh",
+      "sha256": "876b81d6166632738d5bb022ccd960704fe0f0443fae5ec635d2c49004e3377a",
+      "default": "unit",
+      "required": [
+        "all"
+      ],
+      "modes": {
+        "unit": [
+          "project_service"
+        ],
+        "browser": [
+          "site_controls",
+          "site_controls-2"
+        ],
+        "all": [
+          "project_service",
+          "site_controls",
+          "site_controls-2"
+        ]
+      },
+      "runs": {
+        "project_service": {
+          "binary": "project_service_unittests",
+          "include": [
+            "ProjectServiceTest.*"
+          ],
+          "display": false
+        },
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "ProjectNavigationBrowserTest.*"
+          ],
+          "display": true
+        },
+        "site_controls-2": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "ProjectNavigationBrowserTest.UnifiedHorizontalLayoutToleratesMissingNativeAllocation"
+          ],
+          "display": true,
+          "arguments": [
+            "--enable-features=TabStripUnification"
+          ]
+        }
+      }
+    },
+    "sidebar": {
+      "script": "test-sidebar.sh",
+      "sha256": "e06386a53a77092fc11c001e83792055fed103fd9969406db6c344b22bd62fd9",
+      "default": "unit",
+      "required": [
+        "all"
+      ],
+      "modes": {
+        "unit": [
+          "yee_layout"
+        ],
+        "interactive": [
+          "yee_interactive_ui_tests"
+        ],
+        "all": [
+          "yee_layout",
+          "yee_interactive_ui_tests"
+        ]
+      },
+      "runs": {
+        "yee_layout": {
+          "binary": "yee_layout_unittests",
+          "include": [
+            "Favorites*",
+            "*GroupMarkSignalsTest.*",
+            "SidebarFooter*",
+            "*SplitPaneControlsTest.*",
+            "YeeSurfaceColorTest.*",
+            "YeeSurfaceGeometryTest.*",
+            "YeeShellColorTest.*",
+            "YeeSidebarItemColorTest.*",
+            "YeeTabGroupHeaderViewTest.Yee*",
+            "All/YeeTabCollectionAnimatingLayoutManagerTest.RemoveChildDuringActiveAnimation/*",
+            "All/YeeTabCollectionAnimatingLayoutManagerTest.YeeDragOverlayPreservesOnlyVerticalSourceOpacity/*",
+            "All/YeeTabCollectionAnimatingLayoutManagerTest.YeeFavoriteClockRetargetDoesNotChangeSharedTabClock/*",
+            "YeeTabGroupHeaderViewTest.EditorBubbleButtonVisibilityOnHover",
+            "YeeTabGroupHeaderViewTest.FocusModeMarkAndExpandedButtons"
+          ],
+          "display": false
+        },
+        "yee_interactive_ui_tests": {
+          "binary": "yee_interactive_ui_tests",
+          "include": [
+            "YeeVerticalTabDragTest.*Favorite*",
+            "YeeVerticalTabDragTest.LoneTabCanPinAndUnpinInsideItsOwnSidebar",
+            "YeeVerticalTabDragTest.YeeSidebar*",
+            "YeeVerticalTabDragTest.DragWithinUnpinnedContainer",
+            "YeeVerticalTabDragTest.CancelDragWithinUnpinnedContainer",
+            "YeeVerticalTabDragTest.DragSplitTabs",
+            "YeeVerticalTabDragTest.DragOverSplit",
+            "YeeVerticalTabDragTest.DragOverSplitInGroup",
+            "YeeVerticalTabDragTest.DragMultipleTabs",
+            "YeeVerticalTabDragTest.DragMultipleTabsInGroup",
+            "YeeVerticalTabDragTest.DragWithinGroup",
+            "YeeVerticalTabDragTest.DragOutOfGroup",
+            "YeeVerticalTabDragTest.DragGroupHeader",
+            "YeeVerticalTabDragTest.DragCollapsedGroupStaysCollapsed",
+            "YeeVerticalTabDragTest.DragCollapsedGroupOverExpandedGroup",
+            "YeeVerticalTabDragTest.DragToScroll",
+            "All/YeeTabStripCollectionControllerInteractiveUiTest.YeeFavoriteContextMenuHonorsCapacityAndAllowsUnpin/Vertical",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeSidebarControlsPersistAcrossSplitAndCollapse/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeSplitCommandsUpdateChromiumModel/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.InsetsOnlyInSplit/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.ResizeMouseDoubleClickEqualizesSplitViews/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.RoundedCornersForSplitView/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.BackgroundVisibility/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.ResizeGestureDoubleTapEqualizesSplitViews/*",
+            "YeeVerticalTabStripRegionViewInteractiveUiTest.YeeFooterPointerExitKeepsPopupAndEscapeRestoresFocus",
+            "All/YeeTabStripCollectionControllerInteractiveUiTest.YeeDragPreviewFollowsStripOrientation/*",
+            "All/YeeTabStripCollectionControllerInteractiveUiTest.YeePinnedSplitBorderFollowsStripOrientation/*",
+            "All/YeeTabStripCollectionControllerInteractiveUiTest.YeeClosingTabCanReattachWithoutModel/*",
+            "SplitTabLayout/YeeMultiContentsViewUiTest.YeeDividerMouseDragResizesBothPanesAndKeepsTabs/*"
+          ],
+          "display": true,
+          "arguments": [
+            "--ui-test-action-max-timeout=20000",
+            "--ui-test-action-timeout=10000"
+          ]
+        }
+      }
+    },
+    "site-controls": {
+      "script": "test-site-controls.sh",
+      "sha256": "2f734261ba8c8be75e5337a788c3cc7a71c9209c5d822d3e2ac1c7a1c42c2b70",
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "site_controls"
+        ]
+      },
+      "runs": {
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "CustomizationMojoBrowserTest.*",
+            "SiteControlsBrowserTest.*",
+            "SidebarFooterBrowserTest.*",
+            "DisclosureArrowTest.*",
+            "YeeSessionStartupPrefTest.*",
+            "YeeTabDataObserverBrowserTest.FaviconAndIconFlags",
+            "All/YeeTabStripCollectionControllerBrowserTest.YeeGroupRenameRefreshesInactiveTabAccessibleNames/*",
+            "All/YeeTabSearchPageHandlerTest.RemoveSplit_NTP/*",
+            "YeeUiaApplicationExitBrowserTest.*"
+          ],
+          "display": true
+        }
+      }
+    },
+    "youtube-live": {
+      "script": "test-youtube-live.sh",
+      "sha256": "8c7652d1dab45a2acfa7c08ce3d42ff3b32766346fde8e8a2aa816fa1deac4b1",
+      "default": "off",
+      "required": [],
+      "modes": {
+        "off": [
+          "site_controls"
+        ],
+        "on": [
+          "site_controls-2"
+        ]
+      },
+      "runs": {
+        "site_controls": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "YouTubeLiveBrowserTest.DISABLED_MidrollObservation"
+          ],
+          "display": true,
+          "arguments": [
+            "--gtest_also_run_disabled_tests",
+            "--test-launcher-timeout=2100000",
+            "--yee-live-youtube-mode=off",
+            "--yee-live-youtube-seconds=120",
+            "--yee-live-youtube-min-content-seconds=60",
+            "--yee-live-youtube-report=/gate/youtube-live/off.json"
+          ]
+        },
+        "site_controls-2": {
+          "binary": "site_controls_browsertests",
+          "include": [
+            "YouTubeLiveBrowserTest.DISABLED_MidrollObservation"
+          ],
+          "display": true,
+          "arguments": [
+            "--gtest_also_run_disabled_tests",
+            "--test-launcher-timeout=2100000",
+            "--yee-live-youtube-mode=on",
+            "--yee-live-youtube-seconds=120",
+            "--yee-live-youtube-min-content-seconds=60",
+            "--yee-live-youtube-report=/gate/youtube-live/on.json"
+          ]
+        }
+      }
+    },
+    "setup": {
+      "default": "default",
+      "required": [
+        "default"
+      ],
+      "modes": {
+        "default": [
+          "installer"
+        ]
+      },
+      "runs": {
+        "installer": {
+          "binary": "setup_unittests",
+          "include": [
+            "TaskbarPinningTest.*",
+            "YeeInstallShortcutTest.*"
+          ],
+          "display": false
+        }
+      }
+    }
+  },
+  "non_native": {
+    "test-macos-install.sh": "macOS",
+    "test-run-preflight.sh": "tooling"
+  }
+}

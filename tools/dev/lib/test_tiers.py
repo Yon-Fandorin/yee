@@ -1,10 +1,11 @@
 """사례별 manifest로 기존 GTest 필터를 실행 tier별로 나눈다."""
 
 import argparse
-import fnmatch
 import json
 from pathlib import Path
 import re
+
+from native_test_discovery import matches_pattern
 
 
 def load_manifest(path):
@@ -16,7 +17,7 @@ def load_manifest(path):
             result[key] = value
         return result
 
-    manifest = json.loads(Path(path).read_text(), object_pairs_hook=unique_entries)
+    manifest = json.loads(Path(path).read_text(encoding='utf-8'), object_pairs_hook=unique_entries)
     for key, entry in manifest.items():
         if not re.fullmatch(r'[\w/.-]+::\w+\.\w+', key):
             raise ValueError('정확한 소스::Suite.Case가 필요하다: ' + key)
@@ -33,19 +34,33 @@ def load_manifest(path):
                        for reason in needs_display.values())
                 or (needs_display and entry['tier'] != 'B')):
             raise ValueError('B의 OS별 needs_display 근거가 필요하다: ' + key)
+        exclusions = entry.get('parameter_exclusions', {})
+        if not isinstance(exclusions, dict) or not set(exclusions) <= set(entry['os']):
+            raise ValueError('매개변수 제외는 선언의 OS에 속해야 한다: ' + key)
+        if exclusions:
+            parameter_ids = {f'{prefix}/{suffix}'
+                             for prefix, suffixes in entry.get('parameters', ())
+                             for suffix in suffixes or ()}
+            for excluded in exclusions.values():
+                if (not isinstance(excluded, list) or not excluded
+                        or any(not isinstance(value, str) for value in excluded)
+                        or not set(excluded) <= parameter_ids or len(set(excluded)) != len(excluded)):
+                    raise ValueError('정확한 매개변수 prefix/suffix가 필요하다: ' + key)
     return manifest
 
 
-def case_names(key, entry):
+def case_names(key, entry, platform=None):
     name = key.split('::')[1]
     if 'parameters' not in entry:
         return [name]
+    excluded = entry.get('parameter_exclusions', {}).get(platform, ())
     return [f'{prefix}/{name}/{suffix}'
             for prefix, suffixes in entry['parameters']
-            for suffix in (suffixes if suffixes is not None else ['*'])]
+            for suffix in (suffixes if suffixes is not None else ['*'])
+            if f'{prefix}/{suffix}' not in excluded]
 
 
-def resolve_filter(manifest, pattern, platform, tier, binary):
+def resolve_filter(manifest, pattern, platform, tier, binary, *, preserve_all=True):
     positive, _, negative = pattern.partition('-')
     positives = (positive or '*').split(':')
     negatives = [part for part in negative.split(':') if part]
@@ -53,9 +68,9 @@ def resolve_filter(manifest, pattern, platform, tier, binary):
     for key, entry in manifest.items():
         if platform not in entry['os'] or binary not in entry['binaries']:
             continue
-        for name in case_names(key, entry):
-            matches = {part for part in positives if fnmatch.fnmatchcase(name, part)}
-            if matches and not any(fnmatch.fnmatchcase(name, part) for part in negatives):
+        for name in case_names(key, entry, platform):
+            matches = {part for part in positives if matches_pattern(name, part)}
+            if matches and not any(matches_pattern(name, part) for part in negatives):
                 matched_patterns.update(matches)
                 foreground = entry['tier'] == 'C' or platform in entry.get('needs_display', {})
                 if tier == 'background' and foreground:
@@ -74,7 +89,7 @@ def resolve_filter(manifest, pattern, platform, tier, binary):
     if negative:
         resolved += '-' + negative
     # all에서는 기존 양수 패턴별 native 발견 검사도 그대로 유지한다.
-    return (pattern if tier == 'all' else resolved), ''.join(sorted(tiers))
+    return (pattern if tier == 'all' and preserve_all else resolved), ''.join(sorted(tiers))
 
 
 def main():
