@@ -219,15 +219,15 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   ring으로 구분한다. 주소·제목·중립 control은 고정 theme 색을 사용하지 않고 resolved
   surface에서 primary(읽기 대비), secondary(비텍스트 가시 대비), disabled 역할색을
   계산한다. 위험·보안·제품 상태의 의미 색은 이 중립 팔레트보다 우선한다.
-  위험 보안 표시는 native 의미 색이 page-aware 배경에서 4.5:1 대비를 충족하면
-  그대로 사용하고, 부족할 때만 의미 색을 대비 endpoint 쪽으로 보정한다.
-  고대비 모드에서는 native 팔레트를 그대로 보존한다.
+  위험 보안 표시는 아이콘과 문구가 놓인 실제 배경에서 4.5:1 대비를 확보한다.
+  hover와 누름을 포함해 대비가 부족할 때만 native 의미 색의 명암을 보정한다.
+  고대비 모드에서는 native 팔레트와 주소창의 시스템 포커스 표시를 사용한다.
 - Omnibox의 origin·title 표면과 텍스트 AA 배경은 hover 애니메이션을 포함한
   실제 주소줄 배경색을 함께 사용한다. 미디어 버튼은 같은 Header snapshot의
   일반·disabled 역할색과 30 DIP shell control 규격을 사용한다. 미디어가 표시될
-  때만 앞에 1 × 18 DIP 구분선과 좌우 8 DIP 간격을 두고, 구분선 색은 같은
-  snapshot에서 도출한다. 구분선은 입력 대상에서 제외하고 native 창 이동 영역을
-  유지한다. 이 계약은 Windows·macOS·Linux가 공유한다.
+  때만 앞에 1 × 18 DIP 구분선과 좌우 8 DIP 간격을 둔다. 미디어와 주소·제목
+  사이의 구분선은 같은 snapshot의 낮은 대비 경계색을 사용한다. 구분선은 입력
+  대상에서 제외하고 native 창 이동 영역을 유지한다. 이 계약은 Windows·macOS·Linux가 공유한다.
 - 분할 상태에서는 active native Omnibox와 inactive 주소 표면이 각각 자신이 속한
   WebContents의 resolved color를 사용한다. 두 페이지 색이 다르면 좌우 주소 표면도
   다를 수 있다. active 상태는 주소 표면의 상시 border가 아니라 카드 전체 outline과
@@ -237,6 +237,8 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
   두 상태 모두 읽기 대비를 확보할 수 있는 tint 방향을 선택한다. 사용자 테마색을
   hover·선택에 각각 6%·10% 더하며 대비가 부족하면 중립 상태 쪽으로 보정한다. 팝업 글자·아이콘은
   기본·hover·선택 배경 모두에서 대비를 보장하는 공통 역할색을 사용한다.
+  결과의 작업 버튼은 hover와 누름이 겹친 배경에서도 글자 4.5:1과 포커스 3:1을
+  확보한다. 답변 아이콘 타일과 AI 모드의 첨부 칩도 이 팔레트를 사용한다.
   팝업의 위험·보안 상태색과 고대비 모드는 Chromium의
   native 팔레트를 유지한다. 자세한 계약은 아래 Address suggestions 절을 따른다.
 - Glass 활성화, 전체 창 적용 범위, tint 불투명도는 Yee 코드의 제품 기본값이다.
@@ -282,7 +284,8 @@ stroke geometry를 사용한다. 짧은 0/1/3 DIP key shadow가 경계를 잡고
 - Caption controls: native 순서 Minimize → Maximize → Close, Yee의 30 × 30 DIP
   공통 shell control 크기와 버튼 바깥 좌우 1 DIP 간격을 쓴다. hover와 클릭 범위는
   같은 버튼 경계를 쓰며 바깥 여백에서 활성화하지 않는다. 투명한 기본 바탕과
-  8 DIP 곡률의 hover 표면은 실제 Header 팔레트를 따른다.
+  8 DIP 곡률의 hover 표면은 실제 Header 팔레트를 따른다. 닫기 기호는 빨간
+  상태 배경이 합성되는 동안에도 3:1 이상의 대비를 유지한다.
   고대비·강제 색 모드는 native 크기·색상·상태 표시를 사용한다.
 - 최대화·복원 시에도 같은 행을 유지하고 전체 화면에서는 창 버튼과 exclusion을 숨긴다.
   Windows snap layout과 resize hit test는 native container가 계속 소유한다.
@@ -510,16 +513,16 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
 - focus stroke는 Address suggestions가 열린 동안에도 유지하되 Omnibox의 34 DIP
   외곽에서 사방 2 DIP 안쪽에 1 DIP로 그린다. 따라서 focus 선은 30 DIP 높이와
   10 DIP 곡률을 갖는 내부 edit-state 표시로 읽히며, 12 DIP 외곽 surface와 native
-  hit target은 바꾸지 않는다. 현재 Header 배경에서 더 진한 색을 계산하고, 진한
-  색으로 3:1 비텍스트 대비를 만들 수 없는 어두운 배경에서만 밝은 방향으로
-  전환한다.
+  hit target은 바꾸지 않는다. hover 전환을 포함한 실제 주소창 배경에 포커스
+  색을 혼합해 3:1 비텍스트 대비를 충족하는 가장 가까운 색을 사용한다.
 - security icon과 Bookmark click은 주소 편집을 열지 않는다.
 
 ### Bookmark page
 
 - Address 오른쪽의 28 × 28 DIP 별 button이다.
 - off: outline star + `ink_faint`.
-- on: `#e7ad48` fill, `#bd842b` foreground, `aria-pressed=true`.
+- on: `#e7ad48` 채움과 `#bd842b` 윤곽. 실제 배경에서 윤곽이 3:1에 못 미치면
+  호박색의 명암을 보정한다. `aria-pressed=true`.
 - accessible name은 `이 페이지 북마크`와 `이 페이지 북마크에서 삭제` 사이에서
   상태와 함께 변경한다.
 - native 구현은 `BookmarkModel`과 기존 edit bubble을 사용한다. prototype처럼
@@ -574,8 +577,9 @@ title은 origin보다 낮은 대비를 사용한다. Focus가 들어오면 이 �
 - 패널 top은 실제 Omnibox top과 맞춰 Browser Surface 상단을 침범하지 않는다. 좌우와
   아래만 Omnibox bounds 바깥으로 2 DIP 확장해 하나의 연결된 표면처럼 감싼다. 투명
   cutout은 실제 Omnibox와 같은 12 DIP 곡률을 사용한다. 결과 목록은 Omnibox보다
-  2 DIP 아래의 1 DIP 구분선부터 시작하고, 구분선과 첫 결과·마지막 결과와 패널
-  하단에 각각 8 DIP 여백을 둔다. 결과 강조는 좌우 8 DIP 안쪽에 동일한 8 DIP
+  2 DIP 아래의 1 DIP 구분선부터 시작한다. 구분선은 현재 Header 배경에서 도출한
+  낮은 대비의 경계색을 쓰며, 구분선과 첫 결과·마지막 결과와 패널 하단에 각각
+  8 DIP 여백을 둔다. 결과 강조는 좌우 8 DIP 안쪽에 동일한 8 DIP
   곡률로 그려 한쪽만 둥근 모양을 없앤다. 일반 모드에서는 선택 배경으로 현재 행을
   표시하며, 왼쪽 전체 높이의 native 선택 막대는 고대비 모드에서만 유지한다.
   cutout은 Omnibox의 page-aware 1 DIP focus outline을 덮지

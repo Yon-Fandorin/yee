@@ -26,6 +26,9 @@
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
@@ -71,6 +74,8 @@
 #include "chrome/browser/ui/views/omnibox/omnibox_row_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h"
+#include "chrome/browser/ui/views/page_action/page_action_container_view.h"
+#include "chrome/browser/ui/views/page_action/page_action_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_main_view.h"
 #include "chrome/browser/ui/views/side_panel/side_panel.h"
 #include "chrome/browser/ui/views/test/split_view_interactive_test_mixin.h"
@@ -110,6 +115,7 @@
 #include "ui/base/interaction/state_observer.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_solid_color.h"
 #include "ui/compositor/test/test_utils.h"
 #include "ui/display/screen.h"
 #include "ui/events/base_event_utils.h"
@@ -118,8 +124,15 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image.h"
+#include "ui/native_theme/mock_os_settings_provider.h"
 #include "ui/snapshot/snapshot.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_highlight.h"
+#include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/animation/test/ink_drop_impl_test_api.h"
 #include "ui/views/background.h"
+#include "ui/views/cascading_property.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
@@ -1142,8 +1155,9 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                       contents, content::JsReplace(
                                     R"JS(
             (() => {
-              const row = document.querySelector('omnibox-popup-app')?.shadowRoot
-                  ?.querySelector('cr-searchbox-dropdown')?.shadowRoot
+              const wrapper = document.querySelector('omnibox-popup-app')
+                  ?.shadowRoot?.querySelector('.dropdownContainer');
+              const row = wrapper?.querySelector('cr-searchbox-dropdown')?.shadowRoot
                   ?.querySelector('cr-searchbox-match');
               if (!row) return false;
               const probe = document.createElement('span');
@@ -1151,10 +1165,14 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
                   .getPropertyValue('--color-searchbox-results-background-hovered');
               const actual = probe.style.backgroundColor;
               probe.style.backgroundColor = $1;
-              return !!actual && actual === probe.style.backgroundColor;
+              probe.style.borderTopColor = $2;
+              return !!actual && actual === probe.style.backgroundColor &&
+                  getComputedStyle(wrapper).borderTopColor === probe.style.borderTopColor;
             })()
           )JS",
-                                    color_utils::SkColorToRgbaString(expected)))
+                                    color_utils::SkColorToRgbaString(expected),
+                                    color_utils::SkColorToRgbaString(
+                                        presentation_c->header_separator)))
                       .ExtractBool());
     }
   }
@@ -1434,6 +1452,89 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
 }
 
 IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
+                       YeeHeaderColorsFollowPageAcrossThemeChanges) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL("/title1.html")));
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  constexpr SkColor accent = SkColorSetRGB(0xAF, 0x4F, 0x8B);
+  theme->SetUserColor(accent);
+  ASSERT_EQ(accent, theme->GetUserColor());
+  auto* const browser_view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* const location = location_bar();
+  const std::array<views::View*, 3> controls{
+      browser_view->toolbar_button_provider()->GetBackButton(),
+      location->location_icon_view(),
+      location->page_action_container()->GetPageActionView(kActionBookmarkThisTab),
+  };
+  using Scheme = ThemeService::BrowserColorScheme;
+  for (const auto [scheme, surface] :
+       {std::pair{Scheme::kLight, SkColor{0xFF304560}},
+        std::pair{Scheme::kDark, SkColor{0xFFE8EFFF}}}) {
+    ASSERT_TRUE(applied_.Run({ColorCondition(0, surface, true)}, [&] {
+      theme->SetBrowserColorScheme(scheme);
+      SetYeeSurfaceColorForTab(0, surface);
+    }));
+    EXPECT_EQ(scheme, theme->GetBrowserColorScheme());
+    for (auto* control : controls) {
+      ASSERT_TRUE(control);
+      EXPECT_EQ(surface, views::GetCascadingBackgroundColor(control));
+      EXPECT_GE(color_utils::GetContrastRatio(
+                    views::GetCascadingAccentColor(control), surface),
+                color_utils::kMinimumVisibleContrastRatio);
+      auto highlight = views::InkDrop::Get(control)->CreateInkDropHighlight();
+      ASSERT_TRUE(highlight);
+      EXPECT_EQ(color_utils::GetColorWithMaxContrast(surface),
+                static_cast<ui::LayerSolidColor*>(highlight->layer())
+                    ->background_color().toSkColor());
+    }
+  }
+
+  auto* const site_info_ink_drop =
+      views::InkDrop::Get(location->location_icon_view());
+  ASSERT_EQ(views::InkDropHost::InkDropMode::ON, site_info_ink_drop->GetMode());
+  site_info_ink_drop->GetInkDrop()->SetHovered(true);
+  ASSERT_TRUE(site_info_ink_drop->GetHighlighted());
+  constexpr SkColor dark_surface = SkColorSetRGB(0x30, 0x45, 0x60);
+  ASSERT_TRUE(applied_.Run({ColorCondition(0, dark_surface, true)}, [&] {
+    SetYeeSurfaceColorForTab(0, dark_surface);
+  }));
+  ASSERT_TRUE(site_info_ink_drop->GetHighlighted());
+  {
+    views::test::InkDropImplTestApi ink_drop(
+        static_cast<views::InkDropImpl*>(site_info_ink_drop->GetInkDrop()));
+    ASSERT_TRUE(ink_drop.highlight());
+    const auto* layer =
+        static_cast<const ui::LayerSolidColor*>(ink_drop.highlight()->layer());
+    EXPECT_EQ(color_utils::GetColorWithMaxContrast(dark_surface),
+              layer->background_color().toSkColor());
+  }
+  site_info_ink_drop->GetInkDrop()->SetHovered(false);
+
+  location->FocusLocation(/*is_user_initiated=*/false,
+                          /*clear_focus_if_failed=*/false);
+  auto* const edit = location->GetOmniboxController()->edit_model();
+  edit->SetCaretVisibility(true);
+  ASSERT_TRUE(edit->is_caret_visible());
+  auto* const ring = views::FocusRing::Get(location);
+  ASSERT_TRUE(ring);
+  EXPECT_FALSE(ring->ShouldPaintForTesting());
+  ui::MockOsSettingsProvider settings;
+  settings.SetPreferredContrast(ui::NativeTheme::PreferredContrast::kMore);
+  EXPECT_TRUE(ring->ShouldPaintForTesting());
+  EXPECT_TRUE(ring->GetVisible());
+  settings.SetForcedColorsActive(true);
+  settings.SetPreferredContrast(ui::NativeTheme::PreferredContrast::kCustom);
+  EXPECT_TRUE(ring->ShouldPaintForTesting());
+  EXPECT_TRUE(ring->GetVisible());
+  settings.SetForcedColorsActive(false);
+  settings.SetPreferredContrast(
+      ui::NativeTheme::PreferredContrast::kNoPreference);
+  EXPECT_FALSE(ring->ShouldPaintForTesting());
+  EXPECT_FALSE(ring->GetVisible());
+}
+
+IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                        YeeOmniboxSuggestionsHaveBalancedInsets) {
   ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
@@ -1543,9 +1644,6 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
                         yee::kSidebarMetrics.omnibox_popup_separator_height,
                         yee::kSidebarMetrics.omnibox_popup_row_inset,
                         yee::kSidebarMetrics.omnibox_popup_row_corner_radius)));
-      capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
-              prefix + "-selected-window.png");
-      capture(popup_widget, prefix + "-selected-popup.png");
       // WebPreferences의 inForcedColors만 바꾸면 Blink의 색상 캐시가
       // 무효화되지 않는다. 정식 media emulation 경로로 CSS 반응을 검사한다.
       content::TestDevToolsProtocolClient media_emulation;
@@ -1686,6 +1784,9 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
       EXPECT_GE(webui_content->height(), rows_bottom);
       EXPECT_GT(webui_content->width(), 1);
       EXPECT_EQ(1.f, popup_widget->GetLayer()->opacity());
+      capture(BrowserView::GetBrowserViewForBrowser(browser())->GetWidget(),
+              prefix + "-selected-window.png");
+      capture(popup_widget, prefix + "-selected-popup.png");
       gfx::Point hover = webui_content->GetBoundsInScreen().origin();
       hover.Offset(content::EvalJs(contents, R"(
         Math.floor(yeePopupRowsForTesting()[1].getBoundingClientRect().x +

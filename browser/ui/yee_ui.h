@@ -194,6 +194,10 @@ void UpdateOmniboxRestingTextView(
     std::optional<SkColor> control_background = std::nullopt);
 
 void ApplyShellControlStyle(ToolbarButton& button);
+// 현재 페이지 바탕을 아이콘, 포커스와 마우스 반응에 함께 적용한다.
+void ApplyBrowserSurfaceToolbarButtonColors(
+    ToolbarButton& button,
+    const BrowserSurfacePresentation* presentation);
 std::unique_ptr<views::View> CreateShellControlDivider();
 void UpdateShellControlDivider(
     views::View& divider,

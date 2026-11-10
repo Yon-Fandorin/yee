@@ -50,8 +50,10 @@
 #include "ui/gfx/render_text_test_api.h"
 #include "ui/views/background.h"
 #include "ui/views/cascading_property.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/link.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/paint_info.h"
 #include "ui/views/view_class_properties.h"
@@ -502,9 +504,25 @@ TEST_F(YeeNativePresentationTest, NativeActionAccentUsesActualHeaderSurface) {
   auto widget = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
   auto* header = widget->SetContentsView(std::make_unique<views::View>());
   auto* action = header->AddChildView(std::make_unique<views::View>());
+  widget->SetBounds(gfx::Rect(0, 0, 120, 60));
+  action->SetBoundsRect(gfx::Rect(20, 10, 30, 30));
+  action->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+  views::FocusRing::Install(action);
+  widget->ShowInactive();
+  widget->GetFocusManager()->SetFocusedView(action);
+  widget->LayoutRootViewIfNecessary();
+  auto* const ring = views::FocusRing::Get(action);
+  ring->DeprecatedLayoutImmediately();
+  ASSERT_TRUE(ring->ShouldPaintForTesting());
+  ASSERT_TRUE(ring->layer());
+  ASSERT_FALSE(ring->GetLocalBounds().IsEmpty());
+  ui::LayerTestApi ring_layer(ring->layer());
   for (SkColor surface :
        {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x32, 0x63, 0xB5)}) {
+    ring->layer()->SendDamagedRects();
+    ASSERT_TRUE(ring_layer.damaged_region().IsEmpty());
     SetBrowserSurfaceControlBackground(*header, surface);
+    EXPECT_FALSE(ring_layer.damaged_region().IsEmpty());
     EXPECT_EQ(surface, views::GetCascadingBackgroundColor(action));
     EXPECT_GE(color_utils::GetContrastRatio(
                   views::GetCascadingAccentColor(action), surface),

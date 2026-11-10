@@ -1163,6 +1163,61 @@ index 48ae23bb48..eda7eb376a 100644
  }
  
  /**
+diff --git a/chrome/browser/resources/omnibox_popup/omnibox_composebox.css b/chrome/browser/resources/omnibox_popup/omnibox_composebox.css
+index 2f702a5a4a..9881737e83 100644
+--- a/chrome/browser/resources/omnibox_popup/omnibox_composebox.css
++++ b/chrome/browser/resources/omnibox_popup/omnibox_composebox.css
+@@ -19,13 +19,15 @@
+   --cr-composebox-grid-min-item-width: 100px;
+   --cr-composebox-grid-padding-bottom: 10px;
+   --cr-composebox-grid-row-gap: 16px;
+-  --cr-composebox-header-color: var(--color-sys-on-surface-subtle);
++  --cr-composebox-header-color: var(
++      --yee-omnibox-popup-ink-muted, var(--color-sys-on-surface-subtle));
+   --cr-composebox-header-font-size: 12px;
+   --cr-composebox-header-font-weight: 500;
+   --cr-composebox-header-line-height: 18px;
+   --cr-composebox-image-card-aspect-ratio: 4 / 3;
+   --cr-composebox-image-card-border-radius: 16px;
+-  --cr-composebox-image-card-text-color: var(--color-sys-on-surface);
++  --cr-composebox-image-card-text-color: var(
++      --yee-omnibox-popup-ink, var(--color-sys-on-surface));
+   --input-bottom-spacing: 10px;
+   --text-input-top-spacing: 10px;
+   --text-input-inline-end-spacing: 80px;
+@@ -55,7 +57,8 @@
+   --cr-composebox-match-text-padding-inline-end: 4px;
+   --cr-composebox-max-height: 800px;
+   --cr-composebox-text-container-padding-block-start: 0;
+-  --cr-composebox-voice-icon-fill-color: var(--color-sys-on-surface);
++  --cr-composebox-voice-icon-fill-color: var(
++      --yee-omnibox-popup-ink, var(--color-sys-on-surface));
+   --search-animated-glif-rotation-duration: 2000ms;
+ 
+   --color-composebox-aim-chip-hover-background: var(--color-omnibox-action-icon-hover);
+@@ -202,6 +205,8 @@ cr-composebox-tool-chip {
+ 
+ /* Voice Search Styles */
+ #voiceSearchButton {
++  --cr-icon-button-focus-outline-color:
++      var(--yee-omnibox-popup-focus, var(--cr-focus-outline-color));
+   --cr-icon-button-fill-color: var(--cr-composebox-voice-icon-fill-color);
+   --cr-icon-button-hover-background-color: var(--color-composebox-voice-button-hover-background);
+   --cr-icon-button-margin-end: 0px;
+diff --git a/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css b/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css
+index 0d455f6f6c..4f6a38c25f 100644
+--- a/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css
++++ b/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css
+@@ -19,7 +19,8 @@
+   --color-composebox-context-entrypoint-background: var(--color-omnibox-action-icon-hover);
+   --color-composebox-context-entrypoint-hover-background: var(--color-omnibox-action-icon-hover);
+   --color-composebox-context-entrypoint-text: var(--color-omnibox-context-entrypoint-text);
+-  --color-composebox-document-chip-icon: var(--color-sys-on-surface-subtle);
++  --color-composebox-document-chip-icon: var(
++      --yee-omnibox-popup-ink-muted, var(--color-sys-on-surface-subtle));
+   --color-composebox-file-carousel-divider: var(--color-omnibox-composebox-divider);
+   --color-composebox-file-chip-background: var(--color-omnibox-composebox-chip-background);
+   --color-composebox-file-chip-favicon-background: var(--color-omnibox-composebox-favicon-background);
 diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
 index 03c5693592..03f018a9ff 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
@@ -3591,7 +3646,7 @@ index 09c735790d..361886ebc5 100644
  
    // Mirror for when caption buttons are on the "wrong" side.
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 5b7aa72031..8908ae57cd 100644
+index 5b7aa72031..c380b08e3e 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 @@ -2,14 +2,13 @@
@@ -3699,36 +3754,49 @@ index 5b7aa72031..8908ae57cd 100644
    if (GetBrowserView()->GetTabStripVisible()) {
      return TopAreaHeight(restored);
    }
-@@ -174,6 +210,28 @@ int BrowserFrameViewWin::GetTopInset(bool restored) const {
+@@ -174,11 +210,41 @@ int BrowserFrameViewWin::GetTopInset(bool restored) const {
  
  SkColor BrowserFrameViewWin::GetCaptionColor(
      BrowserFrameActiveState active_state) const {
 +  if (UsesYeeCaptionColors()) {
-+    if (yee::GetBrowserSurfaceMode(*GetBrowserView()->browser()) ==
-+        yee::BrowserSurfaceMode::kConnectedTabs) {
-+      // 수평 탭 모드의 창 버튼은 페이지 Header 위가 아닌 shell 행에 있다.
-+      // 페이지색과 무관하게 실제 바탕에 맞춘 native glyph 대비를 유지한다.
-+      return yee::ResolveBrowserSurfaceHeaderColors(
-+                 yee::ResolveShellBackgroundColor(
-+                     *GetColorProvider(),
-+                     ShouldPaintAsActiveForState(active_state)))
-+          .primary;
-+    }
-+    if (CaptionControlsOverlapSidePanel()) {
-+      return GetColorProvider()->GetColor(kColorSidePanelHeaderButtonIcon);
-+    }
-+    if (const auto* binding = GetCaptionPresentationBinding();
-+        binding && binding->GetPresentation().has_value()) {
-+      return binding->GetPresentation()->primary;
-+    }
 +    return yee::ResolveBrowserSurfaceHeaderColors(
-+               GetColorProvider()->GetColor(kColorToolbar))
++               GetYeeCaptionSurfaceColor(active_state))
 +        .primary;
 +  }
    return GetColorProvider()->GetColor(ShouldPaintAsActiveForState(active_state)
                                            ? kColorCaptionForegroundActive
                                            : kColorCaptionForegroundInactive);
-@@ -297,9 +355,26 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
+ }
+ 
++SkColor BrowserFrameViewWin::ResolveYeeCaptionGlyphColor(
++    SkColor overlay,
++    SkColor preferred) const {
++  return yee::ResolveBrowserSurfaceCaptionGlyph(
++      GetYeeCaptionSurfaceColor(BrowserFrameActiveState::kUseCurrent), overlay,
++      preferred);
++}
++
++SkColor BrowserFrameViewWin::GetYeeCaptionSurfaceColor(
++    BrowserFrameActiveState active_state) const {
++  if (yee::GetBrowserSurfaceMode(*GetBrowserView()->browser()) ==
++      yee::BrowserSurfaceMode::kConnectedTabs) {
++    return yee::ResolveShellBackgroundColor(
++        *GetColorProvider(), ShouldPaintAsActiveForState(active_state));
++  }
++  if (CaptionControlsOverlapSidePanel()) {
++    return GetColorProvider()->GetColor(kColorSidePanelBackground);
++  }
++  if (const auto* binding = GetCaptionPresentationBinding();
++      binding && binding->GetPresentation().has_value()) {
++    return binding->GetPresentation()->surface;
++  }
++  return GetColorProvider()->GetColor(kColorToolbar);
++}
++
+ void BrowserFrameViewWin::UpdateThrobber(bool running) {
+   if (ShouldShowWindowIcon(TitlebarType::kCustom)) {
+     window_icon_->Update();
+@@ -297,9 +363,26 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
            ? FrameTopBorderThickness(false)
            : GetLayoutConstant(LayoutConstant::kTabStripPadding);
  
@@ -3757,7 +3825,7 @@ index 5b7aa72031..8908ae57cd 100644
        browser_widget()->widget_delegate()->CanResize());
  
    const int frame_component =
-@@ -324,24 +399,33 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
+@@ -324,24 +407,33 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
      }
    }
  
@@ -3797,7 +3865,7 @@ index 5b7aa72031..8908ae57cd 100644
    if (caption_button_container_->HitTestPoint(local_point)) {
      const int hit_test_result =
          caption_button_container_->NonClientHitTest(local_point);
-@@ -478,7 +562,6 @@ void BrowserFrameViewWin::Layout(PassKey) {
+@@ -478,7 +570,6 @@ void BrowserFrameViewWin::Layout(PassKey) {
    LayoutSuperclass<BrowserFrameView>(this);
  }
  
@@ -3805,7 +3873,7 @@ index 5b7aa72031..8908ae57cd 100644
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserFrameViewWin, private:
  
-@@ -541,6 +624,9 @@ int BrowserFrameViewWin::TopAreaHeight(bool restored) const {
+@@ -541,6 +632,9 @@ int BrowserFrameViewWin::TopAreaHeight(bool restored) const {
  int BrowserFrameViewWin::TitlebarMaximizedVisualHeight() const {
    int maximized_height =
        display::win::GetScreenWin()->GetSystemMetricsInDIP(SM_CYCAPTION);
@@ -3815,7 +3883,7 @@ index 5b7aa72031..8908ae57cd 100644
    // Adding 2 dip of vertical padding puts at least 1 dip of space on the top
    // and bottom of the element.
    constexpr int kVerticalPadding = 2;
-@@ -607,18 +693,27 @@ bool BrowserFrameViewWin::ShouldShowWindowTitle(TitlebarType type) const {
+@@ -607,18 +701,27 @@ bool BrowserFrameViewWin::ShouldShowWindowTitle(TitlebarType type) const {
  }
  
  SkColor BrowserFrameViewWin::GetTitlebarColor() const {
@@ -3845,7 +3913,7 @@ index 5b7aa72031..8908ae57cd 100644
  
    // Draw the top of the accent border.
    //
-@@ -658,7 +753,9 @@ void BrowserFrameViewWin::PaintTitlebar(gfx::Canvas* canvas) const {
+@@ -658,7 +761,9 @@ void BrowserFrameViewWin::PaintTitlebar(gfx::Canvas* canvas) const {
    // by the theme image.
    flags.setColor(titlebar_color);
    canvas->DrawRect(titlebar_rect, flags);
@@ -3856,7 +3924,7 @@ index 5b7aa72031..8908ae57cd 100644
    if (!frame_image.isNull()) {
      canvas->TileImageInt(frame_image, 0,
                           ThemeProperties::kFrameHeightAboveTabs -
-@@ -667,7 +764,8 @@ void BrowserFrameViewWin::PaintTitlebar(gfx::Canvas* canvas) const {
+@@ -667,7 +772,8 @@ void BrowserFrameViewWin::PaintTitlebar(gfx::Canvas* canvas) const {
                           titlebar_rect.width(), titlebar_rect.height(), scale,
                           SkTileMode::kRepeat, SkTileMode::kMirror);
    }
@@ -3866,7 +3934,7 @@ index 5b7aa72031..8908ae57cd 100644
    if (!frame_overlay_image.isNull()) {
      canvas->DrawImageInt(frame_overlay_image, 0, 0, frame_overlay_image.width(),
                           frame_overlay_image.height(), titlebar_rect.x(),
-@@ -734,6 +832,47 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+@@ -734,6 +840,47 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
    const gfx::Size preferred_size =
        caption_button_container_->GetPreferredSize();
  
@@ -3914,7 +3982,7 @@ index 5b7aa72031..8908ae57cd 100644
    const int height =
        !GetBrowserView()->GetWebAppFrameToolbarPreferredSize().IsEmpty()
            ? (TitlebarHeight(false) - WindowTopY())
-@@ -744,6 +883,55 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+@@ -744,6 +891,55 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
                                         height);
  }
  
@@ -3971,7 +4039,7 @@ index 5b7aa72031..8908ae57cd 100644
    client_view_bounds_ = GetLocalBounds();
    int top_inset = GetTopInset(false);
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.h b/chrome/browser/ui/views/frame/browser_frame_view_win.h
-index e731b2c4c1..1e2f94ebaf 100644
+index e731b2c4c1..fbfae41c15 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.h
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.h
 @@ -8,6 +8,7 @@
@@ -4007,7 +4075,15 @@ index e731b2c4c1..1e2f94ebaf 100644
    METADATA_HEADER(BrowserFrameViewWin, BrowserFrameView)
  
   public:
-@@ -61,6 +69,12 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
+@@ -39,6 +47,7 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
+   bool CaptionButtonsOnLeadingEdge() const override;
+   int GetTopInset(bool restored) const override;
+   SkColor GetCaptionColor(BrowserFrameActiveState active_state) const override;
++  SkColor ResolveYeeCaptionGlyphColor(SkColor overlay, SkColor preferred) const;
+   void UpdateThrobber(bool running) override;
+   gfx::Size GetMinimumSize() const override;
+   void WindowControlsOverlayEnabledChanged() override;
+@@ -61,6 +70,12 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
  
    bool IsMaximized() const;
  
@@ -4020,11 +4096,12 @@ index e731b2c4c1..1e2f94ebaf 100644
    // Returns the y coordinate for the top of the frame, which in maximized mode
    // is the top of the screen and in restored mode is 1 pixel below the top of
    // the window to leave room for the visual border that Windows draws.
-@@ -146,6 +160,15 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
+@@ -146,6 +161,16 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
    // Layout various sub-components of this view.
    void LayoutTitleBar();
    void LayoutCaptionButtons();
 +  bool CaptionControlsOverlapSidePanel() const;
++  SkColor GetYeeCaptionSurfaceColor(BrowserFrameActiveState active_state) const;
 +  yee::BrowserSurfacePresentationBinding* GetCaptionPresentationBinding() const;
 +
 +  // 투명한 창 버튼은 Side Panel 표면의 이동·표시 변화도 따라 다시 그린다.
@@ -4036,7 +4113,7 @@ index e731b2c4c1..1e2f94ebaf 100644
    void LayoutClientView();
    void LayoutWebAppWindowTitle(const gfx::Rect& available_space,
                                 views::Label& window_title_label) const;
-@@ -175,6 +198,12 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
+@@ -175,6 +200,12 @@ class BrowserFrameViewWin : public BrowserFrameView, public TabIconViewModel {
  
    // The container holding the caption buttons (minimize, maximize, close, etc.)
    raw_ptr<BrowserCaptionButtonContainer> caption_button_container_;
@@ -11385,7 +11462,7 @@ index e182430481..f1e1b00b18 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index 3d3d583887..8aa7b0f7c9 100644
+index 3d3d583887..863fee94cf 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,37 +7,63 @@
@@ -11816,7 +11893,7 @@ index 3d3d583887..8aa7b0f7c9 100644
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -244,6 +569,242 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -244,6 +569,248 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -11999,6 +12076,13 @@ index 3d3d583887..8aa7b0f7c9 100644
 +                                          ? kCloseWeight500CustomIcon
 +                                          : kCloseTabChromeRefreshOldIcon;
 +  const int close_icon_size = features::IsRoundedIconsEnabled() ? 14 : 16;
++  auto* const close_ink_drop = views::InkDrop::Get(close_button_);
++  const auto previous_close_ink =
++      close_ink_drop->HasInkDrop()
++          ? std::make_optional(close_ink_drop->GetBaseColor())
++          : std::nullopt;
++  yee::SetBrowserSurfaceControlBackground(
++      *close_button_, native_colors ? std::nullopt : std::make_optional(surface));
 +  if (native_colors) {
 +    views::SetImageFromVectorIconWithColor(
 +        close_button_, close_icon, close_icon_size,
@@ -12017,20 +12101,19 @@ index 3d3d583887..8aa7b0f7c9 100644
 +        views::Button::STATE_DISABLED,
 +        ui::ImageModel::FromVectorIcon(close_icon, presentation->disabled,
 +                                       close_icon_size));
-+    views::InkDrop::Get(close_button_)->SetBaseColor(presentation->primary);
++    close_ink_drop->SetBaseColor(presentation->primary);
++  }
++  if (previous_close_ink && *previous_close_ink != close_ink_drop->GetBaseColor()) {
++    close_ink_drop->GetInkDrop()->HostViewThemeChanged();
 +  }
 +
 +  const auto update_navigation_button =
-+      [&presentation, native_colors](ToolbarButton* button, bool enabled) {
++      [&presentation](ToolbarButton* button, bool enabled) {
 +        if (!button) {
 +          return;
 +        }
 +        button->SetEnabled(enabled);
-+        button->SetForegroundColorOverrides(
-+            native_colors ? std::nullopt
-+                          : std::optional<SkColor>(presentation->primary),
-+            native_colors ? std::nullopt
-+                          : std::optional<SkColor>(presentation->disabled));
++        yee::ApplyBrowserSurfaceToolbarButtonColors(*button, &*presentation);
 +      };
 +  update_navigation_button(yee_sidebar_button_, true);
 +  update_navigation_button(
@@ -12059,7 +12142,7 @@ index 3d3d583887..8aa7b0f7c9 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -264,14 +825,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -264,14 +831,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -12107,7 +12190,7 @@ index 3d3d583887..8aa7b0f7c9 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -287,7 +874,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -287,7 +880,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -13268,7 +13351,7 @@ index 85f1aaa590..6eca8bbacb 100644
    base::RetainingOneShotTimer expand_on_hover_heuristic_timer_;
    std::optional<gfx::Point> point_at_expand_on_hover_timer_start_;
 diff --git a/chrome/browser/ui/views/frame/windows_caption_button.cc b/chrome/browser/ui/views/frame/windows_caption_button.cc
-index a24088e544..b6d6d686d8 100644
+index a24088e544..dd6b71e146 100644
 --- a/chrome/browser/ui/views/frame/windows_caption_button.cc
 +++ b/chrome/browser/ui/views/frame/windows_caption_button.cc
 @@ -16,6 +16,8 @@
@@ -13280,7 +13363,27 @@ index a24088e544..b6d6d686d8 100644
  #include "chrome/grit/theme_resources.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
  #include "ui/base/theme_provider.h"
-@@ -54,12 +56,19 @@ WindowsCaptionButton::CreateIconPainter() {
+@@ -26,6 +28,19 @@
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/scoped_canvas.h"
+ 
++namespace {
++
++SkColor GetCloseButtonBackgroundOverlay(const ui::ColorProvider& provider,
++                                       bool pressed,
++                                       double hover_progress) {
++  const SkAlpha alpha = pressed ? 0x98 : gfx::Tween::IntValueBetween(
++                                            hover_progress, 0, SK_AlphaOPAQUE);
++  return SkColorSetA(
++      provider.GetColor(kColorCaptionCloseButtonBackgroundHovered), alpha);
++}
++
++}  // namespace
++
+ WindowsCaptionButton::WindowsCaptionButton(
+     PressedCallback callback,
+     BrowserFrameViewWin* frame_view,
+@@ -54,12 +69,19 @@ WindowsCaptionButton::CreateIconPainter() {
  
  gfx::Size WindowsCaptionButton::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -13300,7 +13403,7 @@ index a24088e544..b6d6d686d8 100644
    if (frame_view_->IsMaximized()) {
      const auto info = frame_view_->GetBrowserView()->GetFrameElementInfo();
      int maximized_height = info.tabstrip_preferred_height
-@@ -73,12 +82,14 @@ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
+@@ -73,12 +95,14 @@ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
  }
  
  SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
@@ -13321,7 +13424,7 @@ index a24088e544..b6d6d686d8 100644
      return GetColorProvider()->GetColor(kColorCaptionButtonOnToolbar);
    }
    return GetColorProvider()->GetColor(
-@@ -91,8 +102,12 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
+@@ -91,8 +115,12 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
    // Paint the background of the button (the semi-transparent rectangle that
    // appears when you hover or press the button).
    const ui::ThemeProvider* theme_provider = GetThemeProvider();
@@ -13335,7 +13438,7 @@ index a24088e544..b6d6d686d8 100644
    const SkAlpha theme_alpha = SkColorGetA(bg_color);
    gfx::Rect bounds = GetContentsBounds();
    bounds.Inset(gfx::Insets::TLBR(0, GetBetweenButtonSpacing(), 0, 0));
-@@ -105,7 +120,8 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
+@@ -105,7 +133,8 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
              WindowFrameUtil::CalculateWindowsCaptionButtonBackgroundAlpha(
                  theme_alpha)));
    }
@@ -13345,26 +13448,64 @@ index a24088e544..b6d6d686d8 100644
      // Figure out what portion of the background image to display
      const int button_display_order = GetButtonDisplayOrderIndex();
      const int base_button_width = WindowFrameUtil::kWindowsCaptionButtonWidth;
-@@ -149,7 +165,17 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
-     alpha = gfx::Tween::IntValueBetween(hover_animation().GetCurrentValue(),
-                                         SK_AlphaTRANSPARENT, hovered_alpha);
+@@ -120,18 +149,15 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
+         src_x, src_y, bounds.x(), bounds.y(), bounds.width(), bounds.height());
    }
--  canvas->FillRect(bounds, SkColorSetA(base_color, alpha));
+ 
+-  SkColor base_color;
+-  SkAlpha hovered_alpha, pressed_alpha;
++  SkColor overlay;
+   if (button_type_ == VIEW_ID_CLOSE_BUTTON) {
+-    base_color =
+-        GetColorProvider()->GetColor(kColorCaptionCloseButtonBackgroundHovered);
+-    hovered_alpha = SK_AlphaOPAQUE;
+-    pressed_alpha = 0x98;
++    overlay = GetCloseButtonBackgroundOverlay(
++        *GetColorProvider(), GetState() == STATE_PRESSED,
++        hover_animation().GetCurrentValue());
+   } else {
+     // Match the native buttons.
+-    base_color = GetBaseForegroundColor();
+-    hovered_alpha = 0x1A;
+-    pressed_alpha = 0x33;
++    SkAlpha hovered_alpha = 0x1A;
++    SkAlpha pressed_alpha = 0x33;
+ 
+     if (theme_alpha > 0) {
+       // Theme buttons have slightly increased opacity to make them stand out
+@@ -140,16 +166,24 @@ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
+       hovered_alpha = base::ClampRound<SkAlpha>(hovered_alpha * kAlphaScale);
+       pressed_alpha = base::ClampRound<SkAlpha>(pressed_alpha * kAlphaScale);
+     }
++    const SkAlpha alpha = GetState() == STATE_PRESSED
++                              ? pressed_alpha
++                              : gfx::Tween::IntValueBetween(
++                                    hover_animation().GetCurrentValue(),
++                                    SK_AlphaTRANSPARENT, hovered_alpha);
++    overlay = SkColorSetA(GetBaseForegroundColor(), alpha);
+   }
+-
+-  SkAlpha alpha;
+-  if (GetState() == STATE_PRESSED) {
+-    alpha = pressed_alpha;
 +  if (use_shell_colors) {
 +    bounds = yee::ResolveBrowserWindowControlHighlightBounds(bounds);
 +    cc::PaintFlags flags;
 +    flags.setAntiAlias(true);
-+    flags.setColor(SkColorSetA(base_color, alpha));
++    flags.setColor(overlay);
 +    canvas->DrawRoundRect(gfx::RectF(bounds),
 +                          yee::kSidebarMetrics.shell_control_corner_radius,
 +                          flags);
-+  } else {
-+    canvas->FillRect(bounds, SkColorSetA(base_color, alpha));
-+  }
+   } else {
+-    alpha = gfx::Tween::IntValueBetween(hover_animation().GetCurrentValue(),
+-                                        SK_AlphaTRANSPARENT, hovered_alpha);
++    canvas->FillRect(bounds, overlay);
+   }
+-  canvas->FillRect(bounds, SkColorSetA(base_color, alpha));
  }
  
  void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
-@@ -157,6 +183,9 @@ void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
+@@ -157,6 +191,9 @@ void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
  }
  
  int WindowsCaptionButton::GetBetweenButtonSpacing() const {
@@ -13374,6 +13515,37 @@ index a24088e544..b6d6d686d8 100644
    const int display_order_index = GetButtonDisplayOrderIndex();
    return display_order_index == 0
               ? 0
+@@ -193,9 +230,11 @@ void WindowsCaptionButton::PaintSymbol(gfx::Canvas* canvas) {
+   SkColor symbol_color = GetBaseForegroundColor();
+   const SkColor hovered_color =
+       GetColorProvider()->GetColor(kColorCaptionCloseButtonForegroundHovered);
+-  if (!GetEnabled() ||
++  const bool dim_symbol =
++      !GetEnabled() ||
+       (!GetWidget()->ShouldPaintAsActive() && GetState() != STATE_HOVERED &&
+-       GetState() != STATE_PRESSED)) {
++       GetState() != STATE_PRESSED);
++  if (dim_symbol) {
+     symbol_color =
+         SkColorSetA(symbol_color, SkColorGetA(GetColorProvider()->GetColor(
+                                       kColorCaptionForegroundInactive)));
+@@ -207,6 +246,16 @@ void WindowsCaptionButton::PaintSymbol(gfx::Canvas* canvas) {
+              (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED)) {
+     symbol_color = hovered_color;
+   }
++  if (GetEnabled() && button_type_ == VIEW_ID_CLOSE_BUTTON &&
++      frame_view_->UsesYeeCaptionColors()) {
++    const SkColor overlay = GetCloseButtonBackgroundOverlay(
++        *GetColorProvider(), GetState() == STATE_PRESSED,
++        hover_animation().GetCurrentValue());
++    if (!dim_symbol || SkColorGetA(overlay) != SK_AlphaTRANSPARENT) {
++      symbol_color =
++          frame_view_->ResolveYeeCaptionGlyphColor(overlay, symbol_color);
++    }
++  }
+ 
+   gfx::ScopedCanvas scoped_canvas(canvas);
+   const float scale = canvas->UndoDeviceScaleFactor();
 diff --git a/chrome/browser/ui/views/infobars/BUILD.gn b/chrome/browser/ui/views/infobars/BUILD.gn
 index 984d594ea3..f4f23fe851 100644
 --- a/chrome/browser/ui/views/infobars/BUILD.gn
@@ -13806,8 +13978,175 @@ index be1fb0ad07..f3d9ed26de 100644
  }
  
  source_set("icon_label_bubble") {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_util.cc b/chrome/browser/ui/views/location_bar/location_bar_util.cc
+index e5781a301f..079d9c2ebf 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_util.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_util.cc
+@@ -4,29 +4,107 @@
+ 
+ #include "chrome/browser/ui/views/location_bar/location_bar_util.h"
+ 
++#include <algorithm>
++#include <ranges>
++
+ #include "base/i18n/rtl.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "components/user_education/common/user_education_class_properties.h"
++#include "ui/base/class_property.h"
+ #include "ui/base/l10n/l10n_util.h"
++#include "ui/gfx/color_utils.h"
+ #include "ui/views/animation/flood_fill_ink_drop_ripple.h"
+ #include "ui/views/animation/ink_drop.h"
+ #include "ui/views/animation/ink_drop_highlight.h"
+ #include "ui/views/animation/ink_drop_host.h"
+ #include "ui/views/animation/ink_drop_impl.h"
+ #include "ui/views/animation/ink_drop_ripple.h"
++#include "ui/views/background.h"
++#include "ui/views/cascading_property.h"
++
++namespace {
++
++DEFINE_UI_CLASS_PROPERTY_KEY(bool, kLocationBarSurfaceInkDrop, false)
++
++SkColor ResolveInkDropColor(views::View* view, ChromeColorIds color_id) {
++  const auto* provider = view->GetColorProvider();
++  if (color_id == kColorOmniboxIconHover ||
++      color_id == kColorOmniboxActionIconHover ||
++      color_id == kColorOmniboxIconPressed) {
++    for (auto* ancestor = view; ancestor; ancestor = ancestor->parent()) {
++      if (ancestor->GetProperty(kLocationBarSurfaceInkDrop)) {
++        SkColor surface = views::GetCascadingBackgroundColor(view);
++        if (const auto* background = view->background()) {
++          surface = color_utils::GetResultingPaintColor(
++              background->color().ResolveToSkColor(provider), surface);
++        }
++        return SkColorSetA(color_utils::GetColorWithMaxContrast(surface),
++                           color_id == kColorOmniboxIconPressed ? 0x1A : 0x0F);
++      }
++    }
++  }
++  return provider->GetColor(color_id);
++}
++
++}  // namespace
++
++void SetLocationBarSurfaceInkDrop(views::View& location_bar, bool use_surface) {
++  location_bar.SetProperty(kLocationBarSurfaceInkDrop, use_surface);
++}
++
++OmniboxWarningChipColors ResolveOmniboxWarningChipColors(
++    OmniboxWarningChipColors native_colors,
++    SkColor hover,
++    SkColor press) {
++  const auto contrast = [hover, press](SkColor plate, SkColor ink) {
++    const auto paint = color_utils::GetResultingPaintColor;
++    return std::min({
++        color_utils::GetContrastRatio(ink, plate),
++        color_utils::GetContrastRatio(paint(hover, ink), paint(hover, plate)),
++        color_utils::GetContrastRatio(paint(press, ink), paint(press, plate)),
++        color_utils::GetContrastRatio(paint(press, paint(hover, ink)),
++                                      paint(press, paint(hover, plate))),
++    });
++  };
++  constexpr float minimum = color_utils::kMinimumReadableContrastRatio;
++  const SkColor background = native_colors.background;
++  if (contrast(background, native_colors.foreground) >= minimum) {
++    return native_colors;
++  }
++
++  const bool use_dark_ink =
++      contrast(background, SK_ColorBLACK) >= contrast(background, SK_ColorWHITE);
++  const SkColor ink = use_dark_ink ? SK_ColorBLACK : SK_ColorWHITE;
++  const SkColor target = use_dark_ink ? SK_ColorWHITE : SK_ColorBLACK;
++  // Find the smallest change to the warning color that keeps every state legible.
++  const auto alphas = std::views::iota(0, 255);
++  const auto limit = std::ranges::partition_point(alphas, [&](int alpha) {
++    return contrast(color_utils::AlphaBlend(target, background,
++                                            static_cast<SkAlpha>(alpha)),
++                    ink) < minimum;
++  });
++  return {color_utils::AlphaBlend(target, background,
++                                  static_cast<SkAlpha>(limit - alphas.begin())),
++          ink};
++}
+ 
+ void ConfigureInkDropForRefresh2023(views::View* const view,
+                                     const ChromeColorIds hover_color_id,
+                                     const ChromeColorIds ripple_color_id) {
+-  views::InkDrop::Get(view)->SetMode(views::InkDropHost::InkDropMode::ON);
+-  views::InkDrop::Get(view)->SetLayerRegion(views::LayerRegion::kAbove);
++  auto* const host = views::InkDrop::Get(view);
++  if (host->GetMode() != views::InkDropHost::InkDropMode::ON) {
++    host->SetMode(views::InkDropHost::InkDropMode::ON);
++  }
++  if (host->GetLayerRegion() != views::LayerRegion::kAbove) {
++    host->SetLayerRegion(views::LayerRegion::kAbove);
++  }
+ 
+   views::InkDrop::Get(view)->SetCreateRippleCallback(base::BindRepeating(
+       [](views::View* view, ChromeColorIds ripple_color_id)
+           -> std::unique_ptr<views::InkDropRipple> {
+         const SkColor pressed_color =
+-            view->GetColorProvider()->GetColor(ripple_color_id);
++            ResolveInkDropColor(view, ripple_color_id);
+         const float pressed_alpha = SkColorGetA(pressed_color);
+ 
+         return std::make_unique<views::FloodFillInkDropRipple>(
+@@ -40,7 +118,7 @@ void ConfigureInkDropForRefresh2023(views::View* const view,
+   views::InkDrop::Get(view)->SetCreateHighlightCallback(base::BindRepeating(
+       [](views::View* view, ChromeColorIds hover_color_id) {
+         const auto* color_provider = view->GetColorProvider();
+-        SkColor hover_color = color_provider->GetColor(hover_color_id);
++        SkColor hover_color = ResolveInkDropColor(view, hover_color_id);
+ 
+         // override the hover color if this is triggered by `user_education`.
+         if (view->GetProperty(user_education::kHasInProductHelpPromoKey)) {
+@@ -56,6 +134,9 @@ void ConfigureInkDropForRefresh2023(views::View* const view,
+         return ink_drop_highlight;
+       },
+       view, hover_color_id));
++  if (host->HasInkDrop()) {
++    host->GetInkDrop()->HostViewThemeChanged();
++  }
+ }
+ 
+ std::u16string FormatOmniboxAdditionalText(std::u16string_view text) {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_util.h b/chrome/browser/ui/views/location_bar/location_bar_util.h
+index 307a5492fd..d189f104e2 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_util.h
++++ b/chrome/browser/ui/views/location_bar/location_bar_util.h
+@@ -9,6 +9,7 @@
+ #include <string_view>
+ 
+ #include "chrome/browser/ui/color/chrome_color_id.h"
++#include "third_party/skia/include/core/SkColor.h"
+ #include "ui/views/view.h"
+ 
+ // Sets the highlight color callback and ripple color callback for inkdrop when
+@@ -17,6 +18,20 @@ void ConfigureInkDropForRefresh2023(views::View* view,
+                                     ChromeColorIds hover_color_id,
+                                     ChromeColorIds ripple_color_id);
+ 
++// Opts the location bar's neutral controls into its cascading surface color.
++void SetLocationBarSurfaceInkDrop(views::View& location_bar, bool use_surface);
++
++struct OmniboxWarningChipColors {
++  SkColor background;
++  SkColor foreground;
++};
++
++// Resolves the plate and ink for a warning whose ink drop covers its label.
++OmniboxWarningChipColors ResolveOmniboxWarningChipColors(
++    OmniboxWarningChipColors native_colors,
++    SkColor hover,
++    SkColor press);
++
+ // Given a raw value of additional text from autocompletion (e.g.
+ // "example.com") it combines it with the appropriate separator in the current
+ // local for painting it  after the regular location bar text (e.g.
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index d07cbfe86c..9c1be39862 100644
+index d07cbfe86c..8bb21a5950 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -13826,7 +14165,15 @@ index d07cbfe86c..9c1be39862 100644
  #include "base/trace_event/trace_event.h"
  #include "build/build_config.h"
  #include "chrome/app/vector_icons/vector_icons.h"
-@@ -89,6 +91,10 @@
+@@ -81,6 +83,7 @@
+ #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_content.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
+ #include "chrome/browser/ui/views/page_action/page_action_container_view.h"
++#include "chrome/browser/ui/views/page_action/page_action_view.h"
+ #include "chrome/browser/ui/views/page_action/page_action_view_params.h"
+ #include "chrome/browser/ui/views/page_info/page_info_bubble_specification.h"
+ #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
+@@ -89,6 +92,10 @@
  #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/browser/ui/views/user_education/browser_help_bubble.h"
@@ -13837,7 +14184,7 @@ index d07cbfe86c..9c1be39862 100644
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #include "chrome/browser/ui/webui/cr_components/composebox/composebox_handler.h"
  #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
-@@ -117,6 +123,9 @@
+@@ -117,6 +124,9 @@
  #include "components/search_engines/template_url_service.h"
  #include "components/security_state/core/security_state.h"
  #include "components/startup_metric_utils/common/startup_metric_utils.h"
@@ -13847,7 +14194,7 @@ index d07cbfe86c..9c1be39862 100644
  #include "content/public/browser/navigation_controller.h"
  #include "content/public/browser/navigation_entry.h"
  #include "content/public/browser/render_widget_host_view.h"
-@@ -142,6 +151,7 @@
+@@ -142,6 +152,7 @@
  #include "ui/events/event.h"
  #include "ui/gfx/animation/slide_animation.h"
  #include "ui/gfx/canvas.h"
@@ -13855,7 +14202,7 @@ index d07cbfe86c..9c1be39862 100644
  #include "ui/gfx/geometry/skia_conversions.h"
  #include "ui/gfx/image/image.h"
  #include "ui/gfx/paint_vector_icon.h"
-@@ -149,6 +159,7 @@
+@@ -149,6 +160,7 @@
  #include "ui/gfx/vector_icon_types.h"
  #include "ui/menus/simple_menu_model.h"
  #include "ui/views/accessibility/view_accessibility.h"
@@ -13863,7 +14210,7 @@ index d07cbfe86c..9c1be39862 100644
  #include "ui/views/background.h"
  #include "ui/views/border.h"
  #include "ui/views/bubble/bubble_dialog_delegate_view.h"
-@@ -175,6 +186,9 @@
+@@ -175,6 +187,9 @@
  
  namespace {
  
@@ -13873,7 +14220,7 @@ index d07cbfe86c..9c1be39862 100644
  int IncrementalMinimumWidth(const views::View* view) {
    return (view && view->GetVisible()) ? view->GetMinimumSize().width() : 0;
  }
-@@ -230,6 +244,9 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
+@@ -230,6 +245,9 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
      pref_registrar_->Add(omnibox::kShowAiModeOmniboxButton,
                           base::BindRepeating(&LocationBarView::OnChanged,
                                               base::Unretained(this)));
@@ -13883,17 +14230,21 @@ index d07cbfe86c..9c1be39862 100644
    }
  
    run_omnibox_context_menu_callback_ =
-@@ -255,7 +272,8 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
+@@ -255,8 +273,11 @@ LocationBarView::LocationBarView(BrowserWindowInterface* browser,
            // Show focus ring when the Omnibox is visibly focused and either the
            // popup is closed or it's the full WebUI popup, which keeps the
            // focused look (see `ShouldUsePopupOpenAppearance()`).
 -          return v->GetOmniboxController()->edit_model()->is_caret_visible() &&
-+          return !v->compact_shell_mode_ &&
-+                 v->GetOmniboxController()->edit_model()->is_caret_visible() &&
-                  !v->ShouldUsePopupOpenAppearance();
+-                 !v->ShouldUsePopupOpenAppearance();
++          const bool use_focus_ring = v->compact_shell_mode_
++              ? yee::ShouldUseNativeBrowserSurfaceColors(*v->GetNativeTheme())
++              : !v->ShouldUsePopupOpenAppearance();
++          return use_focus_ring &&
++                 v->GetOmniboxController()->edit_model()->is_caret_visible();
          }));
      views::FocusRing::Get(this)->SetOutsetFocusRingDisabled(true);
-@@ -467,6 +485,7 @@ void LocationBarView::Init() {
+     views::InstallPillHighlightPathGenerator(this);
+@@ -467,6 +488,7 @@ void LocationBarView::Init() {
    omnibox_additional_text_view->SetVisible(false);
    omnibox_additional_text_view_ =
        AddChildView(std::move(omnibox_additional_text_view));
@@ -13901,7 +14252,7 @@ index d07cbfe86c..9c1be39862 100644
    omnibox_additional_text_view_->SetEnabledColor(kColorOmniboxResultsUrl);
  
    selected_keyword_view_ = AddChildView(std::make_unique<SelectedKeywordView>(
-@@ -504,6 +523,12 @@ void LocationBarView::Init() {
+@@ -504,6 +526,12 @@ void LocationBarView::Init() {
            page_action_items, page_actions::PageActionPropertiesProvider(),
            page_action_params));
  
@@ -13914,7 +14265,7 @@ index d07cbfe86c..9c1be39862 100644
    auto clear_all_button = views::CreateVectorImageButton(base::BindRepeating(
        static_cast<void (OmniboxView::*)(const std::u16string&)>(
            &OmniboxView::SetUserText),
-@@ -516,6 +541,8 @@ void LocationBarView::Init() {
+@@ -516,6 +544,8 @@ void LocationBarView::Init() {
    auto ai_mode_hint_label = std::make_unique<views::Label>(
        std::u16string(), CONTEXT_OMNIBOX_PRIMARY, views::style::STYLE_PRIMARY);
    ai_mode_hint_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -13923,7 +14274,7 @@ index d07cbfe86c..9c1be39862 100644
    ai_mode_hint_label->SetVisible(false);
    ai_mode_hint_label_ = AddChildView(std::move(ai_mode_hint_label));
  
-@@ -534,7 +561,139 @@ bool LocationBarView::IsInitialized() const {
+@@ -534,7 +564,139 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
  
@@ -14063,7 +14414,7 @@ index d07cbfe86c..9c1be39862 100644
    return ComputeBorderRadius(size());
  }
  
-@@ -551,8 +710,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
+@@ -551,8 +713,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
      gfx::Size size,
      SkBlendMode blend_mode,
      bool antialias,
@@ -14075,7 +14426,7 @@ index d07cbfe86c..9c1be39862 100644
    auto painter =
        stroke_color == SK_ColorTRANSPARENT
            ? views::Painter::CreateSolidRoundRectPainter(
-@@ -731,7 +891,10 @@ bool LocationBarView::HasFocus() const {
+@@ -731,7 +894,10 @@ bool LocationBarView::HasFocus() const {
  }
  
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -14087,7 +14438,7 @@ index d07cbfe86c..9c1be39862 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -758,7 +921,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -758,7 +924,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
  
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -14099,7 +14450,7 @@ index d07cbfe86c..9c1be39862 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -903,13 +1069,16 @@ void LocationBarView::Layout(PassKey) {
+@@ -903,13 +1072,16 @@ void LocationBarView::Layout(PassKey) {
  
    auto add_trailing_decoration = [&](View* view, int intra_item_padding,
                                       int edge_padding) {
@@ -14117,7 +14468,7 @@ index d07cbfe86c..9c1be39862 100644
    if (features::IsPageActionsElevatedToolbarEnabled()) {
      if (page_action_container_ && page_action_container_->GetVisible()) {
        const bool is_capsule_active = page_action_container_->IsCapsuleActive();
-@@ -1047,6 +1216,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -1047,6 +1219,10 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -14128,12 +14479,15 @@ index d07cbfe86c..9c1be39862 100644
    LayoutSuperclass<View>(this);
  }
  
-@@ -1065,7 +1238,11 @@ void LocationBarView::OnThemeChanged() {
+@@ -1065,7 +1241,14 @@ void LocationBarView::OnThemeChanged() {
    }
  
    RefreshBackground();
 -  RefreshClearAllButtonIcon();
 +  if (compact_shell_mode_) {
++    if (auto* ring = views::FocusRing::Get(this)) {
++      ring->Refresh();
++    }
 +    RefreshCompactShellControlColors();
 +  } else {
 +    RefreshClearAllButtonIcon();
@@ -14141,7 +14495,7 @@ index d07cbfe86c..9c1be39862 100644
  }
  
  void LocationBarView::ChildPreferredSizeChanged(views::View* child) {
-@@ -1082,6 +1259,10 @@ void LocationBarView::Update(WebContents* contents) {
+@@ -1082,6 +1265,10 @@ void LocationBarView::Update(WebContents* contents) {
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
@@ -14152,7 +14506,7 @@ index d07cbfe86c..9c1be39862 100644
    location_icon_view_->Update(/*suppress_animations=*/contents,
                                ShouldUsePopupOpenAppearance());
  
-@@ -1222,6 +1403,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
+@@ -1222,6 +1409,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
    // fall back to the usual omnibox text color to ensure UI consistency.
    // In either case, all IconLabelBubbleViews situated within the location bar
    // will inherit the selected "surrounding foreground color".
@@ -14166,7 +14520,7 @@ index d07cbfe86c..9c1be39862 100644
    const auto color_id = ShouldShowKeywordBubble()
                              ? kColorOmniboxKeywordSeparator
                              : kColorOmniboxActionIcon;
-@@ -1233,6 +1421,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
+@@ -1233,6 +1427,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
  }
  
  SkColor LocationBarView::GetIconLabelBubbleBackgroundColor() const {
@@ -14176,7 +14530,7 @@ index d07cbfe86c..9c1be39862 100644
    return GetColorProvider()->GetColor(kColorLocationBarBackground);
  }
  
-@@ -1406,6 +1597,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
+@@ -1406,6 +1603,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
  int LocationBarView::GetMinimumTrailingWidth() const {
    int trailing_width = IncrementalMinimumWidth(page_action_container_);
  
@@ -14185,7 +14539,7 @@ index d07cbfe86c..9c1be39862 100644
    for (ContentSettingImageView* content_setting_view : content_setting_views_) {
      trailing_width += IncrementalMinimumWidth(content_setting_view);
    }
-@@ -1414,33 +1607,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1414,33 +1613,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
  
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -14240,7 +14594,7 @@ index d07cbfe86c..9c1be39862 100644
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1450,7 +1659,7 @@ void LocationBarView::RefreshBackground() {
+@@ -1450,7 +1665,7 @@ void LocationBarView::RefreshBackground() {
    }
  
    SkColor border_color = SK_ColorTRANSPARENT;
@@ -14249,7 +14603,7 @@ index d07cbfe86c..9c1be39862 100644
      // High contrast schemes get a border stroke even on a rounded omnibox.
      border_color =
          is_caret_visible
-@@ -1463,18 +1672,74 @@ void LocationBarView::RefreshBackground() {
+@@ -1463,18 +1678,93 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
  
@@ -14290,6 +14644,25 @@ index d07cbfe86c..9c1be39862 100644
 +      *this, compact_shell_mode_ && presentation
 +                 ? std::optional<SkColor>(background_color_)
 +                 : std::nullopt);
++  SetLocationBarSurfaceInkDrop(*this, compact_shell_mode_ && presentation);
++  if (compact_shell_mode_) {
++    if (auto* bookmark = page_action_container_->GetPageActionView(
++            kActionBookmarkThisTab)) {
++      std::optional<page_actions::PageActionView::AccentIconStyle> style;
++      if (presentation) {
++        const auto colors =
++            yee::ResolveBrowserSurfaceBookmarkColors(background_color_);
++        style = page_actions::PageActionView::AccentIconStyle{
++            .fill = colors.fill,
++            .outline_icon = features::IsRoundedIconsEnabled()
++                                ? &omnibox::kStarIcon
++                                : &omnibox::kStarChromeRefreshOldIcon,
++            .outline = colors.outline,
++        };
++      }
++      bookmark->SetAccentIconStyle(std::move(style));
++    }
++  }
 +  if (compact_shell_mode_ && previous_background != background_color_) {
 +    page_action_container_->RefreshColors();
 +  }
@@ -14328,7 +14701,7 @@ index d07cbfe86c..9c1be39862 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1486,6 +1751,83 @@ void LocationBarView::RefreshBackground() {
+@@ -1486,6 +1776,83 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -14412,7 +14785,7 @@ index d07cbfe86c..9c1be39862 100644
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1560,7 +1902,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1560,7 +1927,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -14420,7 +14793,7 @@ index d07cbfe86c..9c1be39862 100644
    }
  }
  
-@@ -1587,10 +1928,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
+@@ -1587,10 +1953,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
                                  : features::IsRoundedIconsEnabled()
                                      ? kCloseIcon
                                      : kTabCloseNormalOldIcon;
@@ -14449,7 +14822,7 @@ index d07cbfe86c..9c1be39862 100644
    clear_all_button_->SetBorder(views::CreateEmptyBorder(
        GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING)));
  }
-@@ -1815,6 +2170,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1815,6 +2195,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -14462,7 +14835,7 @@ index d07cbfe86c..9c1be39862 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1851,9 +2212,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1851,9 +2237,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
@@ -14475,7 +14848,7 @@ index d07cbfe86c..9c1be39862 100644
  }
  
  int LocationBarView::GetDragOperationsForView(views::View* sender,
-@@ -1952,6 +2313,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1952,6 +2338,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -14486,7 +14859,7 @@ index d07cbfe86c..9c1be39862 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -2148,6 +2513,10 @@ void LocationBarView::OnChanged() {
+@@ -2148,6 +2538,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -14497,7 +14870,7 @@ index d07cbfe86c..9c1be39862 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2381,9 +2750,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2381,9 +2775,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -14516,13 +14889,13 @@ index d07cbfe86c..9c1be39862 100644
 +            yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface &&
 +        !yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme())) {
 +      return yee::ResolveBrowserSurfaceSemanticColor(
-+          compact_shell_presentation_->surface,
++          background_color_,
 +          GetColorProvider()->GetColor(id));
 +    }
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2400,6 +2784,8 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2400,6 +2809,8 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -14531,7 +14904,7 @@ index d07cbfe86c..9c1be39862 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2434,18 +2820,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2434,18 +2845,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -14585,7 +14958,7 @@ index d07cbfe86c..9c1be39862 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2544,7 +2959,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2544,7 +2984,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -14751,10 +15124,68 @@ index 317211c69c..a13514b461 100644
  
    // The focus manager associated with this view. The focus manager is expected
 diff --git a/chrome/browser/ui/views/location_bar/location_icon_view.cc b/chrome/browser/ui/views/location_bar/location_icon_view.cc
-index 5e26e71067..cc5146c42b 100644
+index 5e26e71067..8f2517bdbe 100644
 --- a/chrome/browser/ui/views/location_bar/location_icon_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_icon_view.cc
-@@ -339,12 +339,17 @@ void LocationIconView::UpdateBackground() {
+@@ -35,6 +35,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/color/color_id.h"
+ #include "ui/gfx/animation/tween.h"
++#include "ui/gfx/color_utils.h"
+ #include "ui/gfx/geometry/insets.h"
+ #include "ui/gfx/image/image_skia.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+@@ -43,6 +44,7 @@
+ #include "ui/views/animation/ink_drop_host.h"
+ #include "ui/views/animation/ink_drop_impl.h"
+ #include "ui/views/animation/ink_drop_ripple.h"
++#include "ui/views/background.h"
+ #include "ui/views/controls/label.h"
+ #include "ui/views/style/platform_style.h"
+ #include "ui/views/view_class_properties.h"
+@@ -55,6 +57,30 @@
+ using content::WebContents;
+ using security_state::SecurityLevel;
+ 
++namespace {
++
++OmniboxWarningChipColors GetDangerousChipColors(
++    const LocationIconView::Delegate& delegate,
++    const ui::ColorProvider& provider,
++    std::optional<SkColor> surrounding_surface) {
++  OmniboxWarningChipColors colors{
++      .background = provider.GetColor(
++          delegate.GetLocationIconBackgroundColorOverride().value_or(
++              kColorOmniboxSecurityChipDangerousBackground)),
++      .foreground = provider.GetColor(kColorOmniboxSecurityChipText),
++  };
++  if (!surrounding_surface) {
++    return colors;
++  }
++  colors.background = color_utils::GetResultingPaintColor(
++      colors.background, *surrounding_surface);
++  return ResolveOmniboxWarningChipColors(
++      colors, provider.GetColor(kColorOmniboxSecurityChipInkDropHover),
++      provider.GetColor(kColorOmniboxSecurityChipInkDropRipple));
++}
++
++}  // namespace
++
+ std::optional<ui::ColorId>
+ LocationIconView::Delegate::GetLocationIconBackgroundColorOverride() const {
+   return std::nullopt;
+@@ -99,7 +125,9 @@ SkColor LocationIconView::GetForegroundColor() const {
+       display_text == l10n_util::GetStringUTF16(IDS_DANGEROUS_VERBOSE_STATE);
+ 
+   if (is_text_dangerous) {
+-    return GetColorProvider()->GetColor(kColorOmniboxSecurityChipText);
++    return GetDangerousChipColors(*delegate_, *GetColorProvider(),
++                                  neutral_background_color_override_)
++        .foreground;
+   }
+ 
+   SecurityLevel security_level = SecurityLevel::NONE;
+@@ -339,22 +367,39 @@ void LocationIconView::UpdateBackground() {
    const bool is_text_dangerous =
        display_text == l10n_util::GetStringUTF16(IDS_DANGEROUS_VERBOSE_STATE);
  
@@ -14764,21 +15195,24 @@ index 5e26e71067..cc5146c42b 100644
 -                            : kColorOmniboxIconBackground);
 -
 -  SetBackgroundColor(GetColorProvider()->GetColor(id));
-+  const std::optional<ui::ColorId> delegate_override =
-+      delegate_->GetLocationIconBackgroundColorOverride();
-+  if (!is_text_dangerous && !delegate_override.has_value() &&
-+      neutral_background_color_override_.has_value()) {
-+    SetBackgroundColor(*neutral_background_color_override_);
-+  } else {
-+    const ui::ColorId id = delegate_override.value_or(
-+        is_text_dangerous ? kColorOmniboxSecurityChipDangerousBackground
-+                          : kColorOmniboxIconBackground);
-+    SetBackgroundColor(GetColorProvider()->GetColor(id));
-+  }
- 
+-
    if (is_text_dangerous) {
++    SetBackgroundColor(
++        GetDangerousChipColors(*delegate_, *GetColorProvider(),
++                               neutral_background_color_override_)
++            .background);
      ConfigureInkDropForRefresh2023(this, kColorOmniboxSecurityChipInkDropHover,
-@@ -355,6 +360,15 @@ void LocationIconView::UpdateBackground() {
+                                    kColorOmniboxSecurityChipInkDropRipple);
+   } else {
++    const std::optional<ui::ColorId> delegate_override =
++        delegate_->GetLocationIconBackgroundColorOverride();
++    SetBackgroundColor(
++        !delegate_override && neutral_background_color_override_
++            ? *neutral_background_color_override_
++            : GetColorProvider()->GetColor(
++                  delegate_override.value_or(kColorOmniboxIconBackground)));
+     ConfigureInkDropForRefresh2023(this, kColorOmniboxIconHover,
+                                    kColorOmniboxIconPressed);
    }
  }
  
@@ -14789,6 +15223,10 @@ index 5e26e71067..cc5146c42b 100644
 +  }
 +  neutral_background_color_override_ = color;
 +  UpdateBackground();
++  if (GetSecurityLevel() == SecurityLevel::DANGEROUS) {
++    UpdateIcon();
++    UpdateLabelColors();
++  }
 +}
 +
  void LocationIconView::OnIconFetched(const gfx::Image& image) {
@@ -15446,7 +15884,7 @@ index e5c5f1bf50..96f893be49 100644
  
    // True if `ShowWidget()` execution is currently being deferred until the
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
-index 5e47b2abe8..81ea3c77c9 100644
+index 5e47b2abe8..6e706cf133 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
 @@ -32,16 +32,20 @@
@@ -15609,12 +16047,16 @@ index 5e47b2abe8..81ea3c77c9 100644
    base::WeakPtrFactory<PopupWidget> weak_ptr_factory_{this};
  };
  
-@@ -292,6 +382,25 @@ OmniboxPopupViewViews::~OmniboxPopupViewViews() {
+@@ -292,6 +382,29 @@ OmniboxPopupViewViews::~OmniboxPopupViewViews() {
    UpdateAccessibleControlIds();
  }
  
 +bool OmniboxPopupViewViews::IsCompactShellMode() const {
 +  return location_bar_view_->IsCompactShellMode();
++}
++
++bool OmniboxPopupViewViews::UsesCustomSurfaceColors() const {
++  return location_bar_view_->GetCompactShellPopupSurfaceColor().has_value();
 +}
 +
 +void OmniboxPopupViewViews::RefreshCompactShellSurface() {
@@ -15635,7 +16077,7 @@ index 5e47b2abe8..81ea3c77c9 100644
  gfx::Image OmniboxPopupViewViews::GetMatchIcon(
      const AutocompleteMatch& match,
      SkColor vector_icon_color) const {
-@@ -344,6 +453,9 @@ void OmniboxPopupViewViews::InvalidateLine(size_t line) {
+@@ -344,6 +457,9 @@ void OmniboxPopupViewViews::InvalidateLine(size_t line) {
  }
  
  void OmniboxPopupViewViews::UpdatePopupAppearance() {
@@ -15645,7 +16087,7 @@ index 5e47b2abe8..81ea3c77c9 100644
    const auto* autocomplete_controller = controller()->autocomplete_controller();
    const bool should_be_open =
        controller()->popup_state_manager()->popup_state() !=
-@@ -400,7 +512,14 @@ void OmniboxPopupViewViews::UpdatePopupAppearance() {
+@@ -400,7 +516,14 @@ void OmniboxPopupViewViews::UpdatePopupAppearance() {
      // If the popup is currently closed, we need to create it.
      popup_create_start_time_ = base::TimeTicks::Now();
      // Self-deleting. See comment for `widget_` in the header.
@@ -15661,7 +16103,7 @@ index 5e47b2abe8..81ea3c77c9 100644
      widget_->InitOmniboxPopup(popup_parent);
      // Third-party software such as DigitalPersona identity verification can
      // hook the underlying window creation methods and use SendMessage to
-@@ -737,7 +856,9 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
+@@ -737,7 +860,9 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
    // space is dead unclickable/unhighlightable space. This extra padding is not
    // added if the results section has no height (result set is empty or all
    // results are hidden). See https://crbug.com/40128770 for additional context.
@@ -15672,7 +16114,7 @@ index 5e47b2abe8..81ea3c77c9 100644
      // The amount of extra space is dependent on whether the last match is the
      // toolbelt or not. The toolbelt doesn't have an icon or image on the left
      // like a regular suggestion nor a big background highlight like an IPH
-@@ -751,12 +872,16 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
+@@ -751,12 +876,16 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
    // Add enough space on the top and bottom so it looks like there is the same
    // amount of space between the text and the popup border as there is in the
    // interior between each row of text.
@@ -15692,7 +16134,7 @@ index 5e47b2abe8..81ea3c77c9 100644
    content_rect.set_height(popup_height);
  
    if (omnibox::IsWebUIOmniboxPopupEnabled() &&
-@@ -770,7 +895,8 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
+@@ -770,7 +899,8 @@ gfx::Rect OmniboxPopupViewViews::GetTargetBounds() const {
    }
  
    // Finally, expand the widget to accommodate the custom-drawn shadows.
@@ -15703,14 +16145,15 @@ index 5e47b2abe8..81ea3c77c9 100644
  }
  
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h
-index f8698d2934..9719752519 100644
+index f8698d2934..bd213eb701 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h
-@@ -68,6 +68,9 @@ class OmniboxPopupViewViews : public views::View,
+@@ -68,6 +68,10 @@ class OmniboxPopupViewViews : public views::View,
    virtual OmniboxPopupSelection GetSelection() const;
  
    void UpdatePopupBounds();
 +  bool IsCompactShellMode() const;
++  bool UsesCustomSurfaceColors() const;
 +  void RefreshCompactShellSurface() override;
 +  int GetCompactShellProviderRebuildCountForTesting() const;
  
@@ -15929,10 +16372,34 @@ index e3590312f4..44686bed2d 100644
      int LRInsets = OmniboxMatchCellView::kIphOffset;
      return gfx::Insets::TLBR(8, LRInsets, 8, LRInsets);
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc b/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
-index 295a5d18fa..6d400922bb 100644
+index 295a5d18fa..aa5c6c8a00 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
-@@ -98,7 +98,7 @@ class OmniboxSuggestionRowChip : public views::MdTextButton {
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.h"
+ 
+ #include <algorithm>
++#include <optional>
+ 
+ #include "base/functional/bind.h"
+ #include "base/memory/raw_ptr.h"
+@@ -33,6 +34,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/base/window_open_disposition_utils.h"
++#include "ui/compositor/layer.h"
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/paint_vector_icon.h"
+@@ -42,6 +44,7 @@
+ #include "ui/views/controls/button/md_text_button.h"
+ #include "ui/views/controls/focus_ring.h"
+ #include "ui/views/controls/highlight_path_generator.h"
++#include "ui/views/controls/label.h"
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/layout/layout_manager.h"
+ #include "ui/views/painter.h"
+@@ -98,7 +101,7 @@ class OmniboxSuggestionRowChip : public views::MdTextButton {
          views::Button::STATE_NORMAL,
          ui::ImageModel::FromVectorIcon(*icon_, kColorOmniboxResultsIcon, 10));
      SetEnabledTextColors(
@@ -15941,8 +16408,37 @@ index 295a5d18fa..6d400922bb 100644
    }
  
    void UpdateBackgroundColor() override {
+@@ -343,7 +346,20 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
+   OmniboxPopupSelection selection() const { return selection_; }
+ 
+   void OnThemeChanged() override {
++    const bool custom_colors = popup_view_->UsesCustomSurfaceColors();
++    if (!custom_colors && subpixel_before_custom_colors_) {
++      label()->DestroyLayer();
++      label()->SetSubpixelRenderingEnabled(*subpixel_before_custom_colors_);
++      subpixel_before_custom_colors_.reset();
++    }
+     MdTextButton::OnThemeChanged();
++    if (custom_colors && !label()->layer()) {
++      // Like WebUI, paint text over the hover and pressed backgrounds.
++      subpixel_before_custom_colors_ = label()->GetSubpixelRenderingEnabled();
++      label()->SetSubpixelRenderingEnabled(false);
++      label()->SetPaintToLayer();
++      label()->layer()->SetFillsBoundsOpaquely(false);
++    }
+     // We can't use colors from NativeTheme as the omnibox theme might be
+     // different (for example, if the NTP colors are customized).
+     const auto* const color_provider = GetColorProvider();
+@@ -407,6 +423,7 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
+   raw_ptr<OmniboxPopupViewViews> popup_view_;
+   OmniboxPartState theme_state_ = OmniboxPartState::NORMAL;
+ 
++  std::optional<bool> subpixel_before_custom_colors_;
+   OmniboxPopupSelection selection_;
+ };
+ 
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
-index 5fe6c35545..93c8f1da1d 100644
+index 5fe6c35545..03fbb52fdb 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
 @@ -441,8 +441,7 @@ void OmniboxViewViews::InstallPlaceholderText() {
@@ -15955,7 +16451,7 @@ index 5fe6c35545..93c8f1da1d 100644
  
    if (is_focused) {
      if (!a11y_text.empty()) {
-@@ -460,12 +459,46 @@ void OmniboxViewViews::InstallPlaceholderText() {
+@@ -460,12 +459,55 @@ void OmniboxViewViews::InstallPlaceholderText() {
    UpdatePlaceholderTextColor();
  }
  
@@ -15964,6 +16460,15 @@ index 5fe6c35545..93c8f1da1d 100644
 +    std::optional<SkColor> secondary) {
 +  compact_shell_primary_text_color_ = primary;
 +  compact_shell_secondary_text_color_ = secondary;
++  if (aim_page_action_icon_has_fake_focus_) {
++    if (auto* action = GetAiModePageActionIconView()) {
++      auto* const ring = views::FocusRing::Get(action);
++      ring->SetColorId(primary ? std::nullopt
++                              : std::make_optional<ui::ColorId>(
++                                    kColorOmniboxResultsFocusIndicator));
++      ring->SchedulePaint();
++    }
++  }
 +  EmphasizeURLComponents();
 +  SchedulePaint();
 +}
@@ -16002,7 +16507,19 @@ index 5fe6c35545..93c8f1da1d 100644
    // If the current contents is a URL, turn on special URL rendering mode in
    // RenderText.
    const bool text_is_url = controller()->edit_model()->CurrentTextIsURL();
-@@ -1432,8 +1465,11 @@ int OmniboxViewViews::GetOmniboxTextLength() const {
+@@ -677,7 +719,10 @@ void OmniboxViewViews::ApplyFocusRingToAimButton(bool force_focus) {
+     return;
+   }
+   auto* const focus_ring = views::FocusRing::Get(icon_view);
+-  focus_ring->SetColorId(kColorOmniboxResultsFocusIndicator);
++  focus_ring->SetColorId(
++      location_bar_view_->GetCompactShellPopupSurfaceColor().has_value()
++          ? std::nullopt
++          : std::make_optional<ui::ColorId>(kColorOmniboxResultsFocusIndicator));
+   focus_ring->SetHasFocusPredicate(base::BindRepeating(
+       [](bool force_focus, const views::View* parent) {
+         if (force_focus) {
+@@ -1432,8 +1477,11 @@ int OmniboxViewViews::GetOmniboxTextLength() const {
  }
  
  void OmniboxViewViews::SetEmphasis(bool emphasize, const gfx::Range& range) {
@@ -16360,10 +16877,19 @@ index abccd7964a..81c026472c 100644
    // Invoked when the chip or anchored message state changes. We show the
    // anchored message (if any), then suggestion chips then all other page action
 diff --git a/chrome/browser/ui/views/page_action/page_action_view.cc b/chrome/browser/ui/views/page_action/page_action_view.cc
-index 6038ec2926..72b2f125a4 100644
+index 6038ec2926..3309d16dac 100644
 --- a/chrome/browser/ui/views/page_action/page_action_view.cc
 +++ b/chrome/browser/ui/views/page_action/page_action_view.cc
-@@ -113,6 +113,13 @@ bool PageActionView::IsAnchoredMessageVisible() const {
+@@ -36,6 +36,8 @@
+ #include "ui/gfx/animation/slide_animation.h"
+ #include "ui/gfx/font_list.h"
+ #include "ui/gfx/geometry/insets.h"
++#include "ui/gfx/image/image_skia_operations.h"
++#include "ui/gfx/paint_vector_icon.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/animation/ink_drop.h"
+ #include "ui/views/background.h"
+@@ -113,6 +115,13 @@ bool PageActionView::IsAnchoredMessageVisible() const {
    return anchored_message_ && !anchored_message_->is_closing();
  }
  
@@ -16377,7 +16903,57 @@ index 6038ec2926..72b2f125a4 100644
  base::CallbackListSubscription PageActionView::AddChipVisibilityChangedCallback(
      ChipVisibilityChanged callback) {
    return chip_visibility_changed_callbacks_.Add(std::move(callback));
-@@ -448,8 +455,7 @@ void PageActionView::AnimateImage(
+@@ -392,6 +401,14 @@ void PageActionView::AnimationEnded(const gfx::Animation* animation) {
+   NotifyIsChipShowingChange();
+ }
+ 
++void PageActionView::SetAccentIconStyle(std::optional<AccentIconStyle> style) {
++  if (accent_icon_style_ == style) {
++    return;
++  }
++  accent_icon_style_ = std::move(style);
++  UpdateIconImage();
++}
++
+ void PageActionView::UpdateIconImage() {
+   if (!GetVisible() || observation_.GetSource() == nullptr ||
+       observation_.GetSource()->GetImage().IsEmpty()) {
+@@ -399,10 +416,14 @@ void PageActionView::UpdateIconImage() {
+   }
+ 
+   const auto& icon_image = observation_.GetSource()->GetImage();
+-  const SkColor icon_color = observation_.GetSource()->GetColorSource() ==
+-                                     PageActionColorSource::kForeground
+-                                 ? GetForegroundColor()
+-                                 : views::GetCascadingAccentColor(this);
++  const bool uses_accent = observation_.GetSource()->GetColorSource() ==
++                           PageActionColorSource::kCascadingAccent;
++  const AccentIconStyle* accent =
++      uses_accent && accent_icon_style_ ? &*accent_icon_style_ : nullptr;
++  const SkColor icon_color = accent ? accent->outline
++                                    : (uses_accent
++                                           ? views::GetCascadingAccentColor(this)
++                                           : GetForegroundColor());
+ 
+   if (observation_.GetSource()->GetShouldAnimateImage()) {
+     std::optional<page_actions::PageActionAnimationParams> params =
+@@ -415,7 +436,14 @@ void PageActionView::UpdateIconImage() {
+       icon_image.IsVectorIcon() ? icon_size_ : icon_image.Size().width();
+ 
+   // If image does not have a vector icon, set it directly.
+-  if (icon_image.IsVectorIcon()) {
++  if (accent && icon_image.IsVectorIcon()) {
++    SetImageModel(ui::ImageModel::FromImageSkia(
++        gfx::ImageSkiaOperations::CreateSuperimposedImage(
++            gfx::CreateVectorIcon(*icon_image.GetVectorIcon().vector_icon(),
++                                  drawing_icon_size, accent->fill),
++            gfx::CreateVectorIcon(*accent->outline_icon, drawing_icon_size,
++                                  accent->outline))));
++  } else if (icon_image.IsVectorIcon()) {
+     SetImageModel(ui::ImageModel::FromVectorIcon(
+         *icon_image.GetVectorIcon().vector_icon(), icon_color,
+         drawing_icon_size));
+@@ -448,8 +476,7 @@ void PageActionView::AnimateImage(
      const page_actions::PageActionAnimationParams& params,
      SkColor icon_color) {
    views::SingleAnimatedImageContainer::AnimationConfig config{
@@ -16388,10 +16964,10 @@ index 6038ec2926..72b2f125a4 100644
    if (params.start_offset != 0.0f || params.end_offset != 1.0f) {
      config.boundary = views::SingleAnimatedImageContainer::AnimationBoundary{
 diff --git a/chrome/browser/ui/views/page_action/page_action_view.h b/chrome/browser/ui/views/page_action/page_action_view.h
-index 3b3d90a72e..39dd6c1db3 100644
+index 3b3d90a72e..5f08eeca4c 100644
 --- a/chrome/browser/ui/views/page_action/page_action_view.h
 +++ b/chrome/browser/ui/views/page_action/page_action_view.h
-@@ -79,6 +79,10 @@ class PageActionView : public IconLabelBubbleView,
+@@ -79,6 +79,21 @@ class PageActionView : public IconLabelBubbleView,
    // Returns whether this view is declared visible in its model.
    bool GetDeclaredVisible() const;
  
@@ -16399,9 +16975,28 @@ index 3b3d90a72e..39dd6c1db3 100644
 +  // location bar without changing the action model.
 +  void RefreshColors();
 +
++  struct AccentIconStyle {
++    SkColor fill;
++    raw_ptr<const gfx::VectorIcon> outline_icon;
++    SkColor outline;
++
++    bool operator==(const AccentIconStyle&) const = default;
++  };
++
++  // 강조 아이콘을 선택한 모델에만 호스트가 정한 채움과 윤곽을 적용한다.
++  void SetAccentIconStyle(std::optional<AccentIconStyle> style);
++
    // Reports the chip visibility change state at the beginning of the animation.
    using ChipVisibilityChanged = base::RepeatingCallback<void(PageActionView*)>;
    base::CallbackListSubscription AddChipVisibilityChangedCallback(
+@@ -209,6 +224,7 @@ class PageActionView : public IconLabelBubbleView,
+ 
+   const int icon_size_;
+   const gfx::Insets icon_insets_;
++  std::optional<AccentIconStyle> accent_icon_style_;
+ 
+   // Subscription to changes in label visibility, used for updating properties
+   // dependent on label visibility and notifying others of chip state changes.
 diff --git a/chrome/browser/ui/views/page_info/BUILD.gn b/chrome/browser/ui/views/page_info/BUILD.gn
 index d6e74b52c8..e441de33d9 100644
 --- a/chrome/browser/ui/views/page_info/BUILD.gn
@@ -23120,8 +23715,77 @@ index 0fcdbfa57b..2c25d60149 100644
    // Used to ensure the button remains highlighted while the menu is active.
    std::optional<Button::ScopedAnchorHighlight> menu_anchor_higlight_;
  
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc b/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc
+index 248c124163..dbdedea161 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc
+@@ -107,14 +107,14 @@ void ConfigureToolbarInkdropForRefresh2023(
+ }
+ 
+ void CreateToolbarInkdropCallbacks(views::View* const host,
+-                                   const ChromeColorIds hover_color_id,
+-                                   const ChromeColorIds ripple_color_id) {
++                                   ui::ColorVariant hover_color,
++                                   ui::ColorVariant ripple_color) {
+   views::InkDrop::Get(host)->SetCreateRippleCallback(base::BindRepeating(
+-      [](views::View* host, ChromeColorIds ripple_color_id)
++      [](views::View* host, ui::ColorVariant ripple_color)
+           -> std::unique_ptr<views::InkDropRipple> {
+         const auto* color_provider = host->GetColorProvider();
+         const SkColor pressed_color =
+-            color_provider ? color_provider->GetColor(ripple_color_id)
++            color_provider ? ripple_color.ResolveToSkColor(color_provider)
+                            : gfx::kPlaceholderColor;
+         const float pressed_alpha = SkColorGetA(pressed_color);
+ 
+@@ -124,13 +124,13 @@ void CreateToolbarInkdropCallbacks(views::View* const host,
+             SkColorSetA(pressed_color, SK_AlphaOPAQUE),
+             pressed_alpha / SK_AlphaOPAQUE);
+       },
+-      host, ripple_color_id));
++      host, ripple_color));
+ 
+   views::InkDrop::Get(host)->SetCreateHighlightCallback(base::BindRepeating(
+-      [](views::View* host, ChromeColorIds hover_color_id) {
++      [](views::View* host, ui::ColorVariant highlight_color) {
+         const auto* color_provider = host->GetColorProvider();
+         SkColor hover_color = color_provider
+-                                  ? color_provider->GetColor(hover_color_id)
++                                  ? highlight_color.ResolveToSkColor(color_provider)
+                                   : gfx::kPlaceholderColor;
+ 
+         // override the hover color if this is triggered by `user_education`.
+@@ -147,5 +147,5 @@ void CreateToolbarInkdropCallbacks(views::View* const host,
+         ink_drop_highlight->set_visible_opacity(hover_alpha / SK_AlphaOPAQUE);
+         return ink_drop_highlight;
+       },
+-      host, hover_color_id));
++      host, hover_color));
+ }
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h b/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h
+index 44675cb606..6edaea8d66 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h
++++ b/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h
+@@ -7,6 +7,7 @@
+ 
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "third_party/skia/include/core/SkColor.h"
++#include "ui/color/color_variant.h"
+ #include "ui/gfx/geometry/insets.h"
+ #include "ui/gfx/geometry/point.h"
+ #include "ui/views/controls/highlight_path_generator.h"
+@@ -41,7 +42,7 @@ void ConfigureToolbarInkdropForRefresh2023(views::View* host,
+ // Sets the highlight color callback and ripple color callback for the inkdrop
+ // of the host.
+ void CreateToolbarInkdropCallbacks(views::View* host,
+-                                   ChromeColorIds hover_color_id,
+-                                   ChromeColorIds ripple_color_id);
++                                   ui::ColorVariant hover_color,
++                                   ui::ColorVariant ripple_color);
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TOOLBAR_TOOLBAR_INK_DROP_UTIL_H_
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 184ae3e5bc..9872078f7c 100644
+index 184ae3e5bc..f2ac634aee 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -19,9 +19,11 @@
@@ -23194,7 +23858,7 @@ index 184ae3e5bc..9872078f7c 100644
  
  // Returns whether `point` should be treated as part of the caption area in
  // `view`. Recursively traverses into icon containers to correctly handle
-@@ -324,6 +356,348 @@ void ToolbarView::DestroyWebUIToolbarWebContents() {
+@@ -324,6 +356,335 @@ void ToolbarView::DestroyWebUIToolbarWebContents() {
    }
  }
  
@@ -23381,18 +24045,10 @@ index 184ae3e5bc..9872078f7c 100644
 +  }
 +  location_bar_view_->SetCompactShellSurfacePresentation(presentation);
 +
-+  std::optional<SkColor> foreground;
-+  std::optional<SkColor> disabled_foreground;
-+  if (presentation.has_value() &&
-+      presentation->palette_mode ==
-+          yee::BrowserSurfacePresentation::PaletteMode::kCustomSurface) {
-+    foreground = presentation->primary;
-+    disabled_foreground = presentation->disabled;
-+  }
-+
 +  const auto update_button = [&](ToolbarButton* button) {
 +    if (button) {
-+      button->SetForegroundColorOverrides(foreground, disabled_foreground);
++      yee::ApplyBrowserSurfaceToolbarButtonColors(
++          *button, presentation ? &*presentation : nullptr);
 +    }
 +  };
 +  update_button(compact_shell_sidebar_button_);
@@ -23400,11 +24056,6 @@ index 184ae3e5bc..9872078f7c 100644
 +  update_button(forward_);
 +  update_button(reload_);
 +  update_button(compact_shell_media_button_);
-+  if (compact_shell_media_button_) {
-+    yee::SetBrowserSurfaceControlBackground(
-+        *compact_shell_media_button_,
-+        foreground ? std::make_optional(presentation->surface) : std::nullopt);
-+  }
 +  if (compact_shell_media_divider_) {
 +    yee::UpdateShellControlDivider(*compact_shell_media_divider_, presentation);
 +  }
@@ -23543,7 +24194,7 @@ index 184ae3e5bc..9872078f7c 100644
  void ToolbarView::Init() {
  #if defined(USE_AURA)
    // Avoid generating too many occlusion tracking calculation events before this
-@@ -559,6 +933,7 @@ void ToolbarView::Init() {
+@@ -559,6 +920,7 @@ void ToolbarView::Init() {
    if (features::IsWebUIMediaButtonEnabled()) {
      media_button_ = toolbar_webview_->GetMediaToolbarButton();
    } else if (media_button) {
@@ -23551,7 +24202,7 @@ index 184ae3e5bc..9872078f7c 100644
      media_button_ = AddChildView(std::move(media_button));
    }
  
-@@ -726,6 +1101,9 @@ void ToolbarView::InitGlicContainer() {
+@@ -726,6 +1088,9 @@ void ToolbarView::InitGlicContainer() {
  void ToolbarView::OnVerticalTabStripModeChanged(
      tabs::VerticalTabStripStateController* controller) {
    should_display_vertical_tabs_ = controller->ShouldDisplayVerticalTabs();
@@ -23561,7 +24212,7 @@ index 184ae3e5bc..9872078f7c 100644
    UpdateGlicButtonVisibility();
    UpdateGlicActorVisibility();
    // Invalidate the layout cache so responsive buttons (forward, home, split,
-@@ -1307,6 +1685,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
+@@ -1307,6 +1672,10 @@ void ToolbarView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
  
  bool ToolbarView::IsPositionInWindowCaption(
      const gfx::Point& test_point) const {
@@ -23572,7 +24223,7 @@ index 184ae3e5bc..9872078f7c 100644
    return IsPositionInWindowCaptionForView(this, test_point);
  }
  
-@@ -1458,6 +1840,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1458,6 +1827,16 @@ gfx::Size ToolbarView::GetMinimumSize() const {
              default_margin + overflow_button_->GetMinimumSize().width(), 0);
        }
    }
@@ -23589,7 +24240,7 @@ index 184ae3e5bc..9872078f7c 100644
    size.set_height(size.height() * size_animation_.GetCurrentValue());
    return size;
  }
-@@ -1478,10 +1870,11 @@ void ToolbarView::Layout(PassKey) {
+@@ -1478,10 +1857,11 @@ void ToolbarView::Layout(PassKey) {
    }
  
    if (display_mode_ == DisplayMode::kNormal) {
@@ -23602,7 +24253,7 @@ index 184ae3e5bc..9872078f7c 100644
      // Need to determine whether the overflow button should be visible, and only
      // update it if the visibility changes.
      const bool was_overflow_button_visible =
-@@ -1532,6 +1925,9 @@ void ToolbarView::ChildPreferredSizeChanged(views::View* child) {
+@@ -1532,6 +1912,9 @@ void ToolbarView::ChildPreferredSizeChanged(views::View* child) {
  }
  
  void ToolbarView::ChildVisibilityChanged(views::View* child) {
@@ -23612,7 +24263,7 @@ index 184ae3e5bc..9872078f7c 100644
    if (child == home_) {
      if (!home_->GetVisible() && show_home_button_.GetValue()) {
        base::UmaHistogramBoolean("Toolbar.Overflow.HomeButton", true);
-@@ -1562,22 +1958,15 @@ void ToolbarView::InitLayout() {
+@@ -1562,22 +1945,15 @@ void ToolbarView::InitLayout() {
    // Shift previously flex-able elements' order by `kOrderOffset`.
    // This will cause them to be the first ones to drop out or shrink to minimum.
    // Order 1 - kOrderOffset will be assigned to new flex-able elements.
@@ -23639,7 +24290,7 @@ index 184ae3e5bc..9872078f7c 100644
  
    layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
  
-@@ -1680,7 +2069,7 @@ void ToolbarView::InitLayout() {
+@@ -1680,7 +2056,7 @@ void ToolbarView::InitLayout() {
            views::kFlexBehaviorKey,
            toolbar_webview_->GetFlexSpecification(
                toolbar_controller_->webui_toolbar_button_flex_order(),
@@ -23648,7 +24299,7 @@ index 184ae3e5bc..9872078f7c 100644
      } else {
        // If `toolbar_controller_` is nullptr, then the WebUI toolbar is managing
        // all controls, so don't need to worry about integrating with
-@@ -1771,6 +2160,10 @@ void ToolbarView::LayoutCommon() {
+@@ -1771,6 +2147,10 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
@@ -23659,7 +24310,7 @@ index 184ae3e5bc..9872078f7c 100644
    layout_manager_->SetInteriorMargin(interior_margin);
  
    // Extend buttons to the window edge if we're either in a maximized or
-@@ -1808,7 +2201,9 @@ void ToolbarView::LayoutCommon() {
+@@ -1808,7 +2188,9 @@ void ToolbarView::LayoutCommon() {
  
    if (toolbar_divider_ && extensions_container_) {
      views::ManualLayoutUtil(layout_manager_)
@@ -23670,7 +24321,7 @@ index 184ae3e5bc..9872078f7c 100644
    }
    // Cast button visibility is controlled externally.
  }
-@@ -2137,7 +2532,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
+@@ -2137,7 +2519,7 @@ void ToolbarView::OnShowForwardButtonChanged() {
  
  void ToolbarView::OnShowHomeButtonChanged() {
    if (home_) {
@@ -23679,7 +24330,7 @@ index 184ae3e5bc..9872078f7c 100644
    }
  }
  
-@@ -2153,8 +2548,12 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2153,8 +2535,12 @@ void ToolbarView::OnTouchUiChanged() {
      layout_manager_->SetDefault(views::kMarginsKey,
                                  gfx::Insets::VH(0, default_margin));
      if (location_bar_view_) {
@@ -23694,7 +24345,7 @@ index 184ae3e5bc..9872078f7c 100644
      }
  
      LoadImages();
-@@ -2163,6 +2562,9 @@ void ToolbarView::OnTouchUiChanged() {
+@@ -2163,6 +2549,9 @@ void ToolbarView::OnTouchUiChanged() {
  }
  
  void ToolbarView::SetForwardButtonVisibility(bool visible) {
@@ -25742,6 +26393,34 @@ index 3d98085d74..5fc176b9cf 100644
  };
  
  }  // namespace views
+diff --git a/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css b/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css
+index e3d3b18312..8e907a6d3b 100644
+--- a/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css
++++ b/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css
+@@ -124,7 +124,8 @@
+ 
+ #more-items {
+   align-items: center;
+-  color: var(--color-sys-on-surface-subtle, var(--cr-fallback-color-on-surface-subtle));
++  color: var(--yee-omnibox-popup-ink, var(
++      --color-sys-on-surface-subtle, var(--cr-fallback-color-on-surface-subtle)));
+   display: flex;
+   font-family: inherit;
+   font-size: 11px;
+diff --git a/ui/webui/resources/cr_components/composebox/composebox_match.css b/ui/webui/resources/cr_components/composebox/composebox_match.css
+index 3990d7cc65..e27b1cd449 100644
+--- a/ui/webui/resources/cr_components/composebox/composebox_match.css
++++ b/ui/webui/resources/cr_components/composebox/composebox_match.css
+@@ -217,7 +217,8 @@
+ :host([base-layout='image']:is(:focus-visible, [selected]))
+     .container {
+   box-shadow: none;
+-  outline: 2px solid var(--cr-focus-outline-color);
++  outline: 2px solid var(
++      --yee-omnibox-popup-focus, var(--cr-focus-outline-color));
+ }
+ 
+ :host([base-layout='image']) #secondaryText,
 diff --git a/ui/webui/resources/cr_components/searchbox/searchbox_match.css b/ui/webui/resources/cr_components/searchbox/searchbox_match.css
 index 2344ea9e80..e1c9f1d727 100644
 --- a/ui/webui/resources/cr_components/searchbox/searchbox_match.css

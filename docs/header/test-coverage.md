@@ -153,6 +153,8 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 | Header 텍스트·버튼·focus stroke가 전체 gray 및 대표 chromatic surface에서 같은 대비 계약을 사용하고 실제 Label이 물리색을 유지 | `BrowserSurfacePresentationResolverTest.ExhaustiveGrayAndChromaticContrastContract`, `YeeRestingTextViewTest.WidgetAttachedLabelsUseExactSurfaceAndPhysicalForeground` |
 | 일반적인 밝은·어두운 페이지에서 primary와 secondary의 강약을 유지하면서 두 역할 모두 읽을 수 있는 대비를 보장 | `YeeSurfaceColorTest.HeaderRolesRemainReadableOnLightAndDarkPages` |
 | popup은 exact surface를 쓰되 high contrast/forced colors에서는 native mixer를 보존하고 global provider cache를 늘리지 않음 | `YeeSurfaceColorTest.PopupProvidersAreExactAndDoNotGrowGlobalCache` |
+| 추천 목록의 작업 버튼은 행·hover·누름을 합성한 배경에서 읽을 수 있고, 입력창의 hover와 두 결과 행 상태는 구분 가능 | `BrowserSurfacePresentationResolverTest.PopupSelectionAndHoverKeepDistinctReadableRoles`, `ExhaustiveGrayAndChromaticContrastContract` |
+| 저장된 별의 윤곽과 창 닫기 기호는 실제 바탕과 대비를 유지 | `BrowserSurfacePresentationResolverTest.BookmarkOutlineAndCaptionGlyphFollowPaintedSurface` |
 | 단일·분할 Header가 42 DIP, 주소 표면 34 DIP, 공통 중심축과 edge inset을 공유 | `YeeSurfaceGeometryTest.SplitAndSingleHeadersShareMetricsContract` |
 | LTR·RTL에서 고정·hover Header의 새 탭·Agent 버튼은 창 드래그 영역에서 제외 | `YeeNativePresentationTest.SidebarHeaderButtonsStayOutsideWindowCaption` |
 | 빈 주소 힌트·선택색·Side Panel 바탕·배너 링크 기준선·제품 로고와 favicon 테마가 실제 native View에서 유지 | `YeeNativePresentationTest.*`, `YeeTabIconPresentationTest.*` |
@@ -197,6 +199,7 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | --- | --- |
 | native LocationBar 하나가 단일 Toolbar와 active Pane Header 사이를 이동해도 높이·중심축을 유지하고 분할 해제 시 원래 parent로 복귀 | `YeeSingleAndSplitHeadersShareLocationBarGeometry` |
 | 미디어 버튼이 흰색·검정·빨강 Header의 일반/disabled 색과 크기를 따르고, 표시 여부에 따라 구분선이 함께 사라지며 실제 Omnibox hover에서 origin·title 배경이 일치 | `YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility` |
+| 사용자 테마를 유지한 채 밝은 테마의 어두운 페이지와 어두운 테마의 밝은 페이지에서 탐색·사이트 정보·북마크의 hover 색과 포커스 대비를 확인한다. 열린 hover가 페이지색 변경을 따라가고 고대비·강제 색에서 native 주소창 포커스 표시가 복원된다. | `YeeContentsViewUiTest.YeeHeaderColorsFollowPageAcrossThemeChanges` |
 | 단일 A → 분할 active A/inactive B → active B → popup B → 분할 해제 B 전환에서 주소 배경, 일반·disabled 버튼, IME inline·rich autocomplete·AI hint label, Pane Header 텍스트, location/security icon이 같은 source snapshot을 사용하고, 열린 popup은 animation의 최종 `popup_revision`에서만 한 번 갱신되며 native 모드에서 모든 물리색 override를 제거 | `YeePresentationFollowsSingleAndSplitSources` |
 | active pane 전환과 분할 해제에서 native LocationBar가 최종 parent로 이동하고 실제 host 변경 generation마다 layout/bounds 동기화를 정확히 한 번 수행 | `YeePresentationFollowsSingleAndSplitSources` |
 | 분할 생성·제거 중 Chromium의 focus 정책이 popup을 닫는 동작은 우회하지 않고, popup 색·anchor는 단일과 안정화된 각 분할 상태에서 별도로 검증 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |

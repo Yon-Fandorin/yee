@@ -18,6 +18,7 @@
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/views/location_bar/location_bar_util.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/horizontal_tab_presentation.h"
 #include "chrome/browser/ui/views/yee/page_viewport_hosts.h"
@@ -548,11 +549,29 @@ TEST(YeeSurfaceColorTest, HeaderRolesRemainReadableOnLightAndDarkPages) {
 }
 
 TEST(YeeSurfaceColorTest, FocusStrokeKeepsNonTextContrast) {
+  views::View view;
+  view.SetSize(
+      gfx::Size(200, kSidebarMetrics.browser_surface_location_bar_height));
   for (SkColor surface :
-       {SK_ColorWHITE, SK_ColorBLACK, SkColorSetRGB(0x7A, 0x75, 0x6C)}) {
-    const SkColor stroke = ResolveBrowserSurfaceFocusStrokeColor(surface);
-    EXPECT_GE(color_utils::GetContrastRatio(stroke, surface),
-              color_utils::kMinimumVisibleContrastRatio);
+       {SK_ColorWHITE, SkColorSetRGB(0x3C, 0x3C, 0x3C),
+        SkColorSetRGB(0x7A, 0x75, 0x6C)}) {
+    const auto presentation =
+        ResolveBrowserSurfacePresentation(surface, 0, 0, 0);
+    for (SkColor fill : {surface, presentation.location_hover}) {
+      gfx::Canvas canvas(view.size(), 1.f, false);
+      const auto background = CreateBrowserSurfaceOmniboxBackground(
+          fill, presentation.focus_stroke);
+      background->Paint(&canvas, &view);
+      const SkBitmap pixels = canvas.GetBitmap();
+      const int center_x = view.width() / 2;
+      const SkColor stroke = pixels.getColor(
+          center_x, kSidebarMetrics.location_bar_focus_stroke_inset);
+      const SkColor painted_fill = pixels.getColor(center_x, view.height() / 2);
+      EXPECT_EQ(fill, painted_fill);
+      const float contrast = color_utils::GetContrastRatio(stroke, painted_fill);
+      EXPECT_GE(contrast, color_utils::kMinimumVisibleContrastRatio);
+      EXPECT_LT(contrast, 3.1f);
+    }
   }
 }
 
@@ -573,6 +592,8 @@ TEST(BrowserSurfacePresentationResolverTest,
     const BrowserSurfacePresentation second =
         ResolveBrowserSurfacePresentation(input, 7, 11, 13);
     EXPECT_EQ(SK_AlphaOPAQUE, SkColorGetA(first.surface));
+    EXPECT_NE(first.surface, first.location_hover) << input;
+    EXPECT_EQ(first.header_separator, first.resting_divider);
     EXPECT_GE(color_utils::GetContrastRatio(first.primary, first.surface),
               color_utils::kMinimumReadableContrastRatio);
     EXPECT_GE(color_utils::GetContrastRatio(first.secondary, first.surface),
@@ -604,6 +625,10 @@ TEST(YeeSurfaceColorTest, ThemeTintKeepsPageColorAndReadableInteractionStates) {
       EXPECT_EQ(tinted.surface, neutral.surface);
       EXPECT_EQ(tinted.primary, neutral.primary);
       EXPECT_EQ(tinted.secondary, neutral.secondary);
+      EXPECT_NE(tinted.surface, tinted.location_hover) << accent << ' ' << gray;
+      EXPECT_NE(tinted.surface, tinted.popup_hover) << accent << ' ' << gray;
+      EXPECT_NE(tinted.surface, tinted.popup_selected) << accent << ' ' << gray;
+      EXPECT_NE(tinted.popup_hover, tinted.popup_selected) << accent << ' ' << gray;
       for (SkColor ink : {tinted.primary, tinted.secondary}) {
         EXPECT_GE(color_utils::GetContrastRatio(ink, tinted.location_hover),
                   color_utils::kMinimumReadableContrastRatio);
@@ -658,13 +683,13 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
   const size_t cache_size = manager.num_cached_providers_for_testing();
   const auto expected_custom_colors = [](const BrowserSurfacePresentation&
                                              presentation) {
-    return std::array<std::pair<ui::ColorId, SkColor>, 26>{
-        {{kColorOmniboxResultsBackground, presentation.surface},
+    return std::to_array<std::pair<ui::ColorId, SkColor>>({
+         {kColorOmniboxResultsBackground, presentation.surface},
          {kColorOmniboxResultsBackgroundHovered, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundSelected, presentation.popup_selected},
          {kColorOmniboxResultsBackgroundIph, presentation.popup_hover},
          {kColorOmniboxResultsBackgroundHoverOverlay, presentation.popup_hover},
-         {kColorOmniboxBubbleOutline, presentation.popup_outline},
+         {kColorOmniboxBubbleOutline, presentation.header_separator},
          {kColorOmniboxResultsFocusIndicator, presentation.focus_stroke},
          {kColorOmniboxResultsChipBackground, presentation.popup_hover},
          {kColorOmniboxText, presentation.popup_selected_primary},
@@ -691,7 +716,28 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
          {kColorOmniboxResultsButtonIconSelected,
           presentation.popup_selected_primary},
          {kColorOmniboxResultsButtonBorder, presentation.popup_outline},
-         {kColorOmniboxResultsIconGM3Background, presentation.popup_hover}}};
+         {kColorOmniboxResultsButtonInkDropRowHovered,
+          presentation.popup_button_hover},
+         {kColorOmniboxResultsButtonInkDropRowSelected,
+          presentation.popup_button_hover},
+         {kColorOmniboxResultsButtonInkDropSelectedRowHovered,
+          presentation.popup_button_pressed},
+         {kColorOmniboxResultsButtonInkDropSelectedRowSelected,
+          presentation.popup_button_pressed},
+         {kColorOmniboxAnswerIconGM3Background, presentation.popup_hover},
+         {kColorOmniboxAnswerIconGM3Foreground, presentation.popup_selected_primary},
+         {kColorOmniboxResultsStarterPackIcon, presentation.popup_selected_primary},
+         {kColorOmniboxActionIconHover, presentation.popup_button_hover},
+         {kColorOmniboxIconPressed, presentation.popup_button_pressed},
+         {kColorOmniboxContextEntrypointText, presentation.popup_selected_primary},
+         {kColorOmniboxComposeboxContextEntrypointBackground,
+          presentation.popup_hover},
+         {kColorOmniboxComposeboxChipBackground, presentation.popup_hover},
+         {kColorOmniboxComposeboxFaviconBackground, presentation.popup_hover},
+         {kColorOmniboxComposeboxDivider, presentation.header_separator},
+         {kColorOmniboxForegroundDisabled, presentation.popup_selected_secondary},
+         {kColorNewTabPageActiveBackground, presentation.popup_button_pressed},
+    });
   };
 
   for (SkColor surface :
@@ -700,53 +746,33 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     const BrowserSurfacePresentation presentation =
         ResolveBrowserSurfacePresentation(surface, 0, 0, 0,
                                           SkColorSetRGB(0xAD, 0x32, 0x94));
-    ui::ColorProviderKey key;
-    ui::ColorProviderKey native_key = key;
+    ui::ColorProviderKey native_key;
     native_key.color_mode = color_utils::IsDark(surface)
                                 ? ui::ColorProviderKey::ColorMode::kDark
                                 : ui::ColorProviderKey::ColorMode::kLight;
     std::unique_ptr<ui::ColorProvider> native =
         manager.CreateUncachedColorProvider(native_key);
-    std::unique_ptr<ui::ColorProvider> provider =
-        CreateBrowserSurfaceOmniboxPopupColorProvider(key, presentation);
-    for (const auto& [color_id, expected] :
-         expected_custom_colors(presentation)) {
-      EXPECT_EQ(expected, provider->GetColor(color_id));
+    for (auto mode : {ui::ColorProviderKey::ColorMode::kLight,
+                      ui::ColorProviderKey::ColorMode::kDark}) {
+      ui::ColorProviderKey key;
+      key.color_mode = mode;
+      const auto provider =
+          CreateBrowserSurfaceOmniboxPopupColorProvider(key, presentation);
+      for (const auto& [color_id, expected] : expected_custom_colors(presentation)) {
+        EXPECT_EQ(expected, provider->GetColor(color_id)) << color_id;
+      }
+      EXPECT_EQ(native->GetColor(kColorOmniboxSecurityChipDangerous),
+                provider->GetColor(kColorOmniboxSecurityChipDangerous));
+      EXPECT_EQ(native->GetColor(ui::kColorSysOnSurface),
+                provider->GetColor(ui::kColorSysOnSurface));
+      EXPECT_GE(color_utils::GetContrastRatio(
+                    provider->GetColor(ui::kColorSysOnSurface),
+                    provider->GetColor(ui::kColorSysNeutralContainer)),
+                color_utils::kMinimumVisibleContrastRatio);
+      EXPECT_EQ(cache_size, manager.num_cached_providers_for_testing());
     }
-    // Security warnings are semantic Chromium state, not Yee presentation.
-    EXPECT_EQ(native->GetColor(kColorOmniboxSecurityChipDangerous),
-              provider->GetColor(kColorOmniboxSecurityChipDangerous));
-    EXPECT_EQ(cache_size, manager.num_cached_providers_for_testing());
   }
 
-  const std::array<ui::ColorId, 26> overridden_ids = {
-      kColorOmniboxResultsBackground,
-      kColorOmniboxResultsBackgroundHovered,
-      kColorOmniboxResultsBackgroundSelected,
-      kColorOmniboxResultsBackgroundIph,
-      kColorOmniboxResultsBackgroundHoverOverlay,
-      kColorOmniboxBubbleOutline,
-      kColorOmniboxResultsFocusIndicator,
-      kColorOmniboxResultsChipBackground,
-      kColorOmniboxText,
-      kColorOmniboxTextDimmed,
-      kColorOmniboxResultsTextSelected,
-      kColorOmniboxResultsTextAnswer,
-      kColorOmniboxResultsTextDimmed,
-      kColorOmniboxResultsTextDimmedSelected,
-      kColorOmniboxResultsTextSecondary,
-      kColorOmniboxResultsTextSecondarySelected,
-      kColorOmniboxResultsUrl,
-      kColorOmniboxResultsUrlSelected,
-      kColorOmniboxKeywordSelected,
-      kColorOmniboxKeywordSeparator,
-      kColorOmniboxResultsIcon,
-      kColorOmniboxResultsIconSelected,
-      kColorOmniboxResultsButtonIcon,
-      kColorOmniboxResultsButtonIconSelected,
-      kColorOmniboxResultsButtonBorder,
-      kColorOmniboxResultsIconGM3Background,
-  };
   for (ui::ColorProviderKey key : [] {
          ui::ColorProviderKey high_contrast;
          high_contrast.contrast_mode =
@@ -773,12 +799,12 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
     }
     std::unique_ptr<ui::ColorProvider> native =
         manager.CreateUncachedColorProvider(key);
-    std::unique_ptr<ui::ColorProvider> provider =
-        CreateBrowserSurfaceOmniboxPopupColorProvider(
-            key, ResolveBrowserSurfacePresentation(
-                     SkColorSetRGB(0x7E, 0x7E, 0x7E), 0, 0, 0));
-    for (ui::ColorId color_id : overridden_ids) {
-      EXPECT_EQ(native->GetColor(color_id), provider->GetColor(color_id));
+    const auto presentation = ResolveBrowserSurfacePresentation(
+        SkColorSetRGB(0x7E, 0x7E, 0x7E), 0, 0, 0);
+    const auto provider =
+        CreateBrowserSurfaceOmniboxPopupColorProvider(key, presentation);
+    for (const auto& entry : expected_custom_colors(presentation)) {
+      EXPECT_EQ(native->GetColor(entry.first), provider->GetColor(entry.first));
     }
     EXPECT_EQ(cache_size, manager.num_cached_providers_for_testing());
   }
@@ -786,27 +812,69 @@ TEST(YeeSurfaceColorTest, PopupProvidersAreExactAndDoNotGrowGlobalCache) {
 
 TEST(BrowserSurfacePresentationResolverTest,
      PopupSelectionAndHoverKeepDistinctReadableRoles) {
+  const auto verify = [](SkColor surface, std::optional<SkColor> accent) {
+    SCOPED_TRACE(testing::Message() << surface << ' ' << accent.value_or(0));
+    const auto p = ResolveBrowserSurfacePresentation(surface, 1, 1, 1, accent);
+    EXPECT_NE(p.surface, p.popup_hover);
+    EXPECT_NE(p.surface, p.popup_selected);
+    EXPECT_NE(p.popup_hover, p.popup_selected);
+    for (SkColor row : {p.surface, p.popup_hover, p.popup_selected}) {
+      EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary, row),
+                color_utils::kMinimumReadableContrastRatio);
+      EXPECT_GE(color_utils::GetContrastRatio(p.popup_outline, row), 1.15f);
+      const SkColor hover =
+          color_utils::GetResultingPaintColor(p.popup_button_hover, row);
+      const SkColor press =
+          color_utils::GetResultingPaintColor(p.popup_button_pressed, row);
+      EXPECT_NE(hover, row);
+      EXPECT_NE(press, row);
+      const SkColor webui_press =
+          color_utils::GetResultingPaintColor(p.popup_button_pressed, hover);
+      for (SkColor fill : {row, hover, press, webui_press}) {
+        EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary, fill),
+                  color_utils::kMinimumReadableContrastRatio);
+        EXPECT_GE(color_utils::GetContrastRatio(p.focus_stroke, fill),
+                  color_utils::kMinimumVisibleContrastRatio);
+      }
+    }
+  };
   for (int gray = 0; gray < 256; ++gray) {
-    const auto p = ResolveBrowserSurfacePresentation(
-        SkColorSetRGB(gray, gray, gray), 1, 1, 1);
-    EXPECT_NE(p.popup_hover, p.popup_selected) << gray;
-    EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_primary,
-                                            p.popup_selected),
-              4.5f)
-        << gray;
-    EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
-                                            p.popup_selected),
-              4.5f)
-        << gray;
-    for (SkColor chip_surface : {p.surface, p.popup_hover}) {
-      EXPECT_GE(
-          color_utils::GetContrastRatio(p.popup_selected_primary, chip_surface),
-          4.5f)
-          << gray;
-      EXPECT_GE(color_utils::GetContrastRatio(p.popup_selected_secondary,
-                                              chip_surface),
-                4.5f)
-          << gray;
+    for (auto accent : std::array<std::optional<SkColor>, 3>{
+             std::nullopt, SK_ColorWHITE, SK_ColorBLACK}) {
+      verify(SkColorSetRGB(gray, gray, gray), accent);
+    }
+  }
+  for (SkColor surface : {0xFF304560u, 0xFF668888u, 0xFF1155CCu, SK_ColorRED}) {
+    for (SkColor accent : {SK_ColorWHITE, SK_ColorBLACK, 0xFFA8C7FAu}) {
+      verify(surface, accent);
+    }
+  }
+}
+
+TEST(BrowserSurfacePresentationResolverTest,
+     BookmarkOutlineAndCaptionGlyphFollowPaintedSurface) {
+  constexpr SkColor close_red = 0xFFE81123u;
+  for (SkColor surface : {SK_ColorWHITE, SK_ColorBLACK, 0xFF304560u,
+                          0xFF808080u, close_red}) {
+    const auto bookmark = ResolveBrowserSurfaceBookmarkColors(surface);
+    EXPECT_EQ(bookmark.fill, 0xFFE7AD48u);
+    EXPECT_GE(color_utils::GetContrastRatio(bookmark.outline, surface),
+              color_utils::kMinimumVisibleContrastRatio);
+    const SkColor resting = ResolveBrowserSurfaceHeaderColors(surface).primary;
+    for (int alpha = 0; alpha <= 0xFF; ++alpha) {
+      const SkColor overlay = SkColorSetA(close_red, alpha);
+      const SkColor preferred = color_utils::AlphaBlend(
+          SK_ColorWHITE, resting, static_cast<SkAlpha>(alpha));
+      const SkColor ink = ResolveBrowserSurfaceCaptionGlyph(surface, overlay, preferred);
+      EXPECT_GE(color_utils::GetContrastRatio(
+                    ink, color_utils::GetResultingPaintColor(overlay, surface)),
+                color_utils::kMinimumVisibleContrastRatio);
+      const SkColor inactive = ResolveBrowserSurfaceCaptionGlyph(
+          surface, overlay, SkColorSetA(resting, 0x66));
+      EXPECT_GE(color_utils::GetContrastRatio(
+                    inactive,
+                    color_utils::GetResultingPaintColor(overlay, surface)),
+                color_utils::kMinimumVisibleContrastRatio);
     }
   }
 }
@@ -827,6 +895,25 @@ TEST(BrowserSurfacePresentationResolverTest,
   EXPECT_GE(color_utils::GetContrastRatio(
                 ResolveBrowserSurfaceSemanticColor(warning, warning), warning),
             4.5f);
+
+  for (const auto [plate, ink, overlay] :
+       {std::array<SkColor, 3>{0xFFB3261Eu, SK_ColorWHITE, 0xFFF9FAFCu},
+        std::array<SkColor, 3>{0xFFF28B82u, 0xFFB31412u, 0xFFB31412u}}) {
+    const SkColor hover = SkColorSetA(overlay, 0x1A);
+    const SkColor press = SkColorSetA(overlay, 0x29);
+    const auto colors = ResolveOmniboxWarningChipColors({plate, ink}, hover, press);
+    const auto paint = color_utils::GetResultingPaintColor;
+    EXPECT_GT(SkColorGetR(colors.background), SkColorGetG(colors.background));
+    for (SkColor state : {SK_ColorTRANSPARENT, hover, press}) {
+      EXPECT_GE(color_utils::GetContrastRatio(paint(state, colors.foreground),
+                                              paint(state, colors.background)),
+                color_utils::kMinimumReadableContrastRatio);
+    }
+    EXPECT_GE(color_utils::GetContrastRatio(
+                  paint(press, paint(hover, colors.foreground)),
+                  paint(press, paint(hover, colors.background))),
+              color_utils::kMinimumReadableContrastRatio);
+  }
 }
 
 class YeeRestingTextViewTest : public ChromeViewsTestBase {

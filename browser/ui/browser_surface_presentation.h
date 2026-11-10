@@ -40,6 +40,8 @@ struct BrowserSurfacePresentation {
   SkColor popup_selected_primary = SK_ColorTRANSPARENT;
   SkColor popup_selected_secondary = SK_ColorTRANSPARENT;
   SkColor popup_outline = SK_ColorTRANSPARENT;
+  SkColor popup_button_hover = SK_ColorTRANSPARENT;
+  SkColor popup_button_pressed = SK_ColorTRANSPARENT;
 
   bool operator==(const BrowserSurfacePresentation&) const = default;
 };

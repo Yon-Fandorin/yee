@@ -30,11 +30,16 @@ void ApplyOmniboxPopupStyle(content::WebContents* contents) {
           const properties = {
             '--omnibox-popup-results-padding-top': '%dpx',
             '--omnibox-popup-results-padding-bottom': '%dpx',
-            '--omnibox-popup-results-separator': '%dpx solid color-mix(in srgb, var(--color-searchbox-results-foreground) 18%%, var(--color-searchbox-results-background))',
+            '--omnibox-popup-results-separator':
+                '%dpx solid var(--color-omnibox-bubble-outline)',
             '--cr-searchbox-match-margin-inline-start': '%dpx',
             '--cr-searchbox-match-margin-inline-end': '%dpx',
             '--cr-searchbox-match-corner-radius': '%dpx',
             '--cr-searchbox-match-focus-indicator-display': 'none',
+            '--yee-omnibox-popup-ink': 'var(--color-omnibox-text)',
+            '--yee-omnibox-popup-ink-muted': 'var(--color-omnibox-text-dimmed)',
+            '--yee-omnibox-popup-focus':
+                'var(--color-omnibox-results-focus-indicator)',
           };
           for (const [name, value] of Object.entries(properties)) {
             style.setProperty(name, value);

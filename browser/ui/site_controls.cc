@@ -368,9 +368,11 @@ void SiteControlsButton::RefreshVisualState() {
           BrowserSurfacePresentation::PaletteMode::kCustomSurface;
   SkColor color =
       custom_surface
-          ? presentation_->primary
-          : (GetColorProvider() ? GetColorProvider()->GetColor(ui::kColorIcon)
-                                : gfx::kPlaceholderColor);
+          ? (enabled ? presentation_->primary : presentation_->secondary)
+          : (GetColorProvider()
+                 ? GetColorProvider()->GetColor(
+                       enabled ? ui::kColorIcon : ui::kColorSysOnSurfaceVariant)
+                 : gfx::kPlaceholderColor);
   if (GetColorProvider()) {
     SkColor background =
         GetColorProvider()->GetColor(ui::kColorSysSurfaceVariant);
@@ -381,32 +383,34 @@ void SiteControlsButton::RefreshVisualState() {
               : (GetState() == STATE_HOVERED ? presentation_->popup_hover
                                              : presentation_->location_hover);
     }
-    const SkColor foreground = color_utils::BlendForMinContrast(
-                                   color, background, std::nullopt,
-                                   color_utils::kMinimumReadableContrastRatio)
-                                   .color;
+    const bool highlight =
+        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
+    const SkColor endpoint = color_utils::PickContrastingColor(
+        SK_ColorBLACK, SK_ColorWHITE, background);
+    const SkColor foreground =
+        color_utils::BlendForMinContrast(
+            color, background,
+            custom_surface ? std::make_optional(endpoint) : std::nullopt,
+            color_utils::kMinimumReadableContrastRatio)
+            .color;
     badge_->SetBackgroundColor(background);
     badge_->SetEnabledColor(foreground);
     badge_->SetBackground(views::CreateRoundedRectBackground(background, 4));
-    if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+    if (highlight) {
       SetBackground(views::CreateRoundedRectBackground(
           background, kSidebarMetrics.shell_control_corner_radius));
     } else {
       SetBackground(nullptr);
     }
-    views::FocusRing::Get(this)->SetColorId(
-        custom_surface ? std::make_optional(ResolveBrowserSurfaceFocusColorId(
-                             *GetColorProvider(), presentation_->surface,
-                             ui::kColorFocusableBorderFocused))
-                       : std::nullopt);
-  }
-  if (!enabled) {
-    color =
-        custom_surface
-            ? presentation_->secondary
-            : (GetColorProvider()
-                   ? GetColorProvider()->GetColor(ui::kColorSysOnSurfaceVariant)
-                   : color);
+    SetBrowserSurfaceControlBackground(
+        *this, custom_surface && highlight ? std::make_optional(background)
+                                           : std::nullopt);
+    if (custom_surface && highlight) {
+      color = color_utils::BlendForMinContrast(
+                  color, background, endpoint,
+                  color_utils::kMinimumVisibleContrastRatio)
+                  .color;
+    }
   }
   SetImageModel(views::Button::STATE_NORMAL,
                 ui::ImageModel::FromVectorIcon(vector_icons::kShieldIcon, color,

@@ -25,11 +25,13 @@
 #include "chrome/browser/ui/views/chrome_typography.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_button.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_divider.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
 #include "chrome/browser/ui/views/yee/agent_bridge.h"
 #include "chrome/browser/ui/views/yee/agent_bridge_state.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
+#include "chrome/browser/ui/views/yee/yee_colors.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkRRect.h"
@@ -57,10 +59,14 @@
 #include "ui/menus/simple_menu_model.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/cascading_property.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/painter.h"
 #include "ui/views/style/typography_provider.h"
@@ -796,6 +802,16 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
     if (status_ == Status::kNeedsInput) {
       status_color = SkColorSetRGB(190, 132, 78);
     }
+    const SkColor shell = yee::ResolveShellBackgroundColor(
+        *GetColorProvider(), GetWidget()->ShouldPaintAsActive());
+    const bool use_native =
+        yee::ShouldUseNativeBrowserSurfaceColors(*GetNativeTheme());
+    status_color = use_native
+                       ? GetColorProvider()->GetColor(ui::kColorIcon)
+                       : color_utils::BlendForMinContrast(
+                             status_color, shell, std::nullopt,
+                             color_utils::kMinimumVisibleContrastRatio)
+                             .color;
 
     cc::PaintFlags halo_flags;
     halo_flags.setAntiAlias(true);
@@ -816,23 +832,34 @@ class YeeAgentToolbarButton : public YeeShellToolbarButton {
     gfx::RectF badge_rect(17.0f, 1.0f, 13.0f, 13.0f);
     cc::PaintFlags badge_border_flags;
     badge_border_flags.setAntiAlias(true);
-    badge_border_flags.setColor(SkColorSetRGB(243, 243, 243));
+    badge_border_flags.setColor(shell);
     badge_border_flags.setStyle(cc::PaintFlags::kFill_Style);
     canvas->DrawRoundRect(badge_rect, 6.5f, badge_border_flags);
 
     badge_rect.Inset(1.5f);
+    const SkColor preferred_badge = status_ == Status::kWorking
+                                        ? SkColorSetRGB(15, 108, 92)
+                                        : SkColorSetRGB(166, 105, 48);
+    const SkColor badge_color =
+        use_native ? status_color
+                   : color_utils::BlendForMinContrast(
+                         preferred_badge, shell, std::nullopt,
+                         color_utils::kMinimumVisibleContrastRatio)
+                         .color;
+    const SkColor badge_ink =
+        use_native ? shell
+                   : color_utils::PickContrastingColor(
+                         SK_ColorBLACK, SK_ColorWHITE, badge_color);
     cc::PaintFlags badge_flags;
     badge_flags.setAntiAlias(true);
-    badge_flags.setColor(status_ == Status::kWorking
-                             ? SkColorSetRGB(15, 108, 92)
-                             : SkColorSetRGB(166, 105, 48));
+    badge_flags.setColor(badge_color);
     badge_flags.setStyle(cc::PaintFlags::kFill_Style);
     canvas->DrawRoundRect(badge_rect, 5.0f, badge_flags);
 
     const gfx::FontList badge_font =
         gfx::FontList().Derive(-5, gfx::Font::NORMAL, gfx::Font::Weight::BOLD);
     canvas->DrawStringRectWithFlags(
-        status_ == Status::kWorking ? u"2" : u"!", badge_font, SK_ColorWHITE,
+        status_ == Status::kWorking ? u"2" : u"!", badge_font, badge_ink,
         gfx::Rect(18, 1, 11, 12), gfx::Canvas::TEXT_ALIGN_CENTER);
   }
 
@@ -1149,8 +1176,21 @@ ui::ColorId ResolveBrowserSurfaceFocusColorId(
 std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxBackground(
     SkColor background_color,
     SkColor focus_stroke_color) {
+  if (focus_stroke_color != SK_ColorTRANSPARENT) {
+    // 포커스 선은 hover 전환을 포함한 실제 주소창 배경에서 3:1만 확보한다.
+    if (color_utils::GetContrastRatio(focus_stroke_color, background_color) <
+        color_utils::kMinimumVisibleContrastRatio) {
+      focus_stroke_color = color_utils::PickContrastingColor(
+          SK_ColorBLACK, SK_ColorWHITE, background_color);
+    }
+    focus_stroke_color =
+        color_utils::BlendForMinContrast(
+            background_color, background_color, focus_stroke_color,
+            color_utils::kMinimumVisibleContrastRatio)
+            .color;
+  }
   return std::make_unique<YeeOmniboxBackground>(background_color,
-                                                focus_stroke_color);
+                                               focus_stroke_color);
 }
 
 std::unique_ptr<views::Border> CreateBrowserSurfaceOmniboxResultsBorder() {
@@ -1170,12 +1210,29 @@ std::unique_ptr<views::Background> CreateBrowserSurfaceOmniboxResultBackground(
 
 void SetBrowserSurfaceControlBackground(views::View& view,
                                         std::optional<SkColor> surface) {
+  const auto* property = view.GetProperty(views::kCascadingBackgroundColor);
+  if (surface == (property ? std::make_optional(property->GetValue(&view))
+                           : std::nullopt)) {
+    return;
+  }
   if (surface) {
     views::SetCascadingProperty(
         &view, views::kCascadingBackgroundColor,
         std::make_unique<BrowserSurfaceControlColor>(*surface));
   } else {
     view.ClearProperty(views::kCascadingBackgroundColor);
+  }
+  if (auto* ring = views::FocusRing::Get(&view)) {
+    ring->SchedulePaint();
+  }
+  // Descendant controls can paint their focus rings on separate layers.
+  if (auto* manager = view.GetFocusManager()) {
+    auto* focused = manager->GetFocusedView();
+    if (focused != &view && view.Contains(focused)) {
+      if (auto* ring = views::FocusRing::Get(focused)) {
+        ring->SchedulePaint();
+      }
+    }
   }
 }
 
@@ -1197,7 +1254,7 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   mixer[kColorOmniboxResultsBackgroundIph] = {presentation.popup_hover};
   mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
       presentation.popup_hover};
-  mixer[kColorOmniboxBubbleOutline] = {presentation.popup_outline};
+  mixer[kColorOmniboxBubbleOutline] = {presentation.header_separator};
   mixer[kColorOmniboxResultsFocusIndicator] = {presentation.focus_stroke};
   mixer[kColorOmniboxResultsChipBackground] = {presentation.popup_hover};
 
@@ -1228,7 +1285,31 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   mixer[kColorOmniboxResultsButtonIconSelected] = {
       presentation.popup_selected_primary};
   mixer[kColorOmniboxResultsButtonBorder] = {presentation.popup_outline};
-  mixer[kColorOmniboxResultsIconGM3Background] = {presentation.popup_hover};
+  mixer[kColorOmniboxResultsButtonInkDropRowHovered] = {
+      presentation.popup_button_hover};
+  mixer[kColorOmniboxResultsButtonInkDropRowSelected] = {
+      presentation.popup_button_hover};
+  mixer[kColorOmniboxResultsButtonInkDropSelectedRowHovered] = {
+      presentation.popup_button_pressed};
+  mixer[kColorOmniboxResultsButtonInkDropSelectedRowSelected] = {
+      presentation.popup_button_pressed};
+  mixer[kColorOmniboxAnswerIconGM3Background] = {presentation.popup_hover};
+  mixer[kColorOmniboxAnswerIconGM3Foreground] = {
+      presentation.popup_selected_primary};
+  mixer[kColorOmniboxResultsStarterPackIcon] = {
+      presentation.popup_selected_primary};
+  mixer[kColorOmniboxActionIconHover] = {presentation.popup_button_hover};
+  mixer[kColorOmniboxIconPressed] = {presentation.popup_button_pressed};
+  mixer[kColorOmniboxContextEntrypointText] = {
+      presentation.popup_selected_primary};
+  mixer[kColorOmniboxComposeboxContextEntrypointBackground] = {
+      presentation.popup_hover};
+  mixer[kColorOmniboxComposeboxChipBackground] = {presentation.popup_hover};
+  mixer[kColorOmniboxComposeboxFaviconBackground] = {presentation.popup_hover};
+  mixer[kColorOmniboxComposeboxDivider] = {presentation.header_separator};
+  mixer[kColorOmniboxForegroundDisabled] = {
+      presentation.popup_selected_secondary};
+  mixer[kColorNewTabPageActiveBackground] = {presentation.popup_button_pressed};
 }
 
 std::unique_ptr<ui::ColorProvider>
@@ -1395,6 +1476,42 @@ void ApplyShellControlStyle(ToolbarButton& button) {
   button.SetProperty(
       views::kMarginsKey,
       gfx::Insets::VH(0, kSidebarMetrics.shell_control_horizontal_margin));
+}
+
+void ApplyBrowserSurfaceToolbarButtonColors(
+    ToolbarButton& button,
+    const BrowserSurfacePresentation* presentation) {
+  const bool custom =
+      presentation && presentation->palette_mode ==
+                          BrowserSurfacePresentation::PaletteMode::
+                              kCustomSurface;
+  const auto* previous = button.GetProperty(views::kCascadingBackgroundColor);
+  const SkColor previous_ink =
+      previous
+          ? color_utils::GetColorWithMaxContrast(previous->GetValue(&button))
+          : SK_ColorTRANSPARENT;
+  const SkColor ink =
+      custom ? color_utils::GetColorWithMaxContrast(presentation->surface)
+             : SK_ColorTRANSPARENT;
+  button.SetForegroundColorOverrides(
+      custom ? std::make_optional(presentation->primary) : std::nullopt,
+      custom ? std::make_optional(presentation->disabled) : std::nullopt);
+  SetBrowserSurfaceControlBackground(
+      button, custom ? std::make_optional(presentation->surface) : std::nullopt);
+  if (ink == previous_ink) {
+    return;
+  }
+  if (custom) {
+    CreateToolbarInkdropCallbacks(&button, SkColorSetA(ink, 0x0F),
+                                  SkColorSetA(ink, 0x1A));
+  } else {
+    CreateToolbarInkdropCallbacks(&button, kColorToolbarInkDropHover,
+                                  kColorToolbarInkDropRipple);
+  }
+  auto* const ink_drop = views::InkDrop::Get(&button);
+  if (ink_drop->HasInkDrop()) {
+    ink_drop->GetInkDrop()->HostViewThemeChanged();
+  }
 }
 
 std::unique_ptr<views::View> CreateShellControlDivider() {

@@ -7214,6 +7214,19 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/split_pane_interactive_uitest.cc::YeeContentsViewUiTest.YeeHeaderColorsFollowPageAcrossThemeChanges": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-header.sh",
+    "reason": "테마와 페이지색을 교차하고 native View의 강조색과 포커스 표시를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/split_pane_interactive_uitest.cc::YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets": {
     "os": [
       "Darwin",
@@ -9236,6 +9249,20 @@
     ],
     "binaries": [
       "yee_interactive_ui_tests"
+    ]
+  },
+  "browser/ui/yee_ui_unittest.cc::BrowserSurfacePresentationResolverTest.BookmarkOutlineAndCaptionGlyphFollowPaintedSurface": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-header.sh",
+    "reason": "창 닫기 버튼의 색 합성과 북마크 윤곽 대비를 계산한다.",
+    "binaries": [
+      "yee_header_unittests",
+      "yee_layout_unittests"
     ]
   },
   "browser/ui/yee_ui_unittest.cc::BrowserSurfacePresentationResolverTest.ExhaustiveGrayAndChromaticContrastContract": {
