@@ -208,7 +208,9 @@ Windows의 실제 앱 종료를 소유하는 `HandleAppExitingForPlatform()`에�
 | inactive Pane Header 클릭이 pane 활성화와 native 주소 편집을 한 번에 수행 | `YeeInactivePaneHeaderActivatesAddressEditing` |
 | Omnibox popup이 단일·양쪽 active pane·분할 해제 후 모두 주소 표면의 좌우 폭과 상단에 연결되고 pane 전체 폭으로 확장되지 않음 | `YeeOmniboxPopupFollowsSingleAndSplitHeader` |
 | 밝은·파란 실제 페이지의 Views·WebUI 제안 두 행에서 구분선 아래·목록 하단 8 DIP, 결과 강조 좌우 8 DIP와 네 모서리 8 DIP, WebUI 삭제·컨텍스트 아이콘에 적용된 공통 곡률, pointer hover와 방향키 선택·Escape 닫기를 확인 | `YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets` (`--yee-omnibox-popup-capture-dir`로 실제 창·팝업 PNG 저장 가능) |
-| `Use BrowserView`로 연 전체 주소 팝업의 실제 아이콘도 공통 곡률을 사용한다. | `YeeEmbeddedOmniboxPopupUiTest.IconUsesShellControlHighlight` |
+| `Use BrowserView` 전체 주소 팝업은 공통 아이콘 곡률을 사용한다. 밝은·어두운 브라우저 테마에서 입력줄과 목록을 열었을 때의 포커스 선이 페이지 팔레트를 따른다. | `YeeEmbeddedOmniboxPopupUiTest.UsesShellColorsAndControlHighlight` |
+| 밝은 테마의 검은 페이지에서 새로 설치해 고정한 확장 아이콘이 공통 곡률을 사용하고, 어두운 테마의 흰 페이지로 바꾸면 강조색도 바뀐다. | `ExtensionsBrowserTest.PinnedActionFollowsShellHover` |
+| 밝은·어두운 AI 모드 팝업의 텍스트 제안 행과 첨부 제거 버튼이 공통 곡률을 쓰고, 일반 대비에서는 행 선택 막대를 숨긴다. | `YeeOmniboxPopupViewWebUITest.YeeAimPopupOpensAndDismissesAfterClosedThemeChanges` |
 | WebUI 제안은 강제 색 없는 대비 증가, 강제 색의 custom·less에서 선택 표시를 유지하고 일반 대비에서는 Yee 행 강조를 사용 | 같은 실제 팝업의 renderer에 media emulation을 적용하고 실제 media query와 선택 행의 계산된 표시를 검사. Windows 대비 설정 전파 검증과는 별도 |
 | 선행 일반 탭 유무와 관계없이 수평 그룹의 첫 두 멤버를 연속으로 닫아도 실제 파비콘이 이름을 침범하지 않음. 접기·펼치기 모두 알약 배경을 유지하며 양 끝 사이의 중간 폭을 거치고 마지막 멤버도 정상적으로 닫힘 | `YeeHorizontalGroupTransitionsKeepHeaderClear` |
 | 맞춤설정 패널이 세로·수평 모두 창 Header 아래 행에 도킹해 닫기 버튼을 분리 | `YeeCustomizationPanelStaysBelowWindowHeader` |

@@ -83,6 +83,9 @@
     "chrome/browser/ui/toolbar/BUILD.gn": ["shell"],
     "chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc": ["shell"],
     "chrome/browser/ui/views/BUILD.gn": ["shell"],
+    "chrome/browser/ui/views/extensions/BUILD.gn": ["shell"],
+    "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc": ["shell"],
+    "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h": ["shell"],
     "chrome/browser/ui/views/find_bar_host.cc": ["shell"],
     "chrome/browser/ui/views/find_bar_view.cc": ["shell"],
     "chrome/browser/ui/views/frame/BUILD.gn": ["shell"],
@@ -95,6 +98,7 @@
     "chrome/browser/ui/views/frame/browser_native_widget_mac.mm": ["shell"],
     "chrome/browser/ui/views/frame/browser_view.cc": ["shell"],
     "chrome/browser/ui/views/frame/browser_view.h": ["shell"],
+    "chrome/browser/ui/views/frame/browser_widget.h": ["shell"],
     "chrome/browser/ui/views/frame/contents_container_outline.cc": ["shell"],
     "chrome/browser/ui/views/frame/contents_container_outline.h": ["shell"],
     "chrome/browser/ui/views/frame/contents_container_view.cc": ["shell"],
@@ -159,6 +163,7 @@
     "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc": ["shell"],
+    "chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.h": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui.cc": ["shell"],
@@ -320,6 +325,7 @@
     "ui/webui/resources/cr_components/composebox/composebox_favicon_group.css": ["shell"],
     "ui/webui/resources/cr_components/composebox/composebox_match.css": ["shell"],
     "ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css": ["shell"],
+    "ui/webui/resources/cr_components/composebox/file_thumbnail.css": ["shell"],
     "ui/webui/resources/cr_components/searchbox/searchbox_match.css": ["shell"],
     "ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css": ["shell"]
   }

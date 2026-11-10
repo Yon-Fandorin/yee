@@ -34,6 +34,7 @@
 #include "chrome/browser/ui/views/yee/yee_colors.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/menu_source_utils.h"
@@ -61,6 +62,7 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/cascading_property.h"
@@ -76,6 +78,17 @@
 #include "ui/views/widget/widget.h"
 
 namespace {
+
+class ShellToolbarActionHighlightPath : public views::HighlightPathGenerator {
+ public:
+  SkPath GetHighlightPath(const views::View* view) override {
+    gfx::Rect bounds = view->GetLocalBounds();
+    bounds.Inset(GetToolbarInkDropInsets(view));
+    const int radius = yee::kSidebarMetrics.shell_control_corner_radius;
+    return SkPath::RRect(
+        SkRRect::MakeRectXY(gfx::RectToSkRect(bounds), radius, radius));
+  }
+};
 
 constexpr char kAgentStatusDemoSwitch[] = "yee-agent-status-demo";
 constexpr char kAgentStatusSwitch[] = "yee-agent-status";
@@ -1248,6 +1261,8 @@ void AddBrowserSurfaceOmniboxPopupColorMixer(
   CHECK_EQ(presentation.palette_mode,
            BrowserSurfacePresentation::PaletteMode::kCustomSurface);
   ui::ColorMixer& mixer = provider.AddMixer();
+  mixer[kColorLocationBarBackground] = {presentation.surface};
+  mixer[kColorLocationBarBorderOnMismatch] = {presentation.header_separator};
   mixer[kColorOmniboxResultsBackground] = {presentation.surface};
   mixer[kColorOmniboxResultsBackgroundHovered] = {presentation.popup_hover};
   mixer[kColorOmniboxResultsBackgroundSelected] = {presentation.popup_selected};
@@ -1478,6 +1493,37 @@ void ApplyShellControlStyle(ToolbarButton& button) {
       gfx::Insets::VH(0, kSidebarMetrics.shell_control_horizontal_margin));
 }
 
+void ApplyShellToolbarActionHighlight(views::View& action) {
+  views::HighlightPathGenerator::Install(
+      &action, std::make_unique<ShellToolbarActionHighlightPath>());
+}
+
+void ApplyBrowserSurfaceToolbarInkDrop(views::View& control,
+                                      std::optional<SkColor> surface) {
+  const auto* previous = control.GetProperty(views::kCascadingBackgroundColor);
+  const SkColor previous_ink =
+      previous
+          ? color_utils::GetColorWithMaxContrast(previous->GetValue(&control))
+          : SK_ColorTRANSPARENT;
+  const SkColor ink = surface ? color_utils::GetColorWithMaxContrast(*surface)
+                              : SK_ColorTRANSPARENT;
+  SetBrowserSurfaceControlBackground(control, surface);
+  if (ink == previous_ink) {
+    return;
+  }
+  if (surface) {
+    CreateToolbarInkdropCallbacks(&control, SkColorSetA(ink, 0x0F),
+                                   SkColorSetA(ink, 0x1A));
+  } else {
+    CreateToolbarInkdropCallbacks(&control, kColorToolbarInkDropHover,
+                                   kColorToolbarInkDropRipple);
+  }
+  auto* const ink_drop = views::InkDrop::Get(&control);
+  if (ink_drop->HasInkDrop()) {
+    ink_drop->GetInkDrop()->HostViewThemeChanged();
+  }
+}
+
 void ApplyBrowserSurfaceToolbarButtonColors(
     ToolbarButton& button,
     const BrowserSurfacePresentation* presentation) {
@@ -1485,33 +1531,11 @@ void ApplyBrowserSurfaceToolbarButtonColors(
       presentation && presentation->palette_mode ==
                           BrowserSurfacePresentation::PaletteMode::
                               kCustomSurface;
-  const auto* previous = button.GetProperty(views::kCascadingBackgroundColor);
-  const SkColor previous_ink =
-      previous
-          ? color_utils::GetColorWithMaxContrast(previous->GetValue(&button))
-          : SK_ColorTRANSPARENT;
-  const SkColor ink =
-      custom ? color_utils::GetColorWithMaxContrast(presentation->surface)
-             : SK_ColorTRANSPARENT;
   button.SetForegroundColorOverrides(
       custom ? std::make_optional(presentation->primary) : std::nullopt,
       custom ? std::make_optional(presentation->disabled) : std::nullopt);
-  SetBrowserSurfaceControlBackground(
+  ApplyBrowserSurfaceToolbarInkDrop(
       button, custom ? std::make_optional(presentation->surface) : std::nullopt);
-  if (ink == previous_ink) {
-    return;
-  }
-  if (custom) {
-    CreateToolbarInkdropCallbacks(&button, SkColorSetA(ink, 0x0F),
-                                  SkColorSetA(ink, 0x1A));
-  } else {
-    CreateToolbarInkdropCallbacks(&button, kColorToolbarInkDropHover,
-                                  kColorToolbarInkDropRipple);
-  }
-  auto* const ink_drop = views::InkDrop::Get(&button);
-  if (ink_drop->HasInkDrop()) {
-    ink_drop->GetInkDrop()->HostViewThemeChanged();
-  }
 }
 
 std::unique_ptr<views::View> CreateShellControlDivider() {

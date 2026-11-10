@@ -178,6 +178,12 @@
         },
         {
           "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc",
+          "allowed": 2,
+          "reason": "고정 확장 조작부와 사이드 패널 닫기 버튼이 페이지 팔레트의 native 여부와 공통 강조 정책을 적용한다."
+        },
+        {
+          "metric": "yee_includes",
           "path": "chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc",
           "allowed": 1,
           "reason": "BrowserView에 직접 붙는 주소 팝업에도 기존 Yee 스타일을 적용한다."

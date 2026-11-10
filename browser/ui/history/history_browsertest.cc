@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -24,6 +26,8 @@
 #include "content/public/browser/web_ui.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "content/public/test/test_devtools_protocol_client.h"
+#include "ui/gfx/color_utils.h"
 
 namespace yee {
 namespace {
@@ -78,6 +82,70 @@ class HistoryBrowserTest : public InProcessBrowserTest {
                                                                query)));
   }
 
+  void ExpectDeleteButtonContrast() {
+    content::TestDevToolsProtocolClient devtools;
+    devtools.AttachToWebContents(Contents());
+    base::ScopedClosureRunner detach(base::BindOnce(
+        &content::TestDevToolsProtocolClient::DetachProtocolClient,
+        base::Unretained(&devtools)));
+    ASSERT_TRUE(devtools.SendCommandSync("DOM.enable"));
+    ASSERT_TRUE(devtools.SendCommandSync("CSS.enable"));
+    const auto* document = devtools.SendCommandSync("DOM.getDocument");
+    ASSERT_TRUE(document);
+    const auto* button = devtools.SendCommandSync(
+        "DOM.querySelector",
+        base::DictValue()
+            .Set("nodeId", document->FindIntByDottedPath("root.nodeId").value())
+            .Set("selector", "[data-slot=alert-dialog-action]"));
+    ASSERT_TRUE(button);
+    const int button_id = button->FindInt("nodeId").value_or(0);
+    ASSERT_GT(button_id, 0);
+
+    // 실제 :hover 스타일을 적용하고, 색 전환이 끝난 뒤 최종 대비를 읽는다.
+    for (const char* scheme : {"light", "dark"}) {
+      SCOPED_TRACE(scheme);
+      ASSERT_TRUE(devtools.SendCommandSync(
+          "Emulation.setEmulatedMedia",
+          base::DictValue().Set("features", base::ListValue().Append(
+              base::DictValue().Set("name", "prefers-color-scheme")
+                  .Set("value", scheme)))));
+      ASSERT_TRUE(devtools.SendCommandSync(
+          "CSS.forcePseudoState",
+          base::DictValue().Set("nodeId", button_id).Set(
+              "forcedPseudoClasses", base::ListValue().Append("hover"))));
+      const auto colors = content::EvalJs(Contents(), R"JS(
+        (async () => {
+          const button = document.querySelector('[data-slot=alert-dialog-action]');
+          const dialog = button.closest('[role=alertdialog]');
+          const style = getComputedStyle(button);
+          const dialogStyle = getComputedStyle(dialog);
+          // 계산된 스타일을 읽어 미디어·hover 변경이 만든 전환을 시작한다.
+          style.color;
+          dialogStyle.backgroundColor;
+          await Promise.allSettled([button, dialog].flatMap(node =>
+              node.getAnimations().map(animation => animation.finished)));
+          const canvas = document.createElement('canvas').getContext('2d',
+              {willReadFrequently: true});
+          const composite = (color) => {
+            canvas.fillStyle = color;
+            canvas.fillRect(0, 0, 1, 1);
+            const [r, g, b] = canvas.getImageData(0, 0, 1, 1).data;
+            return (r << 16) | (g << 8) | b;
+          };
+          composite(dialogStyle.backgroundColor);
+          return [composite(style.backgroundColor), composite(style.color)];
+        })()
+      )JS");
+      ASSERT_TRUE(colors.is_list()) << colors;
+      const auto& pixels = colors.ExtractList();
+      ASSERT_EQ(pixels.size(), 2u);
+      const SkColor background = SkColorSetA(pixels[0].GetInt(), SK_AlphaOPAQUE);
+      const SkColor foreground = SkColorSetA(pixels[1].GetInt(), SK_AlphaOPAQUE);
+      EXPECT_GE(color_utils::GetContrastRatio(foreground, background),
+                color_utils::kMinimumReadableContrastRatio);
+    }
+  }
+
   raw_ptr<history::HistoryService> service_ = nullptr;
   base::Time visit_time_;
 };
@@ -119,6 +187,7 @@ IN_PROC_BROWSER_TEST_F(HistoryBrowserTest,
   EXPECT_EQ(true,
             content::EvalJs(Contents(),
                             "!!document.querySelector('[role=alertdialog]')"));
+  ASSERT_NO_FATAL_FAILURE(ExpectDeleteButtonContrast());
   ASSERT_TRUE(content::ExecJs(
       Contents(),
       "document.querySelector('[data-slot=alert-dialog-cancel]').click()"));

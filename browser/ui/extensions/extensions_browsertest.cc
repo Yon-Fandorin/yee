@@ -10,10 +10,18 @@
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/policy/policy_test_utils.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/toolbar/toolbar_actions_model.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/internal_page_test_support.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/views/yee/webui/grit/webui_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -31,7 +39,17 @@
 #include "extensions/common/extension.h"
 #include "extensions/common/mojom/manifest.mojom.h"
 #include "extensions/test/test_extension_dir.h"
+#include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/compositor/layer_solid_color.h"
+#include "ui/gfx/color_utils.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_highlight.h"
+#include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/view_class_properties.h"
+#include "ui/views/widget/widget.h"
 
 namespace yee {
 namespace {
@@ -142,6 +160,48 @@ class ExtensionsBrowserTest : public extensions::ExtensionBrowserTest {
   std::string second_id_;
   testing::NiceMock<policy::MockConfigurationPolicyProvider> policy_provider_;
 };
+
+IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest, PinnedActionFollowsShellHover) {
+  auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  auto* source = BrowserSurfaceColorController::FromWebContents(Contents());
+  ASSERT_TRUE(source);
+  auto* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* toolbar = view->toolbar()->extensions_container_for_testing();
+  ASSERT_TRUE(toolbar);
+  auto* model = ToolbarActionsModel::Get(browser()->GetProfile());
+  ASSERT_TRUE(model);
+
+  // 브라우저 테마와 반대 명도의 페이지에서도 마우스 강조색은 페이지를 따른다.
+  theme->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  source->SetPageSurfaceColorForTesting(SK_ColorBLACK);
+  extensions::TestExtensionDir directory;
+  directory.WriteManifest(R"({
+    "manifest_version": 3, "name": "Pinned action", "version": "1.0",
+    "action": {}
+  })");
+  const auto* extension = LoadExtension(directory.UnpackedPath());
+  ASSERT_TRUE(extension);
+  model->SetActionVisibility(extension->id(), true);
+  auto* action = toolbar->GetViewForId(extension->id());
+  ASSERT_TRUE(action);
+  view->GetWidget()->LayoutRootViewIfNecessary();
+  ASSERT_TRUE(action->GetVisible());
+  auto* path = action->GetProperty(views::kHighlightPathGeneratorKey);
+  ASSERT_TRUE(path);
+  SkRRect highlight;
+  ASSERT_TRUE(path->GetHighlightPath(action).isRRect(&highlight));
+  EXPECT_EQ(kSidebarMetrics.shell_control_corner_radius,
+            highlight.getSimpleRadii().x());
+
+  const auto hover_color = [&] {
+    auto hover = views::InkDrop::Get(action)->CreateInkDropHighlight();
+    return hover->layer()->AsSolidColor()->background_color().toSkColor();
+  };
+  EXPECT_EQ(color_utils::GetColorWithMaxContrast(SK_ColorBLACK), hover_color());
+  theme->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  source->SetPageSurfaceColorForTesting(SK_ColorWHITE);
+  EXPECT_EQ(color_utils::GetColorWithMaxContrast(SK_ColorWHITE), hover_color());
+}
 
 IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest,
                        NativeListSearchAndEnabledEvents) {

@@ -50,6 +50,8 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
+#include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
+#include "chrome/browser/ui/views/yee/internal_page_test_support.h"
 #include "chrome/browser/ui/views/yee/native_browser_test_support.h"
 #include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_handler.h"
@@ -84,6 +86,7 @@
 #include "ui/compositor/compositor.h"
 #include "ui/native_theme/mock_os_settings_provider.h"
 #include "ui/views/controls/webview/webview.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/test/widget_activation_waiter.h"
 #include "ui/views/view_tracker.h"
 #include "ui/views/view_utils.h"
@@ -265,7 +268,7 @@ class YeeEmbeddedOmniboxPopupUiTest : public YeeOmniboxPopupViewWebUITest {
 };
 
 IN_PROC_BROWSER_TEST_F(YeeEmbeddedOmniboxPopupUiTest,
-                       IconUsesShellControlHighlight) {
+                       UsesShellColorsAndControlHighlight) {
   auto* const location = location_bar_view();
   location->FocusLocation(/*is_user_initiated=*/false,
                           /*clear_focus_if_failed=*/false);
@@ -294,6 +297,80 @@ IN_PROC_BROWSER_TEST_F(YeeEmbeddedOmniboxPopupUiTest,
       return getComputedStyle(icon).borderRadius === $1 + 'px';
     })()
   )", radius)));
+
+  auto* source = yee::BrowserSurfaceColorController::FromWebContents(
+      browser()->tab_strip_model()->GetActiveWebContents());
+  ASSERT_TRUE(source);
+  auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto expect_focus = [&](SkColor surface, bool has_results,
+                                bool focused = true) {
+    SCOPED_TRACE(has_results ? "results open" : "results closed");
+    SCOPED_TRACE(focused ? "focused" : "unfocused");
+    const auto* presentation = location->GetCompactShellPopupPresentation();
+    ASSERT_TRUE(presentation);
+    EXPECT_EQ(surface, presentation->surface);
+    const SkColor focus = presentation->focus_stroke;
+    const auto result = content::EvalJs(
+        contents, WaitForInternalPageScript(content::JsReplace(R"JS(
+          (() => {
+            const app = document.querySelector('omnibox-full-app');
+            const box = app.shadowRoot.querySelector('omnibox-popup-searchbox');
+            if (box.hasAttribute('dropdown-is-visible') !== $1) return false;
+            const wrapper = box.shadowRoot.querySelector('#inputWrapper');
+            const ring = $1 ? box.shadowRoot.querySelector('#input') : wrapper;
+            return getComputedStyle(wrapper).backgroundColor ===
+                `rgb($2, $3, $4)` && (getComputedStyle(ring).boxShadow.includes(
+                `rgb($5, $6, $7)`) === $8);
+          })()
+        )JS", has_results, static_cast<int>(SkColorGetR(surface)),
+            static_cast<int>(SkColorGetG(surface)),
+            static_cast<int>(SkColorGetB(surface)),
+            static_cast<int>(SkColorGetR(focus)),
+            static_cast<int>(SkColorGetG(focus)),
+            static_cast<int>(SkColorGetB(focus)), focused)));
+    ASSERT_EQ(true, result);
+  };
+
+  // 브라우저 테마가 바뀌어도 실제 팝업은 현재 페이지 바탕을 따른다.
+  constexpr SkColor kMidGray = SkColorSetRGB(136, 136, 136);
+  theme->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  source->SetPageSurfaceColorForTesting(kMidGray);
+  auto* focus_manager = location->GetFocusManager();
+  ASSERT_TRUE(focus_manager);
+  focus_manager->SetFocusedView(omnibox_view_views());
+  ASSERT_TRUE(omnibox_view_views()->HasFocus());
+  popup->UpdatePopupAppearance();
+  ASSERT_TRUE(popup->popup_frame()->GetVisible());
+  ASSERT_NO_FATAL_FAILURE(expect_focus(kMidGray, /*has_results=*/false));
+
+  // 이 실험 경로의 WebUI는 첫 편집 상태를 받지 않는다. 실제 질의 처리로
+  // 목록을 열고 native 편집기와 WebUI 입력의 포커스를 각각 검사한다.
+  edit_model()->SetUserText(u"example.test");
+  ASSERT_TRUE(content::ExecJs(contents, R"JS(
+    (() => {
+      const app = document.querySelector('omnibox-full-app');
+      const box = app.shadowRoot.querySelector('omnibox-popup-searchbox');
+      box.queryAutocomplete('example.test', true, false);
+    })();
+  )JS"));
+  ASSERT_NO_FATAL_FAILURE(expect_focus(kMidGray, /*has_results=*/true));
+
+  theme->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  source->SetPageSurfaceColorForTesting(SK_ColorWHITE);
+  ASSERT_NO_FATAL_FAILURE(expect_focus(SK_ColorWHITE, /*has_results=*/true));
+  focus_manager->ClearFocus();
+  ASSERT_TRUE(popup->popup_frame()->GetVisible());
+  ASSERT_NO_FATAL_FAILURE(expect_focus(SK_ColorWHITE, /*has_results=*/true,
+                                      /*focused=*/false));
+
+  ASSERT_TRUE(content::ExecJs(contents, R"JS(
+    (() => {
+      const app = document.querySelector('omnibox-full-app');
+      const box = app.shadowRoot.querySelector('omnibox-popup-searchbox');
+      box.shadowRoot.querySelector('#input').focus();
+    })();
+  )JS"));
+  ASSERT_NO_FATAL_FAILURE(expect_focus(SK_ColorWHITE, /*has_results=*/true));
 }
 
 class YeeOmniboxPopupAimShadowGeometryTest
@@ -654,6 +731,40 @@ IN_PROC_BROWSER_TEST_F(YeeOmniboxPopupViewWebUITest,
     auto* const content =
         static_cast<OmniboxAimPopupWebUIContent*>(presenter->GetWebUIContent());
     ASSERT_TRUE(content::WaitForLoadStop(content->GetWebContents()));
+    if (close_method < 2) {
+      // 네트워크 추천이나 업로드 없이 실제 AIM 팝업의 두 렌더러를 검사한다.
+      ASSERT_EQ(true, content::EvalJs(
+          content->GetWebContents(), content::JsReplace(R"JS(
+        (async () => {
+          await customElements.whenDefined('omnibox-aim-app');
+          const app = document.querySelector('omnibox-aim-app');
+          await app.updateComplete;
+          const box = app.shadowRoot.querySelector('#composebox');
+          await box.updateComplete;
+          const fixture = document.createElement('div');
+          fixture.style.position = 'absolute';
+          const row = document.createElement('cr-composebox-match');
+          row.setAttribute('selected', '');
+          const attachment = document.createElement('cr-composebox-file-thumbnail');
+          attachment.file = {...attachment.file, name: 'sample.pdf', type: 'application/pdf'};
+          fixture.append(row, attachment);
+          box.shadowRoot.append(fixture);
+          await Promise.all([row.updateComplete, attachment.updateComplete]);
+          const match = getComputedStyle(row.shadowRoot.querySelector('.container'));
+          const indicator = getComputedStyle(row.shadowRoot.querySelector('#focusIndicator'));
+          const remove = getComputedStyle(attachment.shadowRoot.querySelector('.remove-button'));
+          const matches = match.borderRadius === $1 + 'px' &&
+              match.marginInlineStart === $2 + 'px' &&
+              match.marginInlineEnd === $2 + 'px' &&
+              match.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+              indicator.display === 'none' && remove.borderRadius === $3 + 'px';
+          fixture.remove();
+          return matches;
+        })()
+      )JS", yee::kSidebarMetrics.omnibox_popup_row_corner_radius,
+                            yee::kSidebarMetrics.omnibox_popup_row_inset,
+                            yee::kSidebarMetrics.shell_control_corner_radius)));
+    }
     ASSERT_TRUE(applied_.Run(
         {Omnibox({}, AppliedMatch::kOmniboxTransitionComplete, true)}, [] {},
         AppliedDomain::kWidget, TestTimeouts::action_timeout(), true));

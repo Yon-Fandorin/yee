@@ -642,6 +642,7 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/tabs/saved_tab_groups:test_support",
     "//chrome/browser/ui/thumbnails",
     "//chrome/browser/ui/views/animations",
+    "//chrome/browser/ui/views/extensions:extensions_toolbar_desktop",
     "//chrome/browser/ui/views/frame:browser_view_header",
     "//chrome/browser/ui/views/frame:browser_view_layout",
     "//chrome/browser/ui/views/frame:browser_view_tabbed_layout_impl",

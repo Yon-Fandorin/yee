@@ -516,7 +516,7 @@
     },
     "header": {
       "script": "test-header.sh",
-      "sha256": "055c3d7470d3ec2a226d00cdab46f8f76c425afea11a987e2bf38cdaaaf0b45c",
+      "sha256": "1443fc6e3815bc1733d73c1f4944b5a33c6c6a2f78404b5f1ad194832d457aaa",
       "default": "unit",
       "required": [
         "all"
@@ -568,7 +568,7 @@
             "YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility",
             "YeeContentsViewUiTest.YeeHeaderColorsFollowPageAcrossThemeChanges",
             "YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets",
-            "YeeEmbeddedOmniboxPopupUiTest.IconUsesShellControlHighlight"
+            "YeeEmbeddedOmniboxPopupUiTest.UsesShellColorsAndControlHighlight"
           ],
           "display": true,
           "arguments": [

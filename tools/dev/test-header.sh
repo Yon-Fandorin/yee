@@ -23,7 +23,7 @@ INTERACTIVE_FILTER+=':SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBound
 INTERACTIVE_FILTER+=':YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility'
 INTERACTIVE_FILTER+=':YeeContentsViewUiTest.YeeHeaderColorsFollowPageAcrossThemeChanges'
 INTERACTIVE_FILTER+=':YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets'
-INTERACTIVE_FILTER+=':YeeEmbeddedOmniboxPopupUiTest.IconUsesShellControlHighlight'
+INTERACTIVE_FILTER+=':YeeEmbeddedOmniboxPopupUiTest.UsesShellColorsAndControlHighlight'
 RTL_FILTER='SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*:SplitTabLayout/YeeMultiContentsViewUiTest.YeePresentationFollowsSingleAndSplitSources/*'
 
 if [[ "$SKIP_BUILD" == false ]]; then

@@ -194,6 +194,9 @@ void UpdateOmniboxRestingTextView(
     std::optional<SkColor> control_background = std::nullopt);
 
 void ApplyShellControlStyle(ToolbarButton& button);
+void ApplyShellToolbarActionHighlight(views::View& action);
+void ApplyBrowserSurfaceToolbarInkDrop(views::View& control,
+                                      std::optional<SkColor> surface);
 // 현재 페이지 바탕을 아이콘, 포커스와 마우스 반응에 함께 적용한다.
 void ApplyBrowserSurfaceToolbarButtonColors(
     ToolbarButton& button,
