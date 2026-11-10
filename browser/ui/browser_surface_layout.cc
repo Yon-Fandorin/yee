@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "base/numerics/safe_conversions.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_layout.h"
 #include "chrome/browser/ui/views/yee/shell_features.h"
@@ -214,6 +215,14 @@ ResolvedSplitPaneHeaderLayout ResolveSplitPaneHeaderLayout(
   return result.supported ? result : resolve(true);
 }
 
+BrowserSurfaceEdgeStyle ResolveBrowserSurfaceEdgeStyle(
+    double content_fullscreen_fraction) {
+  const double shell_fraction = 1.0 - content_fullscreen_fraction;
+  return {base::ClampRound(kSidebarMetrics.content_gutter * shell_fraction),
+          static_cast<float>(kSidebarMetrics.content_corner_radius *
+                             shell_fraction)};
+}
+
 ResolvedBrowserSurfaceSeed ResolveBrowserSurfaceSeed(
     const BrowserSurfaceSeedInput& input) {
   ResolvedBrowserSurfaceSeed result;
@@ -270,6 +279,9 @@ ResolvedBrowserSurfaceFrame ResolveBrowserSurfaceFrame(
 
   result.decoration.combined_outline_bounds = result.main_surface_bounds;
   result.decoration.mode = input.mode;
+  if (input.content_fullscreen_edges) {
+    return result;
+  }
   result.decoration.combined_outline_visible =
       !result.split && !result.main_surface_bounds.IsEmpty();
   const bool connected_header =

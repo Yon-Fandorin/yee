@@ -51,6 +51,7 @@ case "$(uname -s)" in
     POPUP_UX_FILTER+=':YeeCustomizeChromeInteractiveTest.YeeTabLayoutSelectPopupFollowsItsHost'
     HORIZONTAL_GROUP_UX_FILTER+=':TabDragging/YeeDetachToBrowserTabDragControllerTest.YeeGroupMembershipDragSurvivesLayoutSwitch/0'
     INTERACTIVE_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsNativeClipSurvivesRendererAttachment'
+    INTERACTIVE_FILTER+=':YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeWindowsContentFullscreenFillsWindowAndRestoresF11'
     HORIZONTAL_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsHorizontalTabsConnectPageSurfaceToHeader:YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSplitThemeChangesKeepCaptionReservations:CaptionPresentation/YeeWindowsCaptionInputUiTest.HoverUsesVisibleControlBounds/*'
     HORIZONTAL_FILTER+=':YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsCaptionButtonsChangeWindowState:YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose:YeeWindowsStartupUiTest.StartupAndHorizontalTabRoundTrip'
     ;;

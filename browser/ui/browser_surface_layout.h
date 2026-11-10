@@ -113,6 +113,14 @@ struct ResolvedSplitPaneHeaderLayout {
 ResolvedSplitPaneHeaderLayout ResolveSplitPaneHeaderLayout(
     const SplitPaneHeaderLayoutInput& input);
 
+struct BrowserSurfaceEdgeStyle {
+  int gutter = 0;
+  float corner_radius = 0.0f;
+};
+
+BrowserSurfaceEdgeStyle ResolveBrowserSurfaceEdgeStyle(
+    double content_fullscreen_fraction);
+
 struct BrowserSurfaceSeedInput {
   gfx::Rect content_column_bounds;
   gfx::Insets surface_insets;
@@ -163,6 +171,7 @@ struct BrowserSurfaceFrameInput {
   std::optional<gfx::Rect> connected_side_panel_resize_gutter = std::nullopt;
   BrowserSurfaceMode mode = BrowserSurfaceMode::kCard;
   bool side_panel_surface_visible = false;
+  bool content_fullscreen_edges = false;
 };
 
 enum class BrowserSurfaceHeaderSeparatorOwner {

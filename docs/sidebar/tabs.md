@@ -261,6 +261,10 @@ permission/security semantic highlight 중에는 native 동작대로 숨긴다.
       않고 시스템 라이트·다크 테마의 surface/on-surface/state 색으로 함께 전환된다.
 - [ ] 두 카드의 네 모서리 모두 12 DIP로 보이고, 특히 하단 좌우가 사각형으로
       돌아가거나 page 배경이 카드 밖으로 넘치지 않는다.
+- [ ] 분할 탭에서 콘텐츠 전체화면에 들어가면 활성 페이지가 네 변에 닿고 카드
+      여백과 곡률이 사라진다. Esc 뒤에는 기존 분할 배치와 각 카드의 clip이 복원된다.
+- [ ] F11에서 영상 전체화면으로 전환하면 창 크기 변화 없이 페이지 여백과
+      모서리가 함께 줄어든다. Esc 뒤에는 F11 화면의 여백과 곡률이 돌아온다.
 - [ ] 스크롤 가능한 일반 한 탭에서 우측 scrollbar와 하단 scrollbar corner가
       Browser Surface의 하단 12 DIP 곡률 또는 Content Gutter로 뚫고 나오지 않는다.
 - [ ] 좌우·위아래 분할의 두 pane을 각각 스크롤해도 overlay scrollbar가 네 모서리,

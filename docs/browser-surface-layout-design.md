@@ -409,16 +409,15 @@ background visible must respect this distinction.
 
 ### 5.5 Fullscreen and immersive modes
 
-Window state alone does not remove Yee's inset or radii. This follows the
-existing product spec, which keeps the final canvas/inset/corner/shadow contract
-in fullscreen and defers automatic window-state corner changes.
+Browser fullscreen uses the normal Surface edge treatment. Content fullscreen
+uses the fullscreen client area with zero inset, radius, outline, and shadow.
 
 | State | Header/Sidebar participation | Surface result | InfoBar |
 | --- | --- | --- | --- |
 | restored or maximized | actual visible Yee chrome participates | integrated single or split | use native visibility predicate |
 | browser fullscreen with always-show toolbar | toolbar and actual Sidebar participate | integrated single or split | use native visibility predicate |
 | browser fullscreen with toolbar hidden | no fixed Header row; Sidebar follows Chromium's actual tab-strip decision | 6-DIP inset Surface remains; single page owns all four 12-DIP outer corners | show only when `IsInfobarVisible()` permits |
-| renderer/content fullscreen | no invented toolbar/Sidebar reservation | preserve the inset Surface contract pending the separately deferred compositor/product decision | show only when `ShouldHideInFullscreen()` permits |
+| renderer/content fullscreen | Header, Sidebar, split presentation, and Side Panel do not reserve space | the active page extends to the client edges without a card outline or shadow | show only when `ShouldHideInFullscreen()` permits |
 | immersive enabled, hidden | no overlay-toolbar reservation | same bounds as the corresponding hidden-toolbar state | native predicate |
 | immersive reveal | revealed top container overlays; it does not add a second 48-DIP row or reflow the Surface | underlying Surface bounds remain stable | retain Chromium's extra paint offset behavior |
 | enter/exit transition | keep the last current viewport visible while cancelling oversized target outsets; platform transition epoch decides when destination chrome participates | resolve and apply the destination once its native callback reports authoritative bounds | no stale target clip or duplicate layout |
@@ -427,13 +426,19 @@ A row in which the Header does not participate resolves `header_bounds` to an
 empty rectangle. Consumers do not infer a hidden Header from a stale 42/48-DIP
 height.
 
-A hidden Header changes which child owns the upper corners; it does not imply
-full-bleed content. Any future decision to make renderer fullscreen full-bleed
-must first update `browser-shell-spec.md` and the split checklist, then receive
-native compositor validation.
+When a single page switches between hidden-toolbar browser fullscreen and
+content fullscreen in the same window bounds, the Surface layout eases the inset
+and radius together over 140 ms if there is no participating Sidebar, Side Panel,
+or visible InfoBar. On Windows, a same-window tab fullscreen change applies its
+layout before notifying the renderer. The entry clips the final viewport as the
+inset shrinks. When returning to browser fullscreen on Windows, a single page
+without docked DevTools uses the destination page viewport immediately and
+scales its native surface to the animated bounds. Native window transitions
+apply their destination geometry at the existing completion callback. Reduced
+motion applies the destination immediately.
 
-Fullscreen is not one synchronous path. A `SurfaceGeometryTransitionEpoch`
-records source state, destination state, platform path, generation, and phase.
+A native fullscreen window change uses a `SurfaceGeometryTransitionEpoch` to
+record its source state, destination state, platform path, generation, and phase.
 At transition start, MCV cancels target-size animation/outsets and every
 ContentsContainer reapplies its native clips from the last *current* viewport;
 it does not clear to an unbounded clip. Normal layout may then be suppressed.
@@ -448,7 +453,7 @@ The verification paths are explicit:
 | macOS legacy/synchronous and native asynchronous fullscreen | preserve overlay-widget anchor reparenting, cancel current target outsets before reparent, then apply destination after native fullscreen state is authoritative |
 | Windows asynchronous fullscreen feature on/off | cover both paths and defer WCO refresh until the destination frame; WCO must not trigger a second stale Surface proposal |
 | Linux asynchronous window-manager fullscreen | tolerate delayed/reversed WM state, maximize/tile interaction, and close during transition; generation rejects late callbacks |
-| immersive hidden/reveal/always-toolbar | reveal remains an overlay over stable underlying geometry; a real browser/content-fullscreen state change starts a new epoch |
+| immersive hidden/reveal/always-toolbar | reveal overlays the stable layout. A native fullscreen window change starts a new epoch. A same-window switch between browser and content fullscreen uses the stable epoch. |
 
 `in_process_fullscreen_` is only one legacy guard and is not the transition
 contract. Tests must cover interrupt/reverse and close during every applicable
@@ -732,8 +737,9 @@ Corner radii are resolved by role, not copied to every child:
 - integrated single page: upper corners 0, lower corners 12;
 - split Pane Card: card outline 12 on all corners; Pane Header inner upper
   corners 11; page viewport upper corners 0 and lower corners 11;
-- hidden-Header fullscreen single page: all four page corners 12, matching the
-  still-inset outer Surface;
+- a single page in hidden-Header browser fullscreen uses 12 DIP on all four
+  corners, matching the inset outer Surface.
+- content fullscreen uses 0 DIP on all four page corners.
 - single pane with a `kContent` Side Panel: the page-facing internal panel edge
   is square and separated by native panel chrome; the panel/background owns the
   outer trailing lower corner. A `kToolbar` panel leaves the reduced main

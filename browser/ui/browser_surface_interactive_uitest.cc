@@ -25,6 +25,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/scoped_multi_source_observation.h"
+#include "base/scoped_observation.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/scoped_feature_list.h"
@@ -233,7 +234,11 @@
 #include "content/public/common/isolated_world_ids.h"
 #include "net/dns/mock_host_resolver.h"
 #include "ui/aura/window.h"
+#include "ui/aura/window_observer.h"
+#include "ui/aura/window_tree_host.h"
 #include "ui/base/hit_test.h"
+#include "ui/events/event.h"
+#include "ui/events/event_sink.h"
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -5517,6 +5522,313 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
     capture_window(browser_view->GetWidget(), "window");
   }
 }
+
+#if BUILDFLAG(IS_WIN)
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplTabAnimationUiTest,
+                       YeeWindowsContentFullscreenFillsWindowAndRestoresF11) {
+  using yee::test::AppliedDomain;
+  using yee::test::AppliedMatch;
+  using ShowState = yee::test::WidgetStateMatches::ShowState;
+  auto reduced_motion =
+      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  ASSERT_TRUE(view->UsesYeeBrowserSurfaceGeometry());
+  auto* const panes = view->multi_contents_view();
+  auto* const model = browser()->tab_strip_model();
+  auto* const contents = model->GetActiveWebContents();
+  ASSERT_TRUE(content::ExecJs(
+      contents, "document.body.innerHTML = '<video id=video></video>';"));
+  auto* const widget = view->GetWidget();
+  const bool background =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          "yee-test-tier") == "background";
+  if (!background) {
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+  }
+  const auto press_key = [&](ui::KeyboardCode key) {
+    if (!background) {
+      ASSERT_TRUE(yee::test::SendKeyPressSync(browser(), key, false, false,
+                                              false, false));
+      return;
+    }
+    // 백그라운드 검사는 이 브라우저의 Aura 창에만 키를 전달한다.
+    view->GetActiveContentsWebView()->RequestFocus();
+    for (auto type :
+         {ui::EventType::kKeyPressed, ui::EventType::kKeyReleased}) {
+      ui::KeyEvent event(type, key, ui::EF_NONE);
+      std::ignore =
+          view->GetNativeWindow()->GetHost()->GetEventSink()->OnEventFromSource(
+              &event);
+    }
+  };
+  const auto request_video_fullscreen = [&] {
+    view->GetActiveContentsWebView()->RequestFocus();
+    contents->Focus();
+    ASSERT_TRUE(content::ExecJs(
+        contents, "document.querySelector('video').requestFullscreen()"));
+  };
+  const auto press_escape = [&] {
+    ASSERT_TRUE(content::ExecJs(contents, R"(
+      window.fullscreenExited = new Promise(resolve => {
+        const onChange = () => {
+          if (document.fullscreenElement)
+            return;
+          document.removeEventListener('fullscreenchange', onChange);
+          resolve();
+        };
+        document.addEventListener('fullscreenchange', onChange);
+        onChange();
+      });
+      void 0;
+    )"));
+    press_key(ui::VKEY_ESCAPE);
+    ASSERT_TRUE(content::ExecJs(contents, "window.fullscreenExited"));
+  };
+  const auto change_window_state = [&](ShowState destination, auto action) {
+    return applied_.Run({applied_.Widget(*widget, {.show_state = destination},
+                                         AppliedMatch::kWidgetShowState)},
+                        action, AppliedDomain::kWidget);
+  };
+
+  ApplyScheduledLayout();
+  const ShowState initial_state =
+      widget->IsMaximized() ? ShowState::kMaximized : ShowState::kNormal;
+  const gfx::Rect initial_bounds = panes->bounds();
+  ASSERT_TRUE(
+      change_window_state(ShowState::kFullscreen, request_video_fullscreen));
+  ApplyScheduledLayout();
+  EXPECT_EQ(view->GetLocalBounds(), panes->bounds());
+  EXPECT_TRUE(panes->GetActiveContentsView()->GetBackgroundRadii().IsEmpty());
+  EXPECT_FALSE(panes->target_content_bounds_for_testing());
+  ASSERT_TRUE(change_window_state(initial_state, press_escape));
+  ApplyScheduledLayout();
+  EXPECT_EQ(initial_bounds, panes->bounds());
+
+  ASSERT_TRUE(change_window_state(ShowState::kFullscreen,
+                                  [&] { press_key(ui::VKEY_F11); }));
+  ASSERT_TRUE(view->IsFullscreen());
+  ApplyScheduledLayout();
+
+  const gfx::Rect fullscreen_bounds = view->GetLocalBounds();
+  gfx::Rect f11_bounds = fullscreen_bounds;
+  f11_bounds.Inset(gfx::Insets(yee::kSidebarMetrics.content_gutter));
+  EXPECT_EQ(f11_bounds, panes->bounds());
+  auto* const container = panes->GetActiveContentsContainerView();
+  ASSERT_TRUE(container);
+  const auto f11_radii =
+      gfx::RoundedCornersF(yee::kSidebarMetrics.content_corner_radius);
+  EXPECT_EQ(f11_radii, container->contents_view()->GetBackgroundRadii());
+  const auto* const layout = static_cast<BrowserViewTabbedLayoutImpl*>(
+      view->GetBrowserViewLayoutForTesting());
+
+  const auto enter_content_fullscreen = [&] {
+    return applied_.Run({applied_.View(*panes, {.bounds = fullscreen_bounds},
+                                       AppliedMatch::kViewBounds)},
+                        request_video_fullscreen);
+  };
+  const auto exit_content_fullscreen = [&](const gfx::Rect& bounds) {
+    return applied_.Run({applied_.View(*panes, {.bounds = bounds},
+                                       AppliedMatch::kViewBounds)},
+                        press_escape);
+  };
+  ASSERT_TRUE(enter_content_fullscreen());
+  ASSERT_TRUE(layout->last_native_layout_for_testing());
+  const auto& fullscreen = *layout->last_native_layout_for_testing();
+  EXPECT_TRUE(fullscreen.surface_chrome_state.content_fullscreen);
+  EXPECT_FALSE(fullscreen.combined_surface_outline_visible);
+  EXPECT_TRUE(container->contents_view()->GetBackgroundRadii().IsEmpty());
+  EXPECT_EQ(fullscreen_bounds,
+            container->GetPageViewportGeometry().current_viewport_in_container);
+  EXPECT_FALSE(panes->target_content_bounds_for_testing());
+  const auto renderer_size = [&] {
+    return content::EvalJs(contents, "[innerWidth, innerHeight].join('x')")
+        .ExtractString();
+  };
+  const std::string fullscreen_renderer_size = renderer_size();
+
+  ASSERT_TRUE(exit_content_fullscreen(f11_bounds));
+  EXPECT_TRUE(view->IsFullscreen());
+  EXPECT_EQ(fullscreen_bounds, view->GetLocalBounds());
+  EXPECT_FALSE(layout->last_native_layout_for_testing()
+                   ->surface_chrome_state.content_fullscreen);
+  EXPECT_EQ(f11_radii, container->contents_view()->GetBackgroundRadii());
+  EXPECT_FALSE(panes->target_content_bounds_for_testing());
+  const std::string f11_renderer_size = renderer_size();
+  ASSERT_NE(fullscreen_renderer_size, f11_renderer_size);
+
+  {
+    // 정수 여백과 모서리 clip이 실제 중간 프레임에서도 함께 바뀌어야 한다.
+    class EdgeProbe : public views::ViewObserver {
+     public:
+      void OnViewBoundsChanged(views::View* view) override {
+        const int gutter = view->x();
+        if (gutter <= 0 || gutter >= yee::kSidebarMetrics.content_gutter) {
+          return;
+        }
+        auto* panes = static_cast<MultiContentsView*>(view);
+        const auto* const native_view =
+            panes->GetActiveContentsView()->holder()->native_view();
+        ASSERT_TRUE(native_view);
+        EXPECT_EQ(expected_renderer_size, native_view->bounds().size());
+        if (expect_scaled_contents) {
+          EXPECT_FALSE(native_view->transform().IsIdentity());
+          EXPECT_EQ(
+              gfx::Rect(view->size()),
+              gfx::ToRoundedRect(native_view->transform().MapRect(
+                  gfx::RectF(gfx::Rect(native_view->bounds().size())))));
+        }
+        const float radius =
+            panes->GetActiveContentsView()->GetBackgroundRadii().upper_left();
+        saw_intermediate_frame |=
+            radius > 0 && radius < yee::kSidebarMetrics.content_corner_radius &&
+            panes->target_content_bounds_for_testing().has_value();
+      }
+      gfx::Size expected_renderer_size;
+      bool expect_scaled_contents = false;
+      bool saw_intermediate_frame = false;
+    } probe;
+    class RendererResizeProbe : public aura::WindowObserver {
+     public:
+      void OnWindowBoundsChanged(aura::Window* window,
+                                 const gfx::Rect& old_bounds,
+                                 const gfx::Rect& new_bounds,
+                                 ui::PropertyChangeReason reason) override {
+        if (old_bounds.size() != new_bounds.size()) {
+          sizes.push_back(new_bounds.size());
+          if (on_resize) {
+            on_resize.Run(new_bounds.size());
+          }
+        }
+      }
+      std::vector<gfx::Size> sizes;
+      base::RepeatingCallback<void(const gfx::Size&)> on_resize;
+    } resize_probe;
+    base::ScopedObservation<views::View, views::ViewObserver> observation(
+        &probe);
+    observation.Observe(panes);
+    base::ScopedObservation<aura::Window, aura::WindowObserver>
+        resize_observation(&resize_probe);
+    resize_observation.Observe(
+        container->contents_view()->holder()->native_view());
+    auto animation_motion =
+        gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
+    gfx::ScopedAnimationDurationScaleMode duration(
+        gfx::ScopedAnimationDurationScaleMode::SLOW_DURATION);
+    view->InvalidateLayout();
+    ApplyScheduledLayout();
+    ASSERT_TRUE(content::ExecJs(contents, R"(
+      window.viewportSizesOnResize = [];
+      window.viewportSizesOnFullscreenChange = [];
+      const currentViewportSize = () => [innerWidth, innerHeight].join('x');
+      window.addEventListener('resize', () => {
+        viewportSizesOnResize.push(currentViewportSize());
+      });
+      document.addEventListener('fullscreenchange', () => {
+        viewportSizesOnFullscreenChange.push(currentViewportSize());
+      });
+      window.fullscreenExited = new Promise(resolve => {
+        const onChange = () => {
+          if (document.fullscreenElement)
+            return;
+          document.removeEventListener('fullscreenchange', onChange);
+          resolve();
+        };
+        document.addEventListener('fullscreenchange', onChange);
+      });
+      void 0;
+    )"));
+    probe.expected_renderer_size = fullscreen_bounds.size();
+    ASSERT_TRUE(enter_content_fullscreen());
+    EXPECT_TRUE(probe.saw_intermediate_frame);
+    // 정수 여백이 먼저 0에 도달해도 Esc가 진행 중인 전환을 되돌려야 한다.
+    probe.expected_renderer_size = f11_bounds.size();
+    probe.expect_scaled_contents = true;
+    probe.saw_intermediate_frame = false;
+    auto* const outline = view->GetViewByID(yee::kCombinedSurfaceOutlineViewId);
+    ASSERT_TRUE(outline);
+    ASSERT_TRUE(applied_.Run(
+        {applied_.View(*panes, {.bounds = f11_bounds}, AppliedMatch::kViewBounds),
+         applied_.View(*outline, {.drawn = true}, AppliedMatch::kViewDrawn)},
+        [&] {
+          ASSERT_TRUE(panes->target_content_bounds_for_testing());
+          press_key(ui::VKEY_ESCAPE);
+        }));
+    ASSERT_TRUE(content::ExecJs(contents, "window.fullscreenExited"));
+    EXPECT_TRUE(probe.saw_intermediate_frame);
+    EXPECT_EQ(f11_radii, container->contents_view()->GetBackgroundRadii());
+    EXPECT_FALSE(panes->target_content_bounds_for_testing());
+    EXPECT_TRUE(container->contents_view()
+                    ->holder()
+                    ->native_view()
+                    ->transform()
+                    .IsIdentity());
+    const std::string expected_sizes =
+        fullscreen_renderer_size + "," + f11_renderer_size;
+    EXPECT_EQ(expected_sizes,
+              content::EvalJs(contents, "viewportSizesOnResize.join(',')"));
+    // 진입 이벤트는 렌더러의 뷰포트 갱신보다 먼저 도착할 수 있다.
+    const std::string fullscreen_change_sizes =
+        content::EvalJs(contents, "viewportSizesOnFullscreenChange.join(',')")
+            .ExtractString();
+    EXPECT_THAT(fullscreen_change_sizes,
+                testing::AnyOf(testing::Eq(expected_sizes),
+                               testing::Eq(f11_renderer_size + "," +
+                                           f11_renderer_size)));
+    EXPECT_THAT(resize_probe.sizes,
+                testing::ElementsAre(fullscreen_bounds.size(),
+                                     f11_bounds.size()));
+
+    // 복귀 중 모션 설정이 바뀌어 중간 프레임에서 목적지로 바로 가도
+    // 렌더러가 기존 프레임의 크기로 돌아가면 안 된다.
+    resize_probe.sizes.clear();
+    probe.expected_renderer_size = fullscreen_bounds.size();
+    probe.expect_scaled_contents = false;
+    ASSERT_TRUE(enter_content_fullscreen());
+    probe.expected_renderer_size = f11_bounds.size();
+    probe.expect_scaled_contents = true;
+    gfx::AnimationTestApi::PrefersReducedMotionResetter snap_motion;
+    resize_probe.on_resize =
+        base::BindLambdaForTesting([&](const gfx::Size& size) {
+          if (size == f11_bounds.size() && !snap_motion) {
+            ASSERT_TRUE(panes->target_content_bounds_for_testing());
+            EXPECT_TRUE(panes->target_content_bounds_for_testing()
+                            ->scale_to_visible_bounds);
+            EXPECT_LT(panes->x(), yee::kSidebarMetrics.content_gutter);
+            snap_motion =
+                gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
+            view->InvalidateLayout();
+          }
+        });
+    ASSERT_TRUE(exit_content_fullscreen(f11_bounds));
+    resize_probe.on_resize.Reset();
+    EXPECT_TRUE(snap_motion);
+    EXPECT_EQ(f11_bounds, panes->bounds());
+    EXPECT_FALSE(panes->target_content_bounds_for_testing());
+    EXPECT_THAT(resize_probe.sizes,
+                testing::ElementsAre(fullscreen_bounds.size(),
+                                     f11_bounds.size()));
+  }
+
+  ASSERT_GT(model->active_index(), 0);
+  const int peer_index = model->active_index() - 1;
+  auto* const peer = model->GetWebContentsAt(peer_index);
+  model->AddToNewSplit({peer_index}, split_tabs::SplitTabVisualData(),
+                       split_tabs::SplitTabCreatedSource::kToolbarButton);
+  ApplyScheduledLayout();
+  ASSERT_TRUE(panes->IsInSplitView());
+  const gfx::Rect split_bounds = panes->bounds();
+  ASSERT_TRUE(enter_content_fullscreen());
+  EXPECT_FALSE(panes->IsInSplitView());
+  EXPECT_EQ(contents, panes->GetActiveContentsView()->web_contents());
+  ASSERT_TRUE(exit_content_fullscreen(split_bounds));
+  EXPECT_TRUE(view->IsFullscreen());
+  EXPECT_TRUE(panes->IsInSplitView());
+  EXPECT_EQ(
+      peer,
+      panes->contents_container_views()[0]->contents_view()->web_contents());
+  EXPECT_EQ(contents, panes->GetActiveContentsView()->web_contents());
+}
+#endif  // BUILDFLAG(IS_WIN)
 
 IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                        YeeFullscreenPreservesSurfaceWithoutStaleChromeRows) {

@@ -237,6 +237,11 @@ test("agent_bridge_prompt_unittests") {
 source_set("browser_surface_transition") {
   public = [ "browser_surface_transition.h" ]
   sources = [ "browser_surface_transition.cc" ]
+  deps = [
+    "//base",
+    "//ui/gfx/animation",
+    "//ui/gfx/geometry",
+  ]
   public_deps = [
     "//ui/base",
     "//ui/views",

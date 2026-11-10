@@ -9,6 +9,12 @@
 
 #include "ui/base/class_property.h"
 
+class BrowserView;
+
+namespace gfx {
+class Rect;
+}
+
 namespace views {
 class View;
 }
@@ -47,9 +53,14 @@ struct BrowserSurfaceChromeState {
       SurfaceGeometryStableState::kWindowed;
   bool toolbar_participates = false;
   bool sidebar_participates = false;
+  bool content_fullscreen = false;
 
   bool operator==(const BrowserSurfaceChromeState&) const = default;
 };
+
+// BrowserView에서 읽은 같은 상태를 native 창 전환과 본문 레이아웃에 사용한다.
+BrowserSurfaceChromeState ReadBrowserSurfaceChromeState(
+    BrowserView& browser_view);
 
 struct SurfaceGeometryTransitionEpoch {
   BrowserSurfaceChromeState committed;
@@ -94,6 +105,19 @@ struct BrowserSurfaceChromeParticipation {
 BrowserSurfaceChromeParticipation ResolveBrowserSurfaceChromeParticipation(
     const BrowserSurfaceChromeState& state,
     bool split);
+
+struct BrowserSurfaceFullscreenProgress {
+  double fraction = 0.0;
+  bool animating = false;
+};
+
+// 창 영역이 같은 전체화면 사이에서만 여백을 움직인다. 창 자체가 전환 중이면
+// 마지막 표시 값을 유지하고 native 전환이 완료되면 새 값에 맞춘다.
+BrowserSurfaceFullscreenProgress ResolveBrowserSurfaceFullscreenProgress(
+    views::View& browser_view,
+    const BrowserSurfaceChromeState& state,
+    const gfx::Rect& client_bounds,
+    bool unobstructed);
 
 SurfaceGeometryTransitionEpoch& InitializeSurfaceGeometryTransition(
     views::View& browser_view,

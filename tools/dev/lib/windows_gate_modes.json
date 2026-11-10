@@ -120,7 +120,7 @@
     },
     "browser-surface-layout": {
       "script": "test-browser-surface-layout.sh",
-      "sha256": "fbc58d2c60c1637f35ff5051e09bda016f31ebb4a2bd57387a617dbe3a1237a2",
+      "sha256": "256408852bd8a16ebb6d9603a1e3bbcc7b5465c856e59a12f6cc990bcaf277e0",
       "default": "fast",
       "required": [
         "fast",
@@ -320,6 +320,7 @@
             "YeeBrowserViewTabbedLayoutImplNativeAnimationUiTest.MidAnimationTypeAndWidthSwitchUseFreshPlans",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeeNativePlannerResultMatchesAppliedLayout",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeeFullscreenPreservesSurfaceWithoutStaleChromeRows",
+            "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeWindowsContentFullscreenFillsWindowAndRestoresF11",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeeSplitTargetLayoutUsesHandedInInsets",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeePageViewportGeometryMatchesAppliedDevToolsEdges",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeePageRemainsPhysicallyClickableWithSidePanelOpen",

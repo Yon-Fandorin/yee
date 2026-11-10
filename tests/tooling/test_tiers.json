@@ -4457,6 +4457,17 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/browser_surface_interactive_uitest.cc::YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeWindowsContentFullscreenFillsWindowAndRestoresF11": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "실제 F11·Esc 입력과 탭의 Fullscreen API로 창과 콘텐츠 영역의 전환을 검증한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/browser_surface_interactive_uitest.cc::YeeBrowserViewTabbedLayoutImplUiTest.YeeWindowsSidebarGroupEditorAndFirstTabClose": {
     "os": [
       "Windows"
