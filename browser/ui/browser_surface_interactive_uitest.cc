@@ -101,6 +101,7 @@
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
+#include "chrome/browser/ui/views/tabs/tab/tab_close_button.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
 #include "chrome/browser/ui/views/tabs/tab_container_impl.h"
 #include "chrome/browser/ui/views/tabs/tab_group_header.h"
@@ -185,6 +186,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/rrect_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image_skia_rep.h"
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
@@ -237,6 +239,16 @@
 #endif
 
 namespace {
+
+void ExpectControlHighlight(views::View& control, int radius) {
+  const auto highlight =
+      views::HighlightPathGenerator::GetRoundRectForView(&control);
+  ASSERT_TRUE(highlight);
+  ASSERT_EQ(gfx::RRectF::Type::kSingle, highlight->GetType());
+  EXPECT_FLOAT_EQ(radius, highlight->GetSimpleRadius());
+  EXPECT_LT(2 * radius,
+            std::min(highlight->rect().width(), highlight->rect().height()));
+}
 
 views::View* GetTabAnchorForModelIndex(BrowserView* view, int index) {
   return view->tab_strip_view()->GetTabAnchorView(
@@ -1913,6 +1925,16 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
         ApplyScheduledLayout();
       }));
   ASSERT_TRUE(editor_button->IsDrawn());
+  ExpectControlHighlight(*editor_button,
+                         yee::kSidebarMetrics.tab_row_corner_radius);
+  const auto* const active_tab = GetTabAnchorForModelIndex(view, 0);
+  ASSERT_TRUE(active_tab);
+  const auto close_button = std::ranges::find_if(
+      active_tab->children(), views::IsViewClass<TabCloseButton>);
+  ASSERT_NE(close_button, active_tab->children().end());
+  ASSERT_TRUE((*close_button)->IsDrawn());
+  ExpectControlHighlight(**close_button,
+                         yee::kSidebarMetrics.tab_row_corner_radius);
   // 창의 활성 상태는 bubble의 표시 여부와 독립적이다. 포인터가 Header를
   // 떠난 뒤에도 편집 버튼과 실제 bubble이 표시되는지 확인한다.
   ASSERT_TRUE(applied_.Run(
@@ -6003,6 +6025,14 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   BrowserView* const browser_view =
       BrowserView::GetBrowserViewForBrowser(browser());
   ASSERT_TRUE(browser_view);
+  const auto context =
+      views::ElementTrackerViews::GetContextForView(browser_view);
+  auto* const close_button =
+      views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
+          kSidePanelCloseButtonElementId, context);
+  ASSERT_TRUE(close_button);
+  ExpectControlHighlight(*close_button,
+                         yee::kSidebarMetrics.shell_control_corner_radius);
   ContentsContainerView* const container =
       browser_view->multi_contents_view()->GetActiveContentsContainerView();
   ASSERT_TRUE(container);
@@ -8147,6 +8177,11 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplContentLayoutUiTest,
     views::View* const control = find_bar_view->GetViewByID(id);
     ASSERT_TRUE(control) << "Missing Find Bar control id " << id;
     EXPECT_TRUE(control->GetVisible()) << "Hidden Find Bar control id " << id;
+    if (id != VIEW_ID_FIND_IN_PAGE_TEXT_FIELD) {
+      SCOPED_TRACE(id);
+      ExpectControlHighlight(*control,
+                             yee::kSidebarMetrics.shell_control_corner_radius);
+    }
     EXPECT_TRUE(
         find_bar_bounds_in_screen.Contains(control->GetBoundsInScreen()))
         << "Find Bar control " << id << " escapes its Widget: widget="

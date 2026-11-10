@@ -349,7 +349,6 @@ class SplitPaneControlButton : public ToolbarButton {
       : ToolbarButton(std::move(callback)), action_(action) {
     ApplyShellControlStyle(*this);
     SetPreferredSize(gfx::Size(kControlButtonSize, kControlButtonSize));
-    SetCustomCornerRadius(kControlButtonSize / 2);
     SetProperty(views::kMarginsKey, gfx::Insets());
     views::InkDrop::Get(this)->SetBaseColor(ui::kColorSysStateHoverOnSubtle);
     views::InkDrop::Get(this)->SetVisibleOpacity(1.0f);

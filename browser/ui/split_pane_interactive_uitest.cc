@@ -110,6 +110,8 @@
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "third_party/blink/public/common/input/web_mouse_event.h"
+#include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/actions/actions.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/interaction/state_observer.h"
@@ -132,7 +134,9 @@
 #include "ui/views/animation/test/ink_drop_impl_test_api.h"
 #include "ui/views/background.h"
 #include "ui/views/cascading_property.h"
+#include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/focus_ring.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
@@ -150,6 +154,19 @@
 #endif
 
 namespace {
+void ExpectShellControlHighlight(views::View& control) {
+  SCOPED_TRACE(testing::Message() << control.GetClassName() << ' '
+                                  << control.GetLocalBounds().ToString());
+  auto* generator = control.GetProperty(views::kHighlightPathGeneratorKey);
+  ASSERT_TRUE(generator);
+  SkRRect highlight;
+  ASSERT_TRUE(generator->GetHighlightPath(&control).isRRect(&highlight));
+  ASSERT_TRUE(highlight.isSimple());
+  const float radius = yee::kSidebarMetrics.shell_control_corner_radius;
+  EXPECT_FLOAT_EQ(radius, highlight.getSimpleRadii().x());
+  EXPECT_FLOAT_EQ(radius, highlight.getSimpleRadii().y());
+}
+
 void CaptureYeeWidgetForTesting(views::Widget* widget,
                                 const base::FilePath& path) {
   widget->LayoutRootViewIfNecessary();
@@ -725,6 +742,11 @@ IN_PROC_BROWSER_TEST_P(YeeMultiContentsViewUiTest,
             browser_view->toolbar()->location_bar_view();
         const int split_location_bar_center_y =
             location_bar->GetBoundsInScreen().CenterPoint().y();
+        for (int pane = 0; pane < 2; ++pane) {
+          ExpectShellControlHighlight(
+              *multi_contents_view()->mini_toolbar_for_testing(pane)
+                   ->close_button_for_testing());
+        }
         return split_location_bar_center_y >=
                    single_location_bar_center_y - 1 &&
                split_location_bar_center_y <=
@@ -1475,9 +1497,12 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
       theme->SetBrowserColorScheme(scheme);
       SetYeeSurfaceColorForTab(0, surface);
     }));
+    // 색상 적용 통지는 새 버튼 배치보다 먼저 도착할 수 있다.
+    browser_view->GetWidget()->LayoutRootViewIfNecessary();
     EXPECT_EQ(scheme, theme->GetBrowserColorScheme());
     for (auto* control : controls) {
       ASSERT_TRUE(control);
+      ExpectShellControlHighlight(*control);
       EXPECT_EQ(surface, views::GetCascadingBackgroundColor(control));
       EXPECT_GE(color_utils::GetContrastRatio(
                     views::GetCascadingAccentColor(control), surface),
@@ -1634,16 +1659,51 @@ IN_PROC_BROWSER_TEST_F(YeeContentsViewUiTest,
           return style.paddingTop === $1 + 'px' && style.paddingBottom === $1 + 'px' &&
               style.borderTopWidth === $2 + 'px' && yeePopupRowsForTesting().every(row => {
                 const s = getComputedStyle(row);
+                const remove = row.getRootNode().querySelector('#remove.action-icon');
                 return s.marginInlineStart === $3 + 'px' && s.marginInlineEnd === $3 + 'px' &&
                     s.borderTopLeftRadius === $4 + 'px' && s.borderTopRightRadius === $4 + 'px' &&
-                    s.borderBottomLeftRadius === $4 + 'px' && s.borderBottomRightRadius === $4 + 'px';
+                    s.borderBottomLeftRadius === $4 + 'px' && s.borderBottomRightRadius === $4 + 'px' &&
+                    remove && getComputedStyle(remove).borderRadius === $5 + 'px';
               });
         })()
       )",
                         yee::kSidebarMetrics.omnibox_popup_results_padding,
                         yee::kSidebarMetrics.omnibox_popup_separator_height,
                         yee::kSidebarMetrics.omnibox_popup_row_inset,
-                        yee::kSidebarMetrics.omnibox_popup_row_corner_radius)));
+                        yee::kSidebarMetrics.omnibox_popup_row_corner_radius,
+                        yee::kSidebarMetrics.shell_control_corner_radius)));
+      // 실제 팝업의 CSS로 계정 자격과 관계없이 컨텍스트 아이콘을 검사한다.
+      EXPECT_EQ(true,
+                content::EvalJs(
+                    contents,
+                    content::JsReplace(
+                        R"(
+        (async () => {
+          const context = document.createElement(
+              'omnibox-popup-contextual-entrypoint-button');
+          context.style.display = 'none';
+          document.body.append(context);
+          try {
+            for (const oblong of [false, true]) {
+              context.isOblongShape = oblong;
+              await context.updateComplete;
+              const entrypoint = context.shadowRoot.querySelector(
+                  'cr-composebox-contextual-entrypoint-button');
+              await entrypoint.updateComplete;
+              const icon = entrypoint.shadowRoot.querySelector('cr-icon-button#entrypoint');
+              // AI 팝업이 아이콘에 직접 지정하는 곡률을 재현한다.
+              icon.style.setProperty('--cr-composebox-entrypoint-border-radius', '100px');
+              if (getComputedStyle(icon).borderRadius !== $1 + 'px') {
+                return false;
+              }
+            }
+            return true;
+          } finally {
+            context.remove();
+          }
+        })()
+      )",
+                        yee::kSidebarMetrics.shell_control_corner_radius)));
       // WebPreferences의 inForcedColors만 바꾸면 Blink의 색상 캐시가
       // 무효화되지 않는다. 정식 media emulation 경로로 CSS 반응을 검사한다.
       content::TestDevToolsProtocolClient media_emulation;

@@ -516,7 +516,7 @@
     },
     "header": {
       "script": "test-header.sh",
-      "sha256": "d41a1a600c0fef284d06c0b90898a9c3e862200b0b6c111a7793abc0520e067d",
+      "sha256": "055c3d7470d3ec2a226d00cdab46f8f76c425afea11a987e2bf38cdaaaf0b45c",
       "default": "unit",
       "required": [
         "all"
@@ -567,7 +567,8 @@
             "SplitTabLayout/YeeMultiContentsViewUiTest.YeeRenderedBoundaryTracksDelayedCssWithoutMetadata/*",
             "YeeContentsViewUiTest.YeeMediaButtonTracksHeaderAndVisibility",
             "YeeContentsViewUiTest.YeeHeaderColorsFollowPageAcrossThemeChanges",
-            "YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets"
+            "YeeContentsViewUiTest.YeeOmniboxSuggestionsHaveBalancedInsets",
+            "YeeEmbeddedOmniboxPopupUiTest.IconUsesShellControlHighlight"
           ],
           "display": true,
           "arguments": [

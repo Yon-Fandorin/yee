@@ -117,6 +117,10 @@ toolbar_content_separator = 1 DIP
 현재 native checkpoint의 공통 shell 행은 48 DIP이고, 40 DIP Browser Toolbar와
 34 DIP Omnibox를 사용한다. Windows 창 버튼은 같은 Header 오른쪽에 통합하며,
 별도 Caption 행을 추가하지 않는다. 공통 좌표는 client 원점 기준이다.
+Yee의 단일·분할 Header와 Side Panel Header, 분할선 빠른 조작, 페이지 내 찾기,
+주소 추천 팝업의 아이콘 버튼은 hover·누름에 모서리 곡률 8 DIP의 둥근 사각형을
+사용한다. 탭 닫기와 그룹 더보기는 작은 강조 영역에도 평평한 변이 남도록 탭 행의
+곡률 6 DIP를 사용한다.
 Windows 창 버튼의 입력과 glyph는 native control이 소유한다. Yee 모드의 버튼은
 다른 shell 조작과 같은 30 × 30 DIP이며 hover·누름 배경과 클릭 범위가 같은
 경계를 사용한다. 반지름은 8 DIP이고 버튼 바깥 여백은 입력 영역에서 제외한다.

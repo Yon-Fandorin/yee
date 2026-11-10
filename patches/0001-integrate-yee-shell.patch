@@ -1204,6 +1204,30 @@ index 2f702a5a4a..9881737e83 100644
    --cr-icon-button-fill-color: var(--cr-composebox-voice-icon-fill-color);
    --cr-icon-button-hover-background-color: var(--color-composebox-voice-button-hover-background);
    --cr-icon-button-margin-end: 0px;
+diff --git a/chrome/browser/resources/omnibox_popup/omnibox_popup_searchbox.css b/chrome/browser/resources/omnibox_popup/omnibox_popup_searchbox.css
+index fbc9b95fb8..82f13059d2 100644
+--- a/chrome/browser/resources/omnibox_popup/omnibox_popup_searchbox.css
++++ b/chrome/browser/resources/omnibox_popup/omnibox_popup_searchbox.css
+@@ -212,7 +212,7 @@ cr-searchbox-input::part(icon) {
+  * show focus borders on these icons. */
+ .searchbox-icon-button-container {
+   align-items: center;
+-  border-radius: 50%;
++  border-radius: var(--cr-icon-button-border-radius, 50%);
+   display: flex;
+   flex-shrink: 0;
+   height: var(--cr-searchbox-height);
+@@ -419,9 +419,8 @@ omnibox-popup-contextual-entrypoint {
+ }
+ 
+ :host([aim-button-icon-only_]) #composeButton::part(compose-button) {
+-  border-radius: 50%;
++  border-radius: var(--cr-icon-button-border-radius, 50%);
+   padding: 0;
+-  /* Match width to height for a 1:1 circular icon button. */
+   min-width: var(--cr-button-height);
+   width: var(--cr-button-height);
+ }
 diff --git a/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css b/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css
 index 0d455f6f6c..4f6a38c25f 100644
 --- a/chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css
@@ -2832,10 +2856,18 @@ index 4e23238dea..bee3f7f2ee 100644
  
  bool ChromeLocationBarModelDelegate::GetURL(GURL* url) const {
 diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
-index fc293bdac2..33c824223c 100644
+index fc293bdac2..86a88b0f42 100644
 --- a/chrome/browser/ui/views/BUILD.gn
 +++ b/chrome/browser/ui/views/BUILD.gn
-@@ -1610,6 +1610,8 @@ source_set("session_crashed_bubble_view") {
+@@ -1525,6 +1525,7 @@ source_set("find_bar_views") {
+     "//chrome/browser/ui/color:color_headers",
+     "//chrome/browser/ui/find_bar",
+     "//chrome/browser/ui/views/frame:browser_view_header",
++    "//chrome/browser/ui/views/yee:yee_ui_headers",
+     "//chrome/browser/user_education",
+     "//components/find_in_page",
+     "//components/strings:components_strings",
+@@ -1610,6 +1611,8 @@ source_set("session_crashed_bubble_view") {
      "//ui/base",
      "//ui/views",
    ]
@@ -2948,6 +2980,33 @@ index e20e096dfc..5995b9d238 100644
  }
  
  void FindBarHost::SetDialogPosition(const gfx::Rect& new_pos) {
+diff --git a/chrome/browser/ui/views/find_bar_view.cc b/chrome/browser/ui/views/find_bar_view.cc
+index 76387a01f1..f93c30a4cf 100644
+--- a/chrome/browser/ui/views/find_bar_view.cc
++++ b/chrome/browser/ui/views/find_bar_view.cc
+@@ -25,6 +25,8 @@
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
+ #include "chrome/browser/ui/views/find_bar_host.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "chrome/browser/user_education/user_education_service.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/find_in_page/find_notification_details.h"
+@@ -68,7 +70,12 @@
+ namespace {
+ void SetCommonButtonAttributes(views::ImageButton* button) {
+   views::ConfigureVectorImageButton(button);
+-  views::InstallCircleHighlightPathGenerator(button);
++  if (yee::IsShellEnabled()) {
++    views::InstallRoundRectHighlightPathGenerator(
++        button, gfx::Insets(), yee::kSidebarMetrics.shell_control_corner_radius);
++  } else {
++    views::InstallCircleHighlightPathGenerator(button);
++  }
+ }
+ }  // namespace
+ 
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
 index 07ff3566c1..e28dc5cc51 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
@@ -11462,7 +11521,7 @@ index e182430481..f1e1b00b18 100644
    // with it and the active tab. If all URLs are blocked, then it will open
    // that.
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
-index 3d3d583887..863fee94cf 100644
+index 3d3d583887..d552eace65 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
 @@ -7,37 +7,63 @@
@@ -11614,7 +11673,22 @@ index 3d3d583887..863fee94cf 100644
    alert_state_indicator_ = AddChildView(std::make_unique<views::ImageView>());
    alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
                                        icon_flex_spec.WithOrder(2));
-@@ -134,13 +216,136 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+@@ -123,7 +205,13 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+       views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
+                                views::MaximumFlexSizeRule::kPreferred)
+           .WithOrder(1));
+-  views::InstallCircleHighlightPathGenerator(close_button_);
++  if (uses_yee_browser_surface_geometry_) {
++    views::InstallRoundRectHighlightPathGenerator(
++        close_button_, gfx::Insets(),
++        yee::kSidebarMetrics.shell_control_corner_radius);
++  } else {
++    views::InstallCircleHighlightPathGenerator(close_button_);
++  }
+ 
+   web_contents_attached_subscription_ =
+       web_view->AddWebContentsAttachedCallback(
+@@ -134,13 +222,136 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
            base::BindRepeating(&MultiContentsViewMiniToolbar::ClearWebContents,
                                base::Unretained(this)));
  
@@ -11751,7 +11825,7 @@ index 3d3d583887..863fee94cf 100644
    const int contents_container_outline_thickness =
        ContentsContainerOutline::GetThickness(is_highlighted);
  
-@@ -168,6 +373,102 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+@@ -168,6 +379,102 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
    alert_state_indicator_->SetVisible(!is_active);
  }
  
@@ -11854,7 +11928,7 @@ index 3d3d583887..863fee94cf 100644
  void MultiContentsViewMiniToolbar::UpdateContents() {
    auto* const interface = GetTabInterface(web_contents_);
    if (!interface) {
-@@ -210,6 +511,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -210,6 +517,8 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
                                        : gfx::ELIDE_TAIL);
    domain_label_->SetCustomTooltipText(base::ASCIIToUTF16(domain_url.spec()));
  
@@ -11863,7 +11937,7 @@ index 3d3d583887..863fee94cf 100644
    UpdateFavicon(tab_ui_helper);
  }
  
-@@ -226,7 +529,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
+@@ -226,7 +535,29 @@ void MultiContentsViewMiniToolbar::ClearWebContents(views::WebView*) {
    web_contents_ = nullptr;
  }
  
@@ -11893,7 +11967,7 @@ index 3d3d583887..863fee94cf 100644
    // Paint the mini toolbar background to match the toolbar.
    ThemedBackground::PaintBackground(canvas, this, browser_view_);
  }
-@@ -244,6 +569,248 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
+@@ -244,6 +575,248 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
        UpdateFavicon(tab_ui_helper);
      }
    }
@@ -12142,7 +12216,7 @@ index 3d3d583887..863fee94cf 100644
  }
  
  void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
-@@ -264,14 +831,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
+@@ -264,14 +837,40 @@ void MultiContentsViewMiniToolbar::RegisterTabSubscriptions() {
  
  void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
      std::optional<tabs::TabAlert> new_alert) {
@@ -12190,7 +12264,7 @@ index 3d3d583887..863fee94cf 100644
    } else {
      alert_state_indicator_->SetImage(ui::ImageModel());
      alert_state_indicator_->SetTooltipText(std::u16string());
-@@ -287,7 +880,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
+@@ -287,7 +886,14 @@ void MultiContentsViewMiniToolbar::UpdateFavicon(TabUIHelper* tab_ui_helper) {
      themify_favicon = true;
    }
    if (const auto* provider = GetColorProvider(); provider && themify_favicon) {
@@ -14146,7 +14220,7 @@ index 307a5492fd..d189f104e2 100644
  // "example.com") it combines it with the appropriate separator in the current
  // local for painting it  after the regular location bar text (e.g.
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index d07cbfe86c..8bb21a5950 100644
+index d07cbfe86c..b6e245aef6 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -6,6 +6,7 @@
@@ -14274,7 +14348,7 @@ index d07cbfe86c..8bb21a5950 100644
    ai_mode_hint_label->SetVisible(false);
    ai_mode_hint_label_ = AddChildView(std::move(ai_mode_hint_label));
  
-@@ -534,7 +564,139 @@ bool LocationBarView::IsInitialized() const {
+@@ -534,7 +564,141 @@ bool LocationBarView::IsInitialized() const {
    return is_initialized_;
  }
  
@@ -14294,6 +14368,8 @@ index d07cbfe86c..8bb21a5950 100644
 +    content_setting_view->SetCornerRadii(control_radii);
 +  }
 +  page_action_container_->SetPageActionCornerRadii(control_radii);
++  views::InstallRoundRectHighlightPathGenerator(
++      clear_all_button_, gfx::Insets(), control_radii);
 +
 +  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
 +                                                kCompactShellLocationBarRadius);
@@ -14414,7 +14490,7 @@ index d07cbfe86c..8bb21a5950 100644
    return ComputeBorderRadius(size());
  }
  
-@@ -551,8 +713,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
+@@ -551,8 +715,9 @@ std::unique_ptr<views::Background> LocationBarView::CreateRoundRectBackground(
      gfx::Size size,
      SkBlendMode blend_mode,
      bool antialias,
@@ -14426,7 +14502,7 @@ index d07cbfe86c..8bb21a5950 100644
    auto painter =
        stroke_color == SK_ColorTRANSPARENT
            ? views::Painter::CreateSolidRoundRectPainter(
-@@ -731,7 +894,10 @@ bool LocationBarView::HasFocus() const {
+@@ -731,7 +896,10 @@ bool LocationBarView::HasFocus() const {
  }
  
  gfx::Size LocationBarView::GetMinimumSize() const {
@@ -14438,7 +14514,7 @@ index d07cbfe86c..8bb21a5950 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -758,7 +924,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
+@@ -758,7 +926,10 @@ gfx::Size LocationBarView::GetMinimumSize() const {
  
  gfx::Size LocationBarView::CalculatePreferredSize(
      const views::SizeBounds& available_size) const {
@@ -14450,7 +14526,7 @@ index d07cbfe86c..8bb21a5950 100644
    if (!IsInitialized()) {
      return gfx::Size(0, height);
    }
-@@ -903,13 +1072,16 @@ void LocationBarView::Layout(PassKey) {
+@@ -903,13 +1074,16 @@ void LocationBarView::Layout(PassKey) {
  
    auto add_trailing_decoration = [&](View* view, int intra_item_padding,
                                       int edge_padding) {
@@ -14468,7 +14544,7 @@ index d07cbfe86c..8bb21a5950 100644
    if (features::IsPageActionsElevatedToolbarEnabled()) {
      if (page_action_container_ && page_action_container_->GetVisible()) {
        const bool is_capsule_active = page_action_container_->IsCapsuleActive();
-@@ -1047,6 +1219,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -1047,6 +1221,10 @@ void LocationBarView::Layout(PassKey) {
      position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
    }
  
@@ -14479,7 +14555,7 @@ index d07cbfe86c..8bb21a5950 100644
    LayoutSuperclass<View>(this);
  }
  
-@@ -1065,7 +1241,14 @@ void LocationBarView::OnThemeChanged() {
+@@ -1065,7 +1243,14 @@ void LocationBarView::OnThemeChanged() {
    }
  
    RefreshBackground();
@@ -14495,7 +14571,7 @@ index d07cbfe86c..8bb21a5950 100644
  }
  
  void LocationBarView::ChildPreferredSizeChanged(views::View* child) {
-@@ -1082,6 +1265,10 @@ void LocationBarView::Update(WebContents* contents) {
+@@ -1082,6 +1267,10 @@ void LocationBarView::Update(WebContents* contents) {
  
    RefreshContentSettingViews();
    RefreshPageActionIconViews();
@@ -14506,7 +14582,7 @@ index d07cbfe86c..8bb21a5950 100644
    location_icon_view_->Update(/*suppress_animations=*/contents,
                                ShouldUsePopupOpenAppearance());
  
-@@ -1222,6 +1409,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
+@@ -1222,6 +1411,13 @@ SkColor LocationBarView::GetIconLabelBubbleSurroundingForegroundColor() const {
    // fall back to the usual omnibox text color to ensure UI consistency.
    // In either case, all IconLabelBubbleViews situated within the location bar
    // will inherit the selected "surrounding foreground color".
@@ -14520,7 +14596,7 @@ index d07cbfe86c..8bb21a5950 100644
    const auto color_id = ShouldShowKeywordBubble()
                              ? kColorOmniboxKeywordSeparator
                              : kColorOmniboxActionIcon;
-@@ -1233,6 +1427,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
+@@ -1233,6 +1429,9 @@ SkAlpha LocationBarView::GetIconLabelBubbleSeparatorAlpha() const {
  }
  
  SkColor LocationBarView::GetIconLabelBubbleBackgroundColor() const {
@@ -14530,7 +14606,7 @@ index d07cbfe86c..8bb21a5950 100644
    return GetColorProvider()->GetColor(kColorLocationBarBackground);
  }
  
-@@ -1406,6 +1603,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
+@@ -1406,6 +1605,8 @@ int LocationBarView::GetMinimumLeadingWidth() const {
  int LocationBarView::GetMinimumTrailingWidth() const {
    int trailing_width = IncrementalMinimumWidth(page_action_container_);
  
@@ -14539,7 +14615,7 @@ index d07cbfe86c..8bb21a5950 100644
    for (ContentSettingImageView* content_setting_view : content_setting_views_) {
      trailing_width += IncrementalMinimumWidth(content_setting_view);
    }
-@@ -1414,33 +1613,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
+@@ -1414,33 +1615,49 @@ int LocationBarView::GetMinimumTrailingWidth() const {
  }
  
  gfx::Rect LocationBarView::GetLocalBoundsWithoutEndcaps() const {
@@ -14594,7 +14670,7 @@ index d07cbfe86c..8bb21a5950 100644
      // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
      // in-progress user input, the background color matches the popup (unless
      // high-contrast mode is enabled).
-@@ -1450,7 +1665,7 @@ void LocationBarView::RefreshBackground() {
+@@ -1450,7 +1667,7 @@ void LocationBarView::RefreshBackground() {
    }
  
    SkColor border_color = SK_ColorTRANSPARENT;
@@ -14603,7 +14679,7 @@ index d07cbfe86c..8bb21a5950 100644
      // High contrast schemes get a border stroke even on a rounded omnibox.
      border_color =
          is_caret_visible
-@@ -1463,18 +1678,93 @@ void LocationBarView::RefreshBackground() {
+@@ -1463,18 +1680,93 @@ void LocationBarView::RefreshBackground() {
      border_color = color_provider->GetColor(kColorLocationBarBorderOnMismatch);
    }
  
@@ -14701,7 +14777,7 @@ index d07cbfe86c..8bb21a5950 100644
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1486,6 +1776,83 @@ void LocationBarView::RefreshBackground() {
+@@ -1486,6 +1778,83 @@ void LocationBarView::RefreshBackground() {
    SchedulePaint();
  }
  
@@ -14785,7 +14861,7 @@ index d07cbfe86c..8bb21a5950 100644
  bool LocationBarView::RefreshContentSettingViews() {
    TRACE_EVENT("omnibox", "LocationBarView::RefreshContentSettingViews");
    if (web_app::AppBrowserController::IsWebApp(browser_)) {
-@@ -1560,7 +1927,6 @@ void LocationBarView::RefreshAiModePageAction() {
+@@ -1560,7 +1929,6 @@ void LocationBarView::RefreshAiModePageAction() {
  #else
      ai_mode_hint_label_->SetText(u"Ctrl + Enter for AI Mode");
  #endif
@@ -14793,7 +14869,7 @@ index d07cbfe86c..8bb21a5950 100644
    }
  }
  
-@@ -1587,10 +1953,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
+@@ -1587,10 +1955,24 @@ void LocationBarView::RefreshClearAllButtonIcon() {
                                  : features::IsRoundedIconsEnabled()
                                      ? kCloseIcon
                                      : kTabCloseNormalOldIcon;
@@ -14822,7 +14898,7 @@ index d07cbfe86c..8bb21a5950 100644
    clear_all_button_->SetBorder(views::CreateEmptyBorder(
        GetLayoutInsets(LOCATION_BAR_ICON_INTERIOR_PADDING)));
  }
-@@ -1815,6 +2195,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
+@@ -1815,6 +2197,12 @@ void LocationBarView::OnPaintBorder(gfx::Canvas* canvas) {
  }
  
  bool LocationBarView::OnMousePressed(const ui::MouseEvent& event) {
@@ -14835,7 +14911,7 @@ index d07cbfe86c..8bb21a5950 100644
    return omnibox_view_->OnMousePressed(
        AdjustMouseEventLocationForOmniboxView(event));
  }
-@@ -1851,9 +2237,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1851,9 +2239,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
@@ -14848,7 +14924,7 @@ index d07cbfe86c..8bb21a5950 100644
  }
  
  int LocationBarView::GetDragOperationsForView(views::View* sender,
-@@ -1952,6 +2338,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
+@@ -1952,6 +2340,10 @@ void LocationBarView::OnPopupStateChanged(OmniboxPopupState old_state,
                                            OmniboxPopupState new_state) {
    CHECK_NE(old_state, new_state);
  
@@ -14859,7 +14935,7 @@ index d07cbfe86c..8bb21a5950 100644
    // Set the transition flag used to skip popup state validation during
    // asynchronous widget hide/show transitions. Clear the flag after a delay.
    in_popup_state_transition_ = true;
-@@ -2148,6 +2538,10 @@ void LocationBarView::OnChanged() {
+@@ -2148,6 +2540,10 @@ void LocationBarView::OnChanged() {
        GetOmniboxController()->edit_model()->user_input_in_progress() &&
        !omnibox_view_->GetText().empty() &&
        IsVirtualKeyboardVisible(GetWidget()));
@@ -14870,7 +14946,7 @@ index d07cbfe86c..8bb21a5950 100644
  
    InvalidateLayout();
    SchedulePaint();
-@@ -2381,9 +2775,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+@@ -2381,9 +2777,24 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
  
  SkColor LocationBarView::GetSecurityChipColor(
      security_state::SecurityLevel security_level) const {
@@ -14895,7 +14971,7 @@ index d07cbfe86c..8bb21a5950 100644
    }
  
    return GetColorProvider()->GetColor(id);
-@@ -2400,6 +2809,8 @@ bool LocationBarView::ShowPageInfoDialog() {
+@@ -2400,6 +2811,8 @@ bool LocationBarView::ShowPageInfoDialog() {
      return false;
    }
  
@@ -14904,7 +14980,7 @@ index d07cbfe86c..8bb21a5950 100644
    DCHECK(GetWidget());
  
    std::unique_ptr<PageInfoBubbleSpecification> specification =
-@@ -2434,18 +2845,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2434,18 +2847,47 @@ ui::ImageModel LocationBarView::GetLocationIcon(
    }
    const int dip_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
  
@@ -14958,7 +15034,7 @@ index d07cbfe86c..8bb21a5950 100644
                     std::move(on_icon_fetched), dark_mode)
               : ui::ImageModel();
  }
-@@ -2544,7 +2984,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2544,7 +2986,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -15883,6 +15959,75 @@ index e5c5f1bf50..96f893be49 100644
    const raw_ptr<OmniboxController> controller_;
  
    // True if `ShowWidget()` execution is currently being deferred until the
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc
+index 12a14dd9c4..25655588f9 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc
+@@ -15,6 +15,7 @@
+ #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+ #include "chrome/browser/ui/views/omnibox/full_webui_omnibox_frame.h"
+ #include "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h"
++#include "chrome/browser/ui/views/yee/omnibox_popup_style.h"
+ #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_web_contents_helper.h"
+ #include "components/omnibox/browser/autocomplete_controller.h"
+ #include "content/public/browser/web_contents.h"
+@@ -29,22 +30,28 @@ class EmbeddedWebView : public views::WebView {
+  public:
+   using ResizeCallback = base::RepeatingCallback<void(const gfx::Size&)>;
+   EmbeddedWebView(content::BrowserContext* browser_context,
+-                  ResizeCallback callback);
++                  ResizeCallback callback,
++                  bool compact_shell);
+   ~EmbeddedWebView() override;
+   void AddedToWidget() override;
++  void DOMContentLoaded(content::RenderFrameHost* render_frame_host) override;
+   void ResizeDueToAutoResize(content::WebContents* source,
+                              const gfx::Size& new_size) override;
+ 
+  private:
+   ResizeCallback callback_;
++  const bool compact_shell_;
+ };
+ 
+ BEGIN_METADATA(EmbeddedWebView)
+ END_METADATA
+ 
+ EmbeddedWebView::EmbeddedWebView(content::BrowserContext* browser_context,
+-                                 ResizeCallback callback)
+-    : views::WebView(browser_context), callback_(std::move(callback)) {}
++                                 ResizeCallback callback,
++                                 bool compact_shell)
++    : views::WebView(browser_context),
++      callback_(std::move(callback)),
++      compact_shell_(compact_shell) {}
+ 
+ EmbeddedWebView::~EmbeddedWebView() = default;
+ 
+@@ -62,6 +69,14 @@ void EmbeddedWebView::AddedToWidget() {
+   holder()->SetNativeViewCornerRadii(rounded_corner_radii);
+ }
+ 
++void EmbeddedWebView::DOMContentLoaded(
++    content::RenderFrameHost* render_frame_host) {
++  if (compact_shell_ &&
++      render_frame_host == web_contents()->GetPrimaryMainFrame()) {
++    yee::ApplyOmniboxPopupStyle(web_contents());
++  }
++}
++
+ void EmbeddedWebView::ResizeDueToAutoResize(content::WebContents* source,
+                                             const gfx::Size& new_size) {
+   views::WebView::ResizeDueToAutoResize(source, new_size);
+@@ -162,7 +177,8 @@ void OmniboxPopupViewBrowserView::UpdateLayout() {
+     auto web_view = std::make_unique<EmbeddedWebView>(
+         browser_->GetProfile(),
+         base::BindRepeating(&OmniboxPopupViewBrowserView::OnWebViewResize,
+-                            base::Unretained(this)));
++                            base::Unretained(this)),
++        location_bar_view_->IsCompactShellMode());
+     web_view->LoadInitialURL(GURL("chrome://omnibox-popup.top-chrome/"));
+     web_view_ = web_view.get();
+ 
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
 index 5e47b2abe8..6e706cf133 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
@@ -16313,18 +16458,96 @@ index 88544af4bd..c9b7fd2e7e 100644
        base::TerminationStatus status) override;
  
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_result_view.cc b/chrome/browser/ui/views/omnibox/omnibox_result_view.cc
-index 65eba79e0d..2392e29ce0 100644
+index 65eba79e0d..462e24050a 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_result_view.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_result_view.cc
-@@ -25,6 +25,7 @@
+@@ -6,6 +6,7 @@
+ 
+ #include <limits.h>
+ 
++#include <optional>
+ #include <utility>
+ 
+ #include "base/check.h"
+@@ -25,6 +26,8 @@
  #include "chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.h"
  #include "chrome/browser/ui/views/omnibox/omnibox_text_view.h"
  #include "chrome/browser/ui/views/omnibox/remove_suggestion_bubble.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 +#include "chrome/browser/ui/views/yee/yee_ui.h"
  #include "chrome/grit/generated_resources.h"
  #include "components/omnibox/browser/autocomplete_match_type.h"
  #include "components/omnibox/browser/omnibox.mojom-shared.h"
-@@ -459,7 +460,11 @@ void OmniboxResultView::ApplyThemeAndRefreshIcons(bool force_reapply_styles) {
+@@ -74,9 +77,17 @@ class OmniboxResultViewButton : public views::ImageButton {
+   METADATA_HEADER(OmniboxResultViewButton, views::ImageButton)
+ 
+  public:
+-  OmniboxResultViewButton(int a11y_message_id, PressedCallback callback)
++  OmniboxResultViewButton(int a11y_message_id,
++                          PressedCallback callback,
++                          std::optional<int> highlight_corner_radius)
+       : ImageButton(std::move(callback)) {
+     views::ConfigureVectorImageButton(this);
++    if (highlight_corner_radius) {
++      views::InstallRoundRectHighlightPathGenerator(
++          this, gfx::Insets(), *highlight_corner_radius);
++    } else {
++      views::InstallCircleHighlightPathGenerator(this);
++    }
+ 
+     SetAnimationDuration(base::TimeDelta());
+     views::InkDrop::Get(this)->GetInkDrop()->SetHoverHighlightFadeDuration(
+@@ -233,17 +244,19 @@ OmniboxResultView::OmniboxResultView(OmniboxPopupViewViews* popup_view,
+       base::Unretained(this)));
+   iph_link_focus_ring->SetColorId(kColorOmniboxResultsFocusIndicator);
+ 
+-  // TODO(b/345536738): Move the common code for setting up instances of
+-  //  OmniboxResultViewButton to the constructor.
++  const auto highlight_corner_radius =
++      popup_view_->IsCompactShellMode()
++          ? std::make_optional(yee::kSidebarMetrics.shell_control_corner_radius)
++          : std::nullopt;
+   thumbs_up_button_ = suggestion_and_buttons->AddChildView(
+       std::make_unique<OmniboxResultViewButton>(
+           IDS_ACC_THUMBS_UP_SUGGESTION_BUTTON,
+           base::BindRepeating(
+               &OmniboxResultView::ButtonPressed, base::Unretained(this),
+-              OmniboxPopupSelection::LineState::kFocusedButtonThumbsUp)));
++              OmniboxPopupSelection::LineState::kFocusedButtonThumbsUp),
++          highlight_corner_radius));
+   thumbs_up_button_->SetProperty(views::kMarginsKey,
+                                  gfx::Insets::TLBR(0, 0, 0, 8));
+-  views::InstallCircleHighlightPathGenerator(thumbs_up_button_);
+   thumbs_up_button_->SetTooltipText(
+       l10n_util::GetStringUTF16(IDS_OMNIBOX_THUMBS_UP_SUGGESTION));
+   auto* const thumbs_up_focus_ring = views::FocusRing::Get(thumbs_up_button_);
+@@ -261,10 +274,10 @@ OmniboxResultView::OmniboxResultView(OmniboxPopupViewViews* popup_view,
+           IDS_ACC_THUMBS_DOWN_SUGGESTION_BUTTON,
+           base::BindRepeating(
+               &OmniboxResultView::ButtonPressed, base::Unretained(this),
+-              OmniboxPopupSelection::LineState::kFocusedButtonThumbsDown)));
++              OmniboxPopupSelection::LineState::kFocusedButtonThumbsDown),
++          highlight_corner_radius));
+   thumbs_down_button_->SetProperty(views::kMarginsKey,
+                                    gfx::Insets::TLBR(0, 0, 0, 8));
+-  views::InstallCircleHighlightPathGenerator(thumbs_down_button_);
+   thumbs_down_button_->SetTooltipText(
+       l10n_util::GetStringUTF16(IDS_OMNIBOX_THUMBS_DOWN_SUGGESTION));
+   auto* const thumbs_down_focus_ring =
+@@ -284,10 +297,10 @@ OmniboxResultView::OmniboxResultView(OmniboxPopupViewViews* popup_view,
+           base::BindRepeating(&OmniboxResultView::ButtonPressed,
+                               base::Unretained(this),
+                               OmniboxPopupSelection::LineState::
+-                                  kFocusedButtonRemoveSuggestion)));
++                                  kFocusedButtonRemoveSuggestion),
++          highlight_corner_radius));
+   remove_suggestion_button_->SetProperty(views::kMarginsKey,
+                                          gfx::Insets::TLBR(0, 0, 0, 16));
+-  views::InstallCircleHighlightPathGenerator(remove_suggestion_button_);
+   auto* const remove_focus_ring =
+       views::FocusRing::Get(remove_suggestion_button_);
+   remove_focus_ring->SetHasFocusPredicate(base::BindRepeating(
+@@ -459,7 +472,11 @@ void OmniboxResultView::ApplyThemeAndRefreshIcons(bool force_reapply_styles) {
    }
  
    const OmniboxPartState state = GetThemeState();
@@ -16337,7 +16560,7 @@ index 65eba79e0d..2392e29ce0 100644
  
    // Reapply the dim color to account for the highlight state.
    const bool selected = (state == OmniboxPartState::SELECTED);
-@@ -515,6 +520,11 @@ void OmniboxResultView::ApplyThemeAndRefreshIcons(bool force_reapply_styles) {
+@@ -515,6 +532,11 @@ void OmniboxResultView::ApplyThemeAndRefreshIcons(bool force_reapply_styles) {
                          OmniboxPopupSelection::LineState::kNormal);
    }
  
@@ -16372,7 +16595,7 @@ index e3590312f4..44686bed2d 100644
      int LRInsets = OmniboxMatchCellView::kIphOffset;
      return gfx::Insets::TLBR(8, LRInsets, 8, LRInsets);
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc b/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
-index 295a5d18fa..aa5c6c8a00 100644
+index 295a5d18fa..bc9a2e9ec0 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_suggestion_button_row_view.cc
 @@ -5,6 +5,7 @@
@@ -16383,7 +16606,15 @@ index 295a5d18fa..aa5c6c8a00 100644
  
  #include "base/functional/bind.h"
  #include "base/memory/raw_ptr.h"
-@@ -33,6 +34,7 @@
+@@ -19,6 +20,7 @@
+ #include "chrome/browser/ui/views/location_bar/selected_keyword_view.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_match_cell_view.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "components/omnibox/browser/actions/omnibox_action.h"
+ #include "components/omnibox/browser/autocomplete_match_type.h"
+ #include "components/omnibox/browser/omnibox_field_trial.h"
+@@ -33,6 +35,7 @@
  #include "ui/base/ui_base_features.h"
  #include "ui/base/window_open_disposition.h"
  #include "ui/base/window_open_disposition_utils.h"
@@ -16391,7 +16622,7 @@ index 295a5d18fa..aa5c6c8a00 100644
  #include "ui/gfx/geometry/size.h"
  #include "ui/gfx/geometry/skia_conversions.h"
  #include "ui/gfx/paint_vector_icon.h"
-@@ -42,6 +44,7 @@
+@@ -42,6 +45,7 @@
  #include "ui/views/controls/button/md_text_button.h"
  #include "ui/views/controls/focus_ring.h"
  #include "ui/views/controls/highlight_path_generator.h"
@@ -16399,7 +16630,7 @@ index 295a5d18fa..aa5c6c8a00 100644
  #include "ui/views/layout/flex_layout.h"
  #include "ui/views/layout/layout_manager.h"
  #include "ui/views/painter.h"
-@@ -98,7 +101,7 @@ class OmniboxSuggestionRowChip : public views::MdTextButton {
+@@ -98,7 +102,7 @@ class OmniboxSuggestionRowChip : public views::MdTextButton {
          views::Button::STATE_NORMAL,
          ui::ImageModel::FromVectorIcon(*icon_, kColorOmniboxResultsIcon, 10));
      SetEnabledTextColors(
@@ -16408,7 +16639,28 @@ index 295a5d18fa..aa5c6c8a00 100644
    }
  
    void UpdateBackgroundColor() override {
-@@ -343,7 +346,20 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
+@@ -294,12 +298,18 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
+         selection_(selection) {
+     SetTriggerableEventFlags(GetTriggerableEventFlags() |
+                              ui::EF_MIDDLE_MOUSE_BUTTON);
+-    views::InstallPillHighlightPathGenerator(this);
++    const bool compact_shell = popup_view_->IsCompactShellMode();
++    if (!compact_shell) {
++      views::InstallPillHighlightPathGenerator(this);
++    }
+ 
+     SetImageLabelSpacing(8);
+     SetCustomPadding(ChromeLayoutProvider::Get()->GetInsetsMetric(
+         INSETS_OMNIBOX_PILL_BUTTON));
+-    SetCornerRadius(GetLayoutConstant(LayoutConstant::kToolbarCornerRadius));
++    SetCornerRadius(
++        compact_shell
++            ? yee::kSidebarMetrics.shell_control_corner_radius
++            : GetLayoutConstant(LayoutConstant::kToolbarCornerRadius));
+ 
+     auto* const ink_drop = views::InkDrop::Get(this);
+     SetAnimationDuration(base::TimeDelta());
+@@ -343,7 +353,20 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
    OmniboxPopupSelection selection() const { return selection_; }
  
    void OnThemeChanged() override {
@@ -16429,7 +16681,7 @@ index 295a5d18fa..aa5c6c8a00 100644
      // We can't use colors from NativeTheme as the omnibox theme might be
      // different (for example, if the NTP colors are customized).
      const auto* const color_provider = GetColorProvider();
-@@ -407,6 +423,7 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
+@@ -407,6 +430,7 @@ class OmniboxSuggestionRowButton : public views::MdTextButton {
    raw_ptr<OmniboxPopupViewViews> popup_view_;
    OmniboxPartState theme_state_ = OmniboxPartState::NORMAL;
  
@@ -16837,17 +17089,30 @@ index 5e581378f2..2cb388e702 100644
    // Only used on platforms that support Aura (non-Mac).
    [[maybe_unused]] bool forward_mouse_events_;
 diff --git a/chrome/browser/ui/views/page_action/page_action_container_view.cc b/chrome/browser/ui/views/page_action/page_action_container_view.cc
-index b102a5c137..ffdd8c9a2c 100644
+index b102a5c137..0a85a5041e 100644
 --- a/chrome/browser/ui/views/page_action/page_action_container_view.cc
 +++ b/chrome/browser/ui/views/page_action/page_action_container_view.cc
-@@ -108,6 +108,19 @@ PageActionView* PageActionContainerView::GetPageActionView(
+@@ -19,6 +19,7 @@
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/color/color_id.h"
+ #include "ui/gfx/geometry/insets.h"
++#include "ui/views/controls/highlight_path_generator.h"
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+@@ -108,6 +109,24 @@ PageActionView* PageActionContainerView::GetPageActionView(
    return id_to_view != page_action_views_.end() ? id_to_view->second : nullptr;
  }
  
 +void PageActionContainerView::SetPageActionCornerRadii(
 +    const gfx::RoundedCornersF& radii) {
++  const bool elevated = features::IsPageActionsElevatedToolbarEnabled();
 +  for (auto& [action_id, page_action_view] : page_action_views_) {
 +    page_action_view->SetCornerRadii(radii);
++    if (elevated) {
++      views::InstallRoundRectHighlightPathGenerator(
++          page_action_view, gfx::Insets(), radii);
++    }
 +  }
 +}
 +
@@ -17378,18 +17643,41 @@ index bcb52bda7f..7f7ffbb41a 100644
  
    // The side panel header should draw on top of its parent's border.
 diff --git a/chrome/browser/ui/views/side_panel/side_panel_header_controller.cc b/chrome/browser/ui/views/side_panel/side_panel_header_controller.cc
-index d83ab21445..bedd4da11e 100644
+index d83ab21445..c05d9778ab 100644
 --- a/chrome/browser/ui/views/side_panel/side_panel_header_controller.cc
 +++ b/chrome/browser/ui/views/side_panel/side_panel_header_controller.cc
-@@ -29,6 +29,7 @@
+@@ -29,6 +29,8 @@
  #include "chrome/browser/ui/views/chrome_layout_provider.h"
  #include "chrome/browser/ui/views/side_panel/side_panel_helper.h"
  #include "chrome/browser/ui/views/side_panel/side_panel_toolbar_pinning_controller.h"
 +#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
  #include "chrome/grit/generated_resources.h"
  #include "components/feature_engagement/public/feature_constants.h"
  #include "components/strings/grit/components_strings.h"
-@@ -122,7 +123,10 @@ std::unique_ptr<views::Label> SidePanelHeaderController::CreatePanelTitle() {
+@@ -40,6 +42,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/color/color_id.h"
++#include "ui/gfx/geometry/insets.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/controls/button/image_button.h"
+ #include "ui/views/controls/button/image_button_factory.h"
+@@ -55,7 +58,12 @@
+ namespace {
+ void ConfigureControlButton(views::ImageButton* button) {
+   button->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+-  views::InstallCircleHighlightPathGenerator(button);
++  if (yee::IsShellEnabled()) {
++    views::InstallRoundRectHighlightPathGenerator(
++        button, gfx::Insets(), yee::kSidebarMetrics.shell_control_corner_radius);
++  } else {
++    views::InstallCircleHighlightPathGenerator(button);
++  }
+   const int minimum_button_size =
+       ChromeLayoutProvider::Get()->GetDistanceMetric(
+           ChromeDistanceMetric::DISTANCE_SIDE_PANEL_HEADER_BUTTON_MINIMUM_SIZE);
+@@ -122,7 +130,10 @@ std::unique_ptr<views::Label> SidePanelHeaderController::CreatePanelTitle() {
        views::style::STYLE_HEADLINE_5);
  
    title->SetEnabledColor(kColorSidePanelEntryTitle);
@@ -19995,7 +20283,7 @@ index c576d9b3ed..23d0f84b9a 100644
  
    std::vector<std::unique_ptr<views::ScrollView::ScopedScrollSynchronizer>>
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index 413c423e53..0feb259a8f 100644
+index 413c423e53..45a64d98d5 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -4,6 +4,7 @@
@@ -20027,7 +20315,26 @@ index 413c423e53..0feb259a8f 100644
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
  #include "ui/base/models/image_model.h"
-@@ -142,6 +150,10 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -75,10 +83,14 @@ views::ScrollView* GetScrollView(views::View* view) {
+ void ConfigureEditorBubbleButton(views::LabelButton* button) {
+   button->SetHasInkDropActionOnClick(true);
+ 
+-  // Inkdrop configuration
+-  auto highlight_path =
+-      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
+-
++  std::unique_ptr<views::HighlightPathGenerator> highlight_path;
++  if (yee::IsShellEnabled()) {
++    highlight_path = std::make_unique<views::RoundRectHighlightPathGenerator>(
++        gfx::Insets(), yee::kSidebarMetrics.tab_row_corner_radius);
++  } else {
++    highlight_path =
++        std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
++  }
+   highlight_path->set_use_contents_bounds(true);
+   views::HighlightPathGenerator::Install(button, std::move(highlight_path));
+ 
+@@ -142,6 +154,10 @@ TabGroupHeaderView::TabGroupHeaderView(
      const tab_groups::TabGroupVisualData* tab_group_visual_data)
      : HoverCardAnchorTarget(this),
        tab_group_visual_data_(*tab_group_visual_data),
@@ -20038,7 +20345,7 @@ index 413c423e53..0feb259a8f 100644
        sync_icon_(AddChildView(std::make_unique<views::ImageView>())),
        group_header_label_(
            AddChildView(std::make_unique<TabGroupHeaderLabel>())),
-@@ -170,6 +182,9 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -170,6 +186,9 @@ TabGroupHeaderView::TabGroupHeaderView(
    SetNotifyEnterExitOnChild(true);
  
    if (editor_bubble_button_) {
@@ -20048,7 +20355,7 @@ index 413c423e53..0feb259a8f 100644
      ConfigureEditorBubbleButton(editor_bubble_button_);
      SetEditorBubbleButtonVisibilityOnHover(/*is_hovered=*/false);
    }
-@@ -210,13 +225,31 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -210,13 +229,31 @@ TabGroupHeaderView::TabGroupHeaderView(
          views::kFlexBehaviorKey,
          views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
                                   views::MaximumFlexSizeRule::kPreferred));
@@ -20081,7 +20388,7 @@ index 413c423e53..0feb259a8f 100644
  
    // Add accessibility and focus ring for the header.
    SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
-@@ -261,6 +294,7 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
+@@ -261,6 +298,7 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
                         (margins ? margins->width() : 0);
    }
    non_label_width += GetHeaderInsets().width();
@@ -20089,7 +20396,7 @@ index 413c423e53..0feb259a8f 100644
  
    int label_width =
        group_header_label_ ? group_header_label_->GetPreferredSize().width() : 0;
-@@ -416,6 +450,7 @@ void TabGroupHeaderView::OnMouseMoved(const ui::MouseEvent& event) {
+@@ -416,6 +454,7 @@ void TabGroupHeaderView::OnMouseMoved(const ui::MouseEvent& event) {
  void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
    delegate_->UpdateHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    UpdateEditorBubbleButtonVisibility();
@@ -20097,7 +20404,7 @@ index 413c423e53..0feb259a8f 100644
  }
  
  void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
-@@ -426,14 +461,17 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
+@@ -426,14 +465,17 @@ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
  #else
    UpdateEditorBubbleButtonVisibility();
  #endif
@@ -20115,7 +20422,7 @@ index 413c423e53..0feb259a8f 100644
    UpdateEditorBubbleButtonVisibility();
    if (!delegate_->IsFocusInTabStrip()) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kFocus);
-@@ -442,11 +480,19 @@ void TabGroupHeaderView::OnBlur() {
+@@ -442,11 +484,19 @@ void TabGroupHeaderView::OnBlur() {
  
  void TabGroupHeaderView::AddedToWidget() {
    views::FlexLayoutView::AddedToWidget();
@@ -20135,7 +20442,7 @@ index 413c423e53..0feb259a8f 100644
    GetFocusManager()->RemoveFocusChangeListener(this);
    views::FlexLayoutView::RemovedFromWidget();
  }
-@@ -557,7 +603,33 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -557,7 +607,33 @@ void TabGroupHeaderView::OnDataChanged(
  
    SetInteriorMargin(GetHeaderInsets());
    UpdateColors();
@@ -20169,7 +20476,7 @@ index 413c423e53..0feb259a8f 100644
      UpdateAttentionState(
          data_sharing::features::IsDataSharingFunctionalityEnabled() &&
          tab_group_data.needs_attention);
-@@ -591,7 +663,9 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -591,7 +667,9 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    }
    needs_attention_ = needs_attention;
  
@@ -20180,7 +20487,7 @@ index 413c423e53..0feb259a8f 100644
      attention_indicator_->SetVisible(true);
      attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
          kDefaultTouchFaviconMaskCustomIcon, GetForegroundColor(),
-@@ -638,6 +712,18 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
+@@ -638,6 +716,18 @@ SkColor TabGroupHeaderView::GetForegroundColor() const {
          frame_active ? ui::kColorSysOnSurfacePrimary
                       : ui::kColorSysOnSurfacePrimaryInactive);
    }
@@ -20199,7 +20506,7 @@ index 413c423e53..0feb259a8f 100644
    return color_utils::GetColorWithMaxContrast(GetBackgroundColor());
  }
  
-@@ -694,6 +780,121 @@ void TabGroupHeaderView::UpdateColors() {
+@@ -694,6 +784,121 @@ void TabGroupHeaderView::UpdateColors() {
        views::CreateRoundedRectBackground(background_color, GetCornerRadii()));
  }
  
@@ -20321,7 +20628,7 @@ index 413c423e53..0feb259a8f 100644
  void TabGroupHeaderView::UpdateEditorBubbleButtonVisibility() {
    // The editor bubble button only exists in the vertical orientation.
    if (!editor_bubble_button_) {
-@@ -717,7 +918,7 @@ void TabGroupHeaderView::OnBubbleOpened() {
+@@ -717,7 +922,7 @@ void TabGroupHeaderView::OnBubbleOpened() {
    }
  
    UpdateEditorBubbleButtonVisibility();
@@ -20330,7 +20637,7 @@ index 413c423e53..0feb259a8f 100644
  }
  
  void TabGroupHeaderView::OnBubbleClosed() {
-@@ -726,7 +927,7 @@ void TabGroupHeaderView::OnBubbleClosed() {
+@@ -726,7 +931,7 @@ void TabGroupHeaderView::OnBubbleClosed() {
      closing_helper->ResumeMouseWatcher();
    }
    UpdateEditorBubbleButtonVisibility();
@@ -20339,7 +20646,7 @@ index 413c423e53..0feb259a8f 100644
  }
  
  void TabGroupHeaderView::SetEditorBubbleButtonVisibilityOnHover(
-@@ -764,6 +965,9 @@ void TabGroupHeaderView::ShowEditorBubble() {
+@@ -764,6 +969,9 @@ void TabGroupHeaderView::ShowEditorBubble() {
  }
  
  int TabGroupHeaderView::GetCornerRadius() const {
@@ -20349,7 +20656,7 @@ index 413c423e53..0feb259a8f 100644
    return TabGroupStyle::GetChipCornerRadius(orientation_);
  }
  
-@@ -786,6 +990,18 @@ int TabGroupHeaderView::GetHorizontalInset() const {
+@@ -786,6 +994,18 @@ int TabGroupHeaderView::GetHorizontalInset() const {
  }
  
  gfx::Insets TabGroupHeaderView::GetHeaderInsets() const {
@@ -22863,6 +23170,66 @@ index 39afe45097..da32bb8dcf 100644
      "//chrome/browser/ui/window_metadata",
      "//chrome/common",
      "//components/feature_engagement/public",
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_close_button.cc b/chrome/browser/ui/views/tabs/tab/tab_close_button.cc
+index 775a64fad9..0437985550 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_close_button.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_close_button.cc
+@@ -10,6 +10,8 @@
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/tabs/tab.h"
+ #include "chrome/browser/ui/views/tabs/tab_slot_controller.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+@@ -42,6 +44,21 @@ gfx::Size GetButtonSize() {
+   return gfx::Size(button_size, button_size);
+ }
+ 
++std::unique_ptr<views::HighlightPathGenerator> CreateCloseButtonHighlightPath(
++    bool use_mirrored_rect) {
++  std::unique_ptr<views::HighlightPathGenerator> path;
++  if (yee::IsShellEnabled()) {
++    // 아이콘 크기의 강조에도 평평한 변이 남도록 탭 행의 곡률을 쓴다.
++    path = std::make_unique<views::RoundRectHighlightPathGenerator>(
++        gfx::Insets(), yee::kSidebarMetrics.tab_row_corner_radius);
++  } else {
++    path = std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
++  }
++  path->set_use_contents_bounds(true);
++  path->set_use_mirrored_rect(use_mirrored_rect);
++  return path;
++}
++
+ }  // namespace
+ 
+ TabCloseButton::TabCloseButton(PressedCallback pressed_callback,
+@@ -76,20 +93,14 @@ TabCloseButton::TabCloseButton(PressedCallback pressed_callback,
+   // but needs to be explicitly mirrored for RTL.
+   // TODO(http://crbug.com/40120351): Make ink drops in RTL work the same way as
+   // focus rings.
+-  auto ink_drop_highlight_path =
+-      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
+-  ink_drop_highlight_path->set_use_contents_bounds(true);
+-  ink_drop_highlight_path->set_use_mirrored_rect(true);
+-  views::HighlightPathGenerator::Install(this,
+-                                         std::move(ink_drop_highlight_path));
++  views::HighlightPathGenerator::Install(
++      this, CreateCloseButtonHighlightPath(/*use_mirrored_rect=*/true));
+ 
+   SetInstallFocusRingOnFocus(true);
+   // TODO(http://crbug.com/40120351): Once this bug is solved and explicit
+   // mirroring for ink drops is not needed, we can combine these two.
+-  auto ring_highlight_path =
+-      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
+-  ring_highlight_path->set_use_contents_bounds(true);
+-  views::FocusRing::Get(this)->SetPathGenerator(std::move(ring_highlight_path));
++  views::FocusRing::Get(this)->SetPathGenerator(
++      CreateCloseButtonHighlightPath(/*use_mirrored_rect=*/false));
+ 
+   UpdateIcon();
+ }
 diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
 index d0e6a244aa..de748211e8 100644
 --- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
@@ -26421,6 +26788,31 @@ index 3990d7cc65..e27b1cd449 100644
  }
  
  :host([base-layout='image']) #secondaryText,
+diff --git a/ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css b/ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css
+index 9fb10a7aab..8b5b59a8cb 100644
+--- a/ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css
++++ b/ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css
+@@ -294,7 +294,8 @@ cr-button#entrypoint:focus {
+ }
+ 
+ cr-icon-button {
+-  border-radius: var(--cr-composebox-entrypoint-border-radius, 50%);
++  border-radius: var(--cr-icon-button-border-radius,
++      var(--cr-composebox-entrypoint-border-radius, 50%));
+ }
+ 
+ #entrypoint {
+@@ -350,6 +351,10 @@ cr-icon-button {
+     --contextual-entrypoint-oblong-margin-inline-start, 0);
+ }
+ 
++:host([is-oblong-shape]) cr-icon-button#entrypoint {
++  border-radius: var(--cr-icon-button-border-radius, 100px);
++}
++
+ /* Keeps the hover color on the entrypoint button while menu is open on omnibox. */
+ :host([apply-context-button-background].menu-open) #entrypoint {
+   background-color: var(
 diff --git a/ui/webui/resources/cr_components/searchbox/searchbox_match.css b/ui/webui/resources/cr_components/searchbox/searchbox_match.css
 index 2344ea9e80..e1c9f1d727 100644
 --- a/ui/webui/resources/cr_components/searchbox/searchbox_match.css
@@ -27277,3 +27669,16 @@ index 0000000000..cb2eb80025
 +}  // namespace browser_view_layout
 +
 +#endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_TABBED_LAYOUT_NATIVE_GEOMETRY_H_
+diff --git a/ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css b/ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css
+index 386e6039f1..43c89dbb4f 100644
+--- a/ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css
++++ b/ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css
+@@ -18,7 +18,7 @@
+   --cr-icon-button-width: var(--cr-icon-button-size);
+   /* Copied from paper-fab.html. Prevents square touch highlight. */
+   -webkit-tap-highlight-color: transparent;
+-  border-radius: 50%;
++  border-radius: var(--cr-icon-button-border-radius, 50%);
+   color: var(--cr-icon-button-stroke-color,
+       var(--cr-icon-button-fill-color));
+   cursor: pointer;

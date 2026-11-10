@@ -34,6 +34,7 @@
     "chrome/browser/profiles/profile_io_data.cc": ["shell"],
     "chrome/browser/resources/omnibox_popup/app.css": ["shell"],
     "chrome/browser/resources/omnibox_popup/omnibox_composebox.css": ["shell"],
+    "chrome/browser/resources/omnibox_popup/omnibox_popup_searchbox.css": ["shell"],
     "chrome/browser/resources/omnibox_popup/omnibox_popup_shared_style.css": ["shell"],
     "chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": ["shell"],
     "chrome/browser/resources/settings/appearance_page/appearance_page.ts": ["shell"],
@@ -83,6 +84,7 @@
     "chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc": ["shell"],
     "chrome/browser/ui/views/BUILD.gn": ["shell"],
     "chrome/browser/ui/views/find_bar_host.cc": ["shell"],
+    "chrome/browser/ui/views/find_bar_view.cc": ["shell"],
     "chrome/browser/ui/views/frame/BUILD.gn": ["shell"],
     "chrome/browser/ui/views/frame/base_tab_strip_region_view.cc": ["shell"],
     "chrome/browser/ui/views/frame/browser_caption_button_container_win.cc": ["shell"],
@@ -156,6 +158,7 @@
     "chrome/browser/ui/views/omnibox/omnibox_popup_presenter.h": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h": ["shell"],
+    "chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.cc": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.h": ["shell"],
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui.cc": ["shell"],
@@ -233,6 +236,7 @@
     "chrome/browser/ui/views/tabs/shared/tab_strip_flat_edge_button.h": ["shell"],
     "chrome/browser/ui/views/tabs/tab.cc": ["shell"],
     "chrome/browser/ui/views/tabs/tab/BUILD.gn": ["shell"],
+    "chrome/browser/ui/views/tabs/tab/tab_close_button.cc": ["shell"],
     "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc": ["shell"],
     "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h": ["shell"],
     "chrome/browser/ui/views/tabs/tab/tab_icon.cc": ["shell"],
@@ -315,6 +319,8 @@
     "ui/views/mouse_watcher.h": ["shell"],
     "ui/webui/resources/cr_components/composebox/composebox_favicon_group.css": ["shell"],
     "ui/webui/resources/cr_components/composebox/composebox_match.css": ["shell"],
-    "ui/webui/resources/cr_components/searchbox/searchbox_match.css": ["shell"]
+    "ui/webui/resources/cr_components/composebox/contextual_entrypoint_button.css": ["shell"],
+    "ui/webui/resources/cr_components/searchbox/searchbox_match.css": ["shell"],
+    "ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css": ["shell"]
   }
 }

@@ -8765,6 +8765,19 @@
       "Windows": "본문의 BringBrowserWindowToFront가 프로세스를 foreground로 변환한다. 창 준비 호출을 보존하므로 기존 runner에 남긴다."
     }
   },
+  "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeEmbeddedOmniboxPopupUiTest.IconUsesShellControlHighlight": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-header.sh",
+    "reason": "BrowserView의 실제 전체 주소 팝업에서 표시된 버튼의 곡률을 읽으며 OS 입력을 쓰지 않는다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/yee_omnibox_popup_view_webui_interactive_uitest.cc::YeeOmniboxPopupViewWebUITest.HiddenWidgetClearsClassicPopupState": {
     "os": [
       "Darwin",

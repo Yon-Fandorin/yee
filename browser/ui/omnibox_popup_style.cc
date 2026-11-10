@@ -35,6 +35,7 @@ void ApplyOmniboxPopupStyle(content::WebContents* contents) {
             '--cr-searchbox-match-margin-inline-start': '%dpx',
             '--cr-searchbox-match-margin-inline-end': '%dpx',
             '--cr-searchbox-match-corner-radius': '%dpx',
+            '--cr-icon-button-border-radius': '%dpx',
             '--cr-searchbox-match-focus-indicator-display': 'none',
             '--yee-omnibox-popup-ink': 'var(--color-omnibox-text)',
             '--yee-omnibox-popup-ink-muted': 'var(--color-omnibox-text-dimmed)',
@@ -51,7 +52,8 @@ void ApplyOmniboxPopupStyle(content::WebContents* contents) {
                              kSidebarMetrics.omnibox_popup_separator_height,
                              kSidebarMetrics.omnibox_popup_row_inset,
                              kSidebarMetrics.omnibox_popup_row_inset,
-                             kSidebarMetrics.omnibox_popup_row_corner_radius)),
+                             kSidebarMetrics.omnibox_popup_row_corner_radius,
+                             kSidebarMetrics.shell_control_corner_radius)),
       base::NullCallback());
 }
 

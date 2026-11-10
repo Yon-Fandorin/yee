@@ -42,6 +42,7 @@
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_full_presenter.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_delegate.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_view_browser_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_webui_content.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
@@ -50,9 +51,11 @@
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/native_browser_test_support.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_handler.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
 #include "chrome/browser/ui/webui/searchbox/webui_omnibox_handler.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -83,6 +86,7 @@
 #include "ui/views/controls/webview/webview.h"
 #include "ui/views/test/widget_activation_waiter.h"
 #include "ui/views/view_tracker.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 
@@ -244,6 +248,53 @@ class YeeOmniboxPopupViewWebUIFullV2Test : public YeeOmniboxPopupViewWebUITest {
  private:
   base::test::ScopedFeatureList feature_list_full_v2_;
 };
+
+class YeeEmbeddedOmniboxPopupUiTest : public YeeOmniboxPopupViewWebUITest {
+ public:
+  YeeEmbeddedOmniboxPopupUiTest() {
+    set_global_browser_set_up_function(nullptr);
+    features_.InitWithFeaturesAndParameters(
+        {{omnibox::internal::kWebUIOmniboxFullPopup,
+          {{"Omnibox_UseBrowserView", "true"},
+           {"Omnibox_DogfoodFeedback", "true"}}}},
+        {features::kWebUILocationBar});
+  }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(YeeEmbeddedOmniboxPopupUiTest,
+                       IconUsesShellControlHighlight) {
+  auto* const location = location_bar_view();
+  location->FocusLocation(/*is_user_initiated=*/false,
+                          /*clear_focus_if_failed=*/false);
+  auto* const popup =
+      location->GetOmniboxPopupView()->AsOmniboxPopupViewBrowserView();
+  ASSERT_TRUE(popup);
+  ASSERT_TRUE(popup->popup_frame());
+  auto* const web_view =
+      views::AsViewClass<views::WebView>(popup->popup_frame()->GetContents());
+  ASSERT_TRUE(web_view);
+  auto* const contents = web_view->GetWebContents();
+  ASSERT_TRUE(content::WaitForLoadStop(contents));
+
+  // 자격이나 추천 결과에 관계없이 이 경로의 실제 아이콘을 표시한다.
+  const int radius = yee::kSidebarMetrics.shell_control_corner_radius;
+  EXPECT_EQ(true,
+            content::EvalJs(
+                contents, content::JsReplace(R"(
+    (async () => {
+      const app = document.querySelector('omnibox-full-app');
+      await app.updateComplete;
+      const searchbox = app.shadowRoot.querySelector('omnibox-popup-searchbox');
+      await searchbox.updateComplete;
+      const icon = searchbox.shadowRoot.querySelector(
+          '.searchbox-icon-button-container.dogfood');
+      return getComputedStyle(icon).borderRadius === $1 + 'px';
+    })()
+  )", radius)));
+}
 
 class YeeOmniboxPopupAimShadowGeometryTest
     : public YeeOmniboxPopupViewWebUIFullV2Test,

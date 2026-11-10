@@ -26,9 +26,11 @@
 #include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/geometry/rrect_f.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_base.h"
@@ -304,9 +306,18 @@ TEST_F(SplitPaneControlsTest, ReducedMotionRevealAndDismissAreAtomic) {
   SetSplitPaneControlsAnchorHovered(*controls_, true);
   task_environment()->FastForwardBy(base::Milliseconds(70));
 
-  EXPECT_TRUE(controls_->GetVisible());
+  ASSERT_TRUE(controls_->GetVisible());
   EXPECT_TRUE(handle_anchored_);
   EXPECT_FLOAT_EQ(controls_->layer()->opacity(), 1.0f);
+  views::test::RunScheduledLayout(controls_);
+  for (views::View* control : controls_->children()) {
+    const auto highlight =
+        views::HighlightPathGenerator::GetRoundRectForView(control);
+    ASSERT_TRUE(highlight);
+    ASSERT_EQ(gfx::RRectF::Type::kSingle, highlight->GetType());
+    EXPECT_FLOAT_EQ(kSidebarMetrics.shell_control_corner_radius,
+                    highlight->GetSimpleRadius());
+  }
 
   DismissSplitPaneControls(*controls_);
   EXPECT_FALSE(controls_->GetVisible());
