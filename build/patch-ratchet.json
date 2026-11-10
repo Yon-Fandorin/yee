@@ -154,6 +154,18 @@
       "exceptions": [
         {
           "metric": "shell_branches",
+          "path": "chrome/browser/ui/views/chrome_layout_provider.cc",
+          "allowed": 1,
+          "reason": "Yee 모드의 공용 버튼 강조 곡률을 브라우저의 Views 수명에 연결한다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/chrome_layout_provider.cc",
+          "allowed": 2,
+          "reason": "브라우저 쪽에서 Yee 모드와 곡률을 전달해 공용 Views에 제품 의존성이 생기지 않도록 한다."
+        },
+        {
+          "metric": "shell_branches",
           "path": "chrome/browser/ui/views/page_info/page_info_view_factory.cc",
           "allowed": 1,
           "reason": "사이트 정보 상세의 뒤로 가기 버튼에 Yee 모드의 공통 강조를 적용한다."

@@ -5401,6 +5401,19 @@
       "multi_contents_geometry_unittests"
     ]
   },
+  "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.PopupInkDropPreservesSmallBoundsAndCaptionCircle": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "A",
+    "owner": "test-header.sh",
+    "reason": "작은 팝업 버튼의 평평한 변과 강조 경계, 원형 창 버튼 및 공용 곡률을 끈 경우의 원형을 검사한다.",
+    "binaries": [
+      "yee_header_unittests"
+    ]
+  },
   "browser/ui/native_presentation_unittest.cc::YeeNativePresentationTest.EmptyAddressHintTracksSurfaceAndNativeReset": {
     "os": [
       "Darwin",
@@ -6799,6 +6812,17 @@
       "Darwin": "ViewsTestHelperMac가 fixture마다 Regular를 설정하고 ScopedFakeNSWindowFocus를 설치한다. headless와 swizzle 수명·paint 동등성을 검증하기 전까지 기존 unit runner를 유지한다."
     }
   },
+  "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.AppMenuZoomDistinguishesMouseAndKeyboardHighlight": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "C",
+    "owner": "test-site-controls.sh",
+    "reason": "Windows 앱 메뉴의 축소·확대·전체 화면 버튼을 키보드와 실제 포인터로 강조하고 밝은·어두운 테마의 합성 픽셀을 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
   "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.BackForwardCacheRestoresDocument": {
     "os": [
       "Darwin",
@@ -6942,6 +6966,19 @@
       "site_controls_browsertests"
     ]
   },
+  "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.PasswordChangeToastCloseKeepsInversePalette": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "밝은·어두운 테마에서 비밀번호 변경 알림의 닫기 아이콘이 반전된 배경과 대비를 유지하는지 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
   "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.PermissionDetailsUseShellHoverCorners": {
     "os": [
       "Darwin",
@@ -6950,7 +6987,7 @@
     ],
     "tier": "B",
     "owner": "test-site-controls.sh",
-    "reason": "격리된 사이트의 권한 상세를 열고 밝은·어두운 테마에서 두 화살표의 강조 경로를 검사한다.",
+    "reason": "밝은·어두운 테마에서 실제 사이트 정보와 권한 상세를 열고 공용 닫기 버튼과 탐색 버튼의 강조 곡률 및 아이콘 대비를 검사한다.",
     "binaries": [
       "site_controls_browsertests"
     ]
@@ -6964,6 +7001,17 @@
     "tier": "B",
     "owner": "test-site-controls.sh",
     "reason": "L344: 브라우저·popup과 ButtonTestApi callback·reload/worker/cache 상태를 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.PopupIconsUseReadableWindowsHighContrastPair": {
+    "os": [
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "Windows 고대비에서 사이트 정보와 기기 선택 창의 아이콘과 강조 배경이 같은 시스템 팔레트를 쓰고 함께 바뀌는지 검사한다.",
     "binaries": [
       "site_controls_browsertests"
     ]
@@ -7107,6 +7155,19 @@
     "tier": "B",
     "owner": "test-site-controls.sh",
     "reason": "L325: 브라우저·popup과 ButtonTestApi callback·reload/worker/cache 상태를 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.ZoomPopupUsesShellHoverCornersWithThemeColor": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "사용자 지정 색이 있는 밝은·어두운 테마에서 실제 확대 팝업의 강조 곡률과 아이콘 대비를 검사한다.",
     "binaries": [
       "site_controls_browsertests"
     ]

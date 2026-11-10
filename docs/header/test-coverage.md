@@ -173,7 +173,21 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 Chromium Page Info bubble을 여는지 확인한다. `PageInfoOpensNativeSiteSettings`는
 그 native 팝업에서 현재 사이트의 설정 화면으로 이동하는 경로를 확인한다.
 `PermissionDetailsUseShellHoverCorners`는 밝은·어두운 테마에서 같은 팝업의
-권한 상세 화살표와 뒤로 가기 버튼을 강조하고 공통 곡률을 확인한다.
+첫 화면과 권한 상세의 닫기, 권한 상세 화살표와 뒤로 가기를 강조하고 합성 레이어의
+곡률과 기본·hover 아이콘 대비를 확인한다. `ZoomPopupUsesShellHoverCornersWithThemeColor`는
+사용자 지정 색을 적용한 밝은·어두운 테마에서 확대 팝업의 고정 크기 강조를 같은 방식으로
+확인한다. 다운로드, 번역, 안내 바, 쿠키·기기 권한, 자동완성, 비밀번호, 확장 권한 팝업의
+원형 버튼 강조가 사용하는 공용 Views 경로를 이 두 사례로 검사한다.
+`PasswordChangeToastCloseKeepsInversePalette`는 밝은·어두운 테마의 반전된 알림 바탕에서
+닫기 아이콘의 기본·hover 대비를 확인한다. `PopupIconsUseReadableWindowsHighContrastPair`는
+Windows 고대비에서 사이트 정보의 닫기와 기기 선택 창의 도움말을 검사한다. 각 아이콘과
+강조 배경은 시스템의 같은 색상 쌍을 쓰고 hover 즉시 함께 바뀌어야 한다.
+작은 버튼의 평평한 변, Linux의 원형 창 버튼, 기본 Chromium 강조는
+`PopupInkDropPreservesSmallBoundsAndCaptionCircle`로 검사한다.
+`AppMenuZoomDistinguishesMouseAndKeyboardHighlight`는 Windows의 밝은·어두운 테마에서
+기본 앱 메뉴의 축소·확대·전체 화면 버튼을 키보드 선택과 실제 포인터로 강조하고,
+각각 그려지는 모서리 픽셀을 합성 프레임에서 확인한다. 이미 키보드로 선택된 버튼에
+포인터가 진입할 때도 모양이 다시 그려져야 한다.
 `--yee-site-controls-capture-dir`를 지정하면 두 배치의 각 팝업 PNG를 저장한다.
 Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다.
 

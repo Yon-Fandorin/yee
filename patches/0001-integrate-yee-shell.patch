@@ -3009,10 +3009,19 @@ index 4e23238dea..bee3f7f2ee 100644
  
  bool ChromeLocationBarModelDelegate::GetURL(GURL* url) const {
 diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
-index fc293bdac2..86a88b0f42 100644
+index fc293bdac2..74566516e4 100644
 --- a/chrome/browser/ui/views/BUILD.gn
 +++ b/chrome/browser/ui/views/BUILD.gn
-@@ -1525,6 +1525,7 @@ source_set("find_bar_views") {
+@@ -216,6 +216,8 @@ source_set("layout_provider_impl") {
+     "//chrome/browser/ui:ui_features",
+     "//chrome/browser/ui/color:color_headers",
+     "//chrome/browser/ui/views/location_bar",
++    "//chrome/browser/ui/views/yee:shell_features",
++    "//chrome/browser/ui/views/yee:yee_ui_headers",
+     "//components/omnibox/browser",
+     "//components/omnibox/common",
+   ]
+@@ -1525,6 +1527,7 @@ source_set("find_bar_views") {
      "//chrome/browser/ui/color:color_headers",
      "//chrome/browser/ui/find_bar",
      "//chrome/browser/ui/views/frame:browser_view_header",
@@ -3020,7 +3029,7 @@ index fc293bdac2..86a88b0f42 100644
      "//chrome/browser/user_education",
      "//components/find_in_page",
      "//components/strings:components_strings",
-@@ -1610,6 +1611,8 @@ source_set("session_crashed_bubble_view") {
+@@ -1610,6 +1613,8 @@ source_set("session_crashed_bubble_view") {
      "//ui/base",
      "//ui/views",
    ]
@@ -3029,6 +3038,38 @@ index fc293bdac2..86a88b0f42 100644
  }
  
  source_set("intent_picker_bubble_view") {
+diff --git a/chrome/browser/ui/views/chrome_layout_provider.cc b/chrome/browser/ui/views/chrome_layout_provider.cc
+index 70b9df9161..e6c3738bfc 100644
+--- a/chrome/browser/ui/views/chrome_layout_provider.cc
++++ b/chrome/browser/ui/views/chrome_layout_provider.cc
+@@ -10,9 +10,12 @@
+ #include "base/feature_list.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/chrome_typography.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "components/omnibox/common/omnibox_features.h"
+ #include "ui/base/pointer/touch_ui_controller.h"
+ #include "ui/gfx/shadow_value.h"
++#include "ui/views/controls/highlight_path_style.h"
+ #include "ui/views/layout/layout_provider.h"
+ 
+ namespace {
+@@ -24,10 +27,14 @@ ChromeLayoutProvider* g_chrome_layout_provider = nullptr;
+ ChromeLayoutProvider::ChromeLayoutProvider() {
+   DCHECK_EQ(nullptr, g_chrome_layout_provider);
+   g_chrome_layout_provider = this;
++  views::SetCircularButtonHighlightCornerRadius(
++      yee::IsShellEnabled() ? yee::kSidebarMetrics.shell_control_corner_radius
++                            : 0);
+ }
+ 
+ ChromeLayoutProvider::~ChromeLayoutProvider() {
+   DCHECK_EQ(this, g_chrome_layout_provider);
++  views::SetCircularButtonHighlightCornerRadius(0);
+   g_chrome_layout_provider = nullptr;
+ }
+ 
 diff --git a/chrome/browser/ui/views/extensions/BUILD.gn b/chrome/browser/ui/views/extensions/BUILD.gn
 index b35075073d..1c39a7bea8 100644
 --- a/chrome/browser/ui/views/extensions/BUILD.gn
@@ -24598,6 +24639,67 @@ index aa58fdf578..05b0ea9aac 100644
      "//chrome/browser/ui/waap",
      "//chrome/browser/ui/waap:manager",
      "//chrome/browser/ui/waap:window_metrics_manager",
+diff --git a/chrome/browser/ui/views/toolbar/app_menu.cc b/chrome/browser/ui/views/toolbar/app_menu.cc
+index 0d5179c864..81d7f486c5 100644
+--- a/chrome/browser/ui/views/toolbar/app_menu.cc
++++ b/chrome/browser/ui/views/toolbar/app_menu.cc
+@@ -107,6 +107,7 @@
+ #include "ui/views/controls/button/image_button.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/menu_button.h"
++#include "ui/views/controls/highlight_path_style.h"
+ #include "ui/views/controls/label.h"
+ #include "ui/views/controls/menu/menu_config.h"
+ #include "ui/views/controls/menu/menu_item_view.h"
+@@ -304,6 +305,13 @@ class InMenuButtonBackground : public views::Background {
+       bounds_rect.ClampToCenteredSize(
+           gfx::Size(kCircularButtonSize, kCircularButtonSize));
+       menu_item.corner_radius = kCircularButtonSize / 2;
++      if (state != views::Button::STATE_NORMAL && view->IsMouseHovered()) {
++        const int radius = views::GetCircularButtonHighlightCornerRadius(
++            bounds_rect.size());
++        if (radius > 0) {
++          menu_item.corner_radius = radius;
++        }
++      }
+     }
+     const auto* const color_provider = view->GetColorProvider();
+     cc::PaintFlags flags;
+@@ -382,6 +390,16 @@ class InMenuImageButton : public ImageButton {
+  public:
+   using ImageButton::ImageButton;
+ 
++  void OnMouseEntered(const ui::MouseEvent& event) override {
++    ImageButton::OnMouseEntered(event);
++    SchedulePaint();
++  }
++
++  void OnMouseExited(const ui::MouseEvent& event) override {
++    ImageButton::OnMouseExited(event);
++    SchedulePaint();
++  }
++
+   void Init(InMenuButtonBackground::ButtonType type,
+             InMenuButtonBackground::ButtonShape shape,
+             const gfx::VectorIcon& vector_icon) {
+@@ -560,14 +578,14 @@ BEGIN_METADATA(AppMenuView)
+ END_METADATA
+ 
+ // Subclass of ImageButton whose preferred size includes the size of the border.
+-class FullscreenButton : public ImageButton {
+-  METADATA_HEADER(FullscreenButton, ImageButton)
++class FullscreenButton : public InMenuImageButton {
++  METADATA_HEADER(FullscreenButton, InMenuImageButton)
+ 
+  public:
+   explicit FullscreenButton(PressedCallback callback,
+                             ButtonMenuItemModel& menu_model,
+                             size_t button_index)
+-      : ImageButton(std::move(callback)),
++      : InMenuImageButton(std::move(callback)),
+         menu_model_(menu_model),
+         button_index_(button_index) {
+     // Since |fullscreen_button_| will reside in a menu, make it ALWAYS
 diff --git a/chrome/browser/ui/views/toolbar/back_forward_button.cc b/chrome/browser/ui/views/toolbar/back_forward_button.cc
 index 95bb878cdd..89a9357f30 100644
 --- a/chrome/browser/ui/views/toolbar/back_forward_button.cc
@@ -27394,6 +27496,294 @@ index 300c89806d..d252ba0568 100644
    size_t num_providers_initialized() const {
      return num_providers_initialized_;
    }
+diff --git a/ui/views/BUILD.gn b/ui/views/BUILD.gn
+index cb35a2682b..9e3723cec8 100644
+--- a/ui/views/BUILD.gn
++++ b/ui/views/BUILD.gn
+@@ -198,6 +198,7 @@ component("views") {
+     "controls/focus_ring.h",
+     "controls/focusable_border.h",
+     "controls/highlight_path_generator.h",
++    "controls/highlight_path_style.h",
+     "controls/image_view.h",
+     "controls/image_view_base.h",
+     "controls/label.h",
+diff --git a/ui/views/animation/ink_drop_host.cc b/ui/views/animation/ink_drop_host.cc
+index c797dc9195..e900821e94 100644
+--- a/ui/views/animation/ink_drop_host.cc
++++ b/ui/views/animation/ink_drop_host.cc
+@@ -15,6 +15,7 @@
+ #include "ui/events/scoped_target_handler.h"
+ #include "ui/gfx/color_palette.h"
+ #include "ui/gfx/geometry/size_conversions.h"
++#include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/views/animation/flood_fill_ink_drop_ripple.h"
+ #include "ui/views/animation/ink_drop.h"
+ #include "ui/views/animation/ink_drop_highlight.h"
+@@ -24,8 +25,10 @@
+ #include "ui/views/animation/pulsing_ink_drop_mask.h"
+ #include "ui/views/animation/pulsing_path_ink_drop_mask.h"
+ #include "ui/views/animation/square_ink_drop_ripple.h"
++#include "ui/views/controls/button/button.h"
+ #include "ui/views/controls/focus_ring.h"
+ #include "ui/views/controls/highlight_path_generator.h"
++#include "ui/views/controls/highlight_path_style.h"
+ #include "ui/views/style/platform_style.h"
+ #include "ui/views/view_class_properties.h"
+ 
+@@ -352,6 +355,29 @@ InkDropEventHandler* InkDropHost::GetEventHandler() {
+ bool InkDropHost::AddInkDropClip(ui::Layer* ink_drop_layer) {
+   std::optional<gfx::RRectF> clipping_data =
+       HighlightPathGenerator::GetRoundRectForView(host_view_);
++  if (!in_attention_state_ && !create_ink_drop_mask_callback_ &&
++      !host_view_->GetProperty(kPreserveCircularButtonHighlightKey) &&
++      Button::AsButton(host_view_) &&
++      GetCircularButtonHighlightCornerRadius(host_view_->size()) > 0) {
++    gfx::RectF oval_bounds;
++    if (clipping_data) {
++      if (static_cast<SkRRect>(*clipping_data).isOval()) {
++        oval_bounds = clipping_data->rect();
++      }
++    } else if (host_view_->GetProperty(kHighlightPathGeneratorKey)) {
++      SkRect oval;
++      if (GetHighlightPath(host_view_).isOval(&oval)) {
++        oval_bounds = gfx::SkRectToRectF(oval);
++      }
++    }
++    if (!oval_bounds.IsEmpty() && oval_bounds.width() == oval_bounds.height()) {
++      const int radius = GetCircularButtonHighlightCornerRadius(
++          gfx::ToFlooredSize(oval_bounds.size()));
++      if (radius > 0) {
++        clipping_data = gfx::RRectF(oval_bounds, radius);
++      }
++    }
++  }
+   if (!clipping_data) {
+     return false;
+   }
+diff --git a/ui/views/animation/ink_drop_impl.cc b/ui/views/animation/ink_drop_impl.cc
+index 0c6f9de645..e1d58f610f 100644
+--- a/ui/views/animation/ink_drop_impl.cc
++++ b/ui/views/animation/ink_drop_impl.cc
+@@ -823,6 +823,10 @@ void InkDropImpl::SetHighlight(bool should_highlight,
+     return;
+   }
+ 
++  // 고대비에서는 아이콘과 배경이 한 프레임에 함께 바뀌어야 한다.
++  if (views::UsingPlatformHighContrastInkDrop(ink_drop_host_->host_view())) {
++    animation_duration = base::TimeDelta();
++  }
+   if (should_highlight) {
+     CreateInkDropHighlight();
+     highlight_->FadeIn(animation_duration);
+diff --git a/ui/views/controls/button/image_button.cc b/ui/views/controls/button/image_button.cc
+index cb89825ac8..e5be60acc4 100644
+--- a/ui/views/controls/button/image_button.cc
++++ b/ui/views/controls/button/image_button.cc
+@@ -10,6 +10,7 @@
+ #include "base/functional/bind.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/trace_event/trace_event.h"
++#include "build/build_config.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/accessibility/ax_node_data.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+@@ -19,6 +20,7 @@
+ #include "ui/gfx/scoped_canvas.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/animation/ink_drop.h"
++#include "ui/views/animation/ink_drop_util.h"
+ #include "ui/views/background.h"
+ #include "ui/views/border.h"
+ #include "ui/views/controls/focus_ring.h"
+@@ -190,10 +192,10 @@ std::unique_ptr<ImageButton> ImageButton::CreateIconButton(
+       ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon, icon_size));
+   icon_button->SetImageModel(
+       ButtonState::STATE_HOVERED,
+-      ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon, icon_size));
++      ui::ImageModel::FromVectorIcon(icon, ui::kColorIconHovered, icon_size));
+   icon_button->SetImageModel(
+       ButtonState::STATE_PRESSED,
+-      ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon, icon_size));
++      ui::ImageModel::FromVectorIcon(icon, ui::kColorIconHovered, icon_size));
+   icon_button->SetImageModel(
+       ButtonState::STATE_DISABLED,
+       ui::ImageModel::FromVectorIcon(icon, ui::kColorIconDisabled, icon_size));
+@@ -220,8 +222,13 @@ std::unique_ptr<ImageButton> ImageButton::CreateIconButton(
+   InkDrop::Get(icon_button.get())
+       ->SetBaseColorCallback(base::BindRepeating(
+           [](ImageButton* host) {
+-            return host->GetColorProvider()->GetColor(
+-                ui::kColorSysOnSurfaceSubtle);
++            const auto* provider = host->GetColorProvider();
++#if BUILDFLAG(IS_WIN)
++            if (UsingPlatformHighContrastInkDrop(host)) {
++              return provider->GetColor(ui::kColorNativeHighlight);
++            }
++#endif
++            return provider->GetColor(ui::kColorSysOnSurfaceSubtle);
+           },
+           icon_button.get()));
+ 
+@@ -262,7 +269,8 @@ void ImageButton::PaintButtonContents(gfx::Canvas* canvas) {
+ 
+ gfx::ImageSkia ImageButton::GetImageToPaint() {
+   const auto* const color_provider = GetColorProvider();
+-  if (!images_[STATE_HOVERED].IsEmpty() && hover_animation().is_animating()) {
++  if (!images_[STATE_HOVERED].IsEmpty() && hover_animation().is_animating() &&
++      !UsingPlatformHighContrastInkDrop(this)) {
+     return gfx::ImageSkiaOperations::CreateBlendedImage(
+         images_[STATE_NORMAL].Rasterize(color_provider),
+         images_[STATE_HOVERED].Rasterize(color_provider),
+diff --git a/ui/views/controls/button/image_button_factory.cc b/ui/views/controls/button/image_button_factory.cc
+index 5d087dfe75..756359ae28 100644
+--- a/ui/views/controls/button/image_button_factory.cc
++++ b/ui/views/controls/button/image_button_factory.cc
+@@ -6,7 +6,9 @@
+ #include <memory>
+ #include <utility>
+ 
++#include "base/functional/bind.h"
+ #include "base/memory/raw_ref.h"
++#include "build/build_config.h"
+ #include "ui/base/models/image_model.h"
+ #include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
+@@ -17,6 +19,7 @@
+ #include "ui/gfx/vector_icon_types.h"
+ #include "ui/gfx/vector_icon_utils.h"
+ #include "ui/views/animation/ink_drop.h"
++#include "ui/views/animation/ink_drop_util.h"
+ #include "ui/views/border.h"
+ #include "ui/views/controls/button/image_button.h"
+ #include "ui/views/layout/layout_provider.h"
+@@ -47,9 +50,17 @@ class ColorTrackingVectorImageButton : public ImageButton {
+     const ui::ColorProvider* cp = GetColorProvider();
+     const SkColor color = cp->GetColor(icon_color_id_);
+     const SkColor disabled_color = cp->GetColor(icon_disabled_color_id_);
+-    SetImageFromVectorIconWithColor(
+-        this, *icon_, dip_size_,
+-        {color, disabled_color, icon_hovered_color_id_});
++    const bool high_contrast =
++        BUILDFLAG(IS_WIN) && UsingPlatformHighContrastInkDrop(this);
++    ui::ColorId hovered_color = icon_hovered_color_id_;
++    if (high_contrast && hovered_color == icon_color_id_) {
++      hovered_color = ui::kColorIconHovered;
++    } else if (!high_contrast && hovered_color == ui::kColorIconHovered) {
++      // 기본 강조는 배너처럼 반전된 표면에서도 평소 아이콘 색을 따른다.
++      hovered_color = icon_color_id_;
++    }
++    SetImageFromVectorIconWithColor(this, *icon_, dip_size_,
++                                    {color, disabled_color, hovered_color});
+   }
+ 
+  private:
+@@ -133,7 +144,23 @@ void SetImageFromVectorIconWithColor(ImageButton* button,
+   button->SetImageModel(Button::STATE_HOVERED, hovered_image);
+   button->SetImageModel(Button::STATE_PRESSED, hovered_image);
+ 
++#if BUILDFLAG(IS_WIN)
++  InkDrop::Get(button)->SetBaseColorCallback(base::BindRepeating(
++      [](const ImageButton* button, ui::ColorVariant normal_color,
++         ui::ColorId hovered_color) {
++        const auto* provider = button->GetColorProvider();
++        // 불투명한 시스템 강조에는 강조 글자색과 같은 팔레트의 배경을 쓴다.
++        if (UsingPlatformHighContrastInkDrop(button) &&
++            provider->GetColor(hovered_color) ==
++                provider->GetColor(ui::kColorNativeHighlightText)) {
++          return provider->GetColor(ui::kColorNativeHighlight);
++        }
++        return normal_color.ResolveToSkColor(provider);
++      },
++      base::Unretained(button), colors.color, colors.hovered_color));
++#else
+   InkDrop::Get(button)->SetBaseColor(colors.color);
++#endif
+ }
+ 
+ void SetImageFromVectorIconWithColor(ImageButton* button,
+diff --git a/ui/views/controls/highlight_path_generator.cc b/ui/views/controls/highlight_path_generator.cc
+index b805a1aa32..a55d424c94 100644
+--- a/ui/views/controls/highlight_path_generator.cc
++++ b/ui/views/controls/highlight_path_generator.cc
+@@ -7,15 +7,39 @@
+ #include <algorithm>
+ #include <utility>
+ 
++#include "base/check_op.h"
+ #include "third_party/skia/include/core/SkRect.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/gfx/geometry/rrect_f.h"
++#include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
++#include "ui/views/controls/highlight_path_style.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_class_properties.h"
+ 
+ namespace views {
+ 
++namespace {
++
++int g_circular_button_highlight_radius = 0;
++
++}  // namespace
++
++DEFINE_UI_CLASS_PROPERTY_KEY(bool, kPreserveCircularButtonHighlightKey, false)
++
++void SetCircularButtonHighlightCornerRadius(int radius) {
++  CHECK_GE(radius, 0);
++  g_circular_button_highlight_radius = radius;
++}
++
++int GetCircularButtonHighlightCornerRadius(const gfx::Size& size) {
++  // 작은 버튼에서도 강조 모양의 평평한 변을 2 DIP 남긴다.
++  constexpr int kMinStraightEdge = 2;
++  return std::clamp(
++      (std::min(size.width(), size.height()) - kMinStraightEdge) / 2, 0,
++      g_circular_button_highlight_radius);
++}
++
+ HighlightPathGenerator::HighlightPathGenerator()
+     : HighlightPathGenerator(gfx::Insets()) {}
+ 
+diff --git a/ui/views/controls/highlight_path_style.h b/ui/views/controls/highlight_path_style.h
+new file mode 100644
+index 0000000000..1079937bee
+--- /dev/null
++++ b/ui/views/controls/highlight_path_style.h
+@@ -0,0 +1,32 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef UI_VIEWS_CONTROLS_HIGHLIGHT_PATH_STYLE_H_
++#define UI_VIEWS_CONTROLS_HIGHLIGHT_PATH_STYLE_H_
++
++#include "ui/views/views_export.h"
++
++namespace gfx {
++class Size;
++}
++
++namespace ui {
++template <typename T>
++struct ClassProperty;
++}
++
++namespace views {
++
++// Views 레이아웃 제공자가 살아 있는 동안 앱의 원형 버튼 강조 곡률을 지정한다.
++// 0은 기존 원형을 사용한다.
++VIEWS_EXPORT void SetCircularButtonHighlightCornerRadius(int radius);
++VIEWS_EXPORT int GetCircularButtonHighlightCornerRadius(const gfx::Size& size);
++
++// 창 버튼처럼 원형이 디자인 계약인 조작부는 기존 강조 경로를 사용한다.
++VIEWS_EXPORT extern const ui::ClassProperty<bool>* const
++    kPreserveCircularButtonHighlightKey;
++
++}  // namespace views
++
++#endif  // UI_VIEWS_CONTROLS_HIGHLIGHT_PATH_STYLE_H_
 diff --git a/ui/views/controls/native/native_view_host.cc b/ui/views/controls/native/native_view_host.cc
 index 9a8c18843c..9604e80cf5 100644
 --- a/ui/views/controls/native/native_view_host.cc
@@ -27551,6 +27941,26 @@ index 3d98085d74..5fc176b9cf 100644
  };
  
  }  // namespace views
+diff --git a/ui/views/window/frame_caption_button.cc b/ui/views/window/frame_caption_button.cc
+index b5a42bcec5..536b924733 100644
+--- a/ui/views/window/frame_caption_button.cc
++++ b/ui/views/window/frame_caption_button.cc
+@@ -28,6 +28,7 @@
+ #include "ui/views/animation/ink_drop_ripple.h"
+ #include "ui/views/controls/button/button.h"
+ #include "ui/views/controls/highlight_path_generator.h"
++#include "ui/views/controls/highlight_path_style.h"
+ #include "ui/views/property_effects.h"
+ #include "ui/views/window/hit_test_utils.h"
+ 
+@@ -77,6 +78,7 @@ FrameCaptionButton::FrameCaptionButton(PressedCallback callback,
+       icon_(icon),
+       swap_images_animation_(std::make_unique<gfx::SlideAnimation>(this)) {
+   views::SetHitTestComponent(this, hit_test_type);
++  SetProperty(kPreserveCircularButtonHighlightKey, true);
+   // Not focusable by default, only for accessibility.
+   SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
+ 
 diff --git a/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css b/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css
 index e3d3b18312..8e907a6d3b 100644
 --- a/ui/webui/resources/cr_components/composebox/composebox_favicon_group.css

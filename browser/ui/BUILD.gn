@@ -654,8 +654,10 @@ test("site_controls_browsertests") {
     "//chrome/browser/ui/views/frame:browser_view_tabbed_layout_impl",
     "//chrome/browser/ui/views/frame:multi_contents_view",
     "//chrome/browser/ui/views/infobars",
+    "//chrome/browser/ui/views/location_bar",
     "//chrome/browser/ui/views/omnibox",
     "//chrome/browser/ui/views/page_info",
+    "//chrome/browser/ui/views/passwords/password_change:password_change_toast",
     "//chrome/browser/ui/views/side_panel",
     "//chrome/browser/ui/views/tabs:new_tab_button",
     "//chrome/browser/ui/views/tabs:tab_style_views",
@@ -734,8 +736,14 @@ test("site_controls_browsertests") {
     deps += [
       "//chrome/browser/accessibility:test_support",
       "//chrome/browser/lifetime",
+      "//chrome/browser/ui/dialogs:browser_dialogs",
+      "//chrome/browser/ui/views/toolbar",
+      "//chrome/browser/ui/views/toolbar:test_support",
       "//chrome/installer/util:strings",
+      "//components/permissions:test_support",
       "//ui/aura:test_support",
+      "//ui/gfx:test_support",
+      "//ui/native_theme:test_support",
     ]
   }
 }
@@ -799,6 +807,7 @@ if (!is_chromeos_device) {
       "//chrome/browser/ui/views/tabs/dragging/tab_drag_controller_interactive_uitest.cc",
       "applied_wait_interactive_uitest.cc",
       "browser_surface_interactive_uitest.cc",
+      "internal_page_test_support.h",
       "interactive_ui_tests_main.cc",
       "split_pane_interactive_uitest.cc",
       "vertical_tab_drag_interactive_uitest.cc",

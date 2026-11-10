@@ -10,6 +10,7 @@
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/test/scoped_rtl_for_testing.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/scoped_command_line.h"
@@ -33,6 +34,7 @@
 #include "components/open_from_clipboard/fake_clipboard_recent_content.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/hit_test.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_mixer.h"
@@ -48,9 +50,13 @@
 #include "ui/gfx/image/image_skia_rep.h"
 #include "ui/gfx/render_text.h"
 #include "ui/gfx/render_text_test_api.h"
+#include "ui/views/animation/ink_drop.h"
 #include "ui/views/background.h"
 #include "ui/views/cascading_property.h"
+#include "ui/views/controls/button/image_button_factory.h"
 #include "ui/views/controls/focus_ring.h"
+#include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/controls/highlight_path_style.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/link.h"
 #include "ui/views/focus/focus_manager.h"
@@ -59,6 +65,7 @@
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/window/frame_caption_button.h"
 
 namespace yee {
 namespace {
@@ -104,6 +111,40 @@ views::Link* FindLink(views::View& root) {
 class YeeNativePresentationTest : public ChromeViewsTestBase {};
 
 class YeeTabIconPresentationTest : public ChromeViewsTestBase {};
+
+TEST_F(YeeNativePresentationTest, PopupInkDropPreservesSmallBoundsAndCaptionCircle) {
+  auto widget = CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+  auto* const contents =
+      widget->SetContentsView(std::make_unique<views::View>());
+  auto* const caption =
+      contents->AddChildView(std::make_unique<views::FrameCaptionButton>(
+          views::Button::PressedCallback(), views::CAPTION_BUTTON_ICON_MINIMIZE,
+          HTMINBUTTON));
+  caption->SetSize(gfx::Size(40, 40));
+  caption->SetInkDropCornerRadius(14);
+  auto* const popup_button = contents->AddChildView(
+      views::CreateVectorImageButton(views::Button::PressedCallback()));
+  popup_button->SetSize(gfx::Size(16, 16));
+  views::InstallCircleHighlightPathGenerator(popup_button);
+
+  const auto expect_clip = [](views::Button& button, const gfx::Rect& bounds,
+                              int radius) {
+    auto layer = ui::Layer::Create(ui::LAYER_NOT_DRAWN);
+    auto* const host = views::InkDrop::Get(&button);
+    host->AddInkDropLayer(layer.get());
+    EXPECT_EQ(bounds, layer->clip_rect());
+    EXPECT_EQ(gfx::RoundedCornersF(radius), layer->rounded_corner_radii());
+    host->RemoveInkDropLayer(layer.get());
+  };
+  expect_clip(*popup_button, gfx::Rect(0, 0, 16, 16), 7);
+  expect_clip(*caption, gfx::Rect(6, 6, 28, 28), 14);
+
+  base::ScopedClosureRunner restore_radius(
+      base::BindOnce(&views::SetCircularButtonHighlightCornerRadius,
+                     kSidebarMetrics.shell_control_corner_radius));
+  views::SetCircularButtonHighlightCornerRadius(0);
+  expect_clip(*popup_button, gfx::Rect(0, 0, 16, 16), 8);
+}
 
 TEST_F(YeeNativePresentationTest,
        SurfaceDecorationSurvivesIndependentWidgetsAndColorUpdates) {

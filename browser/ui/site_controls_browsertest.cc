@@ -3,7 +3,11 @@
 
 #include "chrome/browser/ui/views/yee/site_controls.h"
 
+#include <algorithm>
+#include <array>
 #include <atomic>
+#include <cmath>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -12,6 +16,7 @@
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
@@ -31,9 +36,12 @@
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
+#include "chrome/browser/ui/views/location_bar/zoom_bubble_coordinator.h"
+#include "chrome/browser/ui/views/location_bar/zoom_bubble_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
 #include "chrome/browser/ui/views/page_info/permission_toggle_row_view.h"
+#include "chrome/browser/ui/views/passwords/password_change/password_change_toast.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
@@ -62,23 +70,33 @@
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
-#include "third_party/skia/include/core/SkRRect.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/compositor/compositor.h"
+#include "ui/compositor/layer.h"
 #include "ui/compositor/test/test_utils.h"
+#include "ui/events/event.h"
 #include "ui/events/test/test_event.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/skia_conversions.h"
+#include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/image/image_skia_rep.h"
 #include "ui/snapshot/snapshot.h"
 #include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_highlight.h"
 #include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/animation/ink_drop_impl.h"
+#include "ui/views/animation/test/ink_drop_impl_test_api.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/focus_ring.h"
-#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/tabbed_pane/tabbed_pane.h"
 #include "ui/views/focus/focus_manager.h"
@@ -89,9 +107,21 @@
 #include "ui/views/widget/widget.h"
 
 #if BUILDFLAG(IS_WIN)
+#include "chrome/browser/ui/dialogs/browser_dialogs.h"
+#include "chrome/browser/ui/views/toolbar/app_menu.h"
+#include "chrome/browser/ui/views/toolbar/test_support/app_menu_test_accessor.h"
+#include "components/permissions/fake_usb_chooser_controller.h"
 #include "ui/aura/test/ui_controls_aurawin.h"
+#include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
+#include "ui/native_theme/mock_os_settings_provider.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/snapshot/snapshot_aura.h"
+#include "ui/views/controls/menu/menu_controller.h"
+#include "ui/views/controls/menu/menu_item_view.h"
+#include "ui/views/test/views_drawing_test_utils.h"
+#include "ui/views/widget/any_widget_observer.h"
 #endif
 
 namespace yee {
@@ -571,6 +601,58 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   }
 }
 
+void ExpectPopupIconHover(
+    views::Button* button,
+    ui::ColorId surface_color = ui::kColorBubbleBackground) {
+  ASSERT_TRUE(button && button->IsDrawn() && button->GetEnabled());
+  auto* const image_button = views::AsViewClass<views::ImageButton>(button);
+  ASSERT_TRUE(image_button);
+  const gfx::Rect native_clip = gfx::ToEnclosingRect(
+      gfx::SkRectToRectF(views::GetHighlightPath(button).getBounds()));
+  ASSERT_FALSE(native_clip.IsEmpty());
+  auto* const host = views::InkDrop::Get(button);
+  auto* const ink_drop = host->GetInkDrop();
+  ink_drop->SetHovered(true);
+  ASSERT_TRUE(ink_drop->IsHighlightFadingInOrVisible());
+  views::test::InkDropImplTestApi ink_drop_api(
+      static_cast<views::InkDropImpl*>(ink_drop));
+  const auto* const layer = ink_drop_api.GetRootLayer();
+  ASSERT_TRUE(layer && ink_drop_api.highlight());
+  EXPECT_EQ(native_clip, layer->clip_rect());
+  EXPECT_EQ(gfx::RoundedCornersF(kSidebarMetrics.shell_control_corner_radius),
+            layer->rounded_corner_radii());
+
+  const SkColor surface =
+      button->GetColorProvider()->GetColor(surface_color);
+  const float opacity = ink_drop_api.highlight()->layer()->GetTargetOpacity();
+  ASSERT_GT(opacity, 0.0f);
+  const SkColor hover_surface =
+      color_utils::AlphaBlend(host->GetBaseColor(), surface, opacity);
+  for (const auto state :
+       {views::Button::STATE_NORMAL, views::Button::STATE_HOVERED}) {
+    SCOPED_TRACE(state);
+    const gfx::ImageSkia glyph = image_button->GetImage(state);
+    ASSERT_FALSE(glyph.isNull());
+    const SkBitmap& pixels = glyph.GetRepresentation(1.0f).GetBitmap();
+    float contrast = std::numeric_limits<float>::infinity();
+    for (int y = 0; y < pixels.height(); ++y) {
+      for (int x = 0; x < pixels.width(); ++x) {
+        const SkColor pixel = pixels.getColor(x, y);
+        if (SkColorGetA(pixel) == SK_AlphaOPAQUE) {
+          contrast = std::min(
+              contrast,
+              color_utils::GetContrastRatio(
+                  pixel, state == views::Button::STATE_HOVERED ? hover_surface
+                                                               : surface));
+        }
+      }
+    }
+    ASSERT_TRUE(std::isfinite(contrast));
+    EXPECT_GE(contrast, color_utils::kMinimumVisibleContrastRatio);
+  }
+  ink_drop->SetHovered(false);
+}
+
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                        PermissionDetailsUseShellHoverCorners) {
   const GURL url = FixtureURL("localhost");
@@ -583,23 +665,6 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   HostContentSettingsMapFactory::GetForProfile(browser()->GetProfile())
       ->SetPermissionSettingDefaultScope(url, url, permission, blocked);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
-
-  const auto expect_hover = [](views::Button* button) {
-    ASSERT_TRUE(button && button->IsDrawn() && button->GetEnabled());
-    auto* const ink_drop = views::InkDrop::Get(button)->GetInkDrop();
-    ink_drop->SetHovered(true);
-    EXPECT_TRUE(ink_drop->IsHighlightFadingInOrVisible());
-    auto* const generator =
-        button->GetProperty(views::kHighlightPathGeneratorKey);
-    ASSERT_TRUE(generator);
-    SkRRect highlight;
-    EXPECT_TRUE(generator->GetHighlightPath(button).isRRect(&highlight));
-    constexpr int radius = kSidebarMetrics.shell_control_corner_radius;
-    EXPECT_EQ(SkRRect::MakeRectXY(gfx::RectToSkRect(button->GetLocalBounds()),
-                                  radius, radius),
-              highlight);
-    ink_drop->SetHovered(false);
-  };
 
   auto* const theme =
       ThemeServiceFactory::GetForProfile(browser()->GetProfile());
@@ -619,16 +684,22 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                   ? ui::ColorProviderKey::ColorMode::kDark
                   : ui::ColorProviderKey::ColorMode::kLight,
               widget->GetColorProviderKeyForTesting().color_mode);
+    const auto close_button = [&] {
+      return views::Button::AsButton(page_info->GetViewByID(
+          PageInfoViewFactory::VIEW_ID_PAGE_INFO_CLOSE_BUTTON));
+    };
+    ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(close_button()));
     auto* const details = views::Button::AsButton(
         views::ElementTrackerViews::GetInstance()->GetUniqueView(
             PermissionToggleRowView::kSubpageButtonElementId,
             views::ElementTrackerViews::GetContextForView(page_info)));
-    ASSERT_NO_FATAL_FAILURE(expect_hover(details));
+    ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(details));
     views::test::ButtonTestApi(details).NotifyDefaultMouseClick();
     widget->LayoutRootViewIfNecessary();
     auto* const back = views::Button::AsButton(page_info->GetViewByID(
         PageInfoViewFactory::VIEW_ID_PAGE_INFO_BACK_BUTTON));
-    ASSERT_NO_FATAL_FAILURE(expect_hover(back));
+    ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(back));
+    ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(close_button()));
     views::test::ButtonTestApi(back).NotifyDefaultMouseClick();
     EXPECT_FALSE(page_info->GetViewByID(
         PageInfoViewFactory::VIEW_ID_PAGE_INFO_BACK_BUTTON));
@@ -636,6 +707,260 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
   }
   theme->SetBrowserColorScheme(original_scheme);
 }
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       ZoomPopupUsesShellHoverCornersWithThemeColor) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  const auto original_color = theme->GetUserColor();
+  theme->SetUserColor(SK_ColorRED);
+  auto* const browser_widget =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+  auto* const coordinator = ZoomBubbleCoordinator::From(browser());
+  ASSERT_TRUE(coordinator);
+  for (const auto scheme : {ThemeService::BrowserColorScheme::kLight,
+                            ThemeService::BrowserColorScheme::kDark}) {
+    SCOPED_TRACE(static_cast<int>(scheme));
+    theme->SetBrowserColorScheme(scheme);
+    coordinator->Show(Contents(), LocationBarBubbleDelegateView::USER_GESTURE);
+    auto* const bubble = coordinator->bubble();
+    ASSERT_TRUE(bubble && coordinator->IsShowing());
+    auto* const widget = bubble->GetWidget();
+    widget->LayoutRootViewIfNecessary();
+    EXPECT_EQ(widget->GetColorProvider(), browser_widget->GetColorProvider());
+    EXPECT_EQ(browser_widget->GetColorProviderKeyForTesting().user_color,
+              SK_ColorRED);
+    EXPECT_EQ(scheme == ThemeService::BrowserColorScheme::kDark
+                  ? ui::ColorProviderKey::ColorMode::kDark
+                  : ui::ColorProviderKey::ColorMode::kLight,
+              widget->GetColorProviderKeyForTesting().color_mode);
+    ASSERT_NO_FATAL_FAILURE(
+        ExpectPopupIconHover(bubble->GetZoomInButtonForTesting()));
+    widget->CloseNow();
+  }
+  theme->SetUserColor(original_color);
+  theme->SetBrowserColorScheme(original_scheme);
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       PasswordChangeToastCloseKeepsInversePalette) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  auto* const anchor =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetLocationBarView();
+  for (const auto scheme : {ThemeService::BrowserColorScheme::kLight,
+                            ThemeService::BrowserColorScheme::kDark}) {
+    SCOPED_TRACE(static_cast<int>(scheme));
+    theme->SetBrowserColorScheme(scheme);
+    views::BubbleDialogDelegate bubble(anchor, views::BubbleBorder::TOP_RIGHT);
+    bubble.SetButtons(0);
+    bubble.SetBackgroundColor(ui::kColorToastBackgroundProminent);
+    auto* const toast = bubble.SetContentsView(
+        std::make_unique<PasswordChangeToast>(PasswordChangeToast::ToastOptions(
+            u"Password changed", base::DoNothing())));
+    auto widget = views::BubbleDialogDelegate::CreateBubble(&bubble);
+    widget->Show();
+    widget->LayoutRootViewIfNecessary();
+    EXPECT_EQ(scheme == ThemeService::BrowserColorScheme::kDark
+                  ? ui::ColorProviderKey::ColorMode::kDark
+                  : ui::ColorProviderKey::ColorMode::kLight,
+              widget->GetColorProviderKeyForTesting().color_mode);
+    ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(
+        toast->close_button(), ui::kColorToastBackgroundProminent));
+  }
+  theme->SetBrowserColorScheme(original_scheme);
+}
+
+#if BUILDFLAG(IS_WIN)
+void ExpectMenuZoomHighlight(views::Button& button, bool mouse_hover) {
+  ASSERT_EQ(views::Button::STATE_HOVERED, button.GetState());
+  ASSERT_EQ(mouse_hover, button.IsMouseHovered());
+  auto* const widget = button.GetWidget();
+  ASSERT_TRUE(widget && widget->IsVisible());
+  const gfx::Rect crop = gfx::ToEnclosingRect(views::View::ConvertRectToTarget(
+      &button, widget->GetRootView(), gfx::RectF(button.GetLocalBounds())));
+  base::test::TestFuture<gfx::Image> snapshot;
+  // 다시 그리기를 요청하면 마우스 진입 시 필요한 무효화가 빠져도 통과한다.
+  ui::GrabWindowSnapshotAndScaleAura(widget->GetNativeWindow(), crop,
+                                     button.size(), snapshot.GetCallback());
+  ASSERT_TRUE(snapshot.Wait());
+  const SkBitmap bitmap = snapshot.Take().AsBitmap();
+  ASSERT_EQ(button.size(), gfx::Size(bitmap.width(), bitmap.height()));
+  const SkColor selected = button.GetColorProvider()->GetColor(
+      ui::kColorMenuButtonBackgroundSelected);
+  constexpr gfx::Size kHighlightSize(28, 28);
+  gfx::Rect bounds = button.GetLocalBounds();
+  bounds.ClampToCenteredSize(kHighlightSize);
+  ASSERT_EQ(kHighlightSize, bounds.size());
+  const int x = bounds.x();
+  const int y = bounds.y();
+  ASSERT_EQ(selected, bitmap.getColor(bounds.CenterPoint().x(), y + 1));
+  EXPECT_NE(selected, bitmap.getColor(x, y));
+  // 이 픽셀은 둥근 사각형 안쪽이며 기존 원 밖이다.
+  EXPECT_EQ(mouse_hover, bitmap.getColor(x + 3, y + 3) == selected);
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       AppMenuZoomDistinguishesMouseAndKeyboardHighlight) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  yee::test::InstallOwnedWindowsUIControls();
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  base::ScopedClosureRunner restore_scheme(base::BindOnce(
+      &ThemeService::SetBrowserColorScheme, base::Unretained(theme),
+      theme->GetBrowserColorScheme()));
+  auto* const browser_widget =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+
+  for (const auto scheme : {ThemeService::BrowserColorScheme::kLight,
+                            ThemeService::BrowserColorScheme::kDark}) {
+    SCOPED_TRACE(static_cast<int>(scheme));
+    theme->SetBrowserColorScheme(scheme);
+    ASSERT_TRUE(yee::test::BringBrowserWindowToFront(browser()));
+    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+        browser_widget->GetClientAreaBoundsInScreen().CenterPoint(),
+        browser_widget->GetNativeWindow()));
+
+    AppMenuTestAccessor menu(browser());
+    menu.ShowMenu();
+    base::ScopedClosureRunner close_menu(base::BindOnce(
+        &AppMenuTestAccessor::CloseMenu, base::Unretained(&menu)));
+    auto* const root = menu.GetRootMenuItemView();
+    ASSERT_TRUE(root);
+    auto* const controller = root->GetMenuController();
+    ASSERT_TRUE(controller);
+    auto* const zoom = AppMenu::GetZoomAppMenuViewForTest(root);
+    ASSERT_TRUE(zoom && zoom->GetWidget());
+    auto* const menu_widget = zoom->GetWidget();
+    EXPECT_EQ(scheme == ThemeService::BrowserColorScheme::kDark
+                  ? ui::ColorProviderKey::ColorMode::kDark
+                  : ui::ColorProviderKey::ColorMode::kLight,
+              menu_widget->GetColorProviderKeyForTesting().color_mode);
+    std::array<views::Button*, 3> buttons{};
+    for (views::View* child : zoom->children()) {
+      if (auto* const button = views::Button::AsButton(child)) {
+        const int tag = button->tag();
+        if (tag >= 0 && static_cast<size_t>(tag) < buttons.size()) {
+          buttons[tag] = button;
+        }
+      }
+    }
+    ASSERT_TRUE(std::ranges::all_of(buttons, [](const views::Button* button) {
+      return button && button->GetEnabled();
+    }));
+    auto* const zoom_item =
+        views::AsViewClass<views::MenuItemView>(zoom->parent());
+    auto* const zoom_label = FindView<views::Label>(zoom);
+    ASSERT_TRUE(zoom_item && zoom_label && zoom_label->IsDrawn());
+    ASSERT_TRUE(applied_.WaitForPresentedFrame(*menu_widget));
+    ASSERT_TRUE(ui_test_utils::SendMouseMoveSync(
+        zoom_label->GetBoundsInScreen().CenterPoint(),
+        menu_widget->GetNativeWindow()));
+    ASSERT_TRUE(zoom_item->IsSelected());
+    ASSERT_TRUE(std::ranges::none_of(buttons, [](const views::Button* button) {
+      return button->IsHotTracked();
+    }));
+
+    const auto present_after = [&](auto dispatch) {
+      return applied_.Run({applied_.Frame(*menu_widget, /*redraw=*/false)},
+                          std::move(dispatch), yee::test::AppliedDomain::kFrame);
+    };
+    for (auto* const button : buttons) {
+      SCOPED_TRACE(button->tag());
+      ASSERT_TRUE(present_after([&] {
+        ui::KeyEvent key(ui::EventType::kKeyPressed, ui::VKEY_DOWN, ui::EF_NONE);
+        controller->OnWillDispatchKeyEvent(&key);
+      }));
+      ASSERT_TRUE(button->IsHotTracked());
+      ASSERT_NO_FATAL_FAILURE(ExpectMenuZoomHighlight(*button, false));
+      bool moved = false;
+      const auto presented = present_after([&] {
+        moved = ui_test_utils::SendMouseMoveSync(
+            button->GetBoundsInScreen().CenterPoint(),
+            menu_widget->GetNativeWindow());
+      });
+      ASSERT_TRUE(moved);
+      ASSERT_TRUE(presented);
+      ASSERT_NO_FATAL_FAILURE(ExpectMenuZoomHighlight(*button, true));
+    }
+  }
+}
+
+void ExpectWindowsHighContrastIconHover(views::Button* button) {
+  ASSERT_TRUE(button && button->IsDrawn() && button->GetEnabled());
+  const auto* const provider = button->GetColorProvider();
+  auto* const host = views::InkDrop::Get(button);
+  EXPECT_EQ(provider->GetColor(ui::kColorNativeHighlight), host->GetBaseColor());
+  auto rich_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  auto* const ink_drop = host->GetInkDrop();
+  views::test::InkDropImplTestApi ink_drop_api(
+      static_cast<views::InkDropImpl*>(ink_drop));
+  button->SetState(views::Button::STATE_HOVERED);
+  ink_drop->SetHovered(true);
+  ASSERT_TRUE(ink_drop_api.highlight());
+  EXPECT_FLOAT_EQ(1.0f, ink_drop_api.highlight()->layer()->opacity());
+  const SkColor glyph_color =
+      provider->GetColor(ui::kColorNativeHighlightText);
+  const SkBitmap painted = views::test::PaintViewToBitmap(button);
+  bool paints_highlight_glyph = false;
+  for (int y = 0; y < painted.height(); ++y) {
+    for (int x = 0; x < painted.width(); ++x) {
+      paints_highlight_glyph |= painted.getColor(x, y) == glyph_color;
+    }
+  }
+  EXPECT_TRUE(paints_highlight_glyph);
+  button->SetState(views::Button::STATE_NORMAL);
+  ink_drop->SetHovered(false);
+  EXPECT_FALSE(ink_drop_api.highlight());
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       PopupIconsUseReadableWindowsHighContrastPair) {
+  // 테스트 제공자가 사라지면 운영체제의 실제 테마 설정을 다시 읽는다.
+  base::ScopedClosureRunner restore_native_theme(base::BindOnce([] {
+    auto* const native_theme = ui::NativeTheme::GetInstanceForNativeUi();
+    native_theme->BeginObservingOsSettingChanges();
+    native_theme->NotifyOnNativeThemeUpdated();
+  }));
+  ui::MockOsSettingsProvider settings;
+  settings.SetPreferredContrast(ui::NativeTheme::PreferredContrast::kMore);
+  settings.SetForcedColorsActive(true);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), FixtureURL()));
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  ASSERT_TRUE(view->GetLocationBarView()->ShowPageInfoDialog());
+  auto* const page_info = PageInfoBubbleView::GetPageInfoBubbleForTesting();
+  ASSERT_TRUE(page_info);
+  auto* const widget = page_info->GetWidget();
+  widget->LayoutRootViewIfNecessary();
+  EXPECT_EQ(view->GetWidget()->GetColorProviderKeyForTesting().contrast_mode,
+            ui::ColorProviderKey::ContrastMode::kHigh);
+  auto* const close = views::Button::AsButton(page_info->GetViewByID(
+      PageInfoViewFactory::VIEW_ID_PAGE_INFO_CLOSE_BUTTON));
+  ASSERT_NO_FATAL_FAILURE(ExpectWindowsHighContrastIconHover(close));
+  ASSERT_NO_FATAL_FAILURE(ExpectPopupIconHover(close));
+  widget->CloseNow();
+
+  views::NamedWidgetShownWaiter waiter(views::test::AnyWidgetTestPasskey{},
+                                      "ChooserBubbleUiViewDelegate");
+  base::ScopedClosureRunner close_chooser(chrome::ShowDeviceChooserDialog(
+      Contents()->GetPrimaryMainFrame(),
+      std::make_unique<FakeUsbChooserController>(1)));
+  auto* const chooser = waiter.WaitIfNeededAndGet();
+  ASSERT_TRUE(chooser);
+  chooser->LayoutRootViewIfNecessary();
+  auto* const dialog = chooser->widget_delegate()->AsDialogDelegate();
+  ASSERT_TRUE(dialog);
+  ASSERT_NO_FATAL_FAILURE(ExpectWindowsHighContrastIconHover(
+      FindView<views::ImageButton>(dialog->GetExtraView())));
+}
+#endif
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
                        PageInfoOpensNativeSiteSettings) {
