@@ -17544,10 +17544,19 @@ index 3b3d90a72e..5f08eeca4c 100644
    // Subscription to changes in label visibility, used for updating properties
    // dependent on label visibility and notifying others of chip state changes.
 diff --git a/chrome/browser/ui/views/page_info/BUILD.gn b/chrome/browser/ui/views/page_info/BUILD.gn
-index d6e74b52c8..e441de33d9 100644
+index d6e74b52c8..e81955b2f0 100644
 --- a/chrome/browser/ui/views/page_info/BUILD.gn
 +++ b/chrome/browser/ui/views/page_info/BUILD.gn
-@@ -110,6 +110,7 @@ source_set("impl") {
+@@ -101,6 +101,8 @@ source_set("impl") {
+     "//chrome/browser/ui/views/controls",
+     "//chrome/browser/ui/views/file_system_access",
+     "//chrome/browser/ui/views/frame:browser_view_header",
++    "//chrome/browser/ui/views/yee:shell_features",
++    "//chrome/browser/ui/views/yee:yee_ui_headers",
+     "//chrome/browser/vr",
+     "//components/content_settings/browser/ui",
+     "//components/dom_distiller/core",
+@@ -110,6 +112,7 @@ source_set("impl") {
      "//components/strings:components_branded_strings_grit",
      "//components/strings:components_strings_grit",
      "//components/strings:privacy_sandbox_strings_grit",
@@ -17576,6 +17585,78 @@ index 72e4e2e06d..fe15ec671e 100644
  
    if (ShouldRouteToInternalBubble(url, web_contents)) {
      return new InternalPageInfoBubbleView(anchor, anchor_rect, parent_view,
+diff --git a/chrome/browser/ui/views/page_info/page_info_view_factory.cc b/chrome/browser/ui/views/page_info/page_info_view_factory.cc
+index d5a3104599..4bc1ec9f45 100644
+--- a/chrome/browser/ui/views/page_info/page_info_view_factory.cc
++++ b/chrome/browser/ui/views/page_info/page_info_view_factory.cc
+@@ -21,6 +21,8 @@
+ #include "chrome/browser/ui/views/page_info/page_info_navigation_handler.h"
+ #include "chrome/browser/ui/views/page_info/page_info_permission_content_view.h"
+ #include "chrome/browser/ui/views/page_info/page_info_security_content_view.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "components/content_settings/core/browser/permission_settings_registry.h"
+ #include "components/content_settings/core/common/content_settings.h"
+ #include "components/content_settings/core/common/content_settings_types.h"
+@@ -220,6 +222,16 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateSubpageHeader(
+       layout_provider->GetInsetsMetric(views::INSETS_DIALOG).left();
+   const int bottom_margin =
+       layout_provider->GetDistanceMetric(DISTANCE_CONTENT_LIST_VERTICAL_MULTI);
++  const auto configure_back_button = [](views::ImageButton* button) {
++    if (yee::IsShellEnabled()) {
++      views::InstallRoundRectHighlightPathGenerator(
++          button, gfx::Insets(),
++          yee::kSidebarMetrics.shell_control_corner_radius);
++    } else {
++      views::InstallCircleHighlightPathGenerator(button);
++    }
++    button->SetProperty(views::kInternalPaddingKey, button->GetInsets());
++  };
+ 
+   return views::Builder<views::FlexLayoutView>()
+       .SetOrientation(views::LayoutOrientation::kVertical)
+@@ -244,12 +256,7 @@ std::unique_ptr<views::View> PageInfoViewFactory::CreateSubpageHeader(
+                                    kBackButtonElementId)
+                       .SetTooltipText(
+                           l10n_util::GetStringUTF16(IDS_ACCNAME_BACK))
+-                      .CustomConfigure(
+-                          base::BindOnce([](views::ImageButton* button) {
+-                            views::InstallCircleHighlightPathGenerator(button);
+-                            button->SetProperty(views::kInternalPaddingKey,
+-                                                button->GetInsets());
+-                          })),
++                      .CustomConfigure(base::BindOnce(configure_back_button)),
+                   std::move(label_wrapper)
+                       .SetOrientation(views::LayoutOrientation::kVertical)
+                       .SetProperty(views::kMarginsKey,
+diff --git a/chrome/browser/ui/views/page_info/permission_toggle_row_view.cc b/chrome/browser/ui/views/page_info/permission_toggle_row_view.cc
+index 5fa04fcde9..49032cd1f0 100644
+--- a/chrome/browser/ui/views/page_info/permission_toggle_row_view.cc
++++ b/chrome/browser/ui/views/page_info/permission_toggle_row_view.cc
+@@ -16,6 +16,8 @@
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
+ #include "chrome/browser/ui/views/page_info/page_info_navigation_handler.h"
+ #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "components/content_settings/core/common/content_settings.h"
+ #include "components/content_settings/core/common/content_settings_types.h"
+ #include "components/page_info/page_info.h"
+@@ -247,7 +249,13 @@ void PermissionToggleRowView::InitForUserSource(
+                                 kSubpageButtonElementId);
+     subpage_button->SetTooltipText(
+         PageInfoUI::PermissionSubpageButtonTooltipString(permission_.type));
+-    views::InstallCircleHighlightPathGenerator(subpage_button.get());
++    if (yee::IsShellEnabled()) {
++      views::InstallRoundRectHighlightPathGenerator(
++          subpage_button.get(), gfx::Insets(),
++          yee::kSidebarMetrics.shell_control_corner_radius);
++    } else {
++      views::InstallCircleHighlightPathGenerator(subpage_button.get());
++    }
+     subpage_button->SetMinimumImageSize({icon_size, icon_size});
+     subpage_button->SetFlipCanvasOnPaintForRTLUI(false);
+     if (permission_blocked_on_system_level_) {
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
 index 3a0abc0d12..bb12f7d0f7 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
@@ -22906,6 +22987,54 @@ index ae7f210dc7..d7f727c2ac 100644
        if (ShouldDragWindowUsingSystemDnD()) {
          return StartSystemDnDSessionIfNecessary(attached_context_,
                                                  point_in_screen);
+diff --git a/chrome/browser/ui/views/tabs/horizontal/BUILD.gn b/chrome/browser/ui/views/tabs/horizontal/BUILD.gn
+index f59965e9fb..0c092c2cfb 100644
+--- a/chrome/browser/ui/views/tabs/horizontal/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/horizontal/BUILD.gn
+@@ -63,6 +63,8 @@ source_set("impl") {
+     "//chrome/browser/ui/user_education",
+     "//chrome/browser/ui/views/tabs/common",
+     "//chrome/browser/ui/views/tabs/common:impl",
++    "//chrome/browser/ui/views/yee:shell_features",
++    "//chrome/browser/ui/views/yee:yee_ui_headers",
+     "//components/feature_engagement/public:feature_constants",
+     "//skia",
+     "//ui/actions",
+diff --git a/chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc b/chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc
+index 8dec0e0253..a6f527f66f 100644
+--- a/chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc
++++ b/chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc
+@@ -20,6 +20,8 @@
+ #include "chrome/browser/ui/tabs/horizontal_tab_strip_metrics.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+ #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
++#include "chrome/browser/ui/views/yee/shell_features.h"
++#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/feature_engagement/public/feature_constants.h"
+ #include "ui/actions/actions.h"
+@@ -27,6 +29,7 @@
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/color/color_id.h"
+ #include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/controls/highlight_path_generator.h"
+ #include "ui/views/controls/menu/menu_runner.h"
+ #include "ui/views/controls/scroll_view.h"
+ #include "ui/views/controls/scrollbar/scroll_bar.h"
+@@ -194,6 +197,13 @@ TabScrollButtonContainer::TabScrollButtonContainer(
+   end_scroll_button_->set_paint_transparent_for_glass(true);
+   start_scroll_button_->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
+   end_scroll_button_->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
++  if (yee::IsShellEnabled()) {
++    const int radius = yee::kSidebarMetrics.shell_control_corner_radius;
++    views::InstallRoundRectHighlightPathGenerator(start_scroll_button_,
++                                                  gfx::Insets(), radius);
++    views::InstallRoundRectHighlightPathGenerator(end_scroll_button_,
++                                                  gfx::Insets(), radius);
++  }
+   animation_.SetDuration(kScrollAnimationTime);
+ 
+   if (auto* user_education =
 diff --git a/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc b/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc
 index dc571ae36e..444dacf481 100644
 --- a/chrome/browser/ui/views/tabs/hovercard/tab_hover_card_bubble_view.cc

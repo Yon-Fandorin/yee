@@ -154,6 +154,42 @@
       "exceptions": [
         {
           "metric": "shell_branches",
+          "path": "chrome/browser/ui/views/page_info/page_info_view_factory.cc",
+          "allowed": 1,
+          "reason": "사이트 정보 상세의 뒤로 가기 버튼에 Yee 모드의 공통 강조를 적용한다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/page_info/page_info_view_factory.cc",
+          "allowed": 2,
+          "reason": "사이트 정보 상세의 뒤로 가기 버튼이 Yee 모드와 공통 곡률을 참조한다."
+        },
+        {
+          "metric": "shell_branches",
+          "path": "chrome/browser/ui/views/page_info/permission_toggle_row_view.cc",
+          "allowed": 1,
+          "reason": "사이트 권한 상세 화살표에 Yee 모드의 공통 강조를 적용한다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/page_info/permission_toggle_row_view.cc",
+          "allowed": 2,
+          "reason": "사이트 권한 상세 화살표가 Yee 모드와 공통 곡률을 참조한다."
+        },
+        {
+          "metric": "shell_branches",
+          "path": "chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc",
+          "allowed": 1,
+          "reason": "Yee 모드에서 가로 탭 스크롤 화살표의 강조 경로에 공통 곡률을 적용한다."
+        },
+        {
+          "metric": "yee_includes",
+          "path": "chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.cc",
+          "allowed": 2,
+          "reason": "가로 탭 스크롤 화살표가 Yee 모드와 공통 곡률을 참조한다."
+        },
+        {
+          "metric": "shell_branches",
           "path": "chrome/browser/ui/views/find_bar_view.cc",
           "allowed": 1,
           "reason": "Yee 페이지 내 찾기 버튼의 공통 곡률과 Chromium의 원형 강조를 구분한다."

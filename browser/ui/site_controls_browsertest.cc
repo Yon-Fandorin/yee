@@ -15,6 +15,7 @@
 #include "base/run_loop.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
+#include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
@@ -32,17 +33,22 @@
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
+#include "chrome/browser/ui/views/page_info/permission_toggle_row_view.h"
 #include "chrome/browser/ui/views/yee/applied_wait_browser_observers.h"
 #include "chrome/browser/ui/views/yee/applied_wait_test_util.h"
 #include "chrome/browser/ui/views/yee/browser_surface_color_controller.h"
 #include "chrome/browser/ui/views/yee/browser_surface_presentation.h"
 #include "chrome/browser/ui/views/yee/native_browser_test_support.h"
+#include "chrome/browser/ui/views/yee/sidebar_metrics.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_service_factory.h"
 #include "chrome/browser/yee_content_blocking/content_blocking_tab_helper.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/content_settings/core/browser/host_content_settings_map.h"
+#include "components/content_settings/core/common/content_settings.h"
+#include "components/content_settings/core/common/content_settings_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
@@ -56,21 +62,29 @@
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/test/test_utils.h"
 #include "ui/events/test/test_event.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/snapshot/snapshot.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/button/toggle_button.h"
 #include "ui/views/controls/focus_ring.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/tabbed_pane/tabbed_pane.h"
 #include "ui/views/focus/focus_manager.h"
+#include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/test/button_test_api.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -555,6 +569,72 @@ IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
             vertical ? "page-info-sidebar.png" : "page-info-horizontal.png");
     page_info->GetWidget()->CloseNow();
   }
+}
+
+IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,
+                       PermissionDetailsUseShellHoverCorners) {
+  const GURL url = FixtureURL("localhost");
+  const auto permission = content_settings::GeolocationContentSettingsType();
+  const PermissionSetting blocked =
+      permission == ContentSettingsType::GEOLOCATION_WITH_OPTIONS
+          ? PermissionSetting{GeolocationSetting{PermissionOption::kDenied,
+                                                 PermissionOption::kDenied}}
+          : PermissionSetting{CONTENT_SETTING_BLOCK};
+  HostContentSettingsMapFactory::GetForProfile(browser()->GetProfile())
+      ->SetPermissionSettingDefaultScope(url, url, permission, blocked);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
+
+  const auto expect_hover = [](views::Button* button) {
+    ASSERT_TRUE(button && button->IsDrawn() && button->GetEnabled());
+    auto* const ink_drop = views::InkDrop::Get(button)->GetInkDrop();
+    ink_drop->SetHovered(true);
+    EXPECT_TRUE(ink_drop->IsHighlightFadingInOrVisible());
+    auto* const generator =
+        button->GetProperty(views::kHighlightPathGeneratorKey);
+    ASSERT_TRUE(generator);
+    SkRRect highlight;
+    EXPECT_TRUE(generator->GetHighlightPath(button).isRRect(&highlight));
+    constexpr int radius = kSidebarMetrics.shell_control_corner_radius;
+    EXPECT_EQ(SkRRect::MakeRectXY(gfx::RectToSkRect(button->GetLocalBounds()),
+                                  radius, radius),
+              highlight);
+    ink_drop->SetHovered(false);
+  };
+
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  auto* const location_bar =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetLocationBarView();
+  for (const auto scheme : {ThemeService::BrowserColorScheme::kLight,
+                            ThemeService::BrowserColorScheme::kDark}) {
+    SCOPED_TRACE(static_cast<int>(scheme));
+    theme->SetBrowserColorScheme(scheme);
+    ASSERT_TRUE(location_bar->ShowPageInfoDialog());
+    auto* const page_info = PageInfoBubbleView::GetPageInfoBubbleForTesting();
+    ASSERT_TRUE(page_info);
+    auto* const widget = page_info->GetWidget();
+    widget->LayoutRootViewIfNecessary();
+    EXPECT_EQ(scheme == ThemeService::BrowserColorScheme::kDark
+                  ? ui::ColorProviderKey::ColorMode::kDark
+                  : ui::ColorProviderKey::ColorMode::kLight,
+              widget->GetColorProviderKeyForTesting().color_mode);
+    auto* const details = views::Button::AsButton(
+        views::ElementTrackerViews::GetInstance()->GetUniqueView(
+            PermissionToggleRowView::kSubpageButtonElementId,
+            views::ElementTrackerViews::GetContextForView(page_info)));
+    ASSERT_NO_FATAL_FAILURE(expect_hover(details));
+    views::test::ButtonTestApi(details).NotifyDefaultMouseClick();
+    widget->LayoutRootViewIfNecessary();
+    auto* const back = views::Button::AsButton(page_info->GetViewByID(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_BACK_BUTTON));
+    ASSERT_NO_FATAL_FAILURE(expect_hover(back));
+    views::test::ButtonTestApi(back).NotifyDefaultMouseClick();
+    EXPECT_FALSE(page_info->GetViewByID(
+        PageInfoViewFactory::VIEW_ID_PAGE_INFO_BACK_BUTTON));
+    widget->CloseNow();
+  }
+  theme->SetBrowserColorScheme(original_scheme);
 }
 
 IN_PROC_BROWSER_TEST_F(SiteControlsBrowserTest,

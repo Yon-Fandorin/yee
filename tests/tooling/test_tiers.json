@@ -4179,6 +4179,19 @@
       "yee_interactive_ui_tests"
     ]
   },
+  "browser/ui/browser_surface_interactive_uitest.cc::YeeBrowserViewTabbedLayoutImplUiTest.OverflowArrowsUseShellHoverCorners": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-browser-surface-layout.sh",
+    "reason": "통합 가로 탭이 넘칠 때 나타나는 두 스크롤 화살표의 밝은·어두운 테마 강조 경로를 검사한다.",
+    "binaries": [
+      "yee_interactive_ui_tests"
+    ]
+  },
   "browser/ui/browser_surface_interactive_uitest.cc::YeeBrowserViewTabbedLayoutImplUiTest.TestMinimumWindowSizeWhenSidePanelIsOpen": {
     "os": [
       "Darwin",
@@ -6914,6 +6927,19 @@
     "tier": "B",
     "owner": "test-site-controls.sh",
     "reason": "L509: 브라우저·popup과 ButtonTestApi callback·reload/worker/cache 상태를 검사한다.",
+    "binaries": [
+      "site_controls_browsertests"
+    ]
+  },
+  "browser/ui/site_controls_browsertest.cc::SiteControlsBrowserTest.PermissionDetailsUseShellHoverCorners": {
+    "os": [
+      "Darwin",
+      "Linux",
+      "Windows"
+    ],
+    "tier": "B",
+    "owner": "test-site-controls.sh",
+    "reason": "격리된 사이트의 권한 상세를 열고 밝은·어두운 테마에서 두 화살표의 강조 경로를 검사한다.",
     "binaries": [
       "site_controls_browsertests"
     ]

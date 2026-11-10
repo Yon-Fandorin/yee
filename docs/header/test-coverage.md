@@ -172,6 +172,8 @@ focus 화면만 별도로 캡처하며 일반 실행에는 추가 입력을 발�
 배치에서 방패 버튼이 탭 없는 Protection 팝업을 열고, 사이트 정보 action은 별도의
 Chromium Page Info bubble을 여는지 확인한다. `PageInfoOpensNativeSiteSettings`는
 그 native 팝업에서 현재 사이트의 설정 화면으로 이동하는 경로를 확인한다.
+`PermissionDetailsUseShellHoverCorners`는 밝은·어두운 테마에서 같은 팝업의
+권한 상세 화살표와 뒤로 가기 버튼을 강조하고 공통 곡률을 확인한다.
 `--yee-site-controls-capture-dir`를 지정하면 두 배치의 각 팝업 PNG를 저장한다.
 Windows 캡처 실행에는 `--enable-pixel-output-in-tests`도 전달한다.
 

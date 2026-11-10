@@ -100,6 +100,7 @@
 #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/horizontal/tab_scroll_button_container.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_close_button.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
@@ -155,6 +156,7 @@
 #include "net/base/filename_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/interaction/element_identifier.h"
@@ -188,6 +190,7 @@
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/rrect_f.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/image/image_skia_rep.h"
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/native_theme/mock_os_settings_provider.h"
@@ -2512,6 +2515,57 @@ IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
   ApplyScheduledLayout();
 }
 #endif
+
+IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
+                       OverflowArrowsUseShellHoverCorners) {
+  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
+  tabs::VerticalTabStripStateController::From(browser())
+      ->SetVerticalTabsEnabled(false);
+  browser()->GetProfile()->GetPrefs()->SetBoolean(
+      prefs::kTabScrollButtonsPinnedToTabstrip, true);
+  view->GetWidget()->SetSize(gfx::Size(800, 600));
+  constexpr int kOverflowTabCount = 64;
+  for (int i = 0; i < kOverflowTabCount; ++i) {
+    chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+  }
+  ApplyScheduledLayout();
+
+  auto* const theme =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  auto* const tracker = views::ElementTrackerViews::GetInstance();
+  const auto context = views::ElementTrackerViews::GetContextForView(view);
+  for (const auto scheme : {ThemeService::BrowserColorScheme::kLight,
+                            ThemeService::BrowserColorScheme::kDark}) {
+    SCOPED_TRACE(static_cast<int>(scheme));
+    theme->SetBrowserColorScheme(scheme);
+    ApplyScheduledLayout();
+    EXPECT_EQ(scheme == ThemeService::BrowserColorScheme::kDark
+                  ? ui::ColorProviderKey::ColorMode::kDark
+                  : ui::ColorProviderKey::ColorMode::kLight,
+              view->GetWidget()->GetColorProviderKeyForTesting().color_mode);
+    for (const auto id : {TabScrollButtonContainer::kStartScrollButton,
+                          TabScrollButtonContainer::kEndScrollButton}) {
+      auto* const arrow = tracker->GetUniqueView(id, context);
+      ASSERT_TRUE(arrow && arrow->IsDrawn());
+      auto* const ink_drop = views::InkDrop::Get(arrow)->GetInkDrop();
+      ink_drop->SetHovered(true);
+      EXPECT_TRUE(ink_drop->IsHighlightFadingInOrVisible());
+      auto* const generator =
+          arrow->GetProperty(views::kHighlightPathGeneratorKey);
+      ASSERT_TRUE(generator);
+      SkRRect highlight;
+      EXPECT_TRUE(generator->GetHighlightPath(arrow).isRRect(&highlight));
+      constexpr int radius = yee::kSidebarMetrics.shell_control_corner_radius;
+      EXPECT_EQ(
+          SkRRect::MakeRectXY(gfx::RectToSkRect(arrow->GetContentsBounds()),
+                              radius, radius),
+          highlight);
+      ink_drop->SetHovered(false);
+    }
+  }
+  theme->SetBrowserColorScheme(original_scheme);
+}
 
 IN_PROC_BROWSER_TEST_F(YeeBrowserViewTabbedLayoutImplUiTest,
                        YeeHorizontalTabsPreserveRowsColorsAndTabIdentity) {

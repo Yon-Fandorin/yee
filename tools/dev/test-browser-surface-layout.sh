@@ -143,7 +143,7 @@ if [[ "$MODE" == "horizontal" || "$MODE" == "interactive" || "$MODE" == "all" ]]
   print "Checking the same horizontal contract with Chromium's unified tab strip."
   run_tiered_native_test_gate --display "$YEE_OUT_DIR/yee_interactive_ui_tests" \
     --enable-features=TabStripUnification \
-    --gtest_filter="$HORIZONTAL_FILTER" \
+    --gtest_filter="$HORIZONTAL_FILTER:YeeBrowserViewTabbedLayoutImplUiTest.OverflowArrowsUseShellHoverCorners" \
     --test-launcher-jobs=1 \
     --test-launcher-retry-limit=0 \
     --ui-test-action-max-timeout=20000 \

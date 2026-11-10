@@ -120,7 +120,7 @@
     },
     "browser-surface-layout": {
       "script": "test-browser-surface-layout.sh",
-      "sha256": "e898870ba9acc9d7fbb37d92f56b8ab7da199bf4aaf8b6350f7a0753e125e683",
+      "sha256": "fbc58d2c60c1637f35ff5051e09bda016f31ebb4a2bd57387a617dbe3a1237a2",
       "default": "fast",
       "required": [
         "fast",
@@ -295,6 +295,7 @@
         "yee_interactive_ui_tests-3": {
           "binary": "yee_interactive_ui_tests",
           "include": [
+            "YeeBrowserViewTabbedLayoutImplUiTest.OverflowArrowsUseShellHoverCorners",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeeHorizontalTabsPreserveRowsColorsAndTabIdentity",
             "YeeBrowserViewTabbedLayoutImplTabAnimationUiTest.YeeHorizontalGroupTransitionsKeepHeaderClear",
             "YeeBrowserViewTabbedLayoutImplUiTest.YeeCustomizationPanelStaysBelowWindowHeader",
