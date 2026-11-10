@@ -240,6 +240,58 @@ IN_PROC_BROWSER_TEST_F(ExtensionsBrowserTest,
                                    "1).then(info => info.state)",
                                    first_id_)));
 
+  // 실제 목록의 꺼짐 스위치에서 트랙과 바탕, 손잡이와 트랙의 대비를 확인한다.
+  auto* theme = ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  const auto original_scheme = theme->GetBrowserColorScheme();
+  for (bool dark : {false, true}) {
+    SCOPED_TRACE(dark ? "어두운 테마" : "밝은 테마");
+    theme->SetBrowserColorScheme(dark ? ThemeService::BrowserColorScheme::kDark
+                                      : ThemeService::BrowserColorScheme::kLight);
+    const auto colors = content::EvalJs(Contents(), content::JsReplace(R"JS(
+      (async () => {
+        const scheme = matchMedia('(prefers-color-scheme: ' + $2 + ')');
+        if (!scheme.matches) {
+          await new Promise(resolve => scheme.addEventListener('change', resolve,
+              {once: true}));
+        }
+        const row = document.querySelector('[data-extension-id="' + $1 + '"]');
+        const track = row.querySelector('[data-extension-enable]');
+        const thumb = track.querySelector('[data-slot=switch-thumb]');
+        if (!track.matches('[aria-checked=false]:enabled') || !thumb) return null;
+        const trackStyle = getComputedStyle(track);
+        trackStyle.backgroundColor;
+        await Promise.allSettled(track.getAnimations().map(animation => animation.finished));
+
+        const context = document.createElement('canvas').getContext('2d',
+            {willReadFrequently: true});
+        const composite = color => {
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+          return (r << 16) | (g << 8) | b;
+        };
+        const layers = [];
+        for (let node = track.parentElement; node; node = node.parentElement) {
+          layers.unshift(getComputedStyle(node).backgroundColor);
+        }
+        const surface = layers.map(composite).at(-1);
+        return [surface, composite(trackStyle.backgroundColor),
+                composite(getComputedStyle(thumb).backgroundColor)];
+      })()
+    )JS", first_id_, dark ? "dark" : "light"));
+    ASSERT_TRUE(colors.is_list()) << colors;
+    const auto& pixels = colors.ExtractList();
+    ASSERT_EQ(pixels.size(), 3u);
+    const SkColor surface = SkColorSetA(pixels[0].GetInt(), SK_AlphaOPAQUE);
+    const SkColor track = SkColorSetA(pixels[1].GetInt(), SK_AlphaOPAQUE);
+    const SkColor thumb = SkColorSetA(pixels[2].GetInt(), SK_AlphaOPAQUE);
+    EXPECT_GE(color_utils::GetContrastRatio(track, surface),
+              color_utils::kMinimumVisibleContrastRatio) << "트랙과 주변 바탕";
+    EXPECT_GE(color_utils::GetContrastRatio(thumb, track),
+              color_utils::kMinimumVisibleContrastRatio) << "손잡이와 트랙";
+  }
+  theme->SetBrowserColorScheme(original_scheme);
+
   // 네이티브 변경은 실제 이벤트 라우터를 거쳐 페이지에 전달되어야 한다.
   ASSERT_TRUE(content::ExecJs(Contents(), R"JS(
     window.extensionChanges = [];

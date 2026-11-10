@@ -20,6 +20,7 @@
 	--destructive: #b54048;
 	--border: #e7e7e9;
 	--input: #dcdce1;
+	--switch-track-off: #85858d;
 	--ring-base: #7373db;
 	--ring: var(--ring-base);
 	--sidebar: #fafafa;
@@ -50,6 +51,7 @@
 		--destructive: #ee8e94;
 		--border: #2b2c31;
 		--input: #36373e;
+		--switch-track-off: #74757d;
 		--ring-base: #9c98ee;
 		--sidebar: #0b0b0c;
 		--sidebar-foreground: #e9e9ed;
@@ -91,6 +93,7 @@
 	--color-destructive: var(--destructive);
 	--color-border: var(--border);
 	--color-input: var(--input);
+	--color-switch-track-off: var(--switch-track-off);
 	--color-ring: var(--ring);
 	--color-sidebar: var(--sidebar);
 	--color-sidebar-foreground: var(--sidebar-foreground);
